@@ -1,0 +1,17 @@
+{
+  "name": "yacc-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Yet Another Chat Client - Omni-channel social inbox MVP",
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      // Or ["bun", "x", "my-mcp-command"]
+      "command": ["npx", "@playwright/mcp@latest"],
+      "enabled": true,
+      "environment": {
+        "MY_ENV_VAR": "my_env_var_value",
+      },
+      
+    },
+    "daisyUI": {
+     "type": "remote",
+     "url": "https://gitmcp.io/saadeghi/daisyui"
+   }
+  },
+  "agent": {
+    "fullstack-developer": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/prompts/fullstack-developer.md}",
+      "tools": {
+            "write": true,
+            "edit": true,
+            "bash": true,
+            "read": true,
+            "grep": true,
+            "task": true,
+            "webfetch": true,
+            "todowrite": true,
+            "todoread": true,
+            "skill": true
+      }
+    },
+    "product-owner": {
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/product-owner.md}",
+      "tools": {
+            "write": false,
+            "edit": false,
+            "bash": false,
+            "read": false,
+            "grep": false,
+            "task": true,
+            "webfetch": true,
+            "todowrite": true,
+            "todoread": true,
+            "skill": true
+      }
+    },
+    "architect": {      
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/architect.md}",
+      "tools": {
+            "write": false,
+            "edit": false,
+            "bash": false,
+            "read": true,
+            "grep": true,
+            "task": true,
+            "webfetch": true,
+            "todowrite": true,
+            "todoread": true,
+            "skill": true
+      }
+    },
+    "qa-tester": {      
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/qa-tester.md}",
+      "tools": {
+            "write": true,
+            "edit": true,
+            "bash": true,
+            "read": true,
+            "grep": true,
+            "task": true,
+            "webfetch": true,
+            "todowrite": true,
+            "todoread": true,
+            "skill": true
+      }
+    }
+  }
+}
