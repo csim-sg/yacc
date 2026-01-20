@@ -16,6 +16,7 @@
      "url": "https://gitmcp.io/saadeghi/daisyui"
    }
   },
+  
   "agent": {
     "fullstack-developer": {
       "mode": "primary",
@@ -37,24 +38,8 @@
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/product-owner.md}",
       "tools": {
-            "write": false,
-            "edit": false,
-            "bash": false,
-            "read": false,
-            "grep": false,
-            "task": true,
-            "webfetch": true,
-            "todowrite": true,
-            "todoread": true,
-            "skill": true
-      }
-    },
-    "architect": {      
-      "mode": "all",
-      "prompt": "{file:./.opencode/prompts/architect.md}",
-      "tools": {
-            "write": false,
-            "edit": false,
+            "write": true,
+            "edit": true,
             "bash": false,
             "read": true,
             "grep": true,
@@ -63,7 +48,71 @@
             "todowrite": true,
             "todoread": true,
             "skill": true
-      }
+      },
+      "permission": {
+    "edit": {
+      ".docs/*": "ask",
+      ".docs/*.md": "allow",
+      ".docs/.tocheck/*.md": "allow",
+    },
+    "write": {
+      ".docs/*": "ask",
+      ".docs/*.md": "allow",
+      ".docs/.tocheck/*.md": "allow",
+    },
+    "read": {
+      ".docs/*": "ask",
+      ".docs/*.md": "allow",
+      ".docs/.tocheck/*.md": "allow",
+    },
+    "grep": {
+      ".docs/*": "ask",
+      ".docs/*.md": "allow",
+      ".docs/.tocheck/*.md": "allow",
+    }
+  },
+    },
+    "architect": {      
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/architect.md}",
+      "tools": {
+            "write": true,
+            "edit": true,
+            "bash": false,
+            "read": true,
+            "grep": true,
+            "task": true,
+            "webfetch": true,
+            "todowrite": true,
+            "todoread": true,
+            "skill": true
+      },
+      "permission": {
+    "edit": {
+      "*": "deny",
+      ".docs/*": "ask",
+      ".docs/*.md": "allow",
+      ".docs/.tocheck/*.md": "allow",
+    },
+    "write": {
+      "*": "deny",
+      ".docs/*": "ask",
+      ".docs/*.md": "allow",
+      ".docs/.tocheck/*.md": "allow",
+    },
+    "read": {
+      "*": "deny",
+      ".docs/*": "ask",
+      ".docs/*.md": "allow",
+      ".docs/.tocheck/*.md": "allow",
+    },
+    "grep": {
+      "*": "deny",
+      ".docs/*": "ask",
+      ".docs/*.md": "allow",
+      ".docs/.tocheck/*.md": "allow",
+    }
+  },
     },
     "qa-tester": {      
       "mode": "all",

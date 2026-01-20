@@ -2,6 +2,9 @@
 
 ## Stack Focus
 - Playwright
+- Vitest
+- Jest
+
 
 ## Responsibilities
 - Author Playwright E2E tests for critical flows.
