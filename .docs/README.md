@@ -23,7 +23,7 @@
 
 ---
 
-#### **ARCHITECTURE_AND_IMPLEMENTATION.md**
+#### **03-implementation-guide.md**
 **System architecture, components, implementation phases, and technical decisions**
 
 **Contains**:
@@ -34,10 +34,10 @@
   - Message Retry Queue (Redis + BullMQ)
   - Full-Text Search (PostgreSQL FTS)
   - Notification Engine
-  - Attachment Handling (AWS S3)
+  - Attachment Handling (Cloudflare R2)
   - WebSocket Real-Time Updates
   - Routing Rules Engine
-- 15 architecture diagrams (ASCII)
+- Architecture diagrams (repository structure, deployment flows, auth flow, real-time data flow)
 - Implementation phases (4 phases, 6 weeks)
 - Configuration & environment variables
 - Key technical decisions with rationale
@@ -154,14 +154,14 @@
 ### For Backend Developers
 1. Read **../README.md** → Quick start
 2. Read **../AGENTS.md** → Backend dev role
-3. Read **../ARCHITECTURE_AND_IMPLEMENTATION.md** (30 minutes) — system design & Phase 1
+3. Read **.docs/03-implementation-guide.md** (30 minutes) — system design & Phase 1
 4. Read **.docs/02-api-and-data-model.md** (45 minutes) — API contract & database
 5. Reference **.docs/02-api-and-data-model.md** during implementation
 
 ### For Frontend Developers
 1. Read **../README.md** → Quick start
 2. Read **../AGENTS.md** → Frontend dev role
-3. Read **../ARCHITECTURE_AND_IMPLEMENTATION.md** → System design & UI flow
+3. Read **.docs/03-implementation-guide.md** → System design & UI flow
 4. Read **.docs/01-product-specification.md** sections 7 (UI requirements) & 8 (user stories)
 5. Read **.docs/02-api-and-data-model.md** sections 1–6 (API, data models, WebSocket)
 
@@ -179,7 +179,7 @@
 
 ### For Tech Leads & Architects
 1. Read **../AGENTS.md** → Your role
-2. Read **../ARCHITECTURE_AND_IMPLEMENTATION.md** (30 minutes) — complete architecture
+2. Read **.docs/03-implementation-guide.md** (30 minutes) — complete architecture
 3. Read **.docs/02-api-and-data-model.md** (45 minutes) — full API & data model
 4. Read **.docs/01-product-specification.md** (30 minutes) — complete scope
 
@@ -205,7 +205,7 @@
 |----------|-------|----------|
 | **README.md** (root) | Getting started, commands | All developers |
 | **AGENTS.md** (root) | Team roles, responsibilities | All team members |
-| **ARCHITECTURE_AND_IMPLEMENTATION.md** (root) | System architecture, components | Backend, architects |
+| **.docs/03-implementation-guide.md** | System architecture, components | Backend, architects |
 | **.docs/01-product-specification.md** | Product & features | PMs, designers, QA |
 | **.docs/02-api-and-data-model.md** | API & data model | Backend, API consumers |
 | **.docs/04-qa-and-testing.md** | Testing & QA | QA engineers, testers |
@@ -248,22 +248,22 @@
 ### First Week (Onboarding)
 1. Read **../README.md** (quick start)
 2. Read **../AGENTS.md** (your role)
-3. Read **../ARCHITECTURE_AND_IMPLEMENTATION.md** (system overview)
+3. Read **.docs/03-implementation-guide.md** (system overview)
 4. Read role-specific docs from "Quick Start" section above
 
 ### During Phase 1 Development (Week 1-2)
-- Reference **../ARCHITECTURE_AND_IMPLEMENTATION.md** section 5 (Phase 1 tasks)
+- Reference **.docs/03-implementation-guide.md** section 5 (Phase 1 tasks)
 - Reference **.docs/02-api-and-data-model.md** section 5 (auth endpoints)
 - Reference **.docs/02-api-and-data-model.md** section 6 (WebSocket events)
-- Reference **../ARCHITECTURE_AND_IMPLEMENTATION.md** section 3 (message retry queue)
+- Reference **.docs/03-implementation-guide.md** section 3 (message retry queue)
 - Reference **.docs/01-product-specification.md** section 8 (auth user stories)
 - Reference **.docs/04-qa-and-testing.md** (auth test cases)
 
 ### During Phase 2-4 Development
-- Reference **../ARCHITECTURE_AND_IMPLEMENTATION.md** (core components, data flows)
+- Reference **.docs/03-implementation-guide.md** (core components, data flows)
 - Reference **.docs/02-api-and-data-model.md** (endpoint specs)
 - Reference **.docs/01-product-specification.md** (user stories & AC)
-- Reference **05-quick-reference.md** for daily lookups
+- Reference **.docs/05-quick-reference.md** for daily lookups
 
 ### During Testing & QA
 - Use **.docs/04-qa-and-testing.md** to create test cases
@@ -304,7 +304,7 @@ INTEGRATIONS: Telegram, IRC (end-to-end)
 
 **Unsure about your role?** → Read **../AGENTS.md**
 
-**How does the system work?** → Read **../ARCHITECTURE_AND_IMPLEMENTATION.md**
+**How does the system work?** → Read **.docs/03-implementation-guide.md**
 
 **What features to build?** → Read **01-product-specification.md** section 8 (user stories)
 
@@ -321,7 +321,7 @@ INTEGRATIONS: Telegram, IRC (end-to-end)
 **All developers:**
 - [ ] Read **../README.md** (quick start)
 - [ ] Read **../AGENTS.md** (your role)
-- [ ] Read **../ARCHITECTURE_AND_IMPLEMENTATION.md** (system overview)
+- [ ] Read **.docs/03-implementation-guide.md** (system overview)
 
 **Backend developers:**
 - [ ] Read **02-api-and-data-model.md** (API + database)
@@ -338,7 +338,7 @@ INTEGRATIONS: Telegram, IRC (end-to-end)
 - [ ] Set up test environment (local + Docker)
 
 **Tech lead:**
-- [ ] Read **../ARCHITECTURE_AND_IMPLEMENTATION.md** (complete architecture)
+- [ ] Read **.docs/03-implementation-guide.md** (complete architecture)
 - [ ] Review **02-api-and-data-model.md** (API + database design)
 - [ ] Plan Phase 1 sprint with team
 

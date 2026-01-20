@@ -9,9 +9,10 @@
 1. [System Architecture](#1-system-architecture)
 2. [Technology Stack](#2-technology-stack)
 3. [Core Components Guide](#3-core-components-guide)
-4. [Implementation Phases](#4-implementation-phases)
-5. [Configuration & Environment](#5-configuration--environment)
-6. [Key Technical Decisions](#6-key-technical-decisions)
+4. [Architecture Diagrams](#4-architecture-diagrams)
+5. [Implementation Phases](#5-implementation-phases)
+6. [Configuration & Environment](#6-configuration--environment)
+7. [Key Technical Decisions](#7-key-technical-decisions)
 
 ---
 
@@ -464,7 +465,136 @@ export async function evaluateRules(
 
 ---
 
-## 4. Implementation Phases
+## 4. Architecture Diagrams
+
+### Repository Structure Tree
+
+```
+yacc-client/
+├── packages/
+│   ├── common/
+│   │   ├── src/
+│   │   │   ├── types/
+│   │   │   ├── schemas/
+│   │   │   ├── constants/
+│   │   │   └── utils/
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── backend/
+│   │   ├── src/
+│   │   │   ├── index.ts
+│   │   │   ├── api/
+│   │   │   ├── domain/
+│   │   │   ├── services/
+│   │   │   ├── connectors/
+│   │   │   ├── infrastructure/
+│   │   │   └── config/
+│   │   ├── tests/
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── Dockerfile
+│   │
+│   └── frontend/
+│       ├── src/
+│       │   ├── components/
+│       │   ├── pages/
+│       │   ├── stores/
+│       │   ├── services/
+│       │   ├── types/
+│       │   └── hooks/
+│       ├── tests/
+│       ├── public/
+│       ├── package.json
+│       ├── tsconfig.json
+│       ├── vite.config.ts
+│       └── playwright.config.ts
+│
+├── .github/workflows/
+│   ├── lint.yml
+│   ├── tests.yml
+│   ├── backend-deploy.yml
+│   └── frontend-deploy.yml
+│
+├── .docs/
+├── docker-compose.yml
+├── turbo.json
+├── pnpm-workspace.yaml
+└── package.json
+```
+
+### Backend Deployment Flow
+
+```
+Push to main
+  ↓
+GitHub Actions: backend-deploy.yml
+  ├── Build Docker image (multi-stage)
+  ├── Push to Docker registry
+  ├── SSH to VPS
+  ├── Pull image + restart container
+  ↓
+API live at https://api.example.com
+```
+
+### Frontend Deployment Flow
+
+```
+Push to main
+  ↓
+GitHub Actions: frontend-deploy.yml
+  ├── Build React app (pnpm build)
+  ├── Upload dist/ to AWS S3
+  ├── Invalidate CloudFront cache
+  ↓
+SPA live at https://app.example.com
+```
+
+### Authentication Flow
+
+```
+User Visits App
+  ├── Token exists? → Try to revalidate
+  ├── Token invalid/expired? → Redirect to login
+  └── Token valid? → Load app
+
+Login Form
+  → POST /api/auth/login
+  → Backend validates (BetterAuth)
+  → Return JWT token
+  → Frontend stores in localStorage + Zustand
+
+Every API Request
+  → Attach JWT: Authorization: Bearer <JWT>
+  → Backend middleware: Verify & extract userId, role
+  → Proceed to route handler
+```
+
+### Real-Time Data Flow (WebSocket)
+
+```
+Client (Frontend)
+  → Socket.io connection
+  → Automatic reconnection (exponential backoff)
+  → Attach to user (via JWT)
+
+Backend (Express + Socket.io)
+  → WebSocket Gateway
+  → Authentication middleware
+  → Event handlers (8 event types)
+  → Store in database (reconnect backlog)
+  → Broadcast to relevant users
+  → Clean up old events (1-hour backlog)
+
+Client Receives Event
+  → Update Zustand store
+  → Invalidate TanStack Query cache
+  → UI re-renders automatically
+```
+
+---
+
+## 5. Implementation Phases
 
 ### Phase 1: Core (Week 1–2)
 **Goal**: Auth + data model + basic inbox + real-time foundation
@@ -531,7 +661,7 @@ export async function evaluateRules(
 
 ---
 
-## 5. Configuration & Environment
+## 6. Configuration & Environment
 
 ### Backend (.env)
 
@@ -595,7 +725,7 @@ REACT_APP_WS_URL=https://api.example.com
 
 ---
 
-## 6. Key Technical Decisions
+## 7. Key Technical Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
@@ -615,6 +745,6 @@ REACT_APP_WS_URL=https://api.example.com
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: January 17, 2026  
+**Version**: 2.0  
+**Last Updated**: January 20, 2026  
 **Status**: Complete & Ready for Implementation

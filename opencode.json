@@ -16,9 +16,6 @@
      "url": "https://gitmcp.io/saadeghi/daisyui"
    }
   },
-<<<<<<< HEAD
-  
-=======
   "provider": {
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
@@ -36,9 +33,9 @@
       }
     }
   },
->>>>>>> 5a8b42b093932a4e6569f03e08fba6da79dfe327
   "agent": {
     "fullstack-developer": {
+      "description": "Fullstack developer, develop both frontend and backend codes, POC for any development related, specialized in Java, DotNet, NodeJS Typescript, React, Tenstack. ",
       "mode": "primary",
       "prompt": "{file:./.opencode/prompts/fullstack-developer.md}",
       "tools": {
@@ -55,156 +52,88 @@
       }
     },
     "product-owner": {
+      "description": "Product owner of this project, maintain biz requirement and biz documents. Analyze requirement with users & architect on any new request. Help answer any biz related issues from developers and architect.",
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/product-owner.md}",
       "tools": {
-            "write": true,
-            "edit": true,
-            "bash": false,
-            "read": true,
-            "grep": true,
-            "task": true,
-            "webfetch": true,
-            "todowrite": true,
-            "todoread": true,
-            "skill": true
+        "write": true,
+        "edit": true,
+        "bash": false,
+        "read": true,
+        "grep": true,
+        "task": true,
+        "webfetch": true,
+        "todowrite": true,
+        "todoread": true,
+        "skill": true
       },
       "permission": {
-<<<<<<< HEAD
-    "edit": {
-      ".docs/*": "ask",
-      ".docs/*.md": "allow",
-      ".docs/.tocheck/*.md": "allow",
-    },
-    "write": {
-      ".docs/*": "ask",
-      ".docs/*.md": "allow",
-      ".docs/.tocheck/*.md": "allow",
-    },
-    "read": {
-      ".docs/*": "ask",
-      ".docs/*.md": "allow",
-      ".docs/.tocheck/*.md": "allow",
-    },
-    "grep": {
-      ".docs/*": "ask",
-      ".docs/*.md": "allow",
-      ".docs/.tocheck/*.md": "allow",
-    }
-  },
-    },
-    "architect": {      
-      "mode": "all",
-      "prompt": "{file:./.opencode/prompts/architect.md}",
-      "tools": {
-            "write": true,
-            "edit": true,
-            "bash": false,
-            "read": true,
-            "grep": true,
-            "task": true,
-            "webfetch": true,
-            "todowrite": true,
-            "todoread": true,
-            "skill": true
-      },
-      "permission": {
-    "edit": {
-      "*": "deny",
-      ".docs/*": "ask",
-      ".docs/*.md": "allow",
-      ".docs/.tocheck/*.md": "allow",
-    },
-    "write": {
-      "*": "deny",
-      ".docs/*": "ask",
-      ".docs/*.md": "allow",
-      ".docs/.tocheck/*.md": "allow",
-    },
-    "read": {
-      "*": "deny",
-      ".docs/*": "ask",
-      ".docs/*.md": "allow",
-      ".docs/.tocheck/*.md": "allow",
-    },
-    "grep": {
-      "*": "deny",
-      ".docs/*": "ask",
-      ".docs/*.md": "allow",
-      ".docs/.tocheck/*.md": "allow",
-    }
-  },
-=======
         "edit": {
-          
           ".docs/*.md": "allow",
-          "*": "deny",
         },
         "grep": {
-          
           ".docs/*.md": "allow",
-          "*": "deny",
         },
         "write": {
-          
           ".docs/*.md": "allow",
-"*": "deny",
         },
         "read": {
-          
           ".docs/*.md": "allow",
-"*": "deny",
+        },
+        "bash": {
+          "rm .docs/*": "allow",
         }
       }
->>>>>>> 5a8b42b093932a4e6569f03e08fba6da79dfe327
     },
     "architect": {      
+      "description": "Solution Archtect, maintaining the requirement and features from users can be implemented without changing the planned archtecture. As much as possible, maintaining low cost for production deployment without compromising stability and maintainibility of the project. ",
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/architect.md}",
       "tools": {
-            "write": true,
-            "edit": true,
-            "bash": false,
-            "read": true,
-            "grep": true,
-            "task": true,
-            "webfetch": true,
-            "todowrite": true,
-            "todoread": true,
-            "skill": true
+        "write": true,
+        "edit": true,
+        "bash": false,
+        "read": true,
+        "grep": true,
+        "task": true,
+        "webfetch": true,
+        "todowrite": true,
+        "todoread": true,
+        "skill": true
       },
       "permission": {
         "edit": {
-          
           ".docs/*.md": "allow",
-          "*": "deny",
+        },
+        "grep": {
+          ".docs/*.md": "allow",
         },
         "write": {
-          
           ".docs/*.md": "allow",
-"*": "deny",
         },
         "read": {
-          
           ".docs/*.md": "allow",
-"*": "deny",
+        },
+        "bash": {
+          "rm .docs/*": "allow",
         }
-      },
+      }
     },
-    "qa-tester": {      
+    "qa-tester": {
+      "description": "QA and Auto Test developer, suggest possible edge cases and test cases for the developed features. Create automated test scripts to run regression tests for any new features developed. ",
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/qa-tester.md}",
       "tools": {
-            "write": true,
-            "edit": true,
-            "bash": true,
-            "read": true,
-            "grep": true,
-            "task": true,
-            "webfetch": true,
-            "todowrite": true,
-            "todoread": true,
-            "skill": true
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "read": true,
+        "grep": true,
+        "task": true,
+        "webfetch": true,
+        "todowrite": true,
+        "todoread": true,
+        "skill": true
       }
     }
   }

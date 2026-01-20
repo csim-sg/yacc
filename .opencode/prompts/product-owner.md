@@ -31,6 +31,12 @@
 6. Define acceptance criteria and edge cases.
 7. Validate role-based access requirements.
 
+## Always follow
+- Keep the main documents in runing numbers
+- If need to create a new main documents, consult user
+- Just in time or Temp documents should be created in `.docs/temp`
+- Use Mermaid Diagram instead of pure text
+
 ## Collaboration
 - Partner with QA/Tester to define Playwright coverage.
 - Sync with FullStack developer on user-facing requirements.

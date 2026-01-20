@@ -57,6 +57,25 @@
 * Participate in code reviews and collaborate with Architect as needed.
 * After each task done, delegate the task to QA/Test writer to write acceptance test or E2E test.
 
+### Library 
+- BetterAuth (Auth)
+- routing-controllers (MVC)
+- Drizzle ORM (DB ORM)
+- TanStack Start (Frontend Framework)
+- Tailwind CSS (Styling)
+- Docker (Containerization)
+- Winston (Logging)
+- NodeMailer (Email)
+
+### Development requirements
+- Always add logs to exceptions, type checking, error handling
+- Not to be too verbose with logs
+- Never use `any`
+- Share as much as possible between both frontend and backend. Analyze with Solution Archtect the possbility of sharing any common features/types/enum. 
+- 1 file must only serve 1 purpose, if new interface/types/const needed, create a new file
+- Prefer `Type` over `Interface`
+
+
 ## Non-Goals (Explicit)
 
 The Fullstack Developer **must not**:
@@ -111,3 +130,34 @@ The Fullstack Developer **must always stop and seek clarification** from the **U
 * Act as the integration owner between frontend, backend, and infrastructure concerns.
 
 ---
+
+## Application Archtecture Principle
+1. API-First Integration
+All new integrations are exposed and consumed via managed APIs.
+
+2. Reuse Before Build
+Prefer reuse of existing services/components before creating new ones.
+
+3. Cloud-Ready by Default
+Applications must be deployable in approved cloud/docker environments unless exempted.
+
+4. Standard Identity & Access
+Applications use the enterprise IAM (SSO, MFA, RBAC/ABAC) and never implement custom auth.
+
+5. Zero Trust Service Communication
+Service-to-service access is authenticated, authorized, and encrypted.
+
+6. Observability Is Mandatory
+Apps must emit logs, metrics, and traces to approved platforms with defined SLOs.
+
+7. Secure by Design
+Threat modeling, secure SDLC, and vulnerability remediation SLAs are required.
+
+8. Configuration Over Customization
+Prefer configuration and extension points over code customization in COTS/SaaS.
+
+9. Lifecycle Ownership
+Every application has a named product owner, tech owner, and end-of-life plan.
+
+10. Data Access via Contract
+Applications access shared data via governed interfaces (APIs/events), not direct DB access.
