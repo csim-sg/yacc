@@ -16,7 +16,27 @@
      "url": "https://gitmcp.io/saadeghi/daisyui"
    }
   },
+<<<<<<< HEAD
   
+=======
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen3-coder:30b": {
+          "name": "Qwen 3 Coder"
+        },
+        "gpt-oss:20b": {
+          "name": "GPT OSS 20B"
+        }
+      }
+    }
+  },
+>>>>>>> 5a8b42b093932a4e6569f03e08fba6da79dfe327
   "agent": {
     "fullstack-developer": {
       "mode": "primary",
@@ -50,6 +70,7 @@
             "skill": true
       },
       "permission": {
+<<<<<<< HEAD
     "edit": {
       ".docs/*": "ask",
       ".docs/*.md": "allow",
@@ -113,6 +134,62 @@
       ".docs/.tocheck/*.md": "allow",
     }
   },
+=======
+        "edit": {
+          
+          ".docs/*.md": "allow",
+          "*": "deny",
+        },
+        "grep": {
+          
+          ".docs/*.md": "allow",
+          "*": "deny",
+        },
+        "write": {
+          
+          ".docs/*.md": "allow",
+"*": "deny",
+        },
+        "read": {
+          
+          ".docs/*.md": "allow",
+"*": "deny",
+        }
+      }
+>>>>>>> 5a8b42b093932a4e6569f03e08fba6da79dfe327
+    },
+    "architect": {      
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/architect.md}",
+      "tools": {
+            "write": true,
+            "edit": true,
+            "bash": false,
+            "read": true,
+            "grep": true,
+            "task": true,
+            "webfetch": true,
+            "todowrite": true,
+            "todoread": true,
+            "skill": true
+      },
+      "permission": {
+        "edit": {
+          
+          ".docs/*.md": "allow",
+          "*": "deny",
+        },
+        "write": {
+          
+          ".docs/*.md": "allow",
+"*": "deny",
+        },
+        "read": {
+          
+          ".docs/*.md": "allow",
+"*": "deny",
+        }
+      },
     },
     "qa-tester": {      
       "mode": "all",
