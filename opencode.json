@@ -16,6 +16,23 @@
      "url": "https://gitmcp.io/saadeghi/daisyui"
    }
   },
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen3-coder:30b": {
+          "name": "Qwen 3 Coder"
+        },
+        "gpt-oss:20b": {
+          "name": "GPT OSS 20B"
+        }
+      }
+    }
+  },
   "agent": {
     "fullstack-developer": {
       "mode": "primary",
@@ -37,24 +54,8 @@
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/product-owner.md}",
       "tools": {
-            "write": false,
-            "edit": false,
-            "bash": false,
-            "read": false,
-            "grep": false,
-            "task": true,
-            "webfetch": true,
-            "todowrite": true,
-            "todoread": true,
-            "skill": true
-      }
-    },
-    "architect": {      
-      "mode": "all",
-      "prompt": "{file:./.opencode/prompts/architect.md}",
-      "tools": {
-            "write": false,
-            "edit": false,
+            "write": true,
+            "edit": true,
             "bash": false,
             "read": true,
             "grep": true,
@@ -63,7 +64,62 @@
             "todowrite": true,
             "todoread": true,
             "skill": true
+      },
+      "permission": {
+        "edit": {
+          
+          ".docs/*.md": "allow",
+          "*": "deny",
+        },
+        "grep": {
+          
+          ".docs/*.md": "allow",
+          "*": "deny",
+        },
+        "write": {
+          
+          ".docs/*.md": "allow",
+"*": "deny",
+        },
+        "read": {
+          
+          ".docs/*.md": "allow",
+"*": "deny",
+        }
       }
+    },
+    "architect": {      
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/architect.md}",
+      "tools": {
+            "write": true,
+            "edit": true,
+            "bash": false,
+            "read": true,
+            "grep": true,
+            "task": true,
+            "webfetch": true,
+            "todowrite": true,
+            "todoread": true,
+            "skill": true
+      },
+      "permission": {
+        "edit": {
+          
+          ".docs/*.md": "allow",
+          "*": "deny",
+        },
+        "write": {
+          
+          ".docs/*.md": "allow",
+"*": "deny",
+        },
+        "read": {
+          
+          ".docs/*.md": "allow",
+"*": "deny",
+        }
+      },
     },
     "qa-tester": {      
       "mode": "all",

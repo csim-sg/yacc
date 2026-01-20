@@ -4,9 +4,10 @@ Date: January 18, 2026
 Status: Active planning, scope rescope applied
 
 ## Scope Summary (Phase 1)
-- Core backend: auth, RBAC, inbox APIs, audit logging, password reset
+- Core backend: auth, RBAC, inbox APIs, messaging endpoints, audit logging, password reset
 - Frontend: login + forgot/reset, inbox list + basic conversation view
 - Real-time: WebSocket gateway (end of Phase 1) + message retry queue (end of Phase 1)
+- IRC integration: basic connector setup, inbound message ingest, and messaging endpoints
 - Explicitly deferred: Telegram integration remains Phase 2
 
 ## Key Decisions
@@ -31,7 +32,8 @@ Status: Active planning, scope rescope applied
 ## Scope Notes
 - WebSocket events focus on conversation updates, message status, notifications, presence
 - Retry queue uses Redis + BullMQ with backoff (1m, 5m, 30m) and DLQ
-- Telegram connector remains Phase 2 and is not part of Phase 1 deliverables
+- IRC connector is included in Phase 1; Telegram remains Phase 2 and is not part of Phase 1 deliverables
+- IRC messaging endpoints include send, retry, and raw payload access
 - No token blacklist on logout in Phase 1; rely on token TTL
 
 ## References

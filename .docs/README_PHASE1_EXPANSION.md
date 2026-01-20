@@ -20,6 +20,8 @@ This folder contains **comprehensive analysis and implementation guidance** for 
 - ✅ Testing strategy (QA checklist)
 - ✅ Timeline validation (8-day sprint)
 
+**Phase 1 integration scope**: IRC integration with messaging endpoints. Telegram is deferred to Phase 2.
+
 ---
 
 ## 🎯 Quick Decision (2-Minute Read)
@@ -294,7 +296,7 @@ PHASE 1 COMPLETE: Fri Feb 1 EOD ✓
 
 ### FINAL (Feb 1) EOD
 - [ ] Phase 1 sign-off
-- [ ] Phase 2 starts (WebSocket, messaging)
+- [ ] Phase 2 starts (Telegram integration)
 
 ---
 

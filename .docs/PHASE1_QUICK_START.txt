@@ -5,7 +5,7 @@
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
 📋 STATUS: Conditional Approval (5 conditions must be met)
-🎯 SCOPE: Auth + Inbox List/Detail only (no messaging, notes, rules in Phase 1)
+🎯 SCOPE: Auth + Inbox List/Detail + Messaging + IRC integration (Telegram deferred to Phase 2)
 📅 TIMELINE: 2 weeks (if blockers fixed today)
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -88,6 +88,15 @@ CONVERSATIONS (7 endpoints)
   ✅ PATCH  /api/conversations/:id/assign
   ✅ POST   /api/conversations/:id/tags
   ✅ DELETE /api/conversations/:id/tags/:tagId
+
+MESSAGING (4 endpoints)
+  ✅ GET    /api/conversations/:id/messages
+  ✅ POST   /api/conversations/:id/messages
+  ✅ POST   /api/conversations/:id/messages/:msgId/retry
+  ✅ GET    /api/messages/:id/raw-payload
+
+INTEGRATIONS (1 endpoint)
+  ✅ POST   /api/integrations/irc/connect
 
 All endpoints require: Authorization: Bearer <JWT token>
 

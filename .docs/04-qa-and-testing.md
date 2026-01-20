@@ -45,6 +45,38 @@ export const ircConv = { channel: 'irc', externalThreadId: 'irc-456' };
 - Message retry queue (BullMQ + backoff) ships at the end of Phase 1.
 - Telegram integration testing starts in Phase 2; IRC remains in Phase 1.
 
+### Phase 1 Runnable Test Checklist
+
+#### Prereqs
+
+- Local `.env` configured (DB, Redis, JWT secret, IRC creds).
+- Database migrated and server + web apps running.
+- Seed data loaded for users, conversations, and messages.
+
+#### Seed Data
+
+- Users: `super_admin`, `admin`, `manager`, `user` with known passwords.
+- Conversations: 1 Telegram placeholder (for UI), 1 IRC channel thread.
+- Messages: 3 inbound, 1 outbound (pending) for status checks.
+
+#### Execution Order
+
+- Run Jest unit tests first, then Jest integration, then Playwright E2E.
+- Reset DB between Jest integration and Playwright runs.
+
+#### Jest Unit/Integration IDs
+
+- Auth: `1.1_AC1_ValidLoginCreatesSession`, `1.1_AC2_InvalidPasswordReturns401`, `1.3_AC1_RoleBasedAccessEnforced`.
+- Inbox: `2.1_AC1_InboxShowsSingleQueue`, `2.2_AC1_FiltersByChannel`, `2.3_AC1_TimelineChronological`.
+- Messaging: `4.1_AC1_ReplySendsToChannel`, `4.1_AC3_MessageStatusTracked`.
+- IRC: `5.2_AC1_IRCInboundMessagesAppear`.
+
+#### Playwright E2E IDs
+
+- `REGR_001` Login + inbox load.
+- `REGR_002` Send reply + delivery status.
+- `REGR_004` IRC inbound message.
+
 ---
 
 ## 2. Acceptance Criteria Summary

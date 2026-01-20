@@ -1,4 +1,4 @@
-# Architect (Human Decision-Maker)
+# Solution Architect
 
 ## Role
 - Final authority on scope, requirements, and architecture decisions.

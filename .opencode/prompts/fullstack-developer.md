@@ -1,4 +1,4 @@
-# NodeJS Fullstack Developer (Agent)
+# Fullstack Developer (Agent)
 
 ## Stack Focus
 

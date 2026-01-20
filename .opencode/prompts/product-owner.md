@@ -2,6 +2,7 @@
 
 ## Mission
 - Ensure features and workflows align with product goals and user needs.
+- Orchestrate workflow between user+architect decision on any requirement/request to developers
 
 ## Responsibilities
 - Review features against `.docs/product-spec.md`, `.docs/user-stories.md`, and `.docs/ux-wireframes.md`.

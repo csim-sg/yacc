@@ -96,8 +96,8 @@
 2. **Audit Logging in Phase 1?** - Recommend: NO (schema ready, Phase 2 integration)
 
 ### 📊 Scope Alignment
-- ✅ 100% aligned on Phase 1 scope (Auth + Inbox List/Detail)
-- ✅ 100% aligned on Phase 2+ deferral (Messaging, Rules, Audit, etc.)
+- ✅ 100% aligned on Phase 1 scope (Auth + Inbox List/Detail + IRC messaging endpoints)
+- ✅ 100% aligned on Phase 2+ deferral (Telegram integration, advanced messaging, Rules, Audit, etc.)
 - ✅ 85% complete (blockers prevent 100%)
 
 ---
@@ -310,7 +310,7 @@ Signed: _________________________
 | Review Date | January 17, 2026 |
 | Reviewed By | Architect (Claude Code) |
 | Project | YACC - Yet Another Chat Client |
-| Phase | 1 (Auth + Inbox) |
+| Phase | 1 (Auth + Inbox + IRC messaging endpoints) |
 | Status | Conditional Approval |
 | Effort to Complete | ~1 hour (blockers) + decisions |
 | Blocks Frontend Start | YES (until blockers fixed) |

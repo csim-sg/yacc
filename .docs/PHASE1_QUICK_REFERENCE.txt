@@ -41,6 +41,8 @@
 │ WHAT GETS BUILT                                                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
+│ NOTE: Phase 1 includes IRC integration with messaging endpoints; Telegram deferred to Phase 2 │
+│                                                                              │
 │ ✅ FORGOT PASSWORD                                                          │
 │    ├─ 3 new endpoints (request, validate, reset)                           │
 │    ├─ 1 new table (password_reset_tokens)                                  │
