@@ -24,7 +24,7 @@ export const ERROR_CODE = {
   // Business logic errors
   CONVERSATION_NOT_FOUND: 'conversation_not_found',
   MESSAGE_SEND_FAILED: 'message_send_failed',
-  FILE_TOO_LARGE: 'file_too_large',
+  FILE_TOO_LARGE: 'file_to_large',
   UNSUPPORTED_FILE_TYPE: 'unsupported_file_type',
 
   // Rate limiting

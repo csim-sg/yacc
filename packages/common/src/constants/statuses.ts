@@ -30,14 +30,3 @@ export const USER_STATUSES = {
   ACTIVE: 'active',
   DISABLED: 'disabled',
 } as const;
-
-export const NOTIFICATION_TYPES = {
-  ASSIGNMENT: 'assignment',
-  MENTION: 'mention',
-  UNREAD: 'unread',
-} as const;
-
-export const ROUTING_RULE_STATUSES = {
-  ACTIVE: 'active',
-  DISABLED: 'disabled',
-} as const;

@@ -3,34 +3,29 @@
  * Core data models for the application
  */
 import {
+  ROLES,
   USER_STATUSES,
+  CHANNELS,
+  CONVERSATION_STATUSES,
+  PRIORITY_LEVELS,
+  MESSAGE_STATUSES,
+  MESSAGE_DIRECTIONS,
+  NOTIFICATION_TYPES,
+  ROUTING_RULE_STATUSES,
+  ERROR_CODE,
+  ERROR_MESSAGE,
 } from '../constants';
 
-// Add enums that don't exist in constants yet
-export const NOTIFICATION_TYPES = {
-  ASSIGNMENT: 'assignment',
-  MENTION: 'mention',
-  UNREAD: 'unread',
-} as const;
-
-export const ROUTING_RULE_STATUSES = {
-  ACTIVE: 'active',
-  DISABLED: 'disabled',
-} as const;
-
+export type Role = typeof ROLES[keyof typeof ROLES];
+export type UserStatus = typeof USER_STATUSES[keyof typeof USER_STATUSES];
+export type Channel = typeof CHANNELS[keyof typeof CHANNELS];
+export type ConversationStatus = typeof CONVERSATION_STATUSES[keyof typeof CONVERSATION_STATUSES];
+export type Priority = typeof PRIORITY_LEVELS[keyof typeof PRIORITY_LEVELS];
+export type MessageStatus = typeof MESSAGE_STATUSES[keyof typeof MESSAGE_STATUSES];
+export type MessageDirection = typeof MESSAGE_DIRECTIONS[keyof typeof MESSAGE_DIRECTIONS];
 export type NotificationType = typeof NOTIFICATION_TYPES[keyof typeof NOTIFICATION_TYPES];
 export type RoutingRuleStatus = typeof ROUTING_RULE_STATUSES[keyof typeof ROUTING_RULE_STATUSES];
-export type UserStatus = typeof USER_STATUSES[keyof typeof USER_STATUSES];
-
-// User
-export interface User {
-  id: string;
-  email: string;
-  role: Role;
-  status: UserStatus;
-  createdAt: string;  // ISO-8601
-  updatedAt: string;  // ISO-8601
-}
+export type ErrorCode = typeof ERROR_CODE[keyof typeof ERROR_CODE];
 
 // Conversation
 export interface Conversation {

@@ -20,6 +20,7 @@
 ### PR Review
 When there is a new PR in the repo, review the code. 
 - Ensure its according to the coding standard and our Architecture Principle
+- All finding must be commented in the github issue
 #### Issue found
 - When found any issues, comment it out in the PR and revert back to FullStack Developer
 - Create issues in GitHub, link those issues to the branch/commit

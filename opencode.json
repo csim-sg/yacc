@@ -96,7 +96,7 @@
       "tools": {
         "write": true,
         "edit": true,
-        "bash": false,
+        "bash": true,
         "read": true,
         "grep": true,
         "task": true,
@@ -120,6 +120,8 @@
         },
         "bash": {
           "rm .docs/*": "allow",
+          "gh *": "allow",
+          "*": "ask"
         },
         "github_*": {
           "*": "allow",
