@@ -64,9 +64,11 @@
 
 ---
 
-### **.docs/ Detailed Specifications** (in .docs/ directory)
+### **.docs/ Core Documentation** (in .docs/ directory)
 
-#### **01-product-specification.md** (940 lines)
+The documentation has been consolidated into **6 main documents**. Historical and working documents are preserved in subdirectories.
+
+#### **01-product-specification.md** (Product Specification)
 **Product scope, features, user stories, UI requirements, and acceptance criteria**
 
 **Contains**:
@@ -83,7 +85,7 @@
 
 ---
 
-#### **02-api-and-data-model.md** (1,311 lines)
+#### **02-api-and-data-model.md** (API & Data Model)
 **Complete API contract, database schema, data models, WebSocket events**
 
 **Contains**:
@@ -101,7 +103,26 @@
 
 ---
 
-#### **04-qa-and-testing.md** (354 lines)
+#### **03-implementation-guide.md** (Implementation Guide)
+**System architecture, components, implementation phases, and technical decisions**
+
+**Contains**:
+- High-level system architecture
+- Data flows (inbound, outbound, rules, real-time)
+- Technology stack breakdown
+- 6 core components deep dive
+- Architecture diagrams (repository structure, deployment flows, auth flow, real-time data flow)
+- Implementation phases (4 phases, 6 weeks)
+- Configuration & environment variables
+- Key technical decisions with rationale
+
+**Audience**: Backend developers, architects, tech leads
+
+**When to use**: During development, technical reference
+
+---
+
+#### **04-qa-and-testing.md** (QA & Testing)
 **Test cases, acceptance criteria summary, regression suite, testing priorities**
 
 **Contains**:
@@ -120,7 +141,7 @@
 
 ---
 
-#### **05-quick-reference.md** (334 lines)
+#### **05-quick-reference.md** (Quick Reference)
 **One-page cheat sheet for quick lookup**
 
 **Contains**:
@@ -142,6 +163,52 @@
 **Audience**: Everyone (developers, PMs, QA, leads)
 
 **When to use**: Daily reference, print & pin on wall, during standup meetings
+
+---
+
+#### **06-testing-execution-guide.md** (Testing Execution Guide)
+**Step-by-step testing procedures and checklists**
+
+**Contains**:
+- Test environment setup
+- Test execution procedures
+- Test report templates
+- Regression testing workflow
+- Bug reporting guidelines
+
+**Audience**: QA engineers, testers
+
+**When to use**: Executing tests, creating test reports
+
+---
+
+### **.docs/ Additional Directories**
+
+#### **archive/** (Historical & Critical Documents)
+Preserved historical documents, critical decisions, and sign-offs.
+
+**Structure**:
+- `phase1/` - Phase 1 critical documents (SOW, pending requests, architect decisions)
+- `signoffs/` - Official QA and approval sign-offs
+- `design/` - Design iterations and UI history
+
+**Audience**: All team members (for historical reference)
+
+**When to use**: Understanding project history, reviewing decisions, auditing sign-offs
+
+---
+
+#### **temp/** (Temporary/Working Documents)
+Just-in-time and temporary working documents. May be cleaned up periodically.
+
+**Contents**:
+- Phase 1 working notes and summaries
+- Integration task tracking
+- Quick reference guides for ongoing work
+
+**Audience**: Developers working on current features
+
+**When to use**: Quick lookup during development (may be deleted when no longer needed)
 
 ---
 
@@ -205,11 +272,14 @@
 |----------|-------|----------|
 | **README.md** (root) | Getting started, commands | All developers |
 | **AGENTS.md** (root) | Team roles, responsibilities | All team members |
-| **.docs/03-implementation-guide.md** | System architecture, components | Backend, architects |
 | **.docs/01-product-specification.md** | Product & features | PMs, designers, QA |
 | **.docs/02-api-and-data-model.md** | API & data model | Backend, API consumers |
+| **.docs/03-implementation-guide.md** | System architecture, components | Backend, architects |
 | **.docs/04-qa-and-testing.md** | Testing & QA | QA engineers, testers |
 | **.docs/05-quick-reference.md** | Quick reference | Everyone |
+| **.docs/06-testing-execution-guide.md** | Testing procedures | QA engineers, testers |
+| **.docs/archive/** | Historical & critical documents | All (reference) |
+| **.docs/temp/** | Temporary/working docs | Developers (current work) |
 
 ---
 
@@ -244,6 +314,14 @@
 ---
 
 ## 📋 How to Use These Docs
+
+### Understanding the Structure
+
+The documentation is organized into three levels:
+
+1. **Core Documents (01-06)** - The main, authoritative documentation
+2. **archive/** - Historical documents, critical decisions, and sign-offs
+3. **temp/** - Temporary/working documents (may be cleaned up periodically)
 
 ### First Week (Onboarding)
 1. Read **../README.md** (quick start)
@@ -310,9 +388,15 @@ INTEGRATIONS: Telegram, IRC (end-to-end)
 
 **What's the API contract?** → Read **02-api-and-data-model.md**
 
-**What should I test?** → Read **04-qa-and-testing.md**
+**What should I test?** → Read **04-qa-and-testing.md** or **06-testing-execution-guide.md**
 
 **Quick lookup?** → See **05-quick-reference.md**
+
+**Need historical context?** → Check **.docs/archive/** directory
+
+**Looking for working notes?** → Check **.docs/temp/** directory
+
+**What happened during cleanup?** → Read **DOCUMENTATION_CLEANUP_SUMMARY.md**
 
 ---
 
@@ -349,9 +433,22 @@ INTEGRATIONS: Telegram, IRC (end-to-end)
 
 ---
 
-**Version**: 2.0  
-**Last Updated**: January 17, 2026  
+**Version**: 3.0  
+**Last Updated**: January 21, 2026  
 **Status**: ✅ Complete & Ready for Phase 1  
 **Project**: YACC - Yet Another Chat Client
 
 **Ready to build? Start with ../README.md! 🚀**
+
+---
+
+## 📝 Recent Changes
+
+### January 21, 2026 - Documentation Cleanup
+- Consolidated documentation into 6 main documents (01-06)
+- Archived critical documents to `.docs/archive/` (Phase 1 decisions, SOW, QA sign-offs)
+- Moved temporary/working documents to `.docs/temp/` (Phase 1 notes, quick references)
+- Archived design iterations to `.docs/archive/design/`
+- Deleted obsolete directories (`phases/`, `design/`, `.tocheck/`)
+
+**See**: `DOCUMENTATION_CLEANUP_SUMMARY.md` for details
