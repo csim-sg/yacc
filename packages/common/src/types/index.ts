@@ -1,4 +1,4 @@
+// Export from consolidated type files
+export * from './entities';
 export * from './api';
-export * from './domain';
-export * from './user';
-export * from './conversation';
+export * from './auth';

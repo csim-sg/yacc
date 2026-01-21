@@ -182,6 +182,26 @@ The documentation has been consolidated into **6 main documents**. Historical an
 
 ---
 
+#### **06-p0-execution-plan.md** (Phase 1 P0 Execution Plan)
+**Complete execution plan for 22 P0 backend issues**
+
+**Contains**:
+- All 22 P0 Backend issues with dependencies
+- Complete dependency graph (Mermaid diagram)
+- 3-week execution timeline (15 business days)
+- Week-by-Week breakdown with daily tasks
+- Technical clarifications for all issues
+- High-risk areas with mitigation strategies
+- Complete environment variables reference
+- Testing strategy (unit, integration, E2E)
+- Handoff checklist for Phase 1 completion
+
+**Audience**: Backend developers, tech leads, architects
+
+**When to use**: Starting Phase 1 development, sprint planning, tracking progress
+
+---
+
 ### **.docs/ Additional Directories**
 
 #### **archive/** (Historical & Critical Documents)
@@ -221,9 +241,10 @@ Just-in-time and temporary working documents. May be cleaned up periodically.
 ### For Backend Developers
 1. Read **../README.md** → Quick start
 2. Read **../AGENTS.md** → Backend dev role
-3. Read **.docs/03-implementation-guide.md** (30 minutes) — system design & Phase 1
+3. Read **.docs/03-implementation-guide.md** (30 minutes) — system design & Phase1
 4. Read **.docs/02-api-and-data-model.md** (45 minutes) — API contract & database
-5. Reference **.docs/02-api-and-data-model.md** during implementation
+5. Read **.docs/06-p0-execution-plan.md** (20 minutes) — Phase 1 P0 issues & execution order
+6. Reference **.docs/02-api-and-data-model.md** during implementation
 
 ### For Frontend Developers
 1. Read **../README.md** → Quick start
@@ -278,6 +299,8 @@ Just-in-time and temporary working documents. May be cleaned up periodically.
 | **.docs/04-qa-and-testing.md** | Testing & QA | QA engineers, testers |
 | **.docs/05-quick-reference.md** | Quick reference | Everyone |
 | **.docs/06-testing-execution-guide.md** | Testing procedures | QA engineers, testers |
+| **.docs/06-p0-execution-plan.md** | Phase 1 P0 backend execution plan | Backend developers, tech leads |
+| **.docs/week1-day1-development.md** | Week 1 Day 1 implementation guide | Backend developers |
 | **.docs/archive/** | Historical & critical documents | All (reference) |
 | **.docs/temp/** | Temporary/working docs | Developers (current work) |
 
@@ -329,7 +352,8 @@ The documentation is organized into three levels:
 3. Read **.docs/03-implementation-guide.md** (system overview)
 4. Read role-specific docs from "Quick Start" section above
 
-### During Phase 1 Development (Week 1-2)
+### During Phase 1 Development (Week 1-3)
+- Reference **.docs/06-p0-execution-plan.md** (22 P0 issues, 3-week timeline, dependencies)
 - Reference **.docs/03-implementation-guide.md** section 5 (Phase 1 tasks)
 - Reference **.docs/02-api-and-data-model.md** section 5 (auth endpoints)
 - Reference **.docs/02-api-and-data-model.md** section 6 (WebSocket events)
@@ -433,9 +457,9 @@ INTEGRATIONS: Telegram, IRC (end-to-end)
 
 ---
 
-**Version**: 3.0  
-**Last Updated**: January 21, 2026  
-**Status**: ✅ Complete & Ready for Phase 1  
+**Version**: 3.1
+**Last Updated**: January 21, 2026 (P0 execution plan added)
+**Status**: ✅ Complete & Ready for Phase 1
 **Project**: YACC - Yet Another Chat Client
 
 **Ready to build? Start with ../README.md! 🚀**
@@ -443,6 +467,22 @@ INTEGRATIONS: Telegram, IRC (end-to-end)
 ---
 
 ## 📝 Recent Changes
+
+### January 21, 2026 - P0 Issues & Execution Plan
+- Created 5 new P0 Backend issues (BE-020, BE-025, BE-026, BE-027, BE-028)
+- Promoted 2 issues from P1 to P0 (BE-004, BE-012)
+- Enhanced acceptance criteria for BE-003 (BetterAuth) and BE-016 (Socket.io)
+- Updated dependencies for 5 issues based on architectural analysis
+- Created comprehensive execution plan: **06-p0-execution-plan.md**
+  - 22 P0 Backend issues with complete dependency graph
+  - 3-week execution timeline (15 business days)
+  - Week-by-Week breakdown with daily tasks
+  - Technical clarifications for all issues
+  - Risk mitigation strategies
+  - Environment variables reference
+  - Testing strategy and handoff checklist
+
+**Total P0 Issues**: 22 (11 Week 1, 5 Week 2, 6 Week 3)
 
 ### January 21, 2026 - Documentation Cleanup
 - Consolidated documentation into 6 main documents (01-06)

@@ -1,18 +1,30 @@
 /**
  * @yacc/common - Shared Types and Utilities
  *
- * This package contains shared types, enums, and utilities used across
+ * This package contains shared types, enums, schemas, and utilities used across
  * backend and frontend.
  */
 
 // ============================================
-// Connector Types
+// Types
 // ============================================
 
-export * from './types/connector.types';
+export * from './types/entities';
+export * from './types/api';
+export * from './types/auth';
 
 // ============================================
-// Export all types
+// Schemas
 // ============================================
 
-export type * from './types/connector.types';
+export * from './schemas/entities';
+export * from './schemas/api';
+
+// ============================================
+// Constants
+// ============================================
+
+export * from './constants/roles';
+export * from './constants/statuses';
+export * from './constants/channels';
+export * from './constants/errors';
