@@ -77,6 +77,8 @@ When there is a new PR in the repo, Architect will review the code.
 - Modular, reusable components/services.
 - Proper error handling and logging.
 - Ensure code is well-documented with comments where necessary.
+- No need for `index.ts` to consolidate export. 
+- NEVER have more than 1 defination in 1 file. Each definiation should be seperated into difference file with their name as file name.
 ### Library 
 - BetterAuth (Auth)
 - routing-controllers (MVC)

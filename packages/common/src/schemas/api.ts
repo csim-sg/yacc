@@ -1,12 +1,4 @@
 import { z } from 'zod';
-import {
-  ROLES,
-  USER_STATUSES,
-  CONVERSATION_STATUSES,
-  PRIORITY_LEVELS,
-  MESSAGE_STATUSES,
-  MESSAGE_DIRECTIONS,
-} from '../constants';
 
 export const LoginRequestSchema = z.object({
   email: z.string().email(),

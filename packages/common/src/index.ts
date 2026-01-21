@@ -6,12 +6,12 @@
  */
 
 // ============================================
-// Types
+// Types (Individual Files)
 // ============================================
 
-export * from './types/entities';
 export * from './types/api';
 export * from './types/auth';
+export * from './types/entities';
 
 // ============================================
 // Schemas

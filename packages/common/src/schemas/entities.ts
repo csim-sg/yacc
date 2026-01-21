@@ -1,18 +1,10 @@
 import { z } from 'zod';
-import {
-  ROLES,
-  USER_STATUSES,
-  CONVERSATION_STATUSES,
-  PRIORITY_LEVELS,
-  MESSAGE_STATUSES,
-  MESSAGE_DIRECTIONS,
-} from '../constants';
 
 export const UserSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
-  role: z.nativeEnum(ROLES),
-  status: z.nativeEnum(USER_STATUSES),
+  role: z.enum(['super_admin', 'admin', 'manager', 'user']),
+  status: z.enum(['active', 'disabled']),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -21,8 +13,8 @@ export const ConversationSchema = z.object({
   id: z.string().uuid(),
   channel: z.enum(['telegram', 'irc']),
   externalThreadId: z.string(),
-  status: z.nativeEnum(CONVERSATION_STATUSES),
-  priority: z.nativeEnum(PRIORITY_LEVELS),
+  status: z.enum(['open', 'pending', 'resolved']),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']),
   assignedUserId: z.string().uuid().optional(),
   lastMessageAt: z.string().datetime(),
   createdAt: z.string().datetime(),
@@ -35,8 +27,8 @@ export const MessageSchema = z.object({
   senderId: z.string().uuid().optional(),
   senderName: z.string().optional(),
   body: z.string(),
-  status: z.nativeEnum(MESSAGE_STATUSES),
-  direction: z.nativeEnum(MESSAGE_DIRECTIONS),
+  status: z.enum(['pending', 'sent', 'failed']),
+  direction: z.enum(['inbound', 'outbound']),
   platformMessageId: z.string().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

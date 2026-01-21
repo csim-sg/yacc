@@ -2,6 +2,21 @@
  * API Request/Response Types
  * Shared between frontend and backend
  */
+import {
+  ROLES,
+  CHANNELS,
+  CONVERSATION_STATUSES,
+  PRIORITY_LEVELS,
+  MESSAGE_STATUSES,
+  MESSAGE_DIRECTIONS,
+} from '../constants';
+
+export type Role = typeof ROLES[keyof typeof ROLES];
+export type Channel = typeof CHANNELS[keyof typeof CHANNELS];
+export type ConversationStatus = typeof CONVERSATION_STATUSES[keyof typeof CONVERSATION_STATUSES];
+export type Priority = typeof PRIORITY_LEVELS[keyof typeof PRIORITY_LEVELS];
+export type MessageStatus = typeof MESSAGE_STATUSES[keyof typeof MESSAGE_STATUSES];
+export type MessageDirection = typeof MESSAGE_DIRECTIONS[keyof typeof MESSAGE_DIRECTIONS];
 
 // ============================================
 // Auth Types
@@ -13,7 +28,7 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  user: any;  // User type imported from entities
+  user: any;  // User type from entities
   accessToken: string;
   refreshToken?: string;
 }
@@ -34,22 +49,22 @@ export interface ResetPasswordRequest {
 export interface GetConversationsQuery {
   page?: number;
   pageSize?: number;
-  channel?: any;  // Channel type from constants
+  channel?: Channel;
   assignedUserId?: string;
-  status?: any;  // ConversationStatus from constants
-  priority?: any;  // Priority from constants
+  status?: ConversationStatus;
+  priority?: Priority;
   tagId?: string;
   dateFrom?: string;
   dateTo?: string;
 }
 
 export interface CreateConversationResponse {
-  conversation: any;  // Conversation type
+  conversation: any;  // Conversation type from entities
 }
 
 export interface UpdateConversationRequest {
-  status?: any;  // ConversationStatus from constants
-  priority?: any;  // Priority from constants
+  status?: ConversationStatus;
+  priority?: Priority;
   assignedUserId?: string;
 }
 
@@ -91,8 +106,8 @@ export interface BulkActionRequest {
   data: {
     assignedUserId?: string;
     tagId?: string;
-    status?: any;  // ConversationStatus
-    priority?: any;  // Priority
+    status?: ConversationStatus;
+    priority?: Priority;
   };
 }
 
@@ -114,7 +129,7 @@ export interface CreateRoutingRuleRequest {
 
 export interface UpdateRoutingRuleRequest {
   name?: string;
-  status?: any;  // RoutingRuleStatus
+  status?: any;  // RoutingRuleStatus from entities
   conditions?: any;
   actions?: any;
   priority?: number;
@@ -128,10 +143,10 @@ export interface SearchConversationsQuery {
   q: string;
   page?: number;
   pageSize?: number;
-  channel?: any;  // Channel
+  channel?: Channel;
   tagId?: string;
   assigneeId?: string;
-  status?: any;  // ConversationStatus
+  status?: ConversationStatus;
   dateFrom?: string;
   dateTo?: string;
 }
