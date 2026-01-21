@@ -94,7 +94,7 @@ class TagBody {
   tagId!: number;
 }
 
-@JsonController('/conversations')
+@JsonController('/api/conversations')
 @Authorized()
 export class ConversationsController {
   /**

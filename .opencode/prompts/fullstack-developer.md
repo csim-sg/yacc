@@ -62,6 +62,7 @@
 - Always check the following
     - Test run the project, make sure the new code did not break the existing project
     - Run any regression test and all should pass
+    - Ensure the task has acceptance test or E2E test
 - Delegate to Architect once the PR was created
 #### PR Review
 When there is a new PR in the repo, Architect will review the code.

@@ -35,9 +35,8 @@ const PORT = process.env.PORT || 3000;
   }));
   app.use(express.json());
 
-  // Setup routing-controllers for /api endpoints
+  // Setup routing-controllers
   useExpressServer(app, {
-    routePrefix: '/api',
     controllers: [AuthController, SimpleAuthController, ConversationsController, AuditController, HealthController],
     authorizationChecker: authorizationChecker,
     currentUserChecker: currentUserChecker,
