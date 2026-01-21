@@ -9,6 +9,8 @@ export const CHANNELS = {
   TWITTER: 'twitter',
 } as const;
 
+export type Channel = typeof CHANNELS[keyof typeof CHANNELS];
+
 export const CHANNEL_NAMES: Record<string, string> = {
   telegram: 'Telegram',
   irc: 'IRC',

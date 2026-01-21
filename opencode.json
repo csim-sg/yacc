@@ -14,8 +14,7 @@
     "daisyUI": {
      "type": "remote",
      "url": "https://gitmcp.io/saadeghi/daisyui"
-    },
-   
+    }
   },
   "provider": {
     "ollama": {
