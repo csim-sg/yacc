@@ -2,10 +2,12 @@
  * Routing Rule Domain Types
  */
 
+import type { ValueOf } from './utils';
+
 export interface RoutingRule {
   id: string;
   name: string;
-  status: keyof typeof ROUTING_RULE_STATUSES;
+  status: ValueOf<typeof ROUTING_RULE_STATUSES>;
   priority: number;
   conditions: RuleCondition[];
   actions: RuleAction[];

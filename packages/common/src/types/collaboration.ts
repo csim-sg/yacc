@@ -2,6 +2,8 @@
  * Collaboration API Types
  */
 
+import type { ValueOf } from './utils';
+
 export interface AddTagRequest {
   tagId: string;
 }
@@ -20,8 +22,8 @@ export interface BulkActionRequest {
   data: {
     assignedUserId?: string;
     tagId?: string;
-    status?: keyof typeof CONVERSATION_STATUSES;
-    priority?: keyof typeof PRIORITY_LEVELS;
+    status?: ValueOf<typeof CONVERSATION_STATUSES>;
+    priority?: ValueOf<typeof PRIORITY_LEVELS>;
   };
 }
 

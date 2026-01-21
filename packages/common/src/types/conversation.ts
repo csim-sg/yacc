@@ -4,13 +4,14 @@
 
 import type { User } from './user';
 import type { Tag } from './tag';
+import type { ValueOf } from './utils';
 
 export interface Conversation {
   id: string;
-  channel: keyof typeof CHANNELS;
+  channel: ValueOf<typeof CHANNELS>;
   externalThreadId: string;
-  status: keyof typeof CONVERSATION_STATUSES;
-  priority: keyof typeof PRIORITY_LEVELS;
+  status: ValueOf<typeof CONVERSATION_STATUSES>;
+  priority: ValueOf<typeof PRIORITY_LEVELS>;
   assignedUserId?: string;
   assignedUser?: User;
   lastMessageAt: string;

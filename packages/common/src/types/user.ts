@@ -2,11 +2,13 @@
  * User Domain Type
  */
 
+import type { ValueOf } from './utils';
+
 export interface User {
   id: string;
   email: string;
-  role: keyof typeof ROLES;
-  status: keyof typeof USER_STATUSES;
+  role: ValueOf<typeof ROLES>;
+  status: ValueOf<typeof USER_STATUSES>;
   createdAt: string;
   updatedAt: string;
 }

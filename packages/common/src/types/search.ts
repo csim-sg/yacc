@@ -2,14 +2,16 @@
  * Search API Types
  */
 
+import type { ValueOf } from './utils';
+
 export interface SearchConversationsQuery {
   q: string;
   page?: number;
   pageSize?: number;
-  channel?: keyof typeof CHANNELS;
+  channel?: ValueOf<typeof CHANNELS>;
   tagId?: string;
   assigneeId?: string;
-  status?: keyof typeof CONVERSATION_STATUSES;
+  status?: ValueOf<typeof CONVERSATION_STATUSES>;
   dateFrom?: string;
   dateTo?: string;
 }

@@ -3,14 +3,15 @@
  */
 
 import type { Conversation } from './conversation';
+import type { ValueOf } from './utils';
 
 export interface GetConversationsQuery {
   page?: number;
   pageSize?: number;
-  channel?: keyof typeof CHANNELS;
+  channel?: ValueOf<typeof CHANNELS>;
   assignedUserId?: string;
-  status?: keyof typeof CONVERSATION_STATUSES;
-  priority?: keyof typeof PRIORITY_LEVELS;
+  status?: ValueOf<typeof CONVERSATION_STATUSES>;
+  priority?: ValueOf<typeof PRIORITY_LEVELS>;
   tagId?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -21,8 +22,8 @@ export interface CreateConversationResponse {
 }
 
 export interface UpdateConversationRequest {
-  status?: keyof typeof CONVERSATION_STATUSES;
-  priority?: keyof typeof PRIORITY_LEVELS;
+  status?: ValueOf<typeof CONVERSATION_STATUSES>;
+  priority?: ValueOf<typeof PRIORITY_LEVELS>;
   assignedUserId?: string;
 }
 

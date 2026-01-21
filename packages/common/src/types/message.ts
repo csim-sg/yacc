@@ -3,6 +3,7 @@
  */
 
 import type { Attachment } from './attachment';
+import type { ValueOf } from './utils';
 
 export interface Message {
   id: string;
@@ -10,8 +11,8 @@ export interface Message {
   senderId?: string;
   senderName?: string;
   body: string;
-  status: keyof typeof MESSAGE_STATUSES;
-  direction: keyof typeof MESSAGE_DIRECTIONS;
+  status: ValueOf<typeof MESSAGE_STATUSES>;
+  direction: ValueOf<typeof MESSAGE_DIRECTIONS>;
   platformMessageId?: string;
   createdAt: string;
   updatedAt: string;

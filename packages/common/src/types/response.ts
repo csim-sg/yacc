@@ -2,6 +2,8 @@
  * Common API Response Types
  */
 
+import type { ValueOf } from './utils';
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -10,7 +12,7 @@ export interface ApiResponse<T> {
 }
 
 export interface ErrorResponse {
-  code: keyof typeof ERROR_CODE;
+  code: ValueOf<typeof ERROR_CODE>;
   message: string;
   details?: Record<string, any>;
 }

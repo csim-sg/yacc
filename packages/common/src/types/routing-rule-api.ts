@@ -3,6 +3,7 @@
  */
 
 import type { RuleCondition, RuleAction } from './routing-rule';
+import type { ValueOf } from './utils';
 
 export interface CreateRoutingRuleRequest {
   name: string;
@@ -13,7 +14,7 @@ export interface CreateRoutingRuleRequest {
 
 export interface UpdateRoutingRuleRequest {
   name?: string;
-  status?: keyof typeof ROUTING_RULE_STATUSES;
+  status?: ValueOf<typeof ROUTING_RULE_STATUSES>;
   conditions?: RuleCondition[];
   actions?: RuleAction[];
   priority?: number;

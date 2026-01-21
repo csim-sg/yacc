@@ -2,10 +2,12 @@
  * Notification Domain Type
  */
 
+import type { ValueOf } from './utils';
+
 export interface Notification {
   id: string;
   userId: string;
-  type: keyof typeof NOTIFICATION_TYPES;
+  type: ValueOf<typeof NOTIFICATION_TYPES>;
   conversationId: string;
   actorId?: string;
   actorName?: string;
