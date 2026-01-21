@@ -59,17 +59,17 @@ export abstract class BaseConnector<
   // ==========================================
 
   /**
-   * Connect to the platform (abstract - must be implemented)
+   * Connect to platform (abstract - must be implemented)
    */
   public abstract connect(): Promise<void>;
 
   /**
-   * Disconnect from the platform (abstract - must be implemented)
+   * Disconnect from platform (abstract - must be implemented)
    */
   public abstract disconnect(): Promise<void>;
 
   /**
-   * Send a message to the platform (abstract - must be implemented)
+   * Send a message to platform (abstract - must be implemented)
    */
   public abstract sendMessage(request: SendMessageRequest): Promise<SendMessageResponse>;
 
@@ -229,6 +229,10 @@ export abstract class BaseConnector<
     this.reconnectAttempts = 0;
   }
 
+  // ==========================================
+  // Message Status Tracking Methods
+  // ==========================================
+
   /**
    * Emit message received event
    */
@@ -280,100 +284,6 @@ export abstract class BaseConnector<
       platform: this.platform,
       timestamp: new Date(),
       error: error.message,
-    });
-  }
-
-  /**
-   * Emit message sent event
-   */
-  protected emitMessageSent(response: SendMessageResponse, dbMessageId: number): void {
-    this.emit('message_sent', response);
-
-    // Track message status and persist to database
-    if (response.success) {
-      MessageStatusTracker.trackSentMessage({
-        messageId: dbMessageId.toString(),
-        conversationId: '', // Will be set by connector
-        status: 'sent',
-        platform: this.platform,
-        timestamp: new Date(),
-      });
-    }
-  }
-
-  /**
-   * Emit message failed event
-   */
-  protected emitMessageFailed(error: MessageSendError, dbMessageId: number): void {
-    this.emit('message_failed', {
-      messageId: error.messageId || 'unknown',
-      error,
-    });
-
-    // Track message failure and queue for retry
-    MessageStatusTracker.trackFailedMessage({
-      messageId: dbMessageId.toString(),
-      conversationId: '', // Will be set by connector
-      status: 'failed',
-      platform: this.platform,
-      timestamp: new Date(),
-      error: error.message,
-    });
-  }
-
-  /**
-   * Emit message sent event
-   */
-  protected emitMessageSent(response: SendMessageResponse): void {
-    this.emit('message_sent', response);
-    WebSocketService.emitMessageStatus({
-      event: 'message.sent',
-      data: response,
-    });
-  }
-
-  /**
-   * Emit message failed event
-   */
-  protected emitMessageFailed(error: any): void {
-    this.emit('message_failed', {
-      messageId: error.messageId || 'unknown',
-      error,
-    });
-    WebSocketService.emitMessageStatus({
-      event: 'message.failed',
-      data: {
-        messageId: error.messageId || 'unknown',
-        error: error instanceof Error ? error.message : String(error),
-        platform: this.platform,
-      },
-    });
-  }
-
-  /**
-   * Emit message sent event
-   */
-  protected emitMessageSent(response: SendMessageResponse): void {
-    this.emit('message_sent', response);
-    this.emit('debug', {
-      event: 'message_sent',
-      response,
-      platform: this.platform,
-    });
-  }
-
-  /**
-   * Emit message failed event
-   */
-  protected emitMessageFailed(error: any): void {
-    this.emit('message_failed', {
-      messageId: error.messageId || 'unknown',
-      error: error,
-    });
-    this.emit('debug', {
-      event: 'message_failed',
-      error,
-      platform: this.platform,
     });
   }
 
