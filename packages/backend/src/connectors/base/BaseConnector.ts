@@ -14,8 +14,12 @@ import type {
   SendMessageResponse,
   ConnectorEventMap,
   ValidationError,
+  ConnectorMessage,
+  MessageSendError,
   IConnector as IConnectorType,
 } from '@yacc/common/types/connector.types';
+import type { MessageStatusUpdate } from '../../services/MessageStatusTracker';
+import { MessageStatusTracker } from '../../services/MessageStatusTracker';
 
 // ============================================
 // Abstract Base Connector Class
@@ -55,17 +59,17 @@ export abstract class BaseConnector<
   // ==========================================
 
   /**
-   * Connect to the platform (abstract - must be implemented)
+   * Connect to platform (abstract - must be implemented)
    */
   public abstract connect(): Promise<void>;
 
   /**
-   * Disconnect from the platform (abstract - must be implemented)
+   * Disconnect from platform (abstract - must be implemented)
    */
   public abstract disconnect(): Promise<void>;
 
   /**
-   * Send a message to the platform (abstract - must be implemented)
+   * Send a message to platform (abstract - must be implemented)
    */
   public abstract sendMessage(request: SendMessageRequest): Promise<SendMessageResponse>;
 
@@ -225,42 +229,61 @@ export abstract class BaseConnector<
     this.reconnectAttempts = 0;
   }
 
+  // ==========================================
+  // Message Status Tracking Methods
+  // ==========================================
+
   /**
    * Emit message received event
    */
-  protected emitMessageReceived(message: any): void {
+  protected emitMessageReceived(message: ConnectorMessage, dbMessageId: number): void {
     this.emit('message_received', message);
-    this.emit('debug', {
-      event: 'message_received',
-      message,
+
+    // Track message status and persist to database
+    MessageStatusTracker.trackReceivedMessage({
+      messageId: dbMessageId.toString(),
+      conversationId: '', // Will be set by connector
+      status: 'pending',
       platform: this.platform,
+      timestamp: new Date(),
     });
   }
 
   /**
    * Emit message sent event
    */
-  protected emitMessageSent(response: SendMessageResponse): void {
+  protected emitMessageSent(response: SendMessageResponse, dbMessageId: number): void {
     this.emit('message_sent', response);
-    this.emit('debug', {
-      event: 'message_sent',
-      response,
-      platform: this.platform,
-    });
+
+    // Track message status and persist to database
+    if (response.success) {
+      MessageStatusTracker.trackSentMessage({
+        messageId: dbMessageId.toString(),
+        conversationId: '', // Will be set by connector
+        status: 'sent',
+        platform: this.platform,
+        timestamp: new Date(),
+      });
+    }
   }
 
   /**
    * Emit message failed event
    */
-  protected emitMessageFailed(error: any): void {
+  protected emitMessageFailed(error: MessageSendError, dbMessageId: number): void {
     this.emit('message_failed', {
       messageId: error.messageId || 'unknown',
-      error: error,
-    });
-    this.emit('debug', {
-      event: 'message_failed',
       error,
+    });
+
+    // Track message failure and queue for retry
+    MessageStatusTracker.trackFailedMessage({
+      messageId: dbMessageId.toString(),
+      conversationId: '', // Will be set by connector
+      status: 'failed',
       platform: this.platform,
+      timestamp: new Date(),
+      error: error.message,
     });
   }
 
