@@ -6,10 +6,13 @@ export interface SearchConversationsQuery {
   q: string;
   page?: number;
   pageSize?: number;
-  channel?: 'telegram' | 'irc' | 'whatsapp' | 'twitter';
+  channel?: keyof typeof CHANNELS;
   tagId?: string;
   assigneeId?: string;
-  status?: 'open' | 'pending' | 'resolved';
+  status?: keyof typeof CONVERSATION_STATUSES;
   dateFrom?: string;
   dateTo?: string;
 }
+
+import { CHANNELS } from '../constants/channels';
+import { CONVERSATION_STATUSES } from '../constants/statuses';

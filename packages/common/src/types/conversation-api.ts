@@ -7,10 +7,10 @@ import type { Conversation } from './conversation';
 export interface GetConversationsQuery {
   page?: number;
   pageSize?: number;
-  channel?: 'telegram' | 'irc' | 'whatsapp' | 'twitter';
+  channel?: keyof typeof CHANNELS;
   assignedUserId?: string;
-  status?: 'open' | 'pending' | 'resolved';
-  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  status?: keyof typeof CONVERSATION_STATUSES;
+  priority?: keyof typeof PRIORITY_LEVELS;
   tagId?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -21,7 +21,10 @@ export interface CreateConversationResponse {
 }
 
 export interface UpdateConversationRequest {
-  status?: 'open' | 'pending' | 'resolved';
-  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  status?: keyof typeof CONVERSATION_STATUSES;
+  priority?: keyof typeof PRIORITY_LEVELS;
   assignedUserId?: string;
 }
+
+import { CHANNELS } from '../constants/channels';
+import { CONVERSATION_STATUSES, PRIORITY_LEVELS } from '../constants/statuses';

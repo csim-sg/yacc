@@ -42,5 +42,3 @@ export const ROLE_PERMISSIONS = {
     'conversation.note',
   ],
 } as const;
-
-export type Role = keyof typeof ROLE_PERMISSIONS;

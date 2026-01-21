@@ -10,7 +10,9 @@ export interface ApiResponse<T> {
 }
 
 export interface ErrorResponse {
-  code: string;
+  code: keyof typeof ERROR_CODE;
   message: string;
   details?: Record<string, any>;
 }
+
+import { ERROR_CODE } from '../constants/errors';

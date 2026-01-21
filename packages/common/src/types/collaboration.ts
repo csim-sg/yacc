@@ -20,8 +20,8 @@ export interface BulkActionRequest {
   data: {
     assignedUserId?: string;
     tagId?: string;
-    status?: 'open' | 'pending' | 'resolved';
-    priority?: 'low' | 'normal' | 'high' | 'urgent';
+    status?: keyof typeof CONVERSATION_STATUSES;
+    priority?: keyof typeof PRIORITY_LEVELS;
   };
 }
 
@@ -29,3 +29,5 @@ export interface BulkActionResponse {
   succeeded: string[];
   failed: Array<{ id: string; error: string }>;
 }
+
+import { CONVERSATION_STATUSES, PRIORITY_LEVELS } from '../constants/statuses';

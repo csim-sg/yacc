@@ -7,10 +7,10 @@ import type { Tag } from './tag';
 
 export interface Conversation {
   id: string;
-  channel: 'telegram' | 'irc' | 'whatsapp' | 'twitter';
+  channel: keyof typeof CHANNELS;
   externalThreadId: string;
-  status: 'open' | 'pending' | 'resolved';
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  status: keyof typeof CONVERSATION_STATUSES;
+  priority: keyof typeof PRIORITY_LEVELS;
   assignedUserId?: string;
   assignedUser?: User;
   lastMessageAt: string;
@@ -18,3 +18,6 @@ export interface Conversation {
   updatedAt: string;
   tags?: Tag[];
 }
+
+import { CHANNELS } from '../constants/channels';
+import { CONVERSATION_STATUSES, PRIORITY_LEVELS } from '../constants/statuses';

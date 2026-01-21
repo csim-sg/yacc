@@ -5,7 +5,7 @@
 export interface RoutingRule {
   id: string;
   name: string;
-  status: 'active' | 'disabled';
+  status: keyof typeof ROUTING_RULE_STATUSES;
   priority: number;
   conditions: RuleCondition[];
   actions: RuleAction[];
@@ -24,3 +24,5 @@ export interface RuleAction {
   type: 'assign' | 'tag' | 'priority';
   value: string;
 }
+
+import { ROUTING_RULE_STATUSES } from '../constants/statuses';
