@@ -12,8 +12,9 @@ import { authorizationChecker, currentUserChecker } from './api/middleware/routi
 import { AuthController } from './api/controllers/auth.controller';
 import { SimpleAuthController } from './api/controllers/simple-auth.controller';
 import { ConversationsController } from './api/controllers/conversations.controller';
-import { HealthController } from './api/controllers/HealthController';
+import express, { Router } from 'express';
 import { AuditController } from './api/controllers/audit.controller';
+import { HealthController } from './api/controllers/health.controller';
 
 const app = express();
 const server = http.createServer(app);
@@ -34,10 +35,10 @@ const PORT = process.env.PORT || 3000;
   }));
   app.use(express.json());
 
-  // Setup routing-controllers
+  // Setup routing-controllers for /api endpoints
   useExpressServer(app, {
     routePrefix: '/api',
-    controllers: [AuthController, SimpleAuthController, ConversationsController, HealthController, AuditController],
+    controllers: [AuthController, SimpleAuthController, ConversationsController, AuditController, HealthController],
     authorizationChecker: authorizationChecker,
     currentUserChecker: currentUserChecker,
     defaultErrorHandler: true,
