@@ -52,7 +52,7 @@ class QueryAuditLogsQuery {
   dateTo?: string;
 }
 
-@JsonController('/audit-logs')
+@JsonController('/api/audit-logs')
 @Authorized(['manager', 'admin', 'super_admin'])
 export class AuditController {
   /**

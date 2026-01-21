@@ -32,7 +32,7 @@ interface LoginResponse {
   };
 }
 
-@Controller('/simple-auth')
+@Controller('/api/simple-auth')
 export class SimpleAuthController {
   /**
    * Login with email/password
