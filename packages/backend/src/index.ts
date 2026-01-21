@@ -12,6 +12,7 @@ import { authorizationChecker, currentUserChecker } from './api/middleware/routi
 import { AuthController } from './api/controllers/auth.controller';
 import { SimpleAuthController } from './api/controllers/simple-auth.controller';
 import { ConversationsController } from './api/controllers/conversations.controller';
+import { HealthController } from './api/controllers/HealthController';
 import { AuditController } from './api/controllers/audit.controller';
 
 const app = express();
@@ -60,7 +61,7 @@ app.get('/api', (_req, res) => {
 // Setup routing-controllers
 useExpressServer(app, {
   routePrefix: '/api',
-  controllers: [AuthController, SimpleAuthController, ConversationsController, AuditController],
+  controllers: [AuthController, SimpleAuthController, ConversationsController, HealthController, AuditController],
   authorizationChecker: authorizationChecker,
   currentUserChecker: currentUserChecker,
   defaultErrorHandler: true,
