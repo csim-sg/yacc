@@ -14,8 +14,12 @@ import type {
   SendMessageResponse,
   ConnectorEventMap,
   ValidationError,
+  ConnectorMessage,
+  MessageSendError,
   IConnector as IConnectorType,
 } from '@yacc/common/types/connector.types';
+import type { MessageStatusUpdate } from '../../services/MessageStatusTracker';
+import { MessageStatusTracker } from '../../services/MessageStatusTracker';
 
 // ============================================
 // Abstract Base Connector Class
@@ -228,12 +232,54 @@ export abstract class BaseConnector<
   /**
    * Emit message received event
    */
-  protected emitMessageReceived(message: any): void {
-    const { WebSocketService } = require('../../services/MessageStatusTracker');
+  protected emitMessageReceived(message: ConnectorMessage, dbMessageId: number): void {
     this.emit('message_received', message);
-    WebSocketService.emitMessageStatus({
-      event: 'message.received',
-      data: message,
+
+    // Track message status and persist to database
+    MessageStatusTracker.trackReceivedMessage({
+      messageId: dbMessageId.toString(),
+      conversationId: '', // Will be set by connector
+      status: 'pending',
+      platform: this.platform,
+      timestamp: new Date(),
+    });
+  }
+
+  /**
+   * Emit message sent event
+   */
+  protected emitMessageSent(response: SendMessageResponse, dbMessageId: number): void {
+    this.emit('message_sent', response);
+
+    // Track message status and persist to database
+    if (response.success) {
+      MessageStatusTracker.trackSentMessage({
+        messageId: dbMessageId.toString(),
+        conversationId: '', // Will be set by connector
+        status: 'sent',
+        platform: this.platform,
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  /**
+   * Emit message failed event
+   */
+  protected emitMessageFailed(error: MessageSendError, dbMessageId: number): void {
+    this.emit('message_failed', {
+      messageId: error.messageId || 'unknown',
+      error,
+    });
+
+    // Track message failure and queue for retry
+    MessageStatusTracker.trackFailedMessage({
+      messageId: dbMessageId.toString(),
+      conversationId: '', // Will be set by connector
+      status: 'failed',
+      platform: this.platform,
+      timestamp: new Date(),
+      error: error.message,
     });
   }
 

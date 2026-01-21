@@ -2,10 +2,15 @@
  * Message Status Tracker Service
  *
  * Tracks message delivery status (pending → sent → failed)
- * Emits WebSocket events for real-time updates
+ * Persists status to database and emits WebSocket events for real-time updates
  */
 
-import type { MessageDirection } from '@yacc/common/types/connector.types';
+import { eq } from 'drizzle-orm';
+import type { Platform } from '@yacc/common/types/connector.types';
+import { db } from '../infrastructure/db/client';
+import { messages } from '../infrastructure/db/schema';
+import { enqueueRetry } from '../infrastructure/queues/messageRetryQueue';
+import { MessageEvents } from '../websockets/WSConstants';
 import logger from '../utils/logger';
 
 // ============================================
@@ -19,29 +24,29 @@ export type MessageStatus = 'pending' | 'sent' | 'failed';
 // ============================================
 
 /**
- * Store message status update
+ * Message status update
  */
 export interface MessageStatusUpdate {
   messageId: string;
   conversationId: string;
   status: MessageStatus;
-  platform: 'telegram' | 'irc';
+  platform: Platform;
   previousStatus?: MessageStatus;
   error?: string;
   timestamp: Date;
 }
 
 /**
- * Message status event for WebSocket
+ * Message status event for WebSocket (standardized dot notation)
  */
 export interface MessageStatusEvent {
-  event: 'message_sent' | 'message_failed' | 'message.received';
+  event: 'message.received' | 'message.sent' | 'message.failed';
   data: {
     messageId: string;
     conversationId: string;
     status: MessageStatus;
-    platform: 'telegram' | 'irc';
-    direction: MessageDirection;
+    platform: Platform;
+    direction: 'inbound' | 'outbound';
     timestamp: Date;
     error?: string;
     previousStatus?: MessageStatus;
@@ -49,46 +54,31 @@ export interface MessageStatusEvent {
 }
 
 // ============================================
-// WebSocket Service (Placeholder)
+// Status Transition State Machine
 // ============================================
 
 /**
- * WebSocket service for emitting message status events
- * TODO: Implement when WebSocket server is set up
+ * Valid status transitions based on current status
+ * Pending → Sent (success)
+ * Pending → Failed (failure)
+ * Failed → Pending (retry)
+ * Sent → No transitions (terminal)
  */
-export class WebSocketService {
-  /**
-   * Emit message status event
-   */
-  static emitMessageStatus(event: MessageStatusEvent): void {
-    logger.debug('Emitting message status event', {
-      event: event.event,
-      messageId: event.data.messageId,
-      status: event.data.status,
-      platform: event.data.platform,
-    });
+const VALID_TRANSITIONS: Record<MessageStatus, MessageStatus[]> = {
+  pending: ['sent', 'failed'],
+  sent: [], // Terminal state - no further transitions
+  failed: ['pending'], // Can retry from failed
+};
 
-    // TODO: Emit via Socket.io
-    // socket.emit(`message_${event.event}`, event.data);
-  }
-
-  /**
-   * Emit generic notification event
-   */
-  static emitNotification(type: string, data: Record<string, unknown>): void {
-    logger.debug('Emitting notification event', { type, data });
-
-    // TODO: Emit via Socket.io
-    // socket.emit('notification', { type, data });
-  }
+/**
+ * Check if status transition is valid
+ */
+export function canTransitionTo(from: MessageStatus, to: MessageStatus): boolean {
+  return VALID_TRANSITIONS[from]?.includes(to) || false;
 }
 
-// ============================================
-// Status Transitions
-// ============================================
-
 /**
- * Get next status after a failure
+ * Get next status after failure
  */
 export function getNextStatusAfterFailure(currentStatus: MessageStatus): MessageStatus {
   switch (currentStatus) {
@@ -103,18 +93,251 @@ export function getNextStatusAfterFailure(currentStatus: MessageStatus): Message
   }
 }
 
-/**
- * Check if message status can be updated
- */
-export function canUpdateStatus(from: MessageStatus, to: MessageStatus): boolean {
-  const validTransitions: Record<MessageStatus, MessageStatus[]> = {
-    pending: ['pending'],
-    sent: ['pending'], // Can be retried after failure
-    failed: ['pending'], // Can be retried after failure
-  };
+// ============================================
+// Message Status Tracker
+// ============================================
 
-  return validTransitions[to]?.includes(from) || false;
+/**
+ * Class to track and manage message status lifecycle
+ */
+class MessageStatusTrackerService {
+  /**
+   * Track received message (inbound from platform)
+   */
+  async trackReceivedMessage(update: MessageStatusUpdate): Promise<void> {
+    try {
+      logger.debug('Tracking received message', {
+        messageId: update.messageId,
+        platform: update.platform,
+      });
+
+      // Persist status to database
+      await db
+        .update(messages)
+        .set({ status: 'pending', updatedAt: new Date() })
+        .where(eq(messages.id, parseInt(update.messageId, 10)));
+
+      // Emit WebSocket event
+      this.emitMessageStatus({
+        event: MessageEvents.MESSAGE_RECEIVED,
+        data: {
+          messageId: update.messageId,
+          conversationId: update.conversationId,
+          status: 'pending',
+          platform: update.platform,
+          direction: 'inbound',
+          timestamp: update.timestamp,
+        },
+      });
+    } catch (error) {
+      logger.error('Failed to track received message', {
+        messageId: update.messageId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Track sent message (outbound successfully delivered)
+   */
+  async trackSentMessage(update: MessageStatusUpdate): Promise<void> {
+    try {
+      logger.debug('Tracking sent message', {
+        messageId: update.messageId,
+        platform: update.platform,
+      });
+
+      // Get current status from database
+      const currentMessage = await db
+        .select({ status: messages.status })
+        .from(messages)
+        .where(eq(messages.id, parseInt(update.messageId, 10)))
+        .limit(1);
+
+      const currentStatus: MessageStatus | undefined = currentMessage[0]?.status as MessageStatus | undefined;
+
+      // Validate status transition
+      if (currentStatus && !canTransitionTo(currentStatus, 'sent')) {
+        logger.warn('Invalid status transition attempted', {
+          messageId: update.messageId,
+          from: currentStatus,
+          to: 'sent',
+        });
+        return;
+      }
+
+      // Persist status to database
+      await db
+        .update(messages)
+        .set({ status: 'sent', updatedAt: new Date() })
+        .where(eq(messages.id, parseInt(update.messageId, 10)));
+
+      // Emit WebSocket event
+      this.emitMessageStatus({
+        event: MessageEvents.MESSAGE_SENT,
+        data: {
+          messageId: update.messageId,
+          conversationId: update.conversationId,
+          status: 'sent',
+          platform: update.platform,
+          direction: 'outbound',
+          timestamp: update.timestamp,
+          previousStatus: currentStatus,
+        },
+      });
+    } catch (error) {
+      logger.error('Failed to track sent message', {
+        messageId: update.messageId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Track failed message (outbound delivery failed)
+   * Enqueues for retry if retryable
+   */
+  async trackFailedMessage(update: MessageStatusUpdate): Promise<void> {
+    try {
+      logger.debug('Tracking failed message', {
+        messageId: update.messageId,
+        platform: update.platform,
+        error: update.error,
+      });
+
+      // Get current status from database
+      const currentMessage = await db
+        .select({ status: messages.status })
+        .from(messages)
+        .where(eq(messages.id, parseInt(update.messageId, 10)))
+        .limit(1);
+
+      const currentStatus: MessageStatus | undefined = currentMessage[0]?.status as MessageStatus | undefined;
+
+      // Validate status transition
+      if (currentStatus && !canTransitionTo(currentStatus, 'failed')) {
+        logger.warn('Invalid status transition attempted', {
+          messageId: update.messageId,
+          from: currentStatus,
+          to: 'failed',
+        });
+        return;
+      }
+
+      // Persist status to database
+      await db
+        .update(messages)
+        .set({
+          status: 'failed',
+          updatedAt: new Date(),
+          metadata: {
+            lastError: update.error,
+          },
+        })
+        .where(eq(messages.id, parseInt(update.messageId, 10)));
+
+      // Determine next status for retry
+      const nextStatus = getNextStatusAfterFailure(currentStatus || 'pending');
+
+      // Emit WebSocket event
+      this.emitMessageStatus({
+        event: MessageEvents.MESSAGE_FAILED,
+        data: {
+          messageId: update.messageId,
+          conversationId: update.conversationId,
+          status: 'failed',
+          platform: update.platform,
+          direction: 'outbound',
+          timestamp: update.timestamp,
+          error: update.error,
+          previousStatus: currentStatus,
+        },
+      });
+
+      // Enqueue for retry (only if retryable)
+      await this.enqueueRetryIfNeeded(update, nextStatus);
+    } catch (error) {
+      logger.error('Failed to track failed message', {
+        messageId: update.messageId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Enqueue message for retry if it's retryable
+   */
+  private async enqueueRetryIfNeeded(
+    update: MessageStatusUpdate,
+    nextStatus: MessageStatus
+  ): Promise<void> {
+    try {
+      // Only retry if next status is pending
+      if (nextStatus !== 'pending') {
+        logger.debug('Message not retryable', {
+          messageId: update.messageId,
+          status: update.status,
+        });
+        return;
+      }
+
+      // Enqueue for retry
+      await enqueueRetry({
+        messageId: update.messageId,
+        conversationId: update.conversationId,
+        platform: update.platform,
+        attemptNumber: 1, // Will be incremented by retry worker
+        attemptAt: new Date(),
+        lastError: update.error,
+      });
+
+      logger.info('Message enqueued for retry', {
+        messageId: update.messageId,
+        conversationId: update.conversationId,
+        platform: update.platform,
+      });
+    } catch (error) {
+      logger.error('Failed to enqueue message for retry', {
+        messageId: update.messageId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Emit message status event via WebSocket
+   * Socket.io server integration will be implemented in Phase 2
+   * For now, we only log the event (WebSocket not yet initialized)
+   */
+  private emitMessageStatus(event: MessageStatusEvent): void {
+    logger.debug('Emitting message status event', {
+      event: event.event,
+      messageId: event.data.messageId,
+      status: event.data.status,
+      platform: event.data.platform,
+    });
+
+    // Socket.io server integration will be implemented in Phase 2
+    // When implemented, this will emit to connected clients:
+    // socket.emit(`message.${event.event}`, event.data);
+  }
 }
+
+// Singleton instance
+const tracker = new MessageStatusTrackerService();
+
+// ============================================
+// Public API
+// ============================================
+
+export const MessageStatusTracker = {
+  trackReceivedMessage: (update: MessageStatusUpdate) =>
+    tracker.trackReceivedMessage(update),
+  trackSentMessage: (update: MessageStatusUpdate) =>
+    tracker.trackSentMessage(update),
+  trackFailedMessage: (update: MessageStatusUpdate) =>
+    tracker.trackFailedMessage(update),
+};
 
 // ============================================
 // Export
@@ -124,7 +347,6 @@ export {
   MessageStatus,
   MessageStatusUpdate,
   MessageStatusEvent,
-  WebSocketService,
+  canTransitionTo,
   getNextStatusAfterFailure,
-  canUpdateStatus,
 };
