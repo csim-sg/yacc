@@ -229,11 +229,40 @@ export abstract class BaseConnector<
    * Emit message received event
    */
   protected emitMessageReceived(message: any): void {
+    const { WebSocketService } = require('../../services/MessageStatusTracker');
     this.emit('message_received', message);
-    this.emit('debug', {
-      event: 'message_received',
-      message,
-      platform: this.platform,
+    WebSocketService.emitMessageStatus({
+      event: 'message.received',
+      data: message,
+    });
+  }
+
+  /**
+   * Emit message sent event
+   */
+  protected emitMessageSent(response: SendMessageResponse): void {
+    this.emit('message_sent', response);
+    WebSocketService.emitMessageStatus({
+      event: 'message.sent',
+      data: response,
+    });
+  }
+
+  /**
+   * Emit message failed event
+   */
+  protected emitMessageFailed(error: any): void {
+    this.emit('message_failed', {
+      messageId: error.messageId || 'unknown',
+      error,
+    });
+    WebSocketService.emitMessageStatus({
+      event: 'message.failed',
+      data: {
+        messageId: error.messageId || 'unknown',
+        error: error instanceof Error ? error.message : String(error),
+        platform: this.platform,
+      },
     });
   }
 
