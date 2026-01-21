@@ -286,6 +286,44 @@ export abstract class BaseConnector<
   /**
    * Emit message sent event
    */
+  protected emitMessageSent(response: SendMessageResponse, dbMessageId: number): void {
+    this.emit('message_sent', response);
+
+    // Track message status and persist to database
+    if (response.success) {
+      MessageStatusTracker.trackSentMessage({
+        messageId: dbMessageId.toString(),
+        conversationId: '', // Will be set by connector
+        status: 'sent',
+        platform: this.platform,
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  /**
+   * Emit message failed event
+   */
+  protected emitMessageFailed(error: MessageSendError, dbMessageId: number): void {
+    this.emit('message_failed', {
+      messageId: error.messageId || 'unknown',
+      error,
+    });
+
+    // Track message failure and queue for retry
+    MessageStatusTracker.trackFailedMessage({
+      messageId: dbMessageId.toString(),
+      conversationId: '', // Will be set by connector
+      status: 'failed',
+      platform: this.platform,
+      timestamp: new Date(),
+      error: error.message,
+    });
+  }
+
+  /**
+   * Emit message sent event
+   */
   protected emitMessageSent(response: SendMessageResponse): void {
     this.emit('message_sent', response);
     WebSocketService.emitMessageStatus({
