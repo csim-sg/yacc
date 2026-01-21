@@ -44,7 +44,7 @@ export interface GetConversationsQuery {
 }
 
 export interface CreateConversationResponse {
-  conversation: any;  // Conversation type from entities
+  conversation: any;  // Conversation type
 }
 
 export interface UpdateConversationRequest {
@@ -91,8 +91,8 @@ export interface BulkActionRequest {
   data: {
     assignedUserId?: string;
     tagId?: string;
-    status?: any;  // ConversationStatus from constants
-    priority?: any;  // Priority from constants
+    status?: any;  // ConversationStatus
+    priority?: any;  // Priority
   };
 }
 
@@ -114,7 +114,7 @@ export interface CreateRoutingRuleRequest {
 
 export interface UpdateRoutingRuleRequest {
   name?: string;
-  status?: any;  // RoutingRuleStatus from entities
+  status?: any;  // RoutingRuleStatus
   conditions?: any;
   actions?: any;
   priority?: number;
@@ -128,10 +128,10 @@ export interface SearchConversationsQuery {
   q: string;
   page?: number;
   pageSize?: number;
-  channel?: any;  // Channel from constants
+  channel?: any;  // Channel
   tagId?: string;
   assigneeId?: string;
-  status?: any;  // ConversationStatus from constants
+  status?: any;  // ConversationStatus
   dateFrom?: string;
   dateTo?: string;
 }
