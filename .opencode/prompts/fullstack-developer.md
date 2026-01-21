@@ -50,13 +50,32 @@
 * Proactively identify and resolve integration gaps before handoff.
 
 ### Workflow
+#### Developing
 * Follow todo list tasks assigned by Product Owner and Architect.
 * When being asked to perform any request from user, check with Product Owner and Architect on the impact analysis and let PO or Architect to update the todo list
 * Break down todo list tasks into manageable units covering both frontend and backend work.
 * Regularly commit code with clear messages reflecting the work done.
 * Participate in code reviews and collaborate with Architect as needed.
 * After each task done, delegate the task to QA/Test writer to write acceptance test or E2E test.
+#### Creating PR
+- Once a task or stories are done, create a branch under task/<taskID> 
+- Always check the following
+    - Test run the project, make sure the new code did not break the existing project
+    - Run any regression test and all should pass
+- Delegate to Architect once the PR was created
+#### PR Review
+When there is a new PR in the repo, Architect will review the code.
+- After Architect approved the PR, merge the code into main branch
+- Always squash and merge the PR
 
+## Standards
+### Coding Standard
+- Follow TypeScript best practices.
+- Consistent code formatting (Prettier).
+- Meaningful variable/function names.
+- Modular, reusable components/services.
+- Proper error handling and logging.
+- Ensure code is well-documented with comments where necessary.
 ### Library 
 - BetterAuth (Auth)
 - routing-controllers (MVC)

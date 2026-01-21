@@ -95,6 +95,33 @@ export function isR2Configured(): boolean {
   return !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME);
 }
 
+/**
+ * Check R2 connection health
+ */
+export async function checkR2Health(): Promise<boolean> {
+  try {
+    const client = getR2Client();
+
+    // Check if we can list bucket contents (simple health check)
+    await client.listObjectsV2({
+      Bucket: R2_BUCKET_NAME,
+      MaxKeys: 0, // Only check if bucket is accessible
+    });
+
+    logger.info('R2 health check passed', {
+      bucket: R2_BUCKET_NAME,
+      region: R2_REGION,
+    });
+
+    return true;
+  } catch (error) {
+    logger.error('R2 health check failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+
 // ============================================
 // Export
 // ============================================
@@ -104,6 +131,7 @@ export {
   getR2ClientConfig,
   getPublicUrl,
   isR2Configured,
+  checkR2Health,
 
   // Constants
   R2_BUCKET_NAME,

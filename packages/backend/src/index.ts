@@ -12,7 +12,9 @@ import { authorizationChecker, currentUserChecker } from './api/middleware/routi
 import { AuthController } from './api/controllers/auth.controller';
 import { SimpleAuthController } from './api/controllers/simple-auth.controller';
 import { ConversationsController } from './api/controllers/conversations.controller';
+import express, { Router } from 'express';
 import { AuditController } from './api/controllers/audit.controller';
+import { HealthController } from './api/controllers/health.controller';
 
 const app = express();
 const server = http.createServer(app);
@@ -25,51 +27,27 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true,
-  exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
-}));
-app.use(express.json());
+  // Middleware
+  app.use(cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    credentials: true,
+    exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
+  }));
+  app.use(express.json());
 
-// Health check
-app.get('/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// API routes
-app.get('/api', (_req, res) => {
-  res.json({
-    message: 'YACC Inbox API',
-    version: '0.1.0',
-    endpoints: {
-      health: '/health',
-      auth: '/api/auth',
-      conversations: '/api/conversations',
-      'audit-logs': '/api/audit-logs',
-      messages: '/api/messages (Phase 2)',
-      users: '/api/users (Phase 2)',
+  // Setup routing-controllers for /api endpoints
+  useExpressServer(app, {
+    routePrefix: '/api',
+    controllers: [AuthController, SimpleAuthController, ConversationsController, AuditController, HealthController],
+    authorizationChecker: authorizationChecker,
+    currentUserChecker: currentUserChecker,
+    defaultErrorHandler: true,
+    validation: {
+      whitelist: true,
+      forbidNonWhitelisted: true,
     },
+    classTransformer: true,
   });
-});
-
-// Setup routing-controllers
-useExpressServer(app, {
-  routePrefix: '/api',
-  controllers: [AuthController, SimpleAuthController, ConversationsController, AuditController],
-  authorizationChecker: authorizationChecker,
-  currentUserChecker: currentUserChecker,
-  defaultErrorHandler: true,
-  validation: {
-    whitelist: true,
-    forbidNonWhitelisted: true,
-  },
-  classTransformer: true,
-});
 
 // Conversations list headers middleware
 app.use('/api/conversations', (req, res, next) => {

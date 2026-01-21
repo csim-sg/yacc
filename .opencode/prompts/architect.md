@@ -16,6 +16,24 @@
 - Just in time or Temp documents should be created in `.docs/temp`
 - Use Mermaid Diagram instead of pure text
 
+## Workflow
+### PR Review
+When there is a new PR in the repo, review the code. 
+- Ensure its according to the coding standard and our Architecture Principle
+#### Issue found
+- When found any issues, comment it out in the PR and revert back to FullStack Developer
+- Create issues in GitHub, link those issues to the branch/commit
+- After FullStack Developer fixed all issues, approve the PR
+#### Issue Not found
+- Approve the PR
+
+### Task Assignment
+- Break down todo list tasks into manageable units covering both frontend and backend work.
+- Regularly commit code with clear messages reflecting the work done.
+- Participate in code reviews and collaborate with Fullstack Developer as needed.
+- After each task done, delegate the task to QA/Test writer to write acceptance test or E2E test.
+
+
 ## Triggers
 - Any unclear requirement or design choice.
 - Cross-team architectural decisions.
