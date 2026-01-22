@@ -58,7 +58,7 @@ curl -X GET http://localhost:3000/api
     "health": "/health",
     "auth": "/api/auth",
     "conversations": "/api/conversations",
-    "audit-logs": "/api/audit-logs",
+    "audit-logs": "/api/conversations/:conversationId/audit-logs",
     "messages": "/api/messages (Phase 2)",
     "users": "/api/users (Phase 2)"
   }
@@ -514,40 +514,25 @@ curl -X DELETE http://localhost:3000/api/conversations/1/tags/1 \
 
 ### Audit Log Endpoints
 
-#### GET /api/audit-logs
+#### GET /api/conversations/:conversationId/audit-logs
+
+Get audit logs for a specific conversation. Audit logs are conversation-scoped only.
 
 ```bash
-curl -X GET http://localhost:3000/api/audit-logs \
+curl -X GET http://localhost:3000/api/conversations/1/audit-logs \
+  -H "Authorization: Bearer $MANAGER_TOKEN"
+```
+
+**With pagination**:
+```bash
+curl -X GET "http://localhost:3000/api/conversations/1/audit-logs?page=1&limit=20" \
   -H "Authorization: Bearer $MANAGER_TOKEN"
 ```
 
 **Success Criteria**:
 - ✅ Status code: 200
-- ✅ Response includes: logs array, total, page, limit, totalPages
-
-**With filters**:
-```bash
-curl -X GET "http://localhost:3000/api/audit-logs?action=conversation_assigned" \
-  -H "Authorization: Bearer $MANAGER_TOKEN"
-```
-
----
-
-#### GET /api/audit-logs/conversation/:conversationId
-
-```bash
-curl -X GET http://localhost:3000/api/audit-logs/conversation/1 \
-  -H "Authorization: Bearer $MANAGER_TOKEN"
-```
-
----
-
-#### GET /api/audit-logs/actor/:actorId
-
-```bash
-curl -X GET http://localhost:3000/api/audit-logs/actor/2 \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-```
+- ✅ Response includes: logs array, pagination object with page, limit, total, pages
+- ✅ Only conversation-related audit events are returned
 
 ---
 
@@ -703,33 +688,17 @@ curl -X GET http://localhost:3000/api/audit-logs/actor/2 \
       "name": "Audit Logs",
       "item": [
         {
-          "name": "Query Audit Logs",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{manager_token}}"}],
-            "url": {
-              "raw": "{{base_url}}/api/audit-logs?page=1&limit=20&action=conversation_assigned",
-              "protocol": "http",
-              "host": ["{{base_url}}"],
-              "path": ["/api/audit-logs"],
-              "query": [{"key": "page", "value": "1"}, {"key": "limit", "value": "20"}, {"key": "action", "value": "conversation_assigned"}]
-            }
-          }
-        },
-        {
           "name": "Get Conversation Audit Logs",
           "request": {
             "method": "GET",
             "header": [{"key": "Authorization", "value": "Bearer {{manager_token}}"}],
-            "url": {"raw": "{{base_url}}/api/audit-logs/conversation/1", "protocol": "http", "host": ["{{base_url}}"], "path": ["/api/audit-logs/conversation/1"]}
-          }
-        },
-        {
-          "name": "Get Actor Audit Logs",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}],
-            "url": {"raw": "{{base_url}}/api/audit-logs/actor/1", "protocol": "http", "host": ["{{base_url}}"], "path": ["/api/audit-logs/actor/1"]}
+            "url": {
+              "raw": "{{base_url}}/api/conversations/1/audit-logs?page=1&limit=20",
+              "protocol": "http",
+              "host": ["{{base_url}}"],
+              "path": ["api", "conversations", "1", "audit-logs"],
+              "query": [{"key": "page", "value": "1"}, {"key": "limit", "value": "20"}]
+            }
           }
         }
       ]

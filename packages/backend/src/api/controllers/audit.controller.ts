@@ -1,6 +1,6 @@
 /**
  * Audit Controller
- * Handles audit log queries with routing-controllers
+ * Handles conversation-scoped audit log queries
  */
 
 import {
@@ -8,13 +8,14 @@ import {
   Get,
   QueryParams,
   Authorized,
+  Param,
 } from 'routing-controllers';
-import { IsOptional, IsInt, IsString, IsDateString, IsUUID } from 'class-validator';
+import { IsOptional, IsInt } from 'class-validator';
 import { Type } from 'class-transformer';
 import { auditService } from '@yacc/backend/domain/services/audit.service';
 
 // DTOs
-class QueryConversationAuditLogsQuery {
+class GetConversationAuditLogsQuery {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -24,51 +25,35 @@ class QueryConversationAuditLogsQuery {
   @Type(() => Number)
   @IsInt()
   limit?: number;
-
-  @IsUUID()
-  conversationId!: string;
-
-  @IsOptional()
-  @IsUUID()
-  actorId?: string;
-
-  @IsOptional()
-  @IsString()
-  action?: string;
-
-  @IsOptional()
-  @IsDateString()
-  dateFrom?: string;
-
-  @IsOptional()
-  @IsDateString()
-  dateTo?: string;
 }
 
-@JsonController('/api/audit-logs')
+/**
+ * Audit logs are conversation-scoped only
+ * This controller provides endpoints to retrieve audit logs for specific conversations
+ */
+@JsonController('/api/conversations')
 @Authorized(['manager', 'admin', 'super_admin'])
 export class AuditController {
   /**
-   * GET /api/audit-logs
-   * Query conversation audit logs (admin/manager only)
+   * GET /api/conversations/:conversationId/audit-logs
+   * Get audit logs for a specific conversation
+   * Audit logs are conversation-scoped only, Manager+ access
    */
-  @Get('/')
-  async queryConversationAuditLogs(
-    @QueryParams() query: QueryConversationAuditLogsQuery
+  @Get('/:conversationId/audit-logs')
+  async getConversationAuditLogs(
+    @Param('conversationId') conversationId: string,
+    @QueryParams() query: GetConversationAuditLogsQuery,
   ) {
-    // Transform date strings to Date objects
-    const params = {
-      ...query,
-      dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,
-      dateTo: query.dateTo ? new Date(query.dateTo) : undefined,
-    };
+    const result = await auditService.getConversationAuditLogs({
+      conversationId,
+      page: query.page,
+      limit: query.limit,
+    });
 
-    const result = await auditService.queryConversationAuditLogs(params);
     return {
       success: true,
       data: result.logs,
       pagination: result.pagination,
     };
   }
-
 }
