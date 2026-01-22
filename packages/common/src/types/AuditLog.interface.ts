@@ -1,13 +1,16 @@
 import type { Timestamp } from './Timestamp.interface';
 
-export interface AuditLog extends Timestamp {
+/**
+ * Audit Log Domain Type
+ * Conversation-scoped only
+ */
+export interface AuditLog extends Omit<Timestamp, 'updatedAt'> {
   id: string;
   actorId?: string;
   actorName?: string;
   action: string;
-  entityType: string;
+  entityType: 'conversation';
   entityId: string;
   metadata?: Record<string, unknown>;
-  ip?: string;
-  userAgent?: string;
+  ipAddress?: string;
 }

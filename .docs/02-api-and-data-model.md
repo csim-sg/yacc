@@ -532,9 +532,9 @@ Conversation-scoped audit events only (entity_type is always `conversation`).
 ```sql
 CREATE TABLE audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  actor_id UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+  actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
   action VARCHAR(255) NOT NULL,
-  entity_type VARCHAR(50) NOT NULL DEFAULT 'conversation',
+  entity_type VARCHAR(50) NOT NULL,
   entity_id UUID NOT NULL,
   metadata JSONB,
   ip_address VARCHAR(45),
