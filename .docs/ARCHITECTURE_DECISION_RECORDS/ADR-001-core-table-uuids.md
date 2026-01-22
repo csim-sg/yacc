@@ -28,12 +28,13 @@ Core domain entities are exposed as primary page views. Sequential integer IDs l
 ## Decision
 Convert core page-view tables to UUID primary keys while keeping BetterAuth table IDs as text and allowing their foreign keys to reference UUID users.
 
-**Tables affected (UUID):** `users`, `conversations`, `messages`, `attachments`, `notes`, `notifications`, `routing_rules`, `audit_logs`.
+**Tables affected (UUID):** `users`, `conversations`, `messages`, `attachments`, `notes`, `notifications`, `routing_rules`, `audit_logs` (conversation-only scope; not comprehensive).
 
 ## Implications & Consequences
 - Database schema changes required for listed tables.
 - API contracts and services must treat affected IDs as UUID strings.
 - Migration must preserve referential integrity for updated foreign keys.
+- Audit logs remain conversation-scoped; API contract must avoid implying system-wide coverage.
 
 ## Architecture Principle Alignment
 - **API-First Integration:** safer external references.
@@ -64,6 +65,7 @@ Convert core page-view tables to UUID primary keys while keeping BetterAuth tabl
 - Update Drizzle schema and migrations.
 - Update API/service types for UUID IDs.
 - Leave BetterAuth table IDs unchanged; allow UUID user foreign keys.
+- Confirm `.docs/02-api-and-data-model.md` describes conversation-scoped audit logs; update if needed.
 
 ## Mermaid (Decision Flow)
 ```mermaid

@@ -8,7 +8,7 @@
 # Governance Log
 
 ## Decision Summary
-Adopt UUID primary keys for core page-view tables and keep BetterAuth tables unchanged.
+Adopt UUID primary keys for core page-view tables, keep BetterAuth tables unchanged, and clarify audit logs are conversation-scoped (not comprehensive).
 
 ## Governance Trigger
 Architecture alignment for Phase 6.5 modernization and security hardening.
@@ -19,6 +19,7 @@ Aligned with architecture principles: API-first integration, secure by design, z
 ## Impact Assessment
 - Schema changes required for core tables and their foreign keys.
 - API contracts must treat IDs as UUID strings.
+- Audit logs remain conversation-only; update API contract if it implies system-wide coverage.
 - No impact to auth plugin schema.
 
 ## Risk Acceptance / Waivers
