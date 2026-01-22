@@ -297,7 +297,7 @@ export async function runMigrations() {
         actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
         action VARCHAR(255) NOT NULL,
         entity_type VARCHAR(50) NOT NULL,
-        entity_id TEXT NOT NULL,
+        entity_id UUID NOT NULL,
         metadata JSONB,
         ip_address VARCHAR(45),
         created_at TIMESTAMP NOT NULL DEFAULT NOW()

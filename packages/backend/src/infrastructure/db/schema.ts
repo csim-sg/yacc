@@ -297,7 +297,7 @@ export const auditLogs = pgTable(
     actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
     action: varchar('action', { length: 255 }).notNull(), // e.g., 'assignment', 'tag', 'note', 'status_change'
     entityType: varchar('entity_type', { length: 50 }).notNull(), // e.g., 'conversation', 'message', 'user'
-    entityId: text('entity_id').notNull(),
+    entityId: uuid('entity_id').notNull(),
     metadata: jsonb('metadata'), // Additional context (old value, new value, etc.)
     ipAddress: varchar('ip_address', { length: 45 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),

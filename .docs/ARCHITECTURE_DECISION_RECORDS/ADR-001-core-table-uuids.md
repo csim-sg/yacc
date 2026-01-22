@@ -18,15 +18,15 @@ Core domain entities are exposed as primary page views. Sequential integer IDs l
 
 ## Assumptions
 - UUIDs are acceptable in API responses and UI routes.
-- BetterAuth tables remain unmodified in this change.
+- BetterAuth tables keep text primary keys; foreign keys may reference UUID users.
 
 ## Options Considered
 1. Keep serial IDs for all tables.
-2. Convert core page-view tables to UUIDs; keep BetterAuth tables as-is. ✅
-3. Convert all tables (domain + BetterAuth) to UUIDs.
+2. Convert core page-view tables to UUIDs; keep BetterAuth table IDs as text (FKs can reference UUID users). ✅
+3. Convert all tables (domain + BetterAuth IDs) to UUIDs.
 
 ## Decision
-Convert core page-view tables to UUID primary keys while leaving BetterAuth-managed tables unchanged.
+Convert core page-view tables to UUID primary keys while keeping BetterAuth table IDs as text and allowing their foreign keys to reference UUID users.
 
 **Tables affected (UUID):** `users`, `conversations`, `messages`, `attachments`, `notes`, `notifications`, `routing_rules`, `audit_logs`.
 
@@ -63,7 +63,7 @@ Convert core page-view tables to UUID primary keys while leaving BetterAuth-mana
 ## Implementation Notes
 - Update Drizzle schema and migrations.
 - Update API/service types for UUID IDs.
-- Leave BetterAuth tables unchanged.
+- Leave BetterAuth table IDs unchanged; allow UUID user foreign keys.
 
 ## Mermaid (Decision Flow)
 ```mermaid
