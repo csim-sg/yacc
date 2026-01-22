@@ -39,26 +39,27 @@
       "mode": "primary",
       "prompt": "{file:./.opencode/prompts/fullstack-developer.md}",
       "tools": {
-            "write": true,
-            "edit": true,
-            "bash": true,
-            "read": true,
-            "grep": true,
-            "task": true,
-            "webfetch": true,
-            "todowrite": true,
-            "todoread": true,
-            "skill": true
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "read": true,
+        "grep": true,
+        "task": true,
+        "webfetch": true,
+        "todowrite": true,
+        "todoread": true,
+        "skill": true
       }
     },
     "product-owner": {
       "description": "Product owner of this project, maintain biz requirement and biz documents. Analyze requirement with users & architect on any new request. Help answer any biz related issues from developers and architect.",
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/product-owner.md}",
+      "model": "openai/gpt-5.2-codex",
       "tools": {
         "write": true,
         "edit": true,
-        "bash": false,
+        "bash": true,
         "read": true,
         "grep": true,
         "task": true,
@@ -92,6 +93,7 @@
       "description": "Solution Archtect, maintaining the requirement and features from users can be implemented without changing the planned archtecture. As much as possible, maintaining low cost for production deployment without compromising stability and maintainibility of the project. ",
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/architect.md}",
+      "model": "openai/gpt-5.2-codex",
       "tools": {
         "write": true,
         "edit": true,
