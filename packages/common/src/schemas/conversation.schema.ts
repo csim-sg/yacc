@@ -1,39 +1,18 @@
 import { z } from 'zod';
-
-export const ChannelTypeSchema = z.enum(['telegram', 'irc', 'whatsapp', 'twitter']);
-
-export const ConversationStatusSchema = z.enum(['open', 'pending', 'resolved']);
-
-export const PrioritySchema = z.enum(['low', 'normal', 'high', 'urgent']);
+import { ChannelEnum, ConversationStatusEnum, PriorityEnum } from '../constants/statuses.constant';
+import { TagSchema } from './Tag.schema';
+import { ParticipantSchema } from './Participant.schema';
 
 export const ConversationSchema = z.object({
   id: z.string().uuid(),
-  channel: ChannelTypeSchema,
+  channel: ChannelEnum,
   externalThreadId: z.string(),
-  status: ConversationStatusSchema,
-  priority: PrioritySchema,
+  status: ConversationStatusEnum,
+  priority: PriorityEnum,
   assignedUserId: z.string().uuid().optional(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  tags: z.array(TagSchema).optional(),
+  participants: z.array(ParticipantSchema).optional(),
+  lastMessageAt: z.string().datetime().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
-
-export const UpdateConversationSchema = z.object({
-  status: ConversationStatusSchema.optional(),
-  priority: PrioritySchema.optional(),
-  assignedUserId: z.string().uuid().optional(),
-});
-
-export const ConversationFilterSchema = z.object({
-  channel: ChannelTypeSchema.optional(),
-  status: ConversationStatusSchema.optional(),
-  assignedUserId: z.string().uuid().optional(),
-  tags: z.array(z.string()).optional(),
-  priority: z.string().optional(),
-  searchText: z.string().optional(),
-  dateFrom: z.date().optional(),
-  dateTo: z.date().optional(),
-});
-
-export type Conversation = z.infer<typeof ConversationSchema>;
-export type UpdateConversation = z.infer<typeof UpdateConversationSchema>;
-export type ConversationFilter = z.infer<typeof ConversationFilterSchema>;

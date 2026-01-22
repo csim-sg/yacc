@@ -5,11 +5,11 @@
  * Implements exponential backoff retry strategy.
  */
 
-import { Worker } from 'bullmq';
-import type { RetryJobData } from '@yacc/common/types/connector.types';
+import { Worker, Job } from 'bullmq';
+import type { RetryJobData } from '@yacc/common/types/RetryJobData.interface';
 import { enqueueRetry } from '../infrastructure/queues/messageRetryQueue';
 import logger from '../utils/logger';
-import type { IConnector } from '@yacc/common/types/connector.types';
+import type { IConnector } from '@yacc/common/types/IConnector.interface';
 
 // ============================================
 // Worker Configuration

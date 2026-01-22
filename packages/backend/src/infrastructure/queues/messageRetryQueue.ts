@@ -6,7 +6,7 @@
  */
 
 import { Queue, Worker, Job } from 'bullmq';
-import type { RetryJobData } from '@yacc/common/types/connector.types';
+import type { RetryJobData } from '@yacc/common/types/RetryJobData.interface';
 import { getRedisClient } from '../infrastructure/redis';
 import logger from '../utils/logger';
 

@@ -1,6 +1,6 @@
 import { db } from '../../infrastructure/db/client.js';
 import { users, passwordResetTokens } from '../../infrastructure/db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
   hashPassword,
   verifyPassword,
@@ -12,7 +12,12 @@ export class AuthService {
   /**
    * Register a new user (super admin only)
    */
-  async register(email: string, password: string, name: string, role: string = 'user') {
+  async register(
+    email: string,
+    password: string,
+    name: string,
+    role: 'super_admin' | 'admin' | 'manager' | 'user' = 'user'
+  ) {
     // Check if user exists
     const existing = await db.query.users.findFirst({
       where: eq(users.email, email),
@@ -28,7 +33,7 @@ export class AuthService {
       email,
       name,
       passwordHash,
-      role: role as any, // Type cast for enum
+      role,
       status: 'active',
     }).returning();
 
@@ -79,7 +84,7 @@ export class AuthService {
   /**
    * Get user by ID
    */
-  async getUserById(id: number) {
+  async getUserById(id: string) {
     const user = await db.query.users.findFirst({
       where: eq(users.id, id),
     });
@@ -189,7 +194,7 @@ export class AuthService {
   /**
    * Change password for authenticated user
    */
-  async changePassword(userId: number, currentPassword: string, newPassword: string) {
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const user = await db.query.users.findFirst({
       where: eq(users.id, userId),
     });

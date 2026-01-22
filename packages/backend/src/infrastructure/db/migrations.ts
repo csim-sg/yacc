@@ -9,6 +9,10 @@ export async function runMigrations() {
   try {
     console.log('🔄 Starting database migrations...');
 
+    await db.execute(sql`
+      CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+    `);
+
     // Create enums first (must be done before table creation)
     await db.execute(sql`
       DO $$ BEGIN
@@ -101,7 +105,7 @@ export async function runMigrations() {
     // Create tables
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email VARCHAR(255) NOT NULL UNIQUE,
         name VARCHAR(255) NOT NULL,
         password_hash TEXT NOT NULL,
@@ -132,7 +136,7 @@ export async function runMigrations() {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS password_reset_tokens (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         token VARCHAR(255) NOT NULL UNIQUE,
         expires_at TIMESTAMP NOT NULL,
         used_at TIMESTAMP,
@@ -148,13 +152,13 @@ export async function runMigrations() {
 
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS conversations (
-        id SERIAL PRIMARY KEY,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         channel channel_type NOT NULL,
         external_thread_id VARCHAR(255) NOT NULL,
         title VARCHAR(500),
         status conversation_status NOT NULL DEFAULT 'open',
         priority conversation_priority NOT NULL DEFAULT 'medium',
-        assigned_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        assigned_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
         metadata JSONB,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -172,9 +176,9 @@ export async function runMigrations() {
 
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS messages (
-        id SERIAL PRIMARY KEY,
-        conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-        sender_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        sender_id UUID REFERENCES users(id) ON DELETE SET NULL,
         sender_name VARCHAR(255) NOT NULL,
         body TEXT NOT NULL,
         status message_status NOT NULL DEFAULT 'pending',
@@ -199,7 +203,7 @@ export async function runMigrations() {
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         color VARCHAR(7) NOT NULL DEFAULT '#808080',
-        created_by_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_by_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         UNIQUE(name, created_by_id)
       );
@@ -207,7 +211,7 @@ export async function runMigrations() {
 
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS conversation_tags (
-        conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
         tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
         PRIMARY KEY (conversation_id, tag_id)
       );
@@ -215,9 +219,9 @@ export async function runMigrations() {
 
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS notes (
-        id SERIAL PRIMARY KEY,
-        conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-        author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        author_id UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
         body TEXT NOT NULL,
         mentions JSONB,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -232,11 +236,11 @@ export async function runMigrations() {
 
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS notifications (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         type VARCHAR(50) NOT NULL,
-        conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
-        actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+        actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
         message TEXT NOT NULL,
         is_read BOOLEAN NOT NULL DEFAULT FALSE,
         metadata JSONB,
@@ -252,14 +256,14 @@ export async function runMigrations() {
 
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS routing_rules (
-        id SERIAL PRIMARY KEY,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name VARCHAR(255) NOT NULL,
         description TEXT,
         status VARCHAR(50) NOT NULL DEFAULT 'active',
         priority INTEGER NOT NULL DEFAULT 999,
         conditions JSONB NOT NULL,
         actions JSONB NOT NULL,
-        created_by_id INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+        created_by_id UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
         last_run_at TIMESTAMP,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -274,8 +278,8 @@ export async function runMigrations() {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS routing_rule_executions (
         id SERIAL PRIMARY KEY,
-        rule_id INTEGER NOT NULL REFERENCES routing_rules(id) ON DELETE CASCADE,
-        conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        rule_id UUID NOT NULL REFERENCES routing_rules(id) ON DELETE CASCADE,
+        conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
         matched_conditions JSONB,
         applied_actions JSONB,
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -289,11 +293,11 @@ export async function runMigrations() {
 
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS audit_logs (
-        id SERIAL PRIMARY KEY,
-        actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
         action VARCHAR(255) NOT NULL,
         entity_type VARCHAR(50) NOT NULL,
-        entity_id INTEGER NOT NULL,
+        entity_id UUID NOT NULL,
         metadata JSONB,
         ip_address VARCHAR(45),
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -310,7 +314,7 @@ export async function runMigrations() {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS raw_payloads (
         id SERIAL PRIMARY KEY,
-        message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
         platform VARCHAR(50) NOT NULL,
         payload JSONB NOT NULL,
         storage_key VARCHAR(500),
@@ -326,8 +330,8 @@ export async function runMigrations() {
 
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS attachments (
-        id SERIAL PRIMARY KEY,
-        message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
         name VARCHAR(500) NOT NULL,
         mime_type VARCHAR(100) NOT NULL,
         size INTEGER NOT NULL,
@@ -345,7 +349,7 @@ export async function runMigrations() {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS session (
         id TEXT PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         expires_at TIMESTAMP NOT NULL,
         token TEXT NOT NULL UNIQUE,
         ip_address VARCHAR(45),
@@ -381,7 +385,7 @@ export async function runMigrations() {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS account (
         id TEXT PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         account_id TEXT NOT NULL,
         provider_id TEXT NOT NULL,
         access_token TEXT,

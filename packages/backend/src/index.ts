@@ -12,28 +12,29 @@ import { authorizationChecker, currentUserChecker } from './api/middleware/routi
 import { AuthController } from './api/controllers/auth.controller';
 import { SimpleAuthController } from './api/controllers/simple-auth.controller';
 import { ConversationsController } from './api/controllers/conversations.controller';
-import express, { Router } from 'express';
+import { Router } from 'express';
 import { AuditController } from './api/controllers/audit.controller';
 import { HealthController } from './api/controllers/health.controller';
+import { config } from './config/config';
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: config.frontend.url,
     credentials: true,
   },
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = config.app.port;
 
-  // Middleware
-  app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-    credentials: true,
-    exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
-  }));
-  app.use(express.json());
+// Middleware
+app.use(cors({
+  origin: config.frontend.url,
+  credentials: true,
+  exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
+}));
+app.use(express.json());
 
   // Setup routing-controllers
   useExpressServer(app, {
@@ -72,6 +73,11 @@ io.on('connection', (socket) => {
 // Initialize server and database
 async function start() {
   try {
+    console.log('✓ Configuration validated successfully');
+    console.log(`  - Environment: ${config.app.env}`);
+    console.log(`  - Port: ${config.app.port}`);
+    console.log(`  - Log Level: ${config.logging.level}`);
+
     // Check database connection
     const dbConnected = await checkDatabaseConnection();
     if (!dbConnected) {

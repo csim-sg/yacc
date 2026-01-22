@@ -6,6 +6,7 @@ import {
   tags,
 } from '../../infrastructure/db/schema.js';
 import { eq, and, desc, asc, sql } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
 import { auditService } from './audit.service.js';
 
 export interface ListConversationsParams {
@@ -14,7 +15,7 @@ export interface ListConversationsParams {
   channel?: string;
   status?: string;
   priority?: string;
-  assignedUserId?: number;
+  assignedUserId?: string;
   search?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -46,18 +47,21 @@ export class ConversationService {
     const offset = (page - 1) * limit;
 
     // Build where clauses
-    const whereClauses: any[] = [];
+    const whereClauses: SQL<unknown>[] = [];
 
     if (channel) {
-      whereClauses.push(eq(conversations.channel, channel as any));
+      const channelValue = channel as (typeof conversations.channel.enumValues)[number];
+      whereClauses.push(eq(conversations.channel, channelValue));
     }
 
     if (status) {
-      whereClauses.push(eq(conversations.status, status as any));
+      const statusValue = status as (typeof conversations.status.enumValues)[number];
+      whereClauses.push(eq(conversations.status, statusValue));
     }
 
     if (priority) {
-      whereClauses.push(eq(conversations.priority, priority as any));
+      const priorityValue = priority as (typeof conversations.priority.enumValues)[number];
+      whereClauses.push(eq(conversations.priority, priorityValue));
     }
 
     if (assignedUserId) {
@@ -196,7 +200,7 @@ export class ConversationService {
   /**
    * Get a single conversation by ID
    */
-  async getConversation(id: number) {
+  async getConversation(id: string) {
     const convo = await db
       .select()
       .from(conversations)
@@ -235,7 +239,7 @@ export class ConversationService {
    * Create a message and auto-reopen resolved conversations on inbound
    */
   async createMessage(params: {
-    conversationId: number;
+    conversationId: string;
     senderName: string;
     body: string;
     direction: 'inbound' | 'outbound';
@@ -300,7 +304,7 @@ export class ConversationService {
    * Update conversation status
    */
   async updateConversationStatus(
-    id: number,
+    id: string,
     status: 'open' | 'pending' | 'resolved'
   ) {
     const result = await db
@@ -322,7 +326,7 @@ export class ConversationService {
   /**
    * Update status (alias for controller)
    */
-  async updateStatus(id: number, status: 'open' | 'pending' | 'resolved') {
+  async updateStatus(id: string, status: 'open' | 'pending' | 'resolved') {
     const oldConvo = await db
       .select()
       .from(conversations)
@@ -340,7 +344,7 @@ export class ConversationService {
    * Update conversation priority
    */
   async updateConversationPriority(
-    id: number,
+    id: string,
     priority: 'low' | 'medium' | 'high' | 'urgent'
   ) {
     const result = await db
@@ -362,7 +366,7 @@ export class ConversationService {
   /**
    * Update priority (alias for controller)
    */
-  async updatePriority(id: number, priority: 'low' | 'medium' | 'high' | 'urgent') {
+  async updatePriority(id: string, priority: 'low' | 'medium' | 'high' | 'urgent') {
     const oldConvo = await db
       .select()
       .from(conversations)
@@ -379,7 +383,7 @@ export class ConversationService {
   /**
    * Update conversation assignment
    */
-  async updateConversationAssignment(id: number, assignedUserId: number | null) {
+  async updateConversationAssignment(id: string, assignedUserId: string | null) {
     const result = await db
       .update(conversations)
       .set({
@@ -399,7 +403,7 @@ export class ConversationService {
   /**
    * Assign conversation (alias for controller)
    */
-  async assignConversation(id: number, assignedUserId: number | null) {
+  async assignConversation(id: string, assignedUserId: string | null) {
     const oldConvo = await db
       .select()
       .from(conversations)
@@ -416,7 +420,7 @@ export class ConversationService {
   /**
    * Add tag to conversation
    */
-  async addTagToConversation(conversationId: number, tagId: number) {
+  async addTagToConversation(conversationId: string, tagId: number) {
     // Check if already tagged
     const existing = await db
       .select()
@@ -443,14 +447,14 @@ export class ConversationService {
   /**
    * Add tag (alias for controller)
    */
-  async addTag(conversationId: number, tagId: number) {
+  async addTag(conversationId: string, tagId: number) {
     return await this.addTagToConversation(conversationId, tagId);
   }
 
   /**
    * Remove tag from conversation
    */
-  async removeTagFromConversation(conversationId: number, tagId: number) {
+  async removeTagFromConversation(conversationId: string, tagId: number) {
     await db
       .delete(conversationTags)
       .where(
@@ -466,7 +470,7 @@ export class ConversationService {
   /**
    * Remove tag (alias for controller)
    */
-  async removeTag(conversationId: number, tagId: number) {
+  async removeTag(conversationId: string, tagId: number) {
     return await this.removeTagFromConversation(conversationId, tagId);
   }
 }
