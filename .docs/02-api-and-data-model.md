@@ -528,6 +528,7 @@ CREATE TABLE raw_payloads (
 ```
 
 ### Audit Logs
+Conversation-scoped audit events only (entity_type is always `conversation`).
 ```sql
 CREATE TABLE audit_logs (
   id UUID PRIMARY KEY,
@@ -1142,15 +1143,21 @@ Phase 1 includes IRC integration only; Telegram is deferred to Phase 2.
 ### Audit Logs
 
 #### `GET /audit-logs`
-**Query**: `page`, `pageSize`, `actorId`, `action`, `entityType`, `entityId`, `dateFrom`, `dateTo`, `search`
+Conversation-scoped audit logs.
+
+**Query**: `conversationId` (required), `page`, `limit`, `actorId`, `action`, `dateFrom`, `dateTo`
 
 **Response:**
 ```json
 {
+  "success": true,
   "data": [/* Audit Log models */],
-  "page": 1,
-  "pageSize": 50,
-  "total": 5000
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 5000,
+    "pages": 100
+  }
 }
 ```
 

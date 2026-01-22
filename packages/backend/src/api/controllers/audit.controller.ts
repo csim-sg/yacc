@@ -14,7 +14,7 @@ import { Type } from 'class-transformer';
 import { auditService } from '@yacc/backend/domain/services/audit.service';
 
 // DTOs
-class QueryAuditLogsQuery {
+class QueryConversationAuditLogsQuery {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -25,6 +25,9 @@ class QueryAuditLogsQuery {
   @IsInt()
   limit?: number;
 
+  @IsUUID()
+  conversationId!: string;
+
   @IsOptional()
   @IsUUID()
   actorId?: string;
@@ -32,14 +35,6 @@ class QueryAuditLogsQuery {
   @IsOptional()
   @IsString()
   action?: string;
-
-  @IsOptional()
-  @IsString()
-  entityType?: string;
-
-  @IsOptional()
-  @IsString()
-  entityId?: string;
 
   @IsOptional()
   @IsDateString()
@@ -55,10 +50,12 @@ class QueryAuditLogsQuery {
 export class AuditController {
   /**
    * GET /api/audit-logs
-   * Query audit logs (admin/manager only)
+   * Query conversation audit logs (admin/manager only)
    */
   @Get('/')
-  async queryAuditLogs(@QueryParams() query: QueryAuditLogsQuery) {
+  async queryConversationAuditLogs(
+    @QueryParams() query: QueryConversationAuditLogsQuery
+  ) {
     // Transform date strings to Date objects
     const params = {
       ...query,
@@ -66,7 +63,7 @@ export class AuditController {
       dateTo: query.dateTo ? new Date(query.dateTo) : undefined,
     };
 
-    const result = await auditService.queryAuditLogs(params);
+    const result = await auditService.queryConversationAuditLogs(params);
     return {
       success: true,
       data: result.logs,

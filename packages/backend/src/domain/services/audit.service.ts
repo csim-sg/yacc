@@ -23,6 +23,16 @@ export interface QueryAuditParams {
   dateTo?: Date;
 }
 
+export interface QueryConversationAuditParams {
+  page?: number;
+  limit?: number;
+  conversationId: string;
+  actorId?: string;
+  action?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+}
+
 export class AuditService {
   /**
    * Log an audit event
@@ -54,6 +64,32 @@ export class AuditService {
       // Don't throw - audit failures shouldn't break application
       return { success: false, error: message };
     }
+  }
+
+  /**
+   * Query conversation audit logs with filters
+   */
+  async queryConversationAuditLogs(params: QueryConversationAuditParams) {
+    const {
+      page,
+      limit,
+      conversationId,
+      actorId,
+      action,
+      dateFrom,
+      dateTo,
+    } = params;
+
+    return this.queryAuditLogs({
+      page,
+      limit,
+      actorId,
+      action,
+      dateFrom,
+      dateTo,
+      entityType: 'conversation',
+      entityId: conversationId,
+    });
   }
 
   /**
@@ -140,10 +176,9 @@ export class AuditService {
    * Get audit logs for a conversation
    */
   async getConversationAuditLogs(conversationId: string, page: number = 1) {
-    return this.queryAuditLogs({
+    return this.queryConversationAuditLogs({
       page,
-      entityType: 'conversation',
-      entityId: conversationId,
+      conversationId,
     });
   }
 
