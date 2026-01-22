@@ -1,170 +1,110 @@
 import { db } from '../../infrastructure/db/client.js';
 import { auditLogs } from '../../infrastructure/db/schema.js';
-import { desc, eq, and, gte, lte } from 'drizzle-orm';
+import { desc, eq, and } from 'drizzle-orm';
 
+/**
+ * Log audit action parameters
+ * Audit logs are conversation-scoped only
+ */
 export interface LogAuditParams {
-  actorId?: number;
+  actorId?: string;
   action: string;
-  entityType: string;
-  entityId: number;
-  metadata?: Record<string, any>;
+  entityType: 'conversation';
+  entityId: string;
+  metadata?: Record<string, unknown>;
   ipAddress?: string;
 }
 
-export interface QueryAuditParams {
+/**
+ * Get conversation audit logs parameters
+ */
+export interface GetConversationAuditLogsParams {
+  conversationId: string;
   page?: number;
   limit?: number;
-  actorId?: number;
-  action?: string;
-  entityType?: string;
-  entityId?: number;
-  dateFrom?: Date;
-  dateTo?: Date;
 }
 
 export class AuditService {
   /**
-   * Log an audit event
+   * Log an audit event for a conversation
+   * Only conversation entity types are allowed per conversation-only scope
    */
   async logAction(params: LogAuditParams) {
-    const {
-      actorId,
-      action,
-      entityType,
-      entityId,
-      metadata,
-      ipAddress,
-    } = params;
+    const { actorId, action, entityType, entityId, metadata, ipAddress } = params;
+
+    // Enforce conversation-only scope
+    if (entityType !== 'conversation') {
+      console.error(
+        '❌ Audit log error: entityType must be "conversation", got:',
+        entityType,
+      );
+      return { success: false, error: 'Invalid entityType: only conversation allowed' };
+    }
 
     try {
       await db.insert(auditLogs).values({
         actorId: actorId || null,
         action,
-        entityType,
+        entityType: 'conversation',
         entityId,
         metadata: metadata || null,
         ipAddress: ipAddress || null,
       });
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Failed to log audit action:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
       // Don't throw - audit failures shouldn't break application
-      return { success: false, error: error.message };
+      return { success: false, error: message };
     }
   }
 
   /**
-   * Query audit logs with filters
+   * Get audit logs for a specific conversation
+   * This is the only query method available as audit logs are conversation-scoped
    */
-  async queryAuditLogs(params: QueryAuditParams) {
-    const {
-      page = 1,
-      limit = 50,
-      actorId,
-      action,
-      entityType,
-      entityId,
-      dateFrom,
-      dateTo,
-    } = params;
-
+  async getConversationAuditLogs(params: GetConversationAuditLogsParams) {
+    const { conversationId, page = 1, limit = 50 } = params;
     const offset = (page - 1) * limit;
 
-    // Build where clauses
-    const whereClauses: any[] = [];
+    try {
+      // Build where clause - only conversation entity type and specific conversation ID
+      const whereClause = and(
+        eq(auditLogs.entityType, 'conversation'),
+        eq(auditLogs.entityId, conversationId),
+      );
 
-    if (actorId) {
-      whereClauses.push(eq(auditLogs.actorId, actorId));
+      // Get total count for this conversation
+      const countResult = await db
+        .select()
+        .from(auditLogs)
+        .where(whereClause);
+      const total = countResult.length;
+
+      // Get logs for this conversation
+      const logs = await db
+        .select()
+        .from(auditLogs)
+        .where(whereClause)
+        .orderBy(desc(auditLogs.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      return {
+        logs,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error: unknown) {
+      console.error('❌ Failed to query audit logs:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(message);
     }
-
-    if (action) {
-      whereClauses.push(eq(auditLogs.action, action));
-    }
-
-    if (entityType) {
-      whereClauses.push(eq(auditLogs.entityType, entityType));
-    }
-
-    if (entityId) {
-      whereClauses.push(eq(auditLogs.entityId, entityId));
-    }
-
-    if (dateFrom) {
-      whereClauses.push(gte(auditLogs.createdAt, dateFrom));
-    }
-
-    if (dateTo) {
-      whereClauses.push(lte(auditLogs.createdAt, dateTo));
-    }
-
-    // Get total count
-    let countQuery = db
-      .select()
-      .from(auditLogs);
-
-    if (whereClauses.length > 0) {
-      countQuery = countQuery.where(and(...whereClauses)) as any;
-    }
-
-    const countResult = await (countQuery as any);
-    const total = countResult.length;
-
-    // Get logs
-    let query = db
-      .select()
-      .from(auditLogs);
-
-    if (whereClauses.length > 0) {
-      query = query.where(and(...whereClauses)) as any;
-    }
-
-    const logs = await query
-      .orderBy(desc(auditLogs.createdAt))
-      .limit(limit)
-      .offset(offset);
-
-    return {
-      logs,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  /**
-   * Get audit logs for a conversation
-   */
-  async getConversationAuditLogs(conversationId: number, page: number = 1) {
-    return this.queryAuditLogs({
-      page,
-      entityType: 'conversation',
-      entityId: conversationId,
-    });
-  }
-
-  /**
-   * Get audit logs for a specific actor
-   */
-  async getActorAuditLogs(actorId: number, page: number = 1) {
-    return this.queryAuditLogs({
-      page,
-      actorId,
-    });
-  }
-
-  /**
-   * Get audit logs for a date range
-   */
-  async getAuditLogsByDateRange(dateFrom: Date, dateTo: Date, page: number = 1) {
-    return this.queryAuditLogs({
-      page,
-      dateFrom,
-      dateTo,
-    });
   }
 }
 

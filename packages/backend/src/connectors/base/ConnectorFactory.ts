@@ -4,12 +4,11 @@
  * Factory pattern for creating platform connector instances.
  */
 
-import type {
-  Platform,
-  ConnectorConfig,
-  IConnector,
-  ConnectionError,
-} from '@yacc/common/types/connector.types';
+import type { Platform } from '@yacc/common/types/Platform.type';
+import type { ConnectorConfig } from '@yacc/common/types/ConnectorConfig.type';
+import type { IConnector } from '@yacc/common/types/IConnector.interface';
+import type { ValidationError } from '@yacc/common/types/ValidationError.interface';
+import { ConnectionError } from '@yacc/common/types/ConnectionError.class';
 
 // ============================================
 // Placeholder imports (will be replaced when connectors are implemented)
@@ -99,7 +98,7 @@ export class ConnectorFactory {
     config: ConnectorConfig<T>
   ): Promise<true | { field: string; message: string }[]> {
     const connector = ConnectorFactory.createConnector(platform, config);
-    const errors = await connector.validateConfig(config);
+    const errors: ValidationError[] = await connector.validateConfig(config);
 
     if (errors.length > 0) {
       return errors.map((e) => ({ field: e.field, message: e.message }));

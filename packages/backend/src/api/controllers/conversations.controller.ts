@@ -16,7 +16,7 @@ import {
   CurrentUser,
   HttpCode,
 } from 'routing-controllers';
-import { IsOptional, IsEnum, IsInt, IsString, Min, Max } from 'class-validator';
+import { IsOptional, IsEnum, IsInt, IsString, IsUUID, Min, Max } from 'class-validator';
 import { conversationService } from '@yacc/backend/domain/services/conversation.service';
 import { auditService } from '@yacc/backend/domain/services/audit.service';
 
@@ -46,8 +46,8 @@ class ListConversationsQuery {
   priority?: 'low' | 'medium' | 'high' | 'urgent';
 
   @IsOptional()
-  @IsInt()
-  assignedUserId?: number;
+  @IsUUID()
+  assignedUserId?: string;
 
   @IsOptional()
   @IsString()
@@ -84,9 +84,9 @@ class UpdatePriorityBody {
 }
 
 class AssignBody {
-  @IsInt()
+  @IsUUID()
   @IsOptional()
-  assignedUserId!: number | null;
+  assignedUserId!: string | null;
 }
 
 class TagBody {
@@ -110,7 +110,7 @@ export class ConversationsController {
       channel: query.channel,
       status: query.status,
       priority: query.priority,
-      assignedUserId: query.assignedUserId ? Number(query.assignedUserId) : undefined,
+      assignedUserId: query.assignedUserId ? String(query.assignedUserId) : undefined,
       search: query.search,
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
@@ -135,7 +135,7 @@ export class ConversationsController {
    * Get conversation by ID with messages
    */
   @Get('/:id')
-  async getConversation(@Param('id') id: number) {
+  async getConversation(@Param('id') id: string) {
     const conversation = await conversationService.getConversation(id);
     return {
       success: true,
@@ -151,7 +151,7 @@ export class ConversationsController {
   @Authorized(['admin', 'manager', 'super_admin'])
   @HttpCode(200)
   async updateStatus(
-    @Param('id') id: number,
+    @Param('id') id: string,
     @Body() body: UpdateStatusBody,
     @CurrentUser() user: any
   ) {
@@ -180,7 +180,7 @@ export class ConversationsController {
   @Authorized(['manager', 'admin', 'super_admin'])
   @HttpCode(200)
   async updatePriority(
-    @Param('id') id: number,
+    @Param('id') id: string,
     @Body() body: UpdatePriorityBody,
     @CurrentUser() user: any
   ) {
@@ -209,7 +209,7 @@ export class ConversationsController {
   @Authorized(['admin', 'super_admin'])
   @HttpCode(200)
   async assignConversation(
-    @Param('id') id: number,
+    @Param('id') id: string,
     @Body() body: AssignBody,
     @CurrentUser() user: any
   ) {
@@ -241,7 +241,7 @@ export class ConversationsController {
   @Authorized(['admin', 'super_admin'])
   @HttpCode(201)
   async addTag(
-    @Param('id') id: number,
+    @Param('id') id: string,
     @Body() body: TagBody,
     @CurrentUser() user: any
   ) {
@@ -270,7 +270,7 @@ export class ConversationsController {
   @Authorized(['admin', 'super_admin'])
   @HttpCode(200)
   async removeTag(
-    @Param('id') id: number,
+    @Param('id') id: string,
     @Param('tagId') tagId: number,
     @CurrentUser() user: any
   ) {

@@ -528,18 +528,21 @@ CREATE TABLE raw_payloads (
 ```
 
 ### Audit Logs
+Conversation-scoped audit events only (entity_type is always `conversation`).
 ```sql
 CREATE TABLE audit_logs (
-  id UUID PRIMARY KEY,
-  actor_id UUID NOT NULL REFERENCES users(id),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
   action VARCHAR(255) NOT NULL,
-  entity_type VARCHAR(100),
-  entity_id UUID,
-  metadata JSON,
-  created_at TIMESTAMP DEFAULT NOW(),
-  
+  entity_type VARCHAR(50) NOT NULL,
+  entity_id UUID NOT NULL,
+  metadata JSONB,
+  ip_address VARCHAR(45),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
   INDEX(actor_id),
   INDEX(action),
+  INDEX(entity_type),
   INDEX(created_at DESC)
 );
 ```
@@ -1141,27 +1144,26 @@ Phase 1 includes IRC integration only; Telegram is deferred to Phase 2.
 
 ### Audit Logs
 
-#### `GET /audit-logs`
-**Query**: `page`, `pageSize`, `actorId`, `action`, `entityType`, `entityId`, `dateFrom`, `dateTo`, `search`
+#### `GET /api/conversations/:conversationId/audit-logs`
+Get audit logs for a specific conversation. Audit logs are conversation-scoped only.
+
+**Query**: `page`, `limit`
 
 **Response:**
 ```json
 {
+  "success": true,
   "data": [/* Audit Log models */],
-  "page": 1,
-  "pageSize": 50,
-  "total": 5000
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 100,
+    "pages": 2
+  }
 }
 ```
 
-**Auth**: Admin+ only
-
----
-
-#### `GET /audit-logs/export`
-**Query**: Same as GET /audit-logs, plus `format=csv`
-
-**Response**: CSV file download
+**Auth**: Manager+ only
 
 ---
 

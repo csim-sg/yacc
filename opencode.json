@@ -83,9 +83,6 @@
         },
         "bash": {
           "rm .docs/*": "allow",
-        },
-        "github_*": {
-          "*": "allow",
         }
       }
     },
@@ -144,26 +141,6 @@
         "todowrite": true,
         "todoread": true,
         "skill": true
-      },
-      "permission": {
-        "edit": {
-          "src/test": "allow",
-        },
-        "grep": {
-          "src/test": "allow",
-        },
-        "write": {
-          "src/test": "allow",
-        },
-        "read": {
-          "src/test": "allow",
-        },
-        "bash": {
-          "rm src/test/*": "allow",
-        },
-        "github_*": {
-          "*": "allow",
-        }
       }
     }
   }
