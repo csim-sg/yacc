@@ -6,7 +6,7 @@
  */
 
 import { eq } from 'drizzle-orm';
-import type { Platform } from '@yacc/common/types/connector.types';
+import type { Platform } from '@yacc/common/types/Platform.type';
 import { db } from '../infrastructure/db/client';
 import { messages } from '../infrastructure/db/schema';
 import { enqueueRetry } from '../infrastructure/queues/messageRetryQueue';
@@ -115,7 +115,7 @@ class MessageStatusTrackerService {
       await db
         .update(messages)
         .set({ status: 'pending', updatedAt: new Date() })
-        .where(eq(messages.id, parseInt(update.messageId, 10)));
+        .where(eq(messages.id, update.messageId));
 
       // Emit WebSocket event
       this.emitMessageStatus({
@@ -151,7 +151,7 @@ class MessageStatusTrackerService {
       const currentMessage = await db
         .select({ status: messages.status })
         .from(messages)
-        .where(eq(messages.id, parseInt(update.messageId, 10)))
+        .where(eq(messages.id, update.messageId))
         .limit(1);
 
       const currentStatus: MessageStatus | undefined = currentMessage[0]?.status as MessageStatus | undefined;
@@ -170,7 +170,7 @@ class MessageStatusTrackerService {
       await db
         .update(messages)
         .set({ status: 'sent', updatedAt: new Date() })
-        .where(eq(messages.id, parseInt(update.messageId, 10)));
+        .where(eq(messages.id, update.messageId));
 
       // Emit WebSocket event
       this.emitMessageStatus({
@@ -209,7 +209,7 @@ class MessageStatusTrackerService {
       const currentMessage = await db
         .select({ status: messages.status })
         .from(messages)
-        .where(eq(messages.id, parseInt(update.messageId, 10)))
+        .where(eq(messages.id, update.messageId))
         .limit(1);
 
       const currentStatus: MessageStatus | undefined = currentMessage[0]?.status as MessageStatus | undefined;
@@ -234,7 +234,7 @@ class MessageStatusTrackerService {
             lastError: update.error,
           },
         })
-        .where(eq(messages.id, parseInt(update.messageId, 10)));
+        .where(eq(messages.id, update.messageId));
 
       // Determine next status for retry
       const nextStatus = getNextStatusAfterFailure(currentStatus || 'pending');
@@ -339,14 +339,3 @@ export const MessageStatusTracker = {
     tracker.trackFailedMessage(update),
 };
 
-// ============================================
-// Export
-// ============================================
-
-export {
-  MessageStatus,
-  MessageStatusUpdate,
-  MessageStatusEvent,
-  canTransitionTo,
-  getNextStatusAfterFailure,
-};

@@ -11,7 +11,7 @@ import { eq } from 'drizzle-orm';
 
 // User type for BetterAuth
 export interface AuthUser {
-  id: number;
+  id: string;
   email: string;
   role: string;
   name: string;
@@ -20,7 +20,7 @@ export interface AuthUser {
 
 export interface AuthSession {
   id: string;
-  userId: number;
+  userId: string;
   expiresAt: Date;
 }
 
@@ -44,7 +44,7 @@ export async function authenticateRequest(
     }
 
     // Fetch full user from database
-    const userId = parseInt(session.user.id as string);
+    const userId = session.user.id as string;
     const user = await db.query.users.findFirst({
       where: eq(users.id, userId),
     });

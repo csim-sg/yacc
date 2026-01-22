@@ -9,7 +9,7 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
-import type { RawPayloadInfo } from '@yacc/common/types/connector.types';
+import type { RawPayloadInfo } from '@yacc/common/types/RawPayloadInfo.interface';
 import { getR2Client, R2_BUCKET_NAME, RAW_PAYLOAD_RETENTION_DAYS, ATTACHMENT_MAX_SIZE_BYTES } from '../infrastructure/r2';
 import logger from '../utils/logger';
 

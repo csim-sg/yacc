@@ -1,31 +1,12 @@
 import { z } from 'zod';
-
-export const RoleSchema = z.enum(['super_admin', 'admin', 'manager', 'user']);
-
-export const UserStatusSchema = z.enum(['active', 'inactive', 'suspended']);
-
-export const LoginRequestSchema = z.object({
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-});
-
-export const CreateUserSchema = z.object({
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  name: z.string().min(1, 'Name is required'),
-  role: RoleSchema,
-});
+import { RoleEnum, UserStatusEnum } from '../constants/roles.constant';
 
 export const UserSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
-  name: z.string(),
-  role: RoleSchema,
-  status: UserStatusSchema,
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  name: z.string().min(1),
+  role: RoleEnum,
+  status: UserStatusEnum,
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
-
-export type LoginRequest = z.infer<typeof LoginRequestSchema>;
-export type CreateUser = z.infer<typeof CreateUserSchema>;
-export type User = z.infer<typeof UserSchema>;

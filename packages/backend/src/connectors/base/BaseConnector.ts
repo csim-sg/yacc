@@ -5,20 +5,17 @@
  * Ensures consistent behavior across different platforms.
  */
 
-import type { EventEmitter } from 'events';
-import type {
-  Platform,
-  ConnectorStatus,
-  ConnectionInfo,
-  SendMessageRequest,
-  SendMessageResponse,
-  ConnectorEventMap,
-  ValidationError,
-  ConnectorMessage,
-  MessageSendError,
-  IConnector as IConnectorType,
-} from '@yacc/common/types/connector.types';
-import type { MessageStatusUpdate } from '../../services/MessageStatusTracker';
+import { EventEmitter } from 'events';
+import type { Platform } from '@yacc/common/types/Platform.type';
+import type { ConnectorStatus } from '@yacc/common/types/ConnectorStatus.type';
+import type { ConnectionInfo } from '@yacc/common/types/ConnectionInfo.interface';
+import type { SendMessageRequest } from '@yacc/common/types/SendMessageRequest.interface';
+import type { SendMessageResponse } from '@yacc/common/types/SendMessageResponse.interface';
+import type { ConnectorEventMap } from '@yacc/common/types/ConnectorEventMap.type';
+import type { ValidationError } from '@yacc/common/types/ValidationError.interface';
+import type { ConnectorMessage } from '@yacc/common/types/ConnectorMessage.interface';
+import type { MessageSendError } from '@yacc/common/types/MessageSendError.interface';
+import type { ConnectorConfig } from '@yacc/common/types/ConnectorConfig.type';
 import { MessageStatusTracker } from '../../services/MessageStatusTracker';
 
 // ============================================
@@ -236,12 +233,12 @@ export abstract class BaseConnector<
   /**
    * Emit message received event
    */
-  protected emitMessageReceived(message: ConnectorMessage, dbMessageId: number): void {
+  protected emitMessageReceived(message: ConnectorMessage, dbMessageId: string): void {
     this.emit('message_received', message);
 
     // Track message status and persist to database
     MessageStatusTracker.trackReceivedMessage({
-      messageId: dbMessageId.toString(),
+      messageId: dbMessageId,
       conversationId: '', // Will be set by connector
       status: 'pending',
       platform: this.platform,
@@ -252,13 +249,13 @@ export abstract class BaseConnector<
   /**
    * Emit message sent event
    */
-  protected emitMessageSent(response: SendMessageResponse, dbMessageId: number): void {
+  protected emitMessageSent(response: SendMessageResponse, dbMessageId: string): void {
     this.emit('message_sent', response);
 
     // Track message status and persist to database
     if (response.success) {
       MessageStatusTracker.trackSentMessage({
-        messageId: dbMessageId.toString(),
+        messageId: dbMessageId,
         conversationId: '', // Will be set by connector
         status: 'sent',
         platform: this.platform,
@@ -270,7 +267,7 @@ export abstract class BaseConnector<
   /**
    * Emit message failed event
    */
-  protected emitMessageFailed(error: MessageSendError, dbMessageId: number): void {
+  protected emitMessageFailed(error: MessageSendError, dbMessageId: string): void {
     this.emit('message_failed', {
       messageId: error.messageId || 'unknown',
       error,
@@ -278,7 +275,7 @@ export abstract class BaseConnector<
 
     // Track message failure and queue for retry
     MessageStatusTracker.trackFailedMessage({
-      messageId: dbMessageId.toString(),
+      messageId: dbMessageId,
       conversationId: '', // Will be set by connector
       status: 'failed',
       platform: this.platform,

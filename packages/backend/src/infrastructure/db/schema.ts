@@ -10,6 +10,7 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  uuid,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -50,7 +51,7 @@ export const channelTypeEnum = pgEnum('channel_type', ['telegram', 'irc', 'email
 export const users = pgTable(
   'users',
   {
-    id: serial('id').primaryKey(),
+    id: uuid('id').primaryKey().defaultRandom(),
     email: varchar('email', { length: 255 }).notNull().unique(),
     name: varchar('name', { length: 255 }).notNull(),
     passwordHash: text('password_hash').notNull(),
@@ -76,7 +77,7 @@ export const passwordResetTokens = pgTable(
   'password_reset_tokens',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id')
+    userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     token: varchar('token', { length: 255 }).notNull().unique(),
@@ -97,13 +98,13 @@ export const passwordResetTokens = pgTable(
 export const conversations = pgTable(
   'conversations',
   {
-    id: serial('id').primaryKey(),
+    id: uuid('id').primaryKey().defaultRandom(),
     channel: channelTypeEnum('channel').notNull(),
     externalThreadId: varchar('external_thread_id', { length: 255 }).notNull(),
     title: varchar('title', { length: 500 }),
     status: conversationStatusEnum('status').notNull().default('open'),
     priority: conversationPriorityEnum('priority').notNull().default('medium'),
-    assignedUserId: integer('assigned_user_id').references(() => users.id, {
+    assignedUserId: uuid('assigned_user_id').references(() => users.id, {
       onDelete: 'set null',
     }),
     metadata: jsonb('metadata'),
@@ -126,11 +127,11 @@ export const conversations = pgTable(
 export const messages = pgTable(
   'messages',
   {
-    id: serial('id').primaryKey(),
-    conversationId: integer('conversation_id')
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversationId: uuid('conversation_id')
       .notNull()
       .references(() => conversations.id, { onDelete: 'cascade' }),
-    senderId: integer('sender_id').references(() => users.id, { onDelete: 'set null' }),
+    senderId: uuid('sender_id').references(() => users.id, { onDelete: 'set null' }),
     senderName: varchar('sender_name', { length: 255 }).notNull(),
     body: text('body').notNull(),
     status: messageStatusEnum('status').notNull().default('pending'),
@@ -158,7 +159,7 @@ export const tags = pgTable(
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
     color: varchar('color', { length: 7 }).notNull().default('#808080'),
-    createdById: integer('created_by_id')
+    createdById: uuid('created_by_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -174,7 +175,7 @@ export const tags = pgTable(
 export const conversationTags = pgTable(
   'conversation_tags',
   {
-    conversationId: integer('conversation_id')
+    conversationId: uuid('conversation_id')
       .notNull()
       .references(() => conversations.id, { onDelete: 'cascade' }),
     tagId: integer('tag_id')
@@ -192,11 +193,11 @@ export const conversationTags = pgTable(
 export const notes = pgTable(
   'notes',
   {
-    id: serial('id').primaryKey(),
-    conversationId: integer('conversation_id')
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversationId: uuid('conversation_id')
       .notNull()
       .references(() => conversations.id, { onDelete: 'cascade' }),
-    authorId: integer('author_id')
+    authorId: uuid('author_id')
       .notNull()
       .references(() => users.id, { onDelete: 'set null' }),
     body: text('body').notNull(),
@@ -216,15 +217,15 @@ export const notes = pgTable(
 export const notifications = pgTable(
   'notifications',
   {
-    id: serial('id').primaryKey(),
-    userId: integer('user_id')
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     type: varchar('type', { length: 50 }).notNull(), // 'assignment', 'mention', etc.
-    conversationId: integer('conversation_id').references(() => conversations.id, {
+    conversationId: uuid('conversation_id').references(() => conversations.id, {
       onDelete: 'set null',
     }),
-    actorId: integer('actor_id').references(() => users.id, { onDelete: 'set null' }),
+    actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
     message: text('message').notNull(),
     isRead: boolean('is_read').notNull().default(false),
     metadata: jsonb('metadata'),
@@ -243,14 +244,14 @@ export const notifications = pgTable(
 export const routingRules = pgTable(
   'routing_rules',
   {
-    id: serial('id').primaryKey(),
+    id: uuid('id').primaryKey().defaultRandom(),
     name: varchar('name', { length: 255 }).notNull(),
     description: text('description'),
     status: varchar('status', { length: 50 }).notNull().default('active'), // 'active', 'disabled'
     priority: integer('priority').notNull().default(999), // Lower number = higher priority
     conditions: jsonb('conditions').notNull(), // JSON array of conditions
     actions: jsonb('actions').notNull(), // JSON array of actions
-    createdById: integer('created_by_id')
+    createdById: uuid('created_by_id')
       .notNull()
       .references(() => users.id, { onDelete: 'set null' }),
     lastRunAt: timestamp('last_run_at'),
@@ -270,10 +271,10 @@ export const routingRuleExecutions = pgTable(
   'routing_rule_executions',
   {
     id: serial('id').primaryKey(),
-    ruleId: integer('rule_id')
+    ruleId: uuid('rule_id')
       .notNull()
       .references(() => routingRules.id, { onDelete: 'cascade' }),
-    conversationId: integer('conversation_id')
+    conversationId: uuid('conversation_id')
       .notNull()
       .references(() => conversations.id, { onDelete: 'cascade' }),
     matchedConditions: jsonb('matched_conditions'),
@@ -292,11 +293,11 @@ export const routingRuleExecutions = pgTable(
 export const auditLogs = pgTable(
   'audit_logs',
   {
-    id: serial('id').primaryKey(),
-    actorId: integer('actor_id').references(() => users.id, { onDelete: 'set null' }),
+    id: uuid('id').primaryKey().defaultRandom(),
+    actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
     action: varchar('action', { length: 255 }).notNull(), // e.g., 'assignment', 'tag', 'note', 'status_change'
     entityType: varchar('entity_type', { length: 50 }).notNull(), // e.g., 'conversation', 'message', 'user'
-    entityId: integer('entity_id').notNull(),
+    entityId: text('entity_id').notNull(),
     metadata: jsonb('metadata'), // Additional context (old value, new value, etc.)
     ipAddress: varchar('ip_address', { length: 45 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -316,7 +317,7 @@ export const rawPayloads = pgTable(
   'raw_payloads',
   {
     id: serial('id').primaryKey(),
-    messageId: integer('message_id')
+    messageId: uuid('message_id')
       .notNull()
       .references(() => messages.id, { onDelete: 'cascade' }),
     platform: varchar('platform', { length: 50 }).notNull(), // 'telegram', 'irc', etc.
@@ -339,8 +340,8 @@ export const rawPayloads = pgTable(
 export const attachments = pgTable(
   'attachments',
   {
-    id: serial('id').primaryKey(),
-    messageId: integer('message_id')
+    id: uuid('id').primaryKey().defaultRandom(),
+    messageId: uuid('message_id')
       .notNull()
       .references(() => messages.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 500 }).notNull(),
@@ -362,7 +363,7 @@ export const session = pgTable(
   'session',
   {
     id: text('id').primaryKey(),
-    userId: integer('user_id')
+    userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     expiresAt: timestamp('expires_at').notNull(),
@@ -405,7 +406,7 @@ export const account = pgTable(
   'account',
   {
     id: text('id').primaryKey(),
-    userId: integer('user_id')
+    userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     accountId: text('account_id').notNull(),

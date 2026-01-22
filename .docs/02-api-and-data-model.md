@@ -1159,9 +1159,7 @@ Phase 1 includes IRC integration only; Telegram is deferred to Phase 2.
 ---
 
 #### `GET /audit-logs/export`
-**Query**: Same as GET /audit-logs, plus `format=csv`
-
-**Response**: CSV file download
+**Status**: Deferred to Phase 2
 
 ---
 

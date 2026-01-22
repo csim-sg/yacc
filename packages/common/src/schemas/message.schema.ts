@@ -1,35 +1,17 @@
 import { z } from 'zod';
-
-export const MessageStatusSchema = z.enum(['pending', 'sent', 'failed']);
-
-export const MessageDirectionSchema = z.enum(['inbound', 'outbound']);
-
-export const AttachmentSchema = z.object({
-  id: z.string().uuid(),
-  url: z.string().url(),
-  name: z.string(),
-  type: z.string(),
-  size: z.number().max(5242880, 'Attachment size must not exceed 5MB'),
-  storageKey: z.string().optional(),
-});
+import { MessageStatusEnum, MessageDirectionEnum } from '../constants/statuses.constant';
+import { AttachmentSchema } from './Attachment.schema';
 
 export const MessageSchema = z.object({
   id: z.string().uuid(),
   conversationId: z.string().uuid(),
-  senderId: z.string().uuid(),
-  body: z.string().min(1, 'Message body cannot be empty'),
-  status: MessageStatusSchema,
-  direction: MessageDirectionSchema,
+  senderId: z.string().optional(),
+  senderName: z.string().optional(),
+  body: z.string(),
+  status: MessageStatusEnum,
+  direction: MessageDirectionEnum,
+  platformMessageId: z.string().optional(),
   attachments: z.array(AttachmentSchema).optional(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
-
-export const CreateMessageSchema = z.object({
-  body: z.string().min(1, 'Message body cannot be empty').max(5000),
-  attachments: z.array(z.string().url()).optional(),
-});
-
-export type Message = z.infer<typeof MessageSchema>;
-export type CreateMessage = z.infer<typeof CreateMessageSchema>;
-export type Attachment = z.infer<typeof AttachmentSchema>;

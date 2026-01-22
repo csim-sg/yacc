@@ -9,7 +9,7 @@ import {
   QueryParams,
   Authorized,
 } from 'routing-controllers';
-import { IsOptional, IsInt, IsString, IsDateString } from 'class-validator';
+import { IsOptional, IsInt, IsString, IsDateString, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 import { auditService } from '@yacc/backend/domain/services/audit.service';
 
@@ -26,9 +26,8 @@ class QueryAuditLogsQuery {
   limit?: number;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  actorId?: number;
+  @IsUUID()
+  actorId?: string;
 
   @IsOptional()
   @IsString()
@@ -39,9 +38,8 @@ class QueryAuditLogsQuery {
   entityType?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  entityId?: number;
+  @IsString()
+  entityId?: string;
 
   @IsOptional()
   @IsDateString()
@@ -76,27 +74,4 @@ export class AuditController {
     };
   }
 
-  /**
-   * GET /api/audit-logs/export
-   * Export audit logs as CSV (admin/manager only)
-   */
-  @Get('/export')
-  async exportAuditLogs(@QueryParams() query: QueryAuditLogsQuery) {
-    // Transform date strings to Date objects
-    const params = {
-      ...query,
-      dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,
-      dateTo: query.dateTo ? new Date(query.dateTo) : undefined,
-    };
-
-    const csv = await auditService.exportAuditLogs(params);
-    
-    // Return CSV data with proper headers
-    return {
-      success: true,
-      data: csv,
-      contentType: 'text/csv',
-      filename: `audit-logs-${new Date().toISOString()}.csv`,
-    };
-  }
 }

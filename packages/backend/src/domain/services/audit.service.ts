@@ -1,23 +1,24 @@
 import { db } from '../../infrastructure/db/client.js';
 import { auditLogs } from '../../infrastructure/db/schema.js';
 import { desc, eq, and, gte, lte } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
 
 export interface LogAuditParams {
-  actorId?: number;
+  actorId?: string;
   action: string;
   entityType: string;
-  entityId: number;
-  metadata?: Record<string, any>;
+  entityId: string;
+  metadata?: Record<string, unknown>;
   ipAddress?: string;
 }
 
 export interface QueryAuditParams {
   page?: number;
   limit?: number;
-  actorId?: number;
+  actorId?: string;
   action?: string;
   entityType?: string;
-  entityId?: number;
+  entityId?: string;
   dateFrom?: Date;
   dateTo?: Date;
 }
@@ -47,10 +48,11 @@ export class AuditService {
       });
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Failed to log audit action:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
       // Don't throw - audit failures shouldn't break application
-      return { success: false, error: error.message };
+      return { success: false, error: message };
     }
   }
 
@@ -72,7 +74,7 @@ export class AuditService {
     const offset = (page - 1) * limit;
 
     // Build where clauses
-    const whereClauses: any[] = [];
+    const whereClauses: SQL<unknown>[] = [];
 
     if (actorId) {
       whereClauses.push(eq(auditLogs.actorId, actorId));
@@ -98,31 +100,30 @@ export class AuditService {
       whereClauses.push(lte(auditLogs.createdAt, dateTo));
     }
 
-    // Get total count
-    let countQuery = db
-      .select()
-      .from(auditLogs);
-
-    if (whereClauses.length > 0) {
-      countQuery = countQuery.where(and(...whereClauses)) as any;
-    }
-
-    const countResult = await (countQuery as any);
+    const countResult = whereClauses.length > 0
+      ? await db
+          .select()
+          .from(auditLogs)
+          .where(and(...whereClauses))
+      : await db
+          .select()
+          .from(auditLogs);
     const total = countResult.length;
 
-    // Get logs
-    let query = db
-      .select()
-      .from(auditLogs);
-
-    if (whereClauses.length > 0) {
-      query = query.where(and(...whereClauses)) as any;
-    }
-
-    const logs = await query
-      .orderBy(desc(auditLogs.createdAt))
-      .limit(limit)
-      .offset(offset);
+    const logs = whereClauses.length > 0
+      ? await db
+          .select()
+          .from(auditLogs)
+          .where(and(...whereClauses))
+          .orderBy(desc(auditLogs.createdAt))
+          .limit(limit)
+          .offset(offset)
+      : await db
+          .select()
+          .from(auditLogs)
+          .orderBy(desc(auditLogs.createdAt))
+          .limit(limit)
+          .offset(offset);
 
     return {
       logs,
@@ -138,7 +139,7 @@ export class AuditService {
   /**
    * Get audit logs for a conversation
    */
-  async getConversationAuditLogs(conversationId: number, page: number = 1) {
+  async getConversationAuditLogs(conversationId: string, page: number = 1) {
     return this.queryAuditLogs({
       page,
       entityType: 'conversation',
@@ -149,7 +150,7 @@ export class AuditService {
   /**
    * Get audit logs for a specific actor
    */
-  async getActorAuditLogs(actorId: number, page: number = 1) {
+  async getActorAuditLogs(actorId: string, page: number = 1) {
     return this.queryAuditLogs({
       page,
       actorId,
