@@ -10,6 +10,21 @@
 
 ---
 
+## Important Information
+- Repo: https://github.com/csim-sg/yacc
+
+### YACC Project Board
+- **Project Number**: 1
+- **Project ID**: `PVT_kwHOAB4wV84BNGcw`
+- **URL**: https://github.com/users/csim-sg/projects/1/views/1
+- **Owner**: csim-sg
+
+#### Common Field IDs
+- **Status**: `PVTSSF_lAHOAB4wV84BNGcwzg8MYR0`
+- **Assignee**: `PVTSSF_lAHOAB4wV84BNGcwzg8MYR1`
+- **Priority**: `PVTSSF_lAHOAB4wV84BNGcwzg8MYR2`
+- **Iteration**: `PVIT_lAHOAB4wV84BNGcwzg8MYO0`
+
 ## 📋 Project Quick Facts
 
 | Aspect | Details |

@@ -32,6 +32,12 @@ Set up all foundational infrastructure, authentication, and configuration requir
 
 ---
 
+## 📌 Status Update (2026-01-22)
+
+- **BE-028** and **BE-002** were previously marked Done for issue/PR closure but have been reset to **Ready** on the project board to reflect Week 1 verification and integration checks.
+- No Week 1 timeline changes; dependencies remain unblocked.
+- Governance record: `.docs/GOV_LOGS/GOV-003-reset-project-status-ready.md`.
+
 ## 🚀 Getting Started (Day 1)
 
 ### 1. Prerequisites

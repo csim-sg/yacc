@@ -49,6 +49,17 @@
         "todowrite": true,
         "todoread": true,
         "skill": true
+      },
+      "permission": {
+        "bash": {
+          "gh project *":"allow",
+          "gh *":"allow",
+          "gh issue *":"deny",
+          "gh project close *": "deny"
+        },
+        "github_*": {
+          "*": "allow",
+        }
       }
     },
     "product-owner": {
@@ -80,9 +91,16 @@
         },
         "read": {
           ".docs/*.md": "allow",
+          
         },
         "bash": {
           "rm .docs/*": "allow",
+         "gh *":"allow",
+          "gh issue *":"deny",
+          "gh project close *": "deny"
+        },
+        "github_*": {
+          "*": "allow",
         }
       }
     },
@@ -118,7 +136,9 @@
         },
         "bash": {
           "rm .docs/*": "allow",
-          "gh *": "allow",
+          "gh *":"allow",
+          "gh issue *":"deny",
+          "gh project close *": "deny",
           "*": "ask"
         },
         "github_*": {
