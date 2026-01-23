@@ -1,0 +1,148 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      // Or ["bun", "x", "my-mcp-command"]
+      "command": ["npx", "@playwright/mcp@latest"],
+      "enabled": true,
+      "environment": {
+        "MY_ENV_VAR": "my_env_var_value",
+      },
+      
+    },
+    "daisyUI": {
+     "type": "remote",
+     "url": "https://gitmcp.io/saadeghi/daisyui"
+    }
+  },
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen3-coder:30b": {
+          "name": "Qwen 3 Coder"
+        },
+        "gpt-oss:20b": {
+          "name": "GPT OSS 20B"
+        }
+      }
+    }
+  },
+  
+  "agent": {
+    "fullstack-developer": {
+      "description": "Fullstack developer, develop both frontend and backend codes, POC for any development related, specialized in Java, DotNet, NodeJS Typescript, React, Tenstack. ",
+      "mode": "primary",
+      "prompt": "{file:./.opencode/prompts/fullstack-developer.md}",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "read": true,
+        "grep": true,
+        "task": true,
+        "webfetch": true,
+        "todowrite": true,
+        "todoread": true,
+        "skill": true
+      }
+    },
+    "product-owner": {
+      "description": "Product owner of this project, maintain biz requirement and biz documents. Analyze requirement with users & architect on any new request. Help answer any biz related issues from developers and architect.",
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/product-owner.md}",
+      "model": "openai/gpt-5.2-codex",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "read": true,
+        "grep": true,
+        "task": true,
+        "webfetch": true,
+        "todowrite": true,
+        "todoread": true,
+        "skill": true
+      },
+      "permission": {
+        "edit": {
+          ".docs/*.md": "allow",
+        },
+        "grep": {
+          ".docs/*.md": "allow",
+        },
+        "write": {
+          ".docs/*.md": "allow",
+        },
+        "read": {
+          ".docs/*.md": "allow",
+        },
+        "bash": {
+          "rm .docs/*": "allow",
+        }
+      }
+    },
+    "architect": {      
+      "description": "Solution Archtect, maintaining the requirement and features from users can be implemented without changing the planned archtecture. As much as possible, maintaining low cost for production deployment without compromising stability and maintainibility of the project. ",
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/architect.md}",
+      "model": "openai/gpt-5.2-codex",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "read": true,
+        "grep": true,
+        "task": true,
+        "webfetch": true,
+        "todowrite": true,
+        "todoread": true,
+        "skill": true
+      },
+      "permission": {
+        "edit": {
+          ".docs/*.md": "allow",
+        },
+        "grep": {
+          ".docs/*.md": "allow",
+        },
+        "write": {
+          ".docs/*.md": "allow",
+        },
+        "read": {
+          ".docs/*.md": "allow",
+        },
+        "bash": {
+          "*": "ask",
+          "rm .docs/*": "allow",
+          "gh *": "allow"
+        },
+        "github_*": {
+          "*": "allow",
+        }
+      }
+    },
+    "qa-tester": {
+      "description": "QA and Auto Test developer, suggest possible edge cases and test cases for the developed features. Create automated test scripts to run regression tests for any new features developed. ",
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/qa-tester.md}",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "read": true,
+        "grep": true,
+        "task": true,
+        "webfetch": true,
+        "todowrite": true,
+        "todoread": true,
+        "skill": true
+      }
+    }
+  }
+}
