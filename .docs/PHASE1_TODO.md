@@ -5,7 +5,7 @@
 **Scope Correction**: Phase 1 = Telegram + IRC; Phase 2 = WhatsApp/WeChat/Meta/X; future channels (email, slack) remain in enums
 
 ## Executive Summary
-This todo list reflects the corrected Phase 1 scope based on architectural decisions. The SOW.md "Out of Scope" section incorrectly lists both Telegram and IRC as out of scope. The correct scope is:
+This todo list reflects the corrected Phase 1 scope based on architectural decisions. The SOW.md scope is now aligned to Phase 1 Telegram + IRC. The correct scope is:
 - **IN Phase 1**: Telegram + IRC integration with full messaging endpoints, WebSocket gateway, message retry queue
 - **DEFERRED to Phase 2**: Additional platforms (WhatsApp, WeChat, Meta, X)
 - **ENUMS**: Keep future channels (email, slack) for forward compatibility
