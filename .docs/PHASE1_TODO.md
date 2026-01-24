@@ -134,7 +134,7 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 | DOC-006 | Create API documentation (OpenAPI/Swagger for all Phase 1 endpoints) | Not Started | P2 | Backend | BE-025 | API docs generated, hosted |
 | DOC-007 | Create environment variables reference (IRC, R2, Redis, DB) | Not Started | P1 | Backend | INT-010 | All env vars documented with descriptions |
 | DOC-008 | Create deployment guide for Phase 1 (Docker setup, env vars, migrations) | Not Started | P1 | Backend | BE-025 | Step-by-step deployment instructions |
-| DOC-009 | Add governance log entry for FE-012 WebSocket client changes | Not Started | P0 | Architect | FE-012B | GOV_LOG entry created with compliance checklist and Mermaid diagram |
+| DOC-009 | Add governance log entry for PR #131 blocker fixes | Completed | P0 | Architect | DEV-131-03, DEV-131-04 | GOV-004 created with compliance checklist and Mermaid diagram |
 
 ## 8. Handoff Tasks
 
@@ -189,12 +189,18 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria |
 |----|------|--------|----------|----------|--------------|---------------------|
-| DEV-131-01 | Split WebSocket constants/types/service to one-definition-per-file (no barrel exports) | Not Started | P0 | Frontend | FE-012 | Each file exports a single definition; direct imports only |
-| DEV-131-02 | Add WebSocket observability (metrics, traces, SLO) | Not Started | P0 | Frontend | FE-012 | Metrics and traces emitted; SLO documented |
+ | DEV-131-01 | Split WebSocket constants/types/service to one-definition-per-file (no barrel exports) | Deferred | P0 | Frontend | FE-012 | Each file exports a single definition; direct imports only. Blocked: WebSocket client not implemented yet |
+| DEV-131-02 | Add WebSocket observability (metrics, traces, SLO) | Deferred | P0 | Frontend | FE-012 | Metrics and traces emitted; SLO documented. Blocked: WebSocket client not implemented yet |
 | DEV-131-03 | Fix retry queue removal logic and enforce 1m/5m/30m schedule | Completed | P0 | Backend | BE-013 | removeFromQueue uses proper BullMQ API; backoff schedule aligned to 1m/5m/30m |
 | DEV-131-04 | Remove non-MVP channel types or document ADR | Completed | P0 | Backend | BE-002 | channel_type limited to IRC only for Phase 1 MVP |
-| DEV-131-05 | Add governance log entry for FE-012 changes | Not Started | P0 | Architect | DEV-131-02 | GOV_LOG entry with checklist + Mermaid diagram |
-| DEV-131-06 | Align PR summary with actual diff and reference ADR ID | Not Started | P0 | Frontend | DEV-131-01 | PR description matches changes; ADR ID referenced |
+ | DEV-131-05 | Add governance log entry for blocker fixes | Completed | P0 | Architect | DEV-131-03, DEV-131-04 | GOV-004 created with checklist + Mermaid diagram |
+| DEV-131-06 | Align PR summary with actual diff and reference ADR ID | Completed | P0 | Frontend | DEV-131-01 | PR description matches changes; ADR ID referenced |
+
+**Notes:**
+- DEV-131-03 and DEV-131-04 completed in PR #142
+- DEV-131-05 created GOV-004 governance log for these fixes
+- DEV-131-01 and DEV-131-02 deferred until WebSocket client is implemented (blocked by missing frontend code)
+- GOV-004 documents blocker fixes and Phase 1 MVP channel type restrictions
 
 ---
 
