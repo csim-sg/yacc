@@ -16,6 +16,8 @@
 
 ## 1. Testing Overview
 
+**Phase Scope Reference**: See `.docs/phases/PHASE_1.md` for authoritative Phase 1 scope and acceptance criteria.
+
 ### Test Types
 
 | Type | When | Tool | Coverage |
@@ -44,6 +46,7 @@ export const ircConv = { channel: 'irc', externalThreadId: 'irc-456' };
 - WebSocket real-time updates ship at the end of Phase 1.
 - Message retry queue (BullMQ + backoff) ships at the end of Phase 1.
 - Telegram and IRC integration testing are both Phase 1 scope.
+- Phase 1 UI channel filters must show Telegram + IRC only.
 
 ### Phase 1 Runnable Test Checklist
 

@@ -18,6 +18,8 @@
 
 ## 1. System Architecture
 
+**Phase Scope Reference**: See `.docs/phases/PHASE_1.md` for authoritative Phase 1 scope and acceptance criteria.
+
 ### High-Level Overview
 
 ```
@@ -614,6 +616,8 @@ Client Receives Event
 - [ ] Frontend: Conversation view + reply composer
 
 **Deliverable**: Users can send/receive Telegram + IRC messages with live updates
+
+**Phase 1 UI constraint**: Channel filter UI must expose Telegram + IRC only; future channels remain in enums for forward compatibility.
 
 ---
 

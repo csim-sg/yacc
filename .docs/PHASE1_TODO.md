@@ -127,7 +127,7 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| DOC-001 | Update SOW.md with corrected scope (Phase 1 = Telegram + IRC; Phase 2 = WhatsApp/WeChat/Meta/X) | Not Started | P0 | Product Owner | SV-001 | SOW.md updated, reviewed by Architect |  |  |
+| DOC-001 | Update SOW.md with corrected scope (Phase 1 = Telegram + IRC; Phase 2 = WhatsApp/WeChat/Meta/X) | Completed | P0 | Product Owner | SV-001 | SOW.md updated, reviewed by Architect |  |  |
 | DOC-002 | Update 02-api-and-data-model.md with IRC-specific endpoints | Not Started | P1 | Backend | INT-009 | IRC endpoints documented with request/response examples |  |  |
 | DOC-003 | Update 03-implementation-guide.md with IRC connector architecture | Not Started | P1 | Backend | INT-001 | IRC integration documented in architecture section |  |  |
 | DOC-004 | Create IRC integration guide (setup, configuration, troubleshooting) | Not Started | P1 | Backend | INT-004 | Step-by-step guide for connecting IRC to YACC |  |  |

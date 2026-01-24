@@ -5,7 +5,7 @@
 ---
 
 ## Phase Scope Notes
-- **Phase 1** includes WebSocket gateway + message retry queue delivery + Telegram + IRC integration, including Telegram/IRC messaging endpoints.
+- **Phase 1** includes WebSocket gateway + message retry queue delivery + Telegram + IRC integration, including Telegram/IRC messaging endpoints. Phase 1 UI filters must only show Telegram + IRC despite forward-compatible enums.
 - **Phase 2** includes additional platforms (WhatsApp, WeChat, Meta, X).
 - Channel enums remain inclusive of future platforms (WhatsApp, WeChat, Meta, X, email, slack) for forward compatibility.
 

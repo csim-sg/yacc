@@ -66,7 +66,20 @@
 
 ### **.docs/ Core Documentation** (in .docs/ directory)
 
-The documentation has been consolidated into **6 main documents**. Historical and working documents are preserved in subdirectories.
+The documentation has been consolidated into core documents plus phase-specific references. Historical and working documents are preserved in subdirectories.
+
+#### **phases/PHASE_1.md** (Phase 1 Scope)
+**Authoritative Phase 1 scope, deliverables, and acceptance criteria**
+
+**Contains**:
+- Phase 1 scope (Telegram + IRC)
+- Phase 2 deferrals (WhatsApp/WeChat/Meta/X)
+- Acceptance criteria and UI filter constraints
+- High-level Phase 1 timeline
+
+**Audience**: Product Owner, architects, dev leads, QA
+
+**When to use**: Confirming Phase 1 scope and acceptance
 
 #### **01-product-specification.md** (Product Specification)
 **Product scope, features, user stories, UI requirements, and acceptance criteria**
@@ -204,6 +217,15 @@ The documentation has been consolidated into **6 main documents**. Historical an
 
 ### **.docs/ Additional Directories**
 
+#### **adr/** (Architecture Decision Records)
+Official ADRs (ADR-001+). Use for architecture scope and decisions.
+
+#### **governance/** (Governance Logs)
+Governance logs (GOV-001+) with audit traceability and sign-offs.
+
+#### **phases/** (Phase Documents)
+Phase-specific scope and acceptance criteria documents (e.g., Phase 1).
+
 #### **archive/** (Historical & Critical Documents)
 Preserved historical documents, critical decisions, and sign-offs.
 
@@ -310,7 +332,7 @@ Just-in-time and temporary working documents. May be cleaned up periodically.
 
 ### Infrastructure
 - **Database**: PostgreSQL (ACID, FTS, JSON)
-- **Storage**: AWS S3 (payloads, attachments, re-hosting)
+- **Storage**: Cloudflare R2 (payloads, attachments, re-hosting)
 - **Queue**: Redis + BullMQ (message retry with exponential backoff)
 - **Search**: PostgreSQL FTS (MVP) → Elasticsearch (Phase 2)
 - **Real-Time**: Socket.io (WebSocket with 1-hour backlog)
@@ -489,6 +511,6 @@ INTEGRATIONS: Telegram, IRC (end-to-end)
 - Archived critical documents to `.docs/archive/` (Phase 1 decisions, SOW, QA sign-offs)
 - Moved temporary/working documents to `.docs/temp/` (Phase 1 notes, quick references)
 - Archived design iterations to `.docs/archive/design/`
-- Deleted obsolete directories (`phases/`, `design/`, `.tocheck/`)
+- Deleted obsolete directories (`design/`, `.tocheck/`)
 
 **See**: `DOCUMENTATION_CLEANUP_SUMMARY.md` for details

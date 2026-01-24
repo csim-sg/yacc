@@ -2,7 +2,8 @@
 
 **YACC - Yet Another Chat Client - Omni-Channel Social Inbox MVP**
 
-> **Technical Reference**: See `ARCHITECTURE_AND_IMPLEMENTATION.md` for system architecture, technology stack, core components, deployment diagrams, and technical decisions.
+> **Technical Reference**: See `.docs/03-implementation-guide.md` for system architecture, technology stack, core components, deployment diagrams, and technical decisions.
+> **Phase Scope Reference**: See `.docs/phases/PHASE_1.md` for authoritative Phase 1 scope and acceptance criteria.
 
 ---
 
@@ -23,7 +24,7 @@
 ## 1. Product Overview
 
 ### Concept
-**YACC (Yet Another Chat Client)** is a cloud-hosted, single-tenant omni-channel chat platform that centralizes social communications (Phase 1: Telegram groups/channels and IRC; Phase 2: WhatsApp, WeChat, Meta/Facebook/Instagram, and X) into one unified inbox. Built with React, Node.js, PostgreSQL, and deployed to AWS S3 (frontend) + VPS (backend).
+**YACC (Yet Another Chat Client)** is a cloud-hosted, single-tenant omni-channel chat platform that centralizes social communications (Phase 1: Telegram groups/channels and IRC; Phase 2: WhatsApp, WeChat, Meta/Facebook/Instagram, and X) into one unified inbox. Built with React, Node.js, PostgreSQL, and deployed to AWS S3 + CloudFront (frontend) + VPS (backend), with Cloudflare R2 for attachment and raw payload storage.
 
 **Initial Release (Phase 1)**: Unified Inbox + Auth + Basic Ops + Telegram/IRC messaging  
 **Phase 2**: WhatsApp/WeChat/Meta/X channels + advanced features
@@ -57,7 +58,7 @@
 - ✅ Full-text search (sender, message body, date range)
 - ✅ Notifications (in-app: assignment, @mentions, unread badges)
 - ✅ Attachment handling (5 MB max, stored on R2, re-hosted)
-- ✅ Message retry with exponential backoff (Redis/SQS)
+- ✅ Message retry with exponential backoff (Redis + BullMQ)
 
 ### Deferred Features (Phase 2+)
 - Email notifications
@@ -777,7 +778,7 @@ flowchart TD
 
 **AC:**
 - On outbound message failure: retry with exponential backoff (1m, 5m, 30m; 3 attempts total)
-- Use Redis or SQS to queue retries asynchronously
+- Use Redis + BullMQ to queue retries asynchronously
 - After 3 attempts → move to dead-letter queue (DLQ) for ops review
 - Message status: pending → sent (success) or failed (after max retries)
 - User can retry manually via "Retry" button (one additional attempt)

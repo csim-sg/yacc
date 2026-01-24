@@ -13,6 +13,6 @@ Follow-up Required: Yes | No
 
 # Rules
 
-* Stored in `.docs/GOV_LOG/GOV-<running number>-<short name description>.md`
+* Stored in `.docs/governance/GOV-<running number>-<short name description>.md`
 * Append-only (no deletions)
 * Referenced during audits and reviews
