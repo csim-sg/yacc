@@ -18,7 +18,7 @@
 
 ## 1. System Architecture
 
-**Phase Scope Reference**: See `.docs/phases/PHASE_1.md` for authoritative Phase 1 scope and acceptance criteria.
+**Phase Scope Reference**: See `.docs/06-phase1-execution-guide.md` for authoritative Phase 1 scope and acceptance criteria.
 
 ### High-Level Overview
 

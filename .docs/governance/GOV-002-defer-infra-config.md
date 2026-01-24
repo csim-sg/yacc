@@ -83,7 +83,7 @@ Aligned with architecture principles:
 
 - **Issues Affected**: #106 (BE-020), #108 (BE-026)
 - **Week 1 Plan**: Issue #110 [WEEK-1] Phase 1 Week 1: Foundation
-- **Phase 1 TODO**: `.docs/PHASE1_TODO.md`
+- **Phase 1 Tasks**: `.docs/06-phase1-execution-guide.md`
 - **ADR Reference**: None (deferral, not architecture change)
 
 ## Mermaid (Governance Flow)

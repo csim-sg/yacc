@@ -141,7 +141,7 @@ stateDiagram-v2
 
 ### Before Implementation (Now)
 - [x] Create this governance guidance (GOV-005)
-- [x] Update PHASE1_TODO.md with placeholder tasks
+- [x] Update Phase 1 execution guide with placeholder tasks
 - [ ] Optionally: Refactor backend `WSConstants.ts` to one-definition-per-file
 
 ### During Implementation (When WebSocket Client Exists)

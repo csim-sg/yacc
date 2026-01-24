@@ -3,7 +3,7 @@
 **YACC - Yet Another Chat Client - Omni-Channel Social Inbox MVP**
 
 > **Technical Reference**: See `.docs/03-implementation-guide.md` for system architecture, technology stack, core components, deployment diagrams, and technical decisions.
-> **Phase Scope Reference**: See `.docs/phases/PHASE_1.md` for authoritative Phase 1 scope and acceptance criteria.
+> **Phase Scope Reference**: See `.docs/06-phase1-execution-guide.md` for authoritative Phase 1 scope and acceptance criteria.
 
 ---
 

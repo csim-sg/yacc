@@ -68,14 +68,14 @@
 
 The documentation has been consolidated into core documents plus phase-specific references. Historical and working documents are preserved in subdirectories.
 
-#### **phases/PHASE_1.md** (Phase 1 Scope)
+#### **06-phase1-execution-guide.md** (Phase 1 Execution Guide)
 **Authoritative Phase 1 scope, deliverables, and acceptance criteria**
 
 **Contains**:
 - Phase 1 scope (Telegram + IRC)
 - Phase 2 deferrals (WhatsApp/WeChat/Meta/X)
 - Acceptance criteria and UI filter constraints
-- High-level Phase 1 timeline
+- High-level Phase 1 timeline and validation checklist
 
 **Audience**: Product Owner, architects, dev leads, QA
 
@@ -223,14 +223,11 @@ Official ADRs (ADR-001+). Use for architecture scope and decisions.
 #### **governance/** (Governance Logs)
 Governance logs (GOV-001+) with audit traceability and sign-offs.
 
-#### **phases/** (Phase Documents)
-Phase-specific scope and acceptance criteria documents (e.g., Phase 1).
-
 #### **archive/** (Historical & Critical Documents)
 Preserved historical documents, critical decisions, and sign-offs.
 
 **Structure**:
-- `phase1/` - Phase 1 critical documents (SOW, pending requests, architect decisions)
+- `phase1/` - Phase 1 critical documents (scope doc, pending requests, architect decisions)
 - `signoffs/` - Official QA and approval sign-offs
 - `design/` - Design iterations and UI history
 
@@ -321,7 +318,6 @@ Just-in-time and temporary working documents. May be cleaned up periodically.
 | **.docs/04-qa-and-testing.md** | Testing & QA | QA engineers, testers |
 | **.docs/05-quick-reference.md** | Quick reference | Everyone |
 | **.docs/06-phase1-execution-guide.md** | Phase 1 execution + testing guide | Backend developers, QA engineers |
-| **.docs/week1-day1-development.md** | Week 1 Day 1 implementation guide | Backend developers |
 | **.docs/archive/** | Historical & critical documents | All (reference) |
 | **.docs/temp/** | Temporary/working docs | Developers (current work) |
 
@@ -441,7 +437,7 @@ INTEGRATIONS: Telegram, IRC (end-to-end)
 
 **Looking for working notes?** → Check **.docs/temp/** directory
 
-**What happened during cleanup?** → Read **DOCUMENTATION_CLEANUP_SUMMARY.md**
+**How do we lock signed-off docs?** → See **.docs/governance/__README.md** (branch protection + CODEOWNERS)
 
 ---
 
@@ -507,9 +503,7 @@ INTEGRATIONS: Telegram, IRC (end-to-end)
 
 ### January 21, 2026 - Documentation Cleanup
 - Consolidated documentation into 6 main documents (01-06)
-- Archived critical documents to `.docs/archive/` (Phase 1 decisions, SOW, QA sign-offs)
+- Archived critical documents to `.docs/archive/` (Phase 1 decisions, scope doc, QA sign-offs)
 - Moved temporary/working documents to `.docs/temp/` (Phase 1 notes, quick references)
 - Archived design iterations to `.docs/archive/design/`
 - Deleted obsolete directories (`design/`, `.tocheck/`)
-
-**See**: `DOCUMENTATION_CLEANUP_SUMMARY.md` for details
