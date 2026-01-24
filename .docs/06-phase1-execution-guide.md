@@ -1,6 +1,6 @@
 # 06. Phase 1 Execution Guide
 
-**Last Updated**: January 25, 2026  
+**Last Updated**: January 24, 2026  
 **Status**: Ready for Development  
 **Total P0 Issues**: 22  
 **Governance**: ADR-003, GOV-006, GOV-007
@@ -100,11 +100,11 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| BE-001 | Set up PostgreSQL database with Drizzle ORM | Not Started | P0 | Backend | - | Database connection working, Drizzle schema migrations functional | PVTI_lAHOAB4wV84BNGcwzgj_5rE | 12 |
-| BE-002 | Define database schema (users, conversations, messages, tags, notes, audit logs, notifications, routing rules) | Not Started | P0 | Backend | BE-001 | All 11 tables defined with correct relationships, migrations generated | PVTI_lAHOAB4wV84BNGcwzgj_5rQ | 13 |
+| BE-001 | Set up PostgreSQL database with Drizzle ORM | **Done** | P0 | Backend | - | Database connection working, Drizzle schema migrations functional | PVTI_lAHOAB4wV84BNGcwzgj_5rE | 12 |
+| BE-002 | Define database schema (users, conversations, messages, tags, notes, audit logs, notifications, routing rules) | **Done** | P0 | Backend | BE-001 | All 11 tables defined with correct relationships, migrations generated | PVTI_lAHOAB4wV84BNGcwzgj_5rQ | 13 |
 | BE-003 | Implement BetterAuth for authentication (email/password, session/JWT) | Ready | P0 | Backend | BE-002 | Login endpoint working, JWT/session management functional | PVTI_lAHOAB4wV84BNGcwzgj_5rc | 18 |
-| BE-004 | Implement forgot password flow (reset token, email sending) | Not Started | P1 | Backend | BE-003 | POST /auth/forgot-password and /reset-password working | PVTI_lAHOAB4wV84BNGcwzgj_5sM | 19 |
-| BE-005 | Implement RBAC middleware (4 roles: Super Admin, Admin, Manager, User) | Not Started | P0 | Backend | BE-002, BE-003 | Permission checks working for all role-based endpoints | PVTI_lAHOAB4wV84BNGcwzgj_5rU | 20 |
+| BE-004 | Implement forgot password flow (reset token, email sending) | **Ready** | P1 | Backend | BE-003 | POST /auth/forgot-password and /reset-password working | PVTI_lAHOAB4wV84BNGcwzgj_5sM | 19 |
+| BE-005 | Implement RBAC middleware (4 roles: Super Admin, Admin, Manager, User) | **Ready** | P0 | Backend | BE-002, BE-003 | Permission checks working for all role-based endpoints | PVTI_lAHOAB4wV84BNGcwzgj_5rU | 20 |
 | BE-006 | Create user management endpoints (CRUD for users, roles) | Not Started | P1 | Backend | BE-005 | GET/POST/PUT/DELETE /users, /roles working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_5rk | 17 |
 | BE-007 | Implement inbox API (GET /conversations with filters: channel, assignee, tag, status, priority) | Not Started | P0 | Backend | BE-002, BE-005 | Filtering and pagination working | PVTI_lAHOAB4wV84BNGcwzgj_5sA | 14 |
 | BE-008 | Implement conversation detail endpoint (GET /conversations/:id) | Not Started | P0 | Backend | BE-007 | Returns conversation with messages and metadata | PVTI_lAHOAB4wV84BNGcwzgj_5rM | 15 |
@@ -112,20 +112,20 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | BE-010 | Implement send message endpoint (POST /conversations/:id/messages) | Not Started | P0 | Backend | BE-008 | Queues message for delivery, returns pending status | PVTI_lAHOAB4wV84BNGcwzgj_5ro | 11 |
 | BE-011 | Implement message status tracking (pending → sent/failed) | Not Started | P0 | Backend | BE-010 | Status updates working, database reflects delivery state | PVTI_lAHOAB4wV84BNGcwzgj_54c | 30 |
 | BE-012 | Implement message retry endpoint (POST /conversations/:id/messages/:msgId/retry) | Not Started | P1 | Backend | BE-011 | Requeues failed message, updates status to pending | PVTI_lAHOAB4wV84BNGcwzgj_54Q | 22 |
-| BE-013 | Set up Redis + BullMQ for message retry queue | Not Started | P0 | Backend | - | Redis connection working, BullMQ jobs processing | PVTI_lAHOAB4wV84BNGcwzgj_55I | 23 |
+| BE-013 | Set up Redis + BullMQ for message retry queue | **Done** | P0 | Backend | - | Redis connection working, BullMQ jobs processing | PVTI_lAHOAB4wV84BNGcwzgj_55I | 23 |
 | BE-014 | Implement exponential backoff for retries (1m, 5m, 30m; 3 attempts max) | Not Started | P0 | Backend | BE-013 | Failed messages retried with correct backoff schedule |  |  |
 | BE-014A | Fix retry queue removal and backoff schedule alignment | Not Started | P0 | Backend | BE-013 | removeFromQueue uses supported job lookup; backoff is 1m/5m/30m |  |  |
 | BE-015 | Implement dead-letter queue (DLQ) for failed messages | Not Started | P1 | Backend | BE-014 | Messages with 3 failed attempts moved to DLQ |  |  |
-| BE-016 | Set up Socket.io WebSocket server | Not Started | P0 | Backend | - | WebSocket server running on configured port |  |  |
+| BE-016 | Set up Socket.io WebSocket server | Ready | P0 | Backend | - | WebSocket server running on configured port |  |  |
 | BE-017 | Implement message.received event (push on inbound message) | Not Started | P0 | Backend | BE-016 | Event emitted when inbound message received |  |  |
 | BE-018 | Implement message.sent event (push on successful delivery) | Not Started | P0 | Backend | BE-016 | Event emitted when message status → sent | PVTI_lAHOAB4wV84BNGcwzgj_54g | 31 |
 | BE-019 | Implement message.failed event (push on delivery failure) | Not Started | P0 | Backend | BE-016 | Event emitted when message status → failed |  |  |
-| BE-020 | Set up Cloudflare R2 storage for raw payloads and attachments | Not Started | P0 | Backend | - | R2 connection working, upload/download functional |  |  |
+| BE-020 | Set up Cloudflare R2 storage for raw payloads and attachments | **Ready** | P0 | Backend | - | R2 connection working, upload/download functional | PVTI_lAHOAB4wV84BNGcwzgkAlho | 106 |
 | BE-021 | Implement raw payload storage (store inbound platform payloads, 7-day retention) | Not Started | P1 | Backend | BE-020 | Payloads stored, scheduled cleanup working | PVTI_lAHOAB4wV84BNGcwzgj_54I | 24 |
 | BE-022 | Implement raw payload retrieval endpoint (GET /messages/:id/raw-payload, manager+ only) | Not Started | P1 | Backend | BE-021, BE-005 | Endpoint working with RBAC, audit-logged | PVTI_lAHOAB4wV84BNGcwzgj_54U | 21 |
 | BE-023 | Implement attachment download and re-host (inbound files to R2, max 5 MB) | Not Started | P1 | Backend | BE-020 | Files downloaded from IRC, stored on R2, URLs returned |  |  |
 | BE-024 | Implement audit logging (all actions: assignments, tags, notes, status changes, rule executions, retries) | Not Started | P1 | Backend | BE-002 | All actions logged with actor, action, entity_type, entity_id, timestamp |  |  |
-| BE-025 | Implement health check endpoint (GET /health) | Not Started | P2 | Backend | - | Returns status of DB, Redis, R2 connections | PVTI_lAHOAB4wV84BNGcwzgj_54k | 32 |
+| BE-025 | Set up email service (Nodemailer/SendGrid) | **Ready** | P2 | Backend | - | Email service configured, password reset emails functional | PVTI_lAHOAB4wV84BNGcwzgkAlhg | 105 |
 
 ### Frontend Tasks
 
@@ -295,18 +295,18 @@ This document provides the complete execution plan for all 22 P0 Backend issues 
 
 | Issue ID | Title | Status | Dependencies | Week |
 |----------|-------|--------|--------------|------|
-| **BE-028** | Create shared types package | Ready | None | 1 |
-| **BE-026** | Create environment configuration scaffolding | Ready | None | 1 |
-| **BE-001** | Set up PostgreSQL + Drizzle ORM | Ready | None | 1 |
-| **BE-002** | Define database schema (11 tables) | Ready | BE-001 | 1 |
-| **BE-027** | Set up structured logging infrastructure | Ready | BE-026 | 1 |
-| **BE-020** | Set up Cloudflare R2 storage | Ready | None | 1 |
-| **BE-025** | Set up email service (Nodemailer/SendGrid) | Ready | BE-026 | 1 |
-| **BE-003** | Implement BetterAuth for authentication | Ready | BE-002, BE-025 | 1 |
-| **BE-004** | Implement forgot password flow | Ready | BE-003, BE-025 | 1 |
-| **BE-005** | Implement RBAC middleware | Ready | BE-002, BE-003 | 1 |
-| **BE-016** | Set up Socket.io WebSocket server | Ready | BE-003, BE-026 | 1 |
-| **BE-013** | Set up Redis + BullMQ for message retry queue | Ready | None | 2 |
+| **BE-028** | Create shared types package | **Done** | None | 1 |
+| **BE-026** | Create environment configuration scaffolding | **Ready** | None | 1 |
+| **BE-001** | Set up PostgreSQL + Drizzle ORM | **Done** | None | 1 |
+| **BE-002** | Define database schema (11 tables) | **Done** | BE-001 | 1 |
+| **BE-027** | Set up structured logging infrastructure | **Ready** | BE-026 | 1 |
+| **BE-020** | Set up Cloudflare R2 storage | **Ready** | None | 1 |
+| **BE-025** | Set up email service (Nodemailer/SendGrid) | **Ready** | BE-026 | 1 |
+| **BE-003** | Implement BetterAuth for authentication | **Ready** | BE-002, BE-025 | 1 |
+| **BE-004** | Implement forgot password flow | **Ready** | BE-003, BE-025 | 1 |
+| **BE-005** | Implement RBAC middleware | **Ready** | BE-002, BE-003 | 1 |
+| **BE-016** | Set up Socket.io WebSocket server | **Ready** | BE-003, BE-026 | 1 |
+| **BE-013** | Set up Redis + BullMQ for message retry queue | **Done** | None | 2 |
 | **BE-007** | Implement inbox API | Ready | BE-002, BE-005 | 2 |
 | **BE-008** | Implement conversation detail endpoint | Ready | BE-007 | 2 |
 | **BE-009** | Implement message retrieval endpoint | Ready | BE-002, BE-003, BE-008 | 2 |
