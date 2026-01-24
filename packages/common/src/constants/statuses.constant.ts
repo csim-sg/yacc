@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ChannelEnum = z.enum(['irc']); // Phase 1 MVP: IRC only. Expand to include telegram in Phase 2+
+export const ChannelEnum = z.enum(['telegram', 'irc', 'email', 'slack']);
 export const ConversationStatusEnum = z.enum(['open', 'pending', 'resolved']);
 export const PriorityEnum = z.enum(['low', 'normal', 'high', 'urgent']);
 export const MessageStatusEnum = z.enum(['pending', 'sent', 'failed']);
@@ -9,8 +9,11 @@ export const NotificationTypeEnum = z.enum(['assignment', 'mention', 'unread']);
 export const RoutingRuleStatusEnum = z.enum(['active', 'disabled']);
 
 export const Channels = {
+  TELEGRAM: 'telegram',
   IRC: 'irc',
-} as const; // Phase 1 MVP: IRC only. Add TELEGRAM: 'telegram' in Phase 2+
+  EMAIL: 'email',
+  SLACK: 'slack',
+} as const;
 
 export const ConversationStatuses = {
   OPEN: 'open',

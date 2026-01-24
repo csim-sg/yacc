@@ -2,20 +2,20 @@
 
 **Date**: January 20, 2026  
 **Status**: Ready for developer handoff  
-**Scope Correction**: IRC integration in Phase 1, Telegram deferred to Phase 2
+**Scope Correction**: Telegram + IRC integrations in Phase 1
 
 ## Executive Summary
 This todo list reflects the corrected Phase 1 scope based on architectural decisions. The SOW.md "Out of Scope" section incorrectly lists both Telegram and IRC as out of scope. The correct scope is:
-- **IN Phase 1**: IRC integration with full messaging endpoints, WebSocket gateway, message retry queue
-- **DEFERRED to Phase 2**: Telegram integration
+- **IN Phase 1**: Telegram + IRC integration with full messaging endpoints, WebSocket gateway, message retry queue
+- **DEFERRED to Phase 2**: Additional platforms (WhatsApp, WeChat, Meta, X)
 
 ## 1. Scope Validation Tasks
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria |
 |----|------|--------|----------|----------|--------------|---------------------|
-| SV-001 | Fix SOW.md to correctly specify IRC in Phase 1, Telegram deferred to Phase 2 | Not Started | P0 | Product Owner | - | SOW.md updated with correct scope, Architect review approved |
-| SV-002 | Validate all Phase 1 requirements captured in updated SOW (auth, RBAC, inbox APIs, messaging, IRC, WebSocket, retry queue) | Not Started | P0 | Product Owner | SV-001 | All Phase 1 requirements listed with correct dependencies |
-| SV-003 | Update Phase 1 timeline (2 weeks) to include IRC integration tasks | Not Started | P1 | Product Owner | SV-001 | Timeline reflects IRC work with realistic estimates |
+| SV-001 | Fix SOW.md to correctly specify Telegram + IRC in Phase 1 | Not Started | P0 | Product Owner | - | SOW.md updated with correct scope, Architect review approved |
+| SV-002 | Validate all Phase 1 requirements captured in updated SOW (auth, RBAC, inbox APIs, messaging, Telegram, IRC, WebSocket, retry queue) | Not Started | P0 | Product Owner | SV-001 | All Phase 1 requirements listed with correct dependencies |
+| SV-003 | Update Phase 1 timeline (2 weeks) to include Telegram + IRC integration tasks | Not Started | P1 | Product Owner | SV-001 | Timeline reflects Telegram + IRC work with realistic estimates |
 
 ## 2. Backend Tasks
 
@@ -126,7 +126,7 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria |
 |----|------|--------|----------|----------|--------------|---------------------|
-| DOC-001 | Update SOW.md with corrected scope (IRC in Phase 1, Telegram Phase 2) | Not Started | P0 | Product Owner | SV-001 | SOW.md updated, reviewed by Architect |
+| DOC-001 | Update SOW.md with corrected scope (Telegram + IRC in Phase 1) | Not Started | P0 | Product Owner | SV-001 | SOW.md updated, reviewed by Architect |
 | DOC-002 | Update 02-api-and-data-model.md with IRC-specific endpoints | Not Started | P1 | Backend | INT-009 | IRC endpoints documented with request/response examples |
 | DOC-003 | Update 03-implementation-guide.md with IRC connector architecture | Not Started | P1 | Backend | INT-001 | IRC integration documented in architecture section |
 | DOC-004 | Create IRC integration guide (setup, configuration, troubleshooting) | Not Started | P1 | Backend | INT-004 | Step-by-step guide for connecting IRC to YACC |
@@ -193,7 +193,7 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
  | DEV-131-01 | Split WebSocket constants/types/service to one-definition-per-file (no barrel exports) | Deferred | P0 | Frontend | FE-012 | Each file exports a single definition; direct imports only. Blocked: WebSocket client not implemented yet |
 | DEV-131-02 | Add WebSocket observability (metrics, traces, SLO) | Deferred | P0 | Frontend | FE-012 | Metrics and traces emitted; SLO documented. Blocked: WebSocket client not implemented yet |
 | DEV-131-03 | Fix retry queue removal logic and enforce 1m/5m/30m schedule | Completed | P0 | Backend | BE-013 | removeFromQueue uses proper BullMQ API; backoff schedule aligned to 1m/5m/30m |
-| DEV-131-04 | Remove non-MVP channel types or document ADR | Completed | P0 | Backend | BE-002 | channel_type limited to IRC only for Phase 1 MVP |
+| DEV-131-04 | Restore Telegram in Phase 1 scope (ADR-003) | Completed | P0 | Backend | BE-002 | ADR-003 approved; Telegram + IRC supported in Phase 1 |
  | DEV-131-05 | Add governance log entry for blocker fixes | Completed | P0 | Architect | DEV-131-03, DEV-131-04 | GOV-004 created with checklist + Mermaid diagram |
 | DEV-131-06 | Align PR summary with actual diff and reference ADR ID | Completed | P0 | Frontend | DEV-131-01 | PR description matches changes; ADR ID referenced |
 
@@ -201,10 +201,13 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 - DEV-131-03 and DEV-131-04 completed in PR #142
 - DEV-131-05 created GOV-004 governance log for these fixes
 - DEV-131-01 and DEV-131-02 deferred until WebSocket client is implemented (blocked by missing frontend code)
-- GOV-004 documents blocker fixes and Phase 1 MVP channel type restrictions
+- GOV-004 documents blocker fixes; channel type restriction superseded by ADR-003
+- GOV-006 documents Phase 1 scope restoration for Telegram + IRC
+- GOV-005 created (DOC-010) to provide WebSocket client implementation guidance when development begins
+- FE-012A and FE-012B updated to reference GOV-005 guidance instead of just "one-definition-per-file" and "observability"
 
 ---
 
-**Last Updated**: January 20, 2026  
+**Last Updated**: January 24, 2026  
 **Status**: Ready for developer handoff  
-**Total Tasks**: 85 tasks across 8 categories
+**Total Tasks**: 86 tasks across 8 categories

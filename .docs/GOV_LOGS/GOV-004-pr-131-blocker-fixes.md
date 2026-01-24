@@ -8,7 +8,7 @@
 # Governance Log
 
 ## Decision Summary
-Fix PR #131 blockers by correcting retry queue backoff schedule to strict 1m/5m/30m and restricting channel types to IRC-only for Phase 1 MVP scope.
+Fix PR #131 blockers by correcting retry queue backoff schedule to strict 1m/5m/30m and temporarily restricting channel types to IRC-only for Phase 1 MVP scope. This channel restriction was later superseded by ADR-003 (Telegram + IRC Phase 1).
 
 ## Governance Trigger
 Blockers #134 and #135 from PR #131 preventing merge of WebSocket client implementation.
@@ -25,7 +25,7 @@ Aligned with architecture principles: Cloud-ready by default, observability is m
 - Enhanced observability with removedCount logging
 
 ### Channel Type Changes (#135)
-- Restricted `channelTypeEnum` to `['irc']` only for Phase 1 MVP
+- Restricted `channelTypeEnum` to `['irc']` only for Phase 1 MVP (superseded by ADR-003)
 - Removed `telegram`, `email`, `slack` from:
   - Backend schema and migrations
   - Common package types and schemas
@@ -33,7 +33,7 @@ Aligned with architecture principles: Cloud-ready by default, observability is m
 - Updated test expectations accordingly
 
 ## Risk Acceptance / Waivers
-No waivers required. Changes align with approved Phase 1 MVP scope (IRC integration only).
+No waivers required. Retry queue changes remain approved; channel scope was later updated by ADR-003.
 
 ## Approved Controls / Conditions
 
@@ -56,7 +56,8 @@ No waivers required. Changes align with approved Phase 1 MVP scope (IRC integrat
 - Issue #134: BE-013 Retry backoff schedule
 - Issue #135: BE-001 Channel type restrictions
 - PR #142: fix(blockers): Resolve PR #131 blockers
-- Phase 1 MVP scope: IRC integration only
+- ADR-003: Restore Telegram + IRC Phase 1 scope
+- Phase 1 MVP scope: IRC-only (superseded by ADR-003)
 
 ## Mermaid (Governance Flow)
 ```mermaid
@@ -70,7 +71,7 @@ sequenceDiagram
   Dev->>Dev: Fix retry queue (1m/5m/30m)
   Dev->>Dev: Restrict channel types to IRC-only
   Dev->>Arch: Submit changes for review
-  Arch-->>Dev: Approve changes (Phase 1 MVP aligned)
+  Arch-->>Dev: Approve changes (later superseded)
   Dev->>Dev: Create PR #142
   Arch->>Arch: Final review and merge approval
 ```
@@ -78,7 +79,7 @@ sequenceDiagram
 ## Known Constraints & Limitations
 - WebSocket client (#132, #133) not implemented yet, blocked by missing client code
 - Governance log for FE-012 (#136) deferred until WebSocket client is ready
-- Non-MVP channels (telegram, email, slack) require Phase 2+ ADR approval
+- Non-MVP channels (telegram, email, slack) require Phase 2+ ADR approval (superseded by ADR-003 for Phase 1 Telegram)
 
 ## Sign-off
 Approved by: [Pending Architect Review]

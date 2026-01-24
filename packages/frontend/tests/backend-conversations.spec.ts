@@ -95,10 +95,10 @@ test.describe('Backend API - Conversation Endpoints', () => {
       expect(response.status()).toBe(200);
       
       const body = await response.json();
-      // All returned conversations should be irc channel (Phase 1 MVP)
+      // All returned conversations should be telegram channel (Phase 1 MVP includes Telegram)
       body.data.conversations.forEach((conv: any) => {
         if (conv.channel) {
-          expect(conv.channel).toBe('irc');
+          expect(conv.channel).toBe('telegram');
         }
       });
     });

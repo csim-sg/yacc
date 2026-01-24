@@ -90,7 +90,10 @@ export async function runMigrations() {
     await db.execute(sql`
       DO $$ BEGIN
         CREATE TYPE channel_type AS ENUM (
-          'irc'
+          'telegram',
+          'irc',
+          'email',
+          'slack'
         );
       EXCEPTION
         WHEN duplicate_object THEN null;

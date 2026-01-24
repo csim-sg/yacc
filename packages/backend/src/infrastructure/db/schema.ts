@@ -41,7 +41,7 @@ export const messageStatusEnum = pgEnum('message_status', ['pending', 'sent', 'f
 
 export const messageDirectionEnum = pgEnum('message_direction', ['inbound', 'outbound']);
 
-export const channelTypeEnum = pgEnum('channel_type', ['irc']); // Phase 1 MVP: IRC only. Expand to include telegram, email, slack in Phase 2+
+export const channelTypeEnum = pgEnum('channel_type', ['telegram', 'irc', 'email', 'slack']);
 
 // Tables
 

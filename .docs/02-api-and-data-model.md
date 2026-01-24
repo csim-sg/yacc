@@ -5,8 +5,8 @@
 ---
 
 ## Phase Scope Notes
-- **Phase 1** ends with WebSocket gateway + message retry queue delivery + IRC integration, including IRC messaging endpoints.
-- **Phase 2** includes Telegram integration (deferred from Phase 1).
+- **Phase 1** ends with WebSocket gateway + message retry queue delivery + Telegram + IRC integration, including Telegram/IRC messaging endpoints.
+- **Phase 2** includes additional platforms (WhatsApp, WeChat, Meta, X).
 
 ---
 
@@ -1079,7 +1079,7 @@ CREATE TABLE audit_logs (
 
 ### Integrations
 
-Phase 1 includes IRC integration only; Telegram is deferred to Phase 2.
+Phase 1 includes Telegram + IRC integration. Additional platforms are deferred to Phase 2+.
 
 #### `POST /integrations/telegram/connect`
 **Request:**
