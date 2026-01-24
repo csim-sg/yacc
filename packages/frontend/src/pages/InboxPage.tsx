@@ -12,20 +12,15 @@ import {
   type ConversationListItem,
   type ConversationStatus,
   type ConversationPriority,
-  type ChannelType,
+  type Phase1ChannelType,
   type ListConversationsResponse,
   type ConversationTag,
+  PHASE1_CHANNELS,
 } from '../services/conversations.service';
 
-const CHANNEL_LABELS: Record<ChannelType, string> = {
+const CHANNEL_LABELS: Record<Phase1ChannelType, string> = {
   telegram: 'Telegram',
   irc: 'IRC',
-  whatsapp: 'WhatsApp',
-  wechat: 'WeChat',
-  meta: 'Meta',
-  x: 'X',
-  email: 'Email',
-  slack: 'Slack',
 };
 
 const PRIORITY_BADGE: Record<ConversationPriority, string> = {
@@ -43,16 +38,7 @@ const STATUS_BADGE: Record<ConversationStatus, string> = {
 
 const STATUS_VALUES: ConversationStatus[] = ['open', 'pending', 'resolved'];
 const PRIORITY_VALUES: ConversationPriority[] = ['low', 'medium', 'high', 'urgent'];
-const CHANNEL_VALUES: ChannelType[] = [
-  'telegram',
-  'irc',
-  'whatsapp',
-  'wechat',
-  'meta',
-  'x',
-  'email',
-  'slack',
-];
+const CHANNEL_VALUES: Phase1ChannelType[] = [...PHASE1_CHANNELS];
 
 export function InboxPage() {
   const { user, logout, isLoading: authLoading } = useAuthStore();
@@ -61,7 +47,7 @@ export function InboxPage() {
   const [initializedFromUrl, setInitializedFromUrl] = useState(false);
 
   const [page, setPage] = useState(1);
-  const [channel, setChannel] = useState<ChannelType | 'all'>('all');
+  const [channel, setChannel] = useState<Phase1ChannelType | 'all'>('all');
   const [status, setStatus] = useState<ConversationStatus | 'all'>('all');
   const [priority, setPriority] = useState<ConversationPriority | 'all'>('all');
   const [searchInput, setSearchInput] = useState('');
@@ -98,7 +84,7 @@ export function InboxPage() {
     const unreadParam = searchParams.get('unread');
 
     setPage(Number.isNaN(pageParam) ? 1 : pageParam);
-    setChannel(CHANNEL_VALUES.includes(channelParam as ChannelType) ? (channelParam as ChannelType) : 'all');
+    setChannel(CHANNEL_VALUES.includes(channelParam as Phase1ChannelType) ? (channelParam as Phase1ChannelType) : 'all');
     setStatus(STATUS_VALUES.includes(statusParam as ConversationStatus) ? (statusParam as ConversationStatus) : 'all');
     setPriority(PRIORITY_VALUES.includes(priorityParam as ConversationPriority) ? (priorityParam as ConversationPriority) : 'all');
     setSearch(searchParam || '');
@@ -286,7 +272,7 @@ export function InboxPage() {
     setUnreadOnly(false);
   };
 
-  const handleChannelSelect = (value: ChannelType | 'all') => {
+  const handleChannelSelect = (value: Phase1ChannelType | 'all') => {
     setChannel(value);
 
     if (window.innerWidth < 1024) {
@@ -719,7 +705,7 @@ export function InboxPage() {
                         <div className="flex flex-col gap-3">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="badge badge-outline badge-sm">
-                              {CHANNEL_LABELS[conversation.channel] || conversation.channel}
+                              {CHANNEL_LABELS[conversation.channel as Phase1ChannelType] || conversation.channel}
                             </span>
                             <span className={`badge badge-sm ${STATUS_BADGE[conversation.status]}`}>
                               {conversation.status}
