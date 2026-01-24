@@ -75,8 +75,11 @@ Phase 1 is accepted when:
   - WebSocket events update UI for message status and conversation changes
 - **Audit logging**
   - Actions logged with actor, action, entity, and timestamp
+- **Storage constraints**
+  - Attachments limited to 5 MB max and stored on R2
+  - Raw payloads stored on R2 with 7-day retention
 - **Governance alignment**
-  - Phase 1 scope matches ADR-003/GOV-006 and this SOW
+  - Phase 1 scope matches ADR-003/GOV-006/GOV-007 and this SOW
 
 ---
 
