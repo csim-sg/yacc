@@ -67,8 +67,8 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 | FE-013 | Implement message.received event listener (real-time inbox update) | Not Started | P0 | Frontend | FE-012, BE-017 | New inbound messages appear in inbox without refresh |
 | FE-014 | Implement message.sent event listener (update message status in UI) | Not Started | P0 | Frontend | FE-012, BE-018 | Message status changes to sent in real-time |
 | FE-015 | Implement message.failed event listener (show failed status) | Not Started | P0 | Frontend | FE-012, BE-019 | Failed messages updated in UI, retry button appears |
-| FE-012A | Split WebSocket client files to comply with one-definition-per-file rule | Not Started | P0 | Frontend | FE-012 | WebSocket constants/types/service split into single-definition files |
-| FE-012B | Add WebSocket client observability (metrics, traces, SLO) | Not Started | P0 | Frontend | FE-012 | Metrics/traces emitted; SLO documented in governance log |
+| FE-012A | Implement WebSocket client with one-definition-per-file structure | Deferred | P0 | Frontend | FE-012, GOV-005 | Follow GOV-005 guidance for constants, types, and service file structure. Blocked: WebSocket client not implemented yet |
+| FE-012B | Implement WebSocket client observability (metrics, traces, SLO) | Deferred | P0 | Frontend | FE-012, GOV-005 | Emit all required metrics per GOV-005; define SLOs in governance log. Blocked: WebSocket client not implemented yet |
 | FE-016 | Implement admin panel - IRC configuration (server, port, username, password inputs) | Not Started | P0 | Frontend | FE-002, BE-026 | Form to save IRC credentials, validation working |
 | FE-017 | Implement IRC connection test button (connects to server, shows success/error) | Not Started | P0 | Frontend | FE-016, BE-027 | Button triggers test, displays result message |
 | FE-018 | Implement IRC connection status display (connected/retrying/disconnected) | Not Started | P0 | Frontend | FE-016 | Status badge visible in admin panel, updates in real-time |
@@ -135,6 +135,7 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 | DOC-007 | Create environment variables reference (IRC, R2, Redis, DB) | Not Started | P1 | Backend | INT-010 | All env vars documented with descriptions |
 | DOC-008 | Create deployment guide for Phase 1 (Docker setup, env vars, migrations) | Not Started | P1 | Backend | BE-025 | Step-by-step deployment instructions |
 | DOC-009 | Add governance log entry for PR #131 blocker fixes | Completed | P0 | Architect | DEV-131-03, DEV-131-04 | GOV-004 created with compliance checklist and Mermaid diagram |
+| DOC-010 | Create WebSocket client implementation guidance (GOV-005) | Completed | P0 | Architect | DEV-131-05, DEV-131-06 | GOV-005 created with one-definition-per-file rules and observability requirements |
 
 ## 8. Handoff Tasks
 
