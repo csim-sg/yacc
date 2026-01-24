@@ -5,8 +5,9 @@
 ---
 
 ## Phase Scope Notes
-- **Phase 1** ends with WebSocket gateway + message retry queue delivery + Telegram + IRC integration, including Telegram/IRC messaging endpoints.
+- **Phase 1** includes WebSocket gateway + message retry queue delivery + Telegram + IRC integration, including Telegram/IRC messaging endpoints.
 - **Phase 2** includes additional platforms (WhatsApp, WeChat, Meta, X).
+- Channel enums remain inclusive of future platforms (email, slack) for forward compatibility.
 
 ---
 
@@ -79,6 +80,11 @@ open | pending | resolved
 ### Priority
 ```
 low | normal | high | urgent
+```
+
+### Channel
+```
+telegram | irc | whatsapp | wechat | meta | x | email | slack
 ```
 
 ### Message Direction
@@ -358,7 +364,7 @@ CREATE TABLE users (
 ```sql
 CREATE TABLE conversations (
   id UUID PRIMARY KEY,
-  channel VARCHAR(50) NOT NULL,  -- telegram, irc
+  channel VARCHAR(50) NOT NULL,  -- telegram, irc (Phase 1); whatsapp, wechat, meta, x, email, slack (future)
   external_thread_id VARCHAR(255) NOT NULL,
   status VARCHAR(50) DEFAULT 'open',  -- open, pending, resolved
   priority VARCHAR(50) DEFAULT 'normal',  -- low, normal, high, urgent
@@ -1079,7 +1085,7 @@ CREATE TABLE audit_logs (
 
 ### Integrations
 
-Phase 1 includes Telegram + IRC integration. Additional platforms are deferred to Phase 2+.
+Phase 1 includes Telegram + IRC integration. Additional platforms are deferred to Phase 2 (WhatsApp, WeChat, Meta, X).
 
 #### `POST /integrations/telegram/connect`
 **Request:**

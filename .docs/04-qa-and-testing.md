@@ -43,7 +43,7 @@ export const ircConv = { channel: 'irc', externalThreadId: 'irc-456' };
 
 - WebSocket real-time updates ship at the end of Phase 1.
 - Message retry queue (BullMQ + backoff) ships at the end of Phase 1.
-- Telegram integration testing starts in Phase 2; IRC remains in Phase 1.
+- Telegram and IRC integration testing are both Phase 1 scope.
 
 ### Phase 1 Runnable Test Checklist
 
@@ -160,10 +160,10 @@ export const ircConv = { channel: 'irc', externalThreadId: 'irc-456' };
 ### Category 5: Integrations (6 test cases)
 
 ```
-✓ 5.1.1 Telegram messages appear in inbox (Phase 2)
-✓ 5.1.2 Conversation threads created per group (one thread per group) (Phase 2)
-✓ 5.1.3 Replies sent on-behalf-of system account (Phase 2)
-✓ 5.1.4 Attachments from Telegram downloaded + re-hosted (Phase 2)
+✓ 5.1.1 Telegram messages appear in inbox
+✓ 5.1.2 Conversation threads created per group (one thread per group)
+✓ 5.1.3 Replies sent on-behalf-of system account
+✓ 5.1.4 Attachments from Telegram downloaded + re-hosted
 ✓ 5.2.1 IRC messages appear in inbox
 ✓ 5.2.2 IRC auto-reconnect on disconnect
 ```
@@ -242,7 +242,7 @@ export const ircConv = { channel: 'irc', externalThreadId: 'irc-456' };
 |---|-----------|-------|----------|
 | REGR_001 | Login + Inbox Load | 1.1, 2.1 | 🔴 |
 | REGR_002 | Send Reply + Delivery Status | 4.1, 15.2 | 🔴 |
-| REGR_003 | Telegram Inbound Message (Phase 2) | 5.1 | 🔴 |
+| REGR_003 | Telegram Inbound Message | 5.1 | 🔴 |
 | REGR_004 | IRC Inbound Message | 5.2 | 🔴 |
 | REGR_005 | Tag Conversation | 3.2, 17.1 | 🟠 |
 | REGR_006 | Assign + Notification | 3.3, 14.1 | 🟠 |
@@ -266,7 +266,7 @@ export const ircConv = { channel: 'irc', externalThreadId: 'irc-456' };
 - ✅ Inbox list & filtering (core workflow)
 - ✅ Send/receive messages (core messaging)
 - ✅ Conversation view & status changes
-- ✅ Telegram + IRC ingestion (integrations)
+- ✅ Telegram + IRC ingestion (Phase 1 integrations)
 - ✅ Real-time updates (WebSocket, end of Phase 1)
 - ✅ Message retry queue (end of Phase 1)
 - ✅ Notifications (assignment, @mention)
