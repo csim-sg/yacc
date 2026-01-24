@@ -24,7 +24,7 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 |----|------|--------|----------|----------|--------------|---------------------|
 | BE-001 | Set up PostgreSQL database with Drizzle ORM | Not Started | P0 | Backend | - | Database connection working, Drizzle schema migrations functional |
 | BE-002 | Define database schema (users, conversations, messages, tags, notes, audit logs, notifications, routing rules) | Not Started | P0 | Backend | BE-001 | All 11 tables defined with correct relationships, migrations generated |
-| BE-003 | Implement BetterAuth for authentication (email/password, session/JWT) | Not Started | P0 | Backend | BE-002 | Login endpoint working, JWT/session management functional |
+| BE-003 | Implement BetterAuth for authentication (email/password, session/JWT) | Ready | P0 | Backend | BE-002 | Login endpoint working, JWT/session management functional |
 | BE-004 | Implement forgot password flow (reset token, email sending) | Not Started | P1 | Backend | BE-003 | POST /auth/forgot-password and /reset-password working |
 | BE-005 | Implement RBAC middleware (4 roles: Super Admin, Admin, Manager, User) | Not Started | P0 | Backend | BE-002, BE-003 | Permission checks working for all role-based endpoints |
 | BE-006 | Create user management endpoints (CRUD for users, roles) | Not Started | P1 | Backend | BE-005 | GET/POST/PUT/DELETE /users, /roles working with RBAC |
@@ -56,12 +56,12 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 | FE-001 | Set up TanStack Start project with React 18 | Not Started | P0 | Frontend | - | Project scaffold created, dev server running |
 | FE-002 | Configure Tailwind CSS with Williamstown SC brand colors | Not Started | P0 | Frontend | FE-001 | Tailwind working, brand colors defined |
 | FE-003 | Set up Zustand for client state management | Not Started | P0 | Frontend | FE-001 | Store configured, example state working |
-| FE-004 | Set up TanStack Query for API data fetching | Not Started | P0 | Frontend | FE-001 | Query client configured, API requests working |
-| FE-005 | Implement login page (email/password form) | Not Started | P0 | Frontend | FE-002, BE-003 | Login functional, redirects on success, error handling working |
+| FE-004 | Set up TanStack Query for API data fetching | Ready | P0 | Frontend | FE-001 | Query client configured, API requests working |
+| FE-005 | Implement login page (email/password form) | Ready | P0 | Frontend | FE-002, BE-003 | Login functional, redirects on success, error handling working |
 | FE-006 | Implement forgot password page (email input form) | Not Started | P1 | Frontend | FE-002, BE-004 | Request reset working, confirmation message shown |
 | FE-007 | Implement password reset page (new password form) | Not Started | P1 | Frontend | FE-002, BE-004 | Password reset functional, login redirect on success |
 | FE-008 | Implement inbox list page (conversation cards with filters) | Not Started | P0 | Frontend | FE-004, BE-007 | Filters: channel, assignee, tag, status, priority, search, date range |
-| FE-009 | Implement conversation detail page (messages timeline, reply composer) | Not Started | P0 | Frontend | FE-004, BE-008 | Shows conversation with messages, reply form functional |
+| FE-009 | Implement conversation detail page (messages timeline, reply composer) | Ready | P0 | Frontend | FE-004, BE-008 | Shows conversation with messages, reply form functional |
 | FE-010 | Implement message reply composer (text input, attachment upload) | Not Started | P0 | Frontend | FE-009, BE-010 | Send message working, attachment upload to R2 |
 | FE-011 | Implement message status display (pending/sent/failed with retry button) | Not Started | P0 | Frontend | FE-009, BE-011 | Status icons visible, retry button for failed messages |
 | FE-012 | Set up Socket.io client for WebSocket | Not Started | P0 | Frontend | - | Socket.io client connected to server |
