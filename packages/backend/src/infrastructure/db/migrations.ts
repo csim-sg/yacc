@@ -93,11 +93,26 @@ export async function runMigrations() {
           'telegram',
           'irc',
           'email',
-          'slack'
+          'slack',
+          'whatsapp',
+          'wechat',
+          'meta',
+          'x'
         );
       EXCEPTION
         WHEN duplicate_object THEN null;
       END $$;
+    `);
+
+    await db.execute(sql`
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'telegram';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'irc';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'email';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'slack';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'whatsapp';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'wechat';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'meta';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'x';
     `);
 
     console.log('✅ Enums created');

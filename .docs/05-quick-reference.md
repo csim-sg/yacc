@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-YACC — Omni-channel social inbox (Telegram + IRC) with auth, real-time updates, rules, notifications, search, attachments, and audit logs.
+YACC — Omni-channel social inbox. Phase 1 platforms: Telegram + IRC. Phase 2 platforms: WhatsApp, WeChat, Meta, X.
 
 See [01-product-specification.md](./01-product-specification.md) for full scope and user stories, and [03-implementation-guide.md](./03-implementation-guide.md) for architecture and tech stack.
 

@@ -327,7 +327,7 @@ Just-in-time and temporary working documents. May be cleaned up periodically.
 - **Retry Strategy**: Exponential backoff (1m, 5m, 30m; 3 attempts max)
 
 ### Scope
-- **Platforms**: Telegram, IRC (MVP); WhatsApp, WeChat, Meta, X (Phase 2)
+- **Platforms**: Telegram, IRC (Phase 1); WhatsApp, WeChat, Meta, X (Phase 2)
 - **Notifications**: In-app only (email Phase 2)
 - **Search**: PostgreSQL FTS (Elasticsearch Phase 2)
 - **Multi-Tenant**: Phase 2+ (single-tenant MVP)

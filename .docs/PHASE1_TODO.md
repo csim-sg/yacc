@@ -2,20 +2,21 @@
 
 **Date**: January 20, 2026  
 **Status**: Ready for developer handoff  
-**Scope Correction**: IRC integration in Phase 1, Telegram deferred to Phase 2
+**Scope Correction**: Phase 1 = Telegram + IRC; Phase 2 = WhatsApp/WeChat/Meta/X; future channels (email, slack) remain in enums
 
 ## Executive Summary
 This todo list reflects the corrected Phase 1 scope based on architectural decisions. The SOW.md "Out of Scope" section incorrectly lists both Telegram and IRC as out of scope. The correct scope is:
-- **IN Phase 1**: IRC integration with full messaging endpoints, WebSocket gateway, message retry queue
-- **DEFERRED to Phase 2**: Telegram integration
+- **IN Phase 1**: Telegram + IRC integration with full messaging endpoints, WebSocket gateway, message retry queue
+- **DEFERRED to Phase 2**: Additional platforms (WhatsApp, WeChat, Meta, X)
+- **ENUMS**: Keep future channels (email, slack) for forward compatibility
 
 ## 1. Scope Validation Tasks
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria |
 |----|------|--------|----------|----------|--------------|---------------------|
-| SV-001 | Fix SOW.md to correctly specify IRC in Phase 1, Telegram deferred to Phase 2 | Not Started | P0 | Product Owner | - | SOW.md updated with correct scope, Architect review approved |
-| SV-002 | Validate all Phase 1 requirements captured in updated SOW (auth, RBAC, inbox APIs, messaging, IRC, WebSocket, retry queue) | Not Started | P0 | Product Owner | SV-001 | All Phase 1 requirements listed with correct dependencies |
-| SV-003 | Update Phase 1 timeline (2 weeks) to include IRC integration tasks | Not Started | P1 | Product Owner | SV-001 | Timeline reflects IRC work with realistic estimates |
+| SV-001 | Fix SOW.md to specify Phase 1 = Telegram + IRC; Phase 2 = WhatsApp/WeChat/Meta/X | Not Started | P0 | Product Owner | - | SOW.md updated with correct scope + future channels retained, Architect review approved |
+| SV-002 | Validate all Phase 1 requirements captured in updated SOW (auth, RBAC, inbox APIs, messaging, Telegram, IRC, WebSocket, retry queue) | Not Started | P0 | Product Owner | SV-001 | All Phase 1 requirements listed with correct dependencies |
+| SV-003 | Update Phase 1 timeline (2 weeks) to include Telegram + IRC integration tasks | Not Started | P1 | Product Owner | SV-001 | Timeline reflects Telegram + IRC work with realistic estimates |
 
 ## 2. Backend Tasks
 
@@ -35,6 +36,7 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 | BE-012 | Implement message retry endpoint (POST /conversations/:id/messages/:msgId/retry) | Not Started | P1 | Backend | BE-011 | Requeues failed message, updates status to pending |
 | BE-013 | Set up Redis + BullMQ for message retry queue | Not Started | P0 | Backend | - | Redis connection working, BullMQ jobs processing |
 | BE-014 | Implement exponential backoff for retries (1m, 5m, 30m; 3 attempts max) | Not Started | P0 | Backend | BE-013 | Failed messages retried with correct backoff schedule |
+| BE-014A | Fix retry queue removal and backoff schedule alignment | Not Started | P0 | Backend | BE-013 | removeFromQueue uses supported job lookup; backoff is 1m/5m/30m |
 | BE-015 | Implement dead-letter queue (DLQ) for failed messages | Not Started | P1 | Backend | BE-014 | Messages with 3 failed attempts moved to DLQ |
 | BE-016 | Set up Socket.io WebSocket server | Not Started | P0 | Backend | - | WebSocket server running on configured port |
 | BE-017 | Implement message.received event (push on inbound message) | Not Started | P0 | Backend | BE-016 | Event emitted when inbound message received |
@@ -66,6 +68,8 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 | FE-013 | Implement message.received event listener (real-time inbox update) | Not Started | P0 | Frontend | FE-012, BE-017 | New inbound messages appear in inbox without refresh |
 | FE-014 | Implement message.sent event listener (update message status in UI) | Not Started | P0 | Frontend | FE-012, BE-018 | Message status changes to sent in real-time |
 | FE-015 | Implement message.failed event listener (show failed status) | Not Started | P0 | Frontend | FE-012, BE-019 | Failed messages updated in UI, retry button appears |
+| FE-012A | Implement WebSocket client with one-definition-per-file structure | Deferred | P0 | Frontend | FE-012, GOV-005 | Follow GOV-005 guidance for constants, types, and service file structure. Blocked: WebSocket client not implemented yet |
+| FE-012B | Implement WebSocket client observability (metrics, traces, SLO) | Deferred | P0 | Frontend | FE-012, GOV-005 | Emit all required metrics per GOV-005; define SLOs in governance log. Blocked: WebSocket client not implemented yet |
 | FE-016 | Implement admin panel - IRC configuration (server, port, username, password inputs) | Not Started | P0 | Frontend | FE-002, BE-026 | Form to save IRC credentials, validation working |
 | FE-017 | Implement IRC connection test button (connects to server, shows success/error) | Not Started | P0 | Frontend | FE-016, BE-027 | Button triggers test, displays result message |
 | FE-018 | Implement IRC connection status display (connected/retrying/disconnected) | Not Started | P0 | Frontend | FE-016 | Status badge visible in admin panel, updates in real-time |
@@ -123,7 +127,7 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria |
 |----|------|--------|----------|----------|--------------|---------------------|
-| DOC-001 | Update SOW.md with corrected scope (IRC in Phase 1, Telegram Phase 2) | Not Started | P0 | Product Owner | SV-001 | SOW.md updated, reviewed by Architect |
+| DOC-001 | Update SOW.md with corrected scope (Phase 1 = Telegram + IRC; Phase 2 = WhatsApp/WeChat/Meta/X) | Not Started | P0 | Product Owner | SV-001 | SOW.md updated, reviewed by Architect |
 | DOC-002 | Update 02-api-and-data-model.md with IRC-specific endpoints | Not Started | P1 | Backend | INT-009 | IRC endpoints documented with request/response examples |
 | DOC-003 | Update 03-implementation-guide.md with IRC connector architecture | Not Started | P1 | Backend | INT-001 | IRC integration documented in architecture section |
 | DOC-004 | Create IRC integration guide (setup, configuration, troubleshooting) | Not Started | P1 | Backend | INT-004 | Step-by-step guide for connecting IRC to YACC |
@@ -131,6 +135,8 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 | DOC-006 | Create API documentation (OpenAPI/Swagger for all Phase 1 endpoints) | Not Started | P2 | Backend | BE-025 | API docs generated, hosted |
 | DOC-007 | Create environment variables reference (IRC, R2, Redis, DB) | Not Started | P1 | Backend | INT-010 | All env vars documented with descriptions |
 | DOC-008 | Create deployment guide for Phase 1 (Docker setup, env vars, migrations) | Not Started | P1 | Backend | BE-025 | Step-by-step deployment instructions |
+| DOC-009 | Add governance log entry for PR #131 blocker fixes | Completed | P0 | Architect | DEV-131-03, DEV-131-04 | GOV-004 created with compliance checklist and Mermaid diagram |
+| DOC-010 | Create WebSocket client implementation guidance (GOV-005) | Completed | P0 | Architect | DEV-131-05, DEV-131-06 | GOV-005 created with one-definition-per-file rules and observability requirements |
 
 ## 8. Handoff Tasks
 
@@ -181,8 +187,28 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 4. QA: Start creating test cases once core endpoints are ready
 5. Weekly sync: Track progress, unblock dependencies
 
+## Developer Handoff Todo (PR #131 Blockers)
+
+| ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria |
+|----|------|--------|----------|----------|--------------|---------------------|
+ | DEV-131-01 | Split WebSocket constants/types/service to one-definition-per-file (no barrel exports) | Deferred | P0 | Frontend | FE-012 | Each file exports a single definition; direct imports only. Blocked: WebSocket client not implemented yet |
+| DEV-131-02 | Add WebSocket observability (metrics, traces, SLO) | Deferred | P0 | Frontend | FE-012 | Metrics and traces emitted; SLO documented. Blocked: WebSocket client not implemented yet |
+| DEV-131-03 | Fix retry queue removal logic and enforce 1m/5m/30m schedule | Completed | P0 | Backend | BE-013 | removeFromQueue uses proper BullMQ API; backoff schedule aligned to 1m/5m/30m |
+| DEV-131-04 | Restore Telegram in Phase 1 scope (ADR-003) | Completed | P0 | Backend | BE-002 | ADR-003 approved; Telegram + IRC supported in Phase 1 |
+ | DEV-131-05 | Add governance log entry for blocker fixes | Completed | P0 | Architect | DEV-131-03, DEV-131-04 | GOV-004 created with checklist + Mermaid diagram |
+| DEV-131-06 | Align PR summary with actual diff and reference ADR ID | Completed | P0 | Frontend | DEV-131-01 | PR description matches changes; ADR ID referenced |
+
+**Notes:**
+- DEV-131-03 and DEV-131-04 completed in PR #142
+- DEV-131-05 created GOV-004 governance log for these fixes
+- DEV-131-01 and DEV-131-02 deferred until WebSocket client is implemented (blocked by missing frontend code)
+- GOV-004 documents blocker fixes; IRC-only channel restriction superseded by ADR-003 and GOV-006
+- GOV-006 documents Phase 1 scope restoration for Telegram + IRC and keeps future channels (email, slack) in enums
+- GOV-005 created (DOC-010) to provide WebSocket client implementation guidance when development begins
+- FE-012A and FE-012B updated to reference GOV-005 guidance instead of just "one-definition-per-file" and "observability"
+
 ---
 
-**Last Updated**: January 20, 2026  
+**Last Updated**: January 24, 2026  
 **Status**: Ready for developer handoff  
-**Total Tasks**: 85 tasks across 8 categories
+**Total Tasks**: 86 tasks across 8 categories

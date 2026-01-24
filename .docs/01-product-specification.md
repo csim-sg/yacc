@@ -23,10 +23,10 @@
 ## 1. Product Overview
 
 ### Concept
-**YACC (Yet Another Chat Client)** is a cloud-hosted, single-tenant omni-channel chat platform that centralizes social communications (Telegram groups/channels and IRC for MVP; WhatsApp, WeChat, Facebook/Instagram, and X deferred) into one unified inbox. Built with React, Node.js, PostgreSQL, and deployed to AWS S3 (frontend) + VPS (backend).
+**YACC (Yet Another Chat Client)** is a cloud-hosted, single-tenant omni-channel chat platform that centralizes social communications (Phase 1: Telegram groups/channels and IRC; Phase 2: WhatsApp, WeChat, Meta/Facebook/Instagram, and X) into one unified inbox. Built with React, Node.js, PostgreSQL, and deployed to AWS S3 (frontend) + VPS (backend).
 
-**Initial Release**: Unified Inbox + Auth + Basic Ops  
-**Phase 2**: Rule-Based Routing + Advanced Features
+**Initial Release (Phase 1)**: Unified Inbox + Auth + Basic Ops + Telegram/IRC messaging  
+**Phase 2**: WhatsApp/WeChat/Meta/X channels + advanced features
 
 ---
 
@@ -44,6 +44,7 @@
 ## 3. MVP Scope
 
 ### Core Features (Required)
+**Phase 1 Platform Scope**: Telegram + IRC (Phase 2 adds WhatsApp/WeChat/Meta/X).
 - ✅ Unified inbox with real-time updates
 - ✅ Role-based authentication (login, logout, forgot password)
 - ✅ Conversation handling: tags, notes, assignments, bulk actions
@@ -60,7 +61,7 @@
 
 ### Deferred Features (Phase 2+)
 - Email notifications
-- WhatsApp, WeChat, Meta, X integrations
+- WhatsApp, WeChat, Meta, X integrations (Phase 2)
 - RTL support
 - Multi-tenant architecture
 - Elasticsearch for search (use PostgreSQL FTS in MVP)
@@ -126,10 +127,10 @@
 - Audit trail for all changes (assignments, tags, notes, status, rule executions)
 - Notifications on assignment, @mention, and unread badges
 
-### 5.4 Integrations (MVP)
+### 5.4 Integrations (Phase 1)
 - Telegram groups/channels
 - IRC networks
-- Other platforms deferred until credentials available
+- Other platforms deferred to Phase 2 (WhatsApp, WeChat, Meta, X)
 
 ### 5.5 Rule-Based Routing
 - Rules engine with conditions: channel, keyword, sender, tag, time
@@ -513,6 +514,7 @@ flowchart TD
 ---
 
 ### Story 5.1: Telegram Integration
+**Phase**: Phase 1 (MVP)
 **As a** super admin  
 **I want** Telegram messages ingested  
 **So that** teams can manage Telegram in the inbox.
@@ -527,6 +529,7 @@ flowchart TD
 ---
 
 ### Story 5.2: IRC Integration
+**Phase**: Phase 1 (MVP)
 **As a** super admin  
 **I want** IRC messages ingested  
 **So that** teams can manage IRC in the inbox.
@@ -914,26 +917,28 @@ flowchart TD
 
 ## 9. Implementation Milestones
 
-### Week 1–2: Core Infrastructure
+### Week 1–2: Core + Messaging + Integrations (Phase 1)
 - ✓ Core data model + auth + user roles
 - ✓ Basic inbox API (GET /conversations, etc.)
 - ✓ Database schema setup
 - ✓ WebSocket real-time updates
 - ✓ Message retry queue (exponential backoff)
-
-### Week 3–4: UI, Messaging, Integrations
-- ✓ TanStack Start UI for inbox + conversation detail
 - ✓ Message sending + delivery status
 - ✓ Telegram + IRC connectors end-to-end
 
-### Week 5: Collaboration & Routing
+### Week 3–4: Collaboration & Routing (Phase 2)
 - ✓ Tags, notes, assignments + audit log
 - ✓ Rule-based routing engine
 - ✓ Notifications system
+- ✓ Bulk actions
 
-### Week 6: Search & Polish
+### Week 5: Search & Attachments (Phase 3)
 - ✓ Search + attachment handling
+- ✓ Raw payload access controls
+
+### Week 6: Admin & Polish (Phase 4)
 - ✓ Integration setup (credential management)
+- ✓ Admin panel (users, audit logs, rules)
 - ✓ QA + bug fixes
 
 ---

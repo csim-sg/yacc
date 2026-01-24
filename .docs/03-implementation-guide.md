@@ -596,8 +596,8 @@ Client Receives Event
 
 ## 5. Implementation Phases
 
-### Phase 1: Core (Week 1–2)
-**Goal**: Auth + data model + basic inbox + real-time foundation
+### Phase 1: Core + Messaging + Integrations (Week 1–2)
+**Goal**: Auth + data model + inbox + messaging + Telegram/IRC integrations
 
 **Tasks**:
 - [ ] Setup PostgreSQL schema (users, conversations, messages, etc.)
@@ -607,27 +607,17 @@ Client Receives Event
 - [ ] Data: User roles + RBAC middleware
 - [ ] WebSocket: connection, authentication, events
 - [ ] Setup: Redis + BullMQ for message retry
-- [ ] Frontend: Login page + inbox list UI
-
-**Deliverable**: Authenticated users can see inbox list with live updates
-
----
-
-### Phase 2: Messages & Integrations (Week 3–4)
-**Goal**: Send/receive messages, connector wiring
-
-**Tasks**:
 - [ ] API: POST /conversations/:id/messages (send reply)
-- [ ] Frontend: Conversation view + reply composer
-- [ ] Frontend: Real-time inbox updates (WebSocket)
 - [ ] Connectors: Telegram webhook ingestion
 - [ ] Connectors: IRC polling/connection setup
+- [ ] Frontend: Login page + inbox list UI
+- [ ] Frontend: Conversation view + reply composer
 
-**Deliverable**: Users can send/receive messages via Telegram/IRC
+**Deliverable**: Users can send/receive Telegram + IRC messages with live updates
 
 ---
 
-### Phase 3: Collaboration & Rules (Week 5)
+### Phase 2: Collaboration & Rules (Week 3–4)
 **Goal**: Tags, notes, assignments, routing rules
 
 **Tasks**:
@@ -643,15 +633,24 @@ Client Receives Event
 
 ---
 
-### Phase 4: Search, Attachments, Admin (Week 6)
-**Goal**: Search, file handling, admin features
+### Phase 3: Search & Attachments (Week 5)
+**Goal**: Search, file handling, raw payload access
 
 **Tasks**:
 - [ ] Search: PostgreSQL FTS setup + indexing
 - [ ] API: GET /search/conversations endpoint
 - [ ] Attachments: Upload/download to R2
 - [ ] API: POST /conversations/:id/attachments
-- [ ] Connectors: Telegram + IRC end-to-end
+- [ ] Raw payloads: manager+ access + retention
+
+**Deliverable**: Search and attachments complete
+
+---
+
+### Phase 4: Admin & Polish (Week 6)
+**Goal**: Admin workflows, integration setup, QA
+
+**Tasks**:
 - [ ] Admin: User management UI
 - [ ] Admin: Integration setup (credential form + test)
 - [ ] Admin: Audit log viewer + export
