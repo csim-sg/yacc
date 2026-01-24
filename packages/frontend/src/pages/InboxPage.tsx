@@ -20,6 +20,10 @@ import {
 const CHANNEL_LABELS: Record<ChannelType, string> = {
   telegram: 'Telegram',
   irc: 'IRC',
+  whatsapp: 'WhatsApp',
+  wechat: 'WeChat',
+  meta: 'Meta',
+  x: 'X',
   email: 'Email',
   slack: 'Slack',
 };
@@ -39,7 +43,16 @@ const STATUS_BADGE: Record<ConversationStatus, string> = {
 
 const STATUS_VALUES: ConversationStatus[] = ['open', 'pending', 'resolved'];
 const PRIORITY_VALUES: ConversationPriority[] = ['low', 'medium', 'high', 'urgent'];
-const CHANNEL_VALUES: ChannelType[] = ['telegram', 'irc', 'email', 'slack'];
+const CHANNEL_VALUES: ChannelType[] = [
+  'telegram',
+  'irc',
+  'whatsapp',
+  'wechat',
+  'meta',
+  'x',
+  'email',
+  'slack',
+];
 
 export function InboxPage() {
   const { user, logout, isLoading: authLoading } = useAuthStore();

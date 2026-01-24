@@ -41,7 +41,16 @@ export const messageStatusEnum = pgEnum('message_status', ['pending', 'sent', 'f
 
 export const messageDirectionEnum = pgEnum('message_direction', ['inbound', 'outbound']);
 
-export const channelTypeEnum = pgEnum('channel_type', ['telegram', 'irc', 'email', 'slack']);
+export const channelTypeEnum = pgEnum('channel_type', [
+  'telegram',
+  'irc',
+  'whatsapp',
+  'wechat',
+  'meta',
+  'x',
+  'email',
+  'slack',
+]);
 
 // Tables
 

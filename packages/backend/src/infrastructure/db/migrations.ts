@@ -92,6 +92,10 @@ export async function runMigrations() {
         CREATE TYPE channel_type AS ENUM (
           'telegram',
           'irc',
+          'whatsapp',
+          'wechat',
+          'meta',
+          'x',
           'email',
           'slack'
         );

@@ -1,6 +1,15 @@
 import { z } from 'zod';
 
-export const ChannelEnum = z.enum(['telegram', 'irc', 'email', 'slack']);
+export const ChannelEnum = z.enum([
+  'telegram',
+  'irc',
+  'whatsapp',
+  'wechat',
+  'meta',
+  'x',
+  'email',
+  'slack',
+]);
 export const ConversationStatusEnum = z.enum(['open', 'pending', 'resolved']);
 export const PriorityEnum = z.enum(['low', 'normal', 'high', 'urgent']);
 export const MessageStatusEnum = z.enum(['pending', 'sent', 'failed']);
@@ -11,6 +20,10 @@ export const RoutingRuleStatusEnum = z.enum(['active', 'disabled']);
 export const Channels = {
   TELEGRAM: 'telegram',
   IRC: 'irc',
+  WHATSAPP: 'whatsapp',
+  WECHAT: 'wechat',
+  META: 'meta',
+  X: 'x',
   EMAIL: 'email',
   SLACK: 'slack',
 } as const;

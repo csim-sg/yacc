@@ -7,38 +7,38 @@
 
 # Governance Log
 
-## Decision Summary
+## 1. Decision Summary
 Restore Telegram to Phase 1 scope alongside IRC and keep future channel types in the enum for forward compatibility.
 
-## Governance Trigger
+## 2. Governance Trigger
 Scope ambiguity discovered between Phase 1 documentation and implementation; ADR-003 establishes Phase 1 as Telegram + IRC.
 
-## Compliance Assessment
+## 3. Compliance Assessment
 Aligned with architecture principles: API-first integration, reuse before build, and observability requirements remain unchanged.
 
-## Impact Assessment
+## 4. Impact Assessment
 - Documentation updated to reflect Telegram + IRC in Phase 1.
 - API validation and frontend filters must accept Telegram.
 - Tests must validate Telegram filters in Phase 1.
-- Future channels (email, slack) remain in enums but are not part of Phase 1 acceptance criteria.
+- Future channels (whatsapp, wechat, meta, x, email, slack) remain in enums but are not part of Phase 1 acceptance criteria.
 
-## Risk Acceptance / Waivers
+## 5. Risk Acceptance / Waivers
 No waivers required.
 
-## Approved Controls / Conditions
-- Maintain `channel_type` enum with future channels for forward compatibility.
+## 6. Approved Controls / Conditions
+- Maintain `channel_type` enum with future channels (whatsapp, wechat, meta, x, email, slack) for forward compatibility.
 - Ensure Phase 1 acceptance criteria explicitly include Telegram + IRC.
 
-## Implementation Oversight
+## 7. Implementation Oversight
 - Fullstack dev to update schemas, tests, and UI filters.
 - Product Owner to align Phase 1 documentation.
 - Architect to sign off ADR-003 and governance updates.
 
-## Traceability
+## 8. Traceability
 - ADR-003-phase1-telegram-irc-scope
 - PR #142 (scope alignment)
 
-## Mermaid (Governance Flow)
+## 9. Mermaid (Governance Flow)
 ```mermaid
 sequenceDiagram
   participant PO as Product Owner
@@ -52,5 +52,5 @@ sequenceDiagram
   Dev->>Arch: Present scope alignment for sign-off
 ```
 
-## Sign-off
-Approved by: [Pending Architect Sign-off]
+## 10. Sign-off
+Approved by: Chris Sim (Solution Architect)

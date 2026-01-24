@@ -7,60 +7,60 @@
 
 # Architecture Decision Record
 
-## Context / Problem Statement
+## 1. Context / Problem Statement
 Phase 1 scope drifted to IRC-only in some artifacts and code, while the business requirement is to deliver both Telegram and IRC integration in Phase 1. We need an explicit decision to restore Telegram to Phase 1 and align documentation and implementation with that scope.
 
-## Drivers & Constraints
+## 2. Drivers & Constraints
 - MVP requires Telegram and IRC integrations.
-- Avoid breaking future channel expansion (email, slack, etc.).
+- Avoid breaking future channel expansion (whatsapp, wechat, meta, x, email, slack).
 - Maintain existing channel_type enum compatibility.
 - Minimize rework by aligning documentation and tests with scope.
 
-## Assumptions
+## 3. Assumptions
 - Telegram integration is part of the Phase 1 deliverable set.
-- Future channels remain defined in enums for forward compatibility.
+- Future channels (whatsapp, wechat, meta, x, email, slack) remain defined in enums for forward compatibility.
 
-## Options Considered
+## 4. Options Considered
 1. Keep IRC-only in Phase 1 and defer Telegram to Phase 2.
 2. Restore Telegram to Phase 1 scope and keep IRC alongside it. ✅
 
-## Decision
+## 5. Decision
 Phase 1 scope includes **both Telegram and IRC** integrations. The channel_type enum remains inclusive of future channels to avoid unnecessary churn.
 
-## Implications & Consequences
+## 6. Implications & Consequences
 - Documentation must explicitly state Phase 1 includes Telegram + IRC.
 - API schemas and frontend filters must accept Telegram.
 - Tests must validate Telegram filters and behavior in Phase 1.
-- Future channels (email, slack) remain in enums but are not part of Phase 1 acceptance criteria.
+- Future channels (whatsapp, wechat, meta, x, email, slack) remain in enums but are not part of Phase 1 acceptance criteria.
 
-## Architecture Principle Alignment
+## 7. Architecture Principle Alignment
 - **API-First Integration:** supports required platforms in MVP.
 - **Reuse Before Build:** avoids churn by keeping future channel types.
 - **Secure by Design:** no change to auth/permissions.
 
-## Security / Compliance Impact
+## 8. Security / Compliance Impact
 - No new security impact beyond Telegram integration requirements.
 
-## Operational Impact
+## 9. Operational Impact
 - Integration ops for Telegram must be included in Phase 1 rollout.
 
-## Cost / Complexity Impact
+## 10. Cost / Complexity Impact
 - Moderate: documentation and validation updates required.
 
-## Risks & Mitigations
+## 11. Risks & Mitigations
 - **Risk:** Partial documentation updates create ambiguity.  
   **Mitigation:** Update all Phase 1 scope references and acceptance criteria.
 
-## Traceability
+## 12. Traceability
 - Phase 1 MVP scope
 - PR #142 (scope alignment and related blockers)
 
-## Implementation Notes
+## 13. Implementation Notes
 - Re-enable Telegram in channel enums and schema validation.
 - Update tests to validate Telegram filters.
 - Update scope references in product and implementation docs.
 
-## Mermaid (Decision Flow)
+## 14. Mermaid (Decision Flow)
 ```mermaid
 flowchart TD
   A[Phase 1 scope ambiguity] --> B{Options}
@@ -69,5 +69,5 @@ flowchart TD
   D --> E[Decision: Restore Telegram to Phase 1]
 ```
 
-## Sign-off
-Approved by: [Pending Architect Sign-off]
+## 15. Sign-off
+Approved by: Chris Sim (Solution Architect)

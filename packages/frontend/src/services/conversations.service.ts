@@ -7,7 +7,7 @@ import { api } from '../lib/api-client';
 
 export type ConversationStatus = 'open' | 'pending' | 'resolved';
 export type ConversationPriority = 'low' | 'medium' | 'high' | 'urgent';
-export type ChannelType = 'telegram' | 'irc' | 'email' | 'slack';
+export type ChannelType = 'telegram' | 'irc' | 'whatsapp' | 'wechat' | 'meta' | 'x' | 'email' | 'slack';
 
 export interface ConversationTag {
   id: number;
