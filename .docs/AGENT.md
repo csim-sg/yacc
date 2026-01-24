@@ -54,7 +54,7 @@ All contributors MUST NOT:
 ├─ 03-implementation-guide.md
 ├─ 04-qa-and-testing.md
 ├─ 05-quick-reference.md
-├─ 06-testing-execution-guide.md
+├─ 06-phase1-execution-guide.md
 ├─ adr/
 ├─ features/
 ├─ governance/
@@ -137,15 +137,15 @@ Provides a **one-page, human-friendly summary** of key decisions and gotchas.
 
 ---
 
-### `06-testing-execution-guide.md`
+### `06-phase1-execution-guide.md`
 
 **Why it exists**
-Explains **HOW to execute tests**, not what to test.
+Combines the Phase 1 P0 execution plan with a **condensed test execution guide**.
 
 **Focus**
 
+* Phase 1 execution order and dependencies
 * Test setup and execution steps
-* Environment configuration
 * Automation and tooling instructions
 
 ---

@@ -86,7 +86,7 @@ This document summarizes the documentation cleanup process performed on January 
 ├── 03-implementation-guide.md          # Architecture & Implementation Guide
 ├── 04-qa-and-testing.md                # QA & Testing Strategy
 ├── 05-quick-reference.md               # Quick Reference
-├── 06-testing-execution-guide.md       # Testing Execution Guide
+├── 06-phase1-execution-guide.md        # Phase 1 execution + testing guide
 ├── README.md                           # Documentation Navigation
 ├── archive/                            # Preserved Historical Documents
 │   ├── phase1/                         # Phase 1 Critical Documents

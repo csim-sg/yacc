@@ -179,8 +179,8 @@ The documentation has been consolidated into core documents plus phase-specific 
 
 ---
 
-#### **06-testing-execution-guide.md** (Testing Execution Guide)
-**Step-by-step testing procedures and checklists**
+#### **06-phase1-execution-guide.md** (Phase 1 Execution Guide)
+**Phase 1 P0 execution plan plus condensed testing execution guide**
 
 **Contains**:
 - Test environment setup
@@ -195,8 +195,8 @@ The documentation has been consolidated into core documents plus phase-specific 
 
 ---
 
-#### **06-p0-execution-plan.md** (Phase 1 P0 Execution Plan)
-**Complete execution plan for 22 P0 backend issues**
+#### **06-phase1-execution-guide.md** (Phase 1 P0 Execution Plan)
+**Complete execution plan for 22 P0 backend issues with testing execution summary**
 
 **Contains**:
 - All 22 P0 Backend issues with dependencies
@@ -265,7 +265,7 @@ Just-in-time and temporary working documents. May be cleaned up periodically.
 2. Read **../AGENTS.md** → Backend dev role
 3. Read **.docs/03-implementation-guide.md** (30 minutes) — system design & Phase1
 4. Read **.docs/02-api-and-data-model.md** (45 minutes) — API contract & database
-5. Read **.docs/06-p0-execution-plan.md** (20 minutes) — Phase 1 P0 issues & execution order
+5. Read **.docs/06-phase1-execution-guide.md** (20 minutes) — Phase 1 execution plan & testing summary
 6. Reference **.docs/02-api-and-data-model.md** during implementation
 
 ### For Frontend Developers
@@ -320,8 +320,7 @@ Just-in-time and temporary working documents. May be cleaned up periodically.
 | **.docs/03-implementation-guide.md** | System architecture, components | Backend, architects |
 | **.docs/04-qa-and-testing.md** | Testing & QA | QA engineers, testers |
 | **.docs/05-quick-reference.md** | Quick reference | Everyone |
-| **.docs/06-testing-execution-guide.md** | Testing procedures | QA engineers, testers |
-| **.docs/06-p0-execution-plan.md** | Phase 1 P0 backend execution plan | Backend developers, tech leads |
+| **.docs/06-phase1-execution-guide.md** | Phase 1 execution + testing guide | Backend developers, QA engineers |
 | **.docs/week1-day1-development.md** | Week 1 Day 1 implementation guide | Backend developers |
 | **.docs/archive/** | Historical & critical documents | All (reference) |
 | **.docs/temp/** | Temporary/working docs | Developers (current work) |
@@ -375,7 +374,7 @@ The documentation is organized into three levels:
 4. Read role-specific docs from "Quick Start" section above
 
 ### During Phase 1 Development (Week 1-3)
-- Reference **.docs/06-p0-execution-plan.md** (22 P0 issues, 3-week timeline, dependencies)
+- Reference **.docs/06-phase1-execution-guide.md** (P0 issues, execution order, testing summary)
 - Reference **.docs/03-implementation-guide.md** section 5 (Phase 1 tasks)
 - Reference **.docs/02-api-and-data-model.md** section 5 (auth endpoints)
 - Reference **.docs/02-api-and-data-model.md** section 6 (WebSocket events)
@@ -434,7 +433,7 @@ INTEGRATIONS: Telegram, IRC (end-to-end)
 
 **What's the API contract?** → Read **02-api-and-data-model.md**
 
-**What should I test?** → Read **04-qa-and-testing.md** or **06-testing-execution-guide.md**
+**What should I test?** → Read **04-qa-and-testing.md** or **06-phase1-execution-guide.md**
 
 **Quick lookup?** → See **05-quick-reference.md**
 
@@ -495,7 +494,7 @@ INTEGRATIONS: Telegram, IRC (end-to-end)
 - Promoted 2 issues from P1 to P0 (BE-004, BE-012)
 - Enhanced acceptance criteria for BE-003 (BetterAuth) and BE-016 (Socket.io)
 - Updated dependencies for 5 issues based on architectural analysis
-- Created comprehensive execution plan: **06-p0-execution-plan.md**
+- Created comprehensive execution guide: **06-phase1-execution-guide.md**
   - 22 P0 Backend issues with complete dependency graph
   - 3-week execution timeline (15 business days)
   - Week-by-Week breakdown with daily tasks

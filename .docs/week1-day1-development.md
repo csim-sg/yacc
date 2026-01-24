@@ -728,7 +728,7 @@ After completing Day 1, you should have:
 - **Issue BE-028**: [Create shared types package](https://github.com/csim-sg/yacc/issues/109)
 - **Issue BE-026**: [Create environment configuration scaffolding](https://github.com/csim-sg/yacc/issues/108)
 - **Issue BE-001**: [Set up PostgreSQL + Drizzle ORM](https://github.com/csim-sg/yacc/issues/12)
-- **Execution Plan**: `.docs/06-p0-execution-plan.md`
+- **Execution Plan**: `.docs/06-phase1-execution-guide.md`
 - **API Spec**: `.docs/02-api-and-data-model.md`
 
 ---

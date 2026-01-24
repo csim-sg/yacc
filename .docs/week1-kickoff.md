@@ -112,7 +112,7 @@ Follow the step-by-step instructions in [week1-day1-development.md](week1-day1-d
 yacc-client/
 ├── .docs/
 │   ├── week1-day1-development.md          # Day 1 implementation guide
-│   ├── 06-p0-execution-plan.md            # Complete execution plan
+│   ├── 06-phase1-execution-guide.md       # Phase 1 execution + testing guide
 │   └── ...
 ├── packages/
 │   ├── common/
@@ -146,7 +146,7 @@ yacc-client/
 |----------|-------|
 | **Week 1 Tracking Issue** | [#110 - Week 1: Foundation](https://github.com/csim-sg/yacc/issues/110) |
 | **Day 1 Implementation Guide** | [.docs/week1-day1-development.md](week1-day1-development.md) |
-| **Complete Execution Plan** | [.docs/06-p0-execution-plan.md](06-p0-execution-plan.md) |
+| **Complete Execution Plan** | [.docs/06-phase1-execution-guide.md](06-phase1-execution-guide.md) |
 | **P0 Issues List** | [GitHub Search](https://github.com/csim-sg/yacc/issues?q=is%3Aissue+label%3AP0+label%3ABackend) |
 | **API & Data Model** | [.docs/02-api-and-data-model.md](02-api-and-data-model.md) |
 | **Implementation Guide** | [.docs/03-implementation-guide.md](03-implementation-guide.md) |

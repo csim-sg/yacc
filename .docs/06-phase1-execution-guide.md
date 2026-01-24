@@ -1,8 +1,41 @@
-# Phase 1 Backend P0 Issues: Execution Plan
+# 06. Phase 1 Execution Guide
 
 **Last Updated**: January 21, 2026
 **Status**: Ready for Development
 **Total P0 Issues**: 22
+
+---
+
+## Testing Execution Guide (Condensed)
+
+For detailed test strategy and acceptance criteria, see `.docs/04-qa-and-testing.md`.
+
+### Quick Start
+- Backend running at `http://localhost:3000`
+- PostgreSQL initialized and migrations applied
+- Redis running for retry queue
+
+### Test Data Setup (Summary)
+- Create test users (admin, manager, agent, support)
+- Login and capture JWT tokens
+- Seed conversations and tags for Telegram + IRC
+
+### Automated Testing
+- Backend: `npm test` in `packages/backend`
+- Frontend E2E: `npm test` in `packages/frontend` (Playwright)
+
+### Performance Checks
+- List conversations latency < 500ms for typical queries
+- Pagination limits validated for 10/50/100 records
+
+### Common Issues
+- 401 errors: verify token and role
+- DB errors: check migrations and DATABASE_URL
+- CORS: verify FRONTEND_URL in backend config
+
+### Regression Suite
+- Run regression suite before staging release
+- Ensure critical flows: login → inbox → view conversation → reply
 
 ---
 
