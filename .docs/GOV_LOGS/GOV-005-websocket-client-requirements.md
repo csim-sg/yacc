@@ -195,4 +195,4 @@ sequenceDiagram
 4. **SLO Baselines**: SLOs proposed above are baselines. Adjust based on actual production data when available.
 
 ## Sign-off
-Approved by: [Pending Architect Review of this Guidance]
+Approved by: Chris Sim (Solution Architect)

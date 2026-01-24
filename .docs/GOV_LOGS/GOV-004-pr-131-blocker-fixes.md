@@ -82,4 +82,4 @@ sequenceDiagram
 - Non-MVP channels (telegram, email, slack) require Phase 2+ ADR approval (superseded by ADR-003 for Phase 1 Telegram)
 
 ## Sign-off
-Approved by: [Pending Architect Review]
+Approved by: Chris Sim (Solution Architect)
