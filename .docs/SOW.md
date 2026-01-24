@@ -80,7 +80,29 @@ Phase 1 is accepted when:
 
 ---
 
-## 4. Out of Scope (Phase 2+)
+## 4. Phase 1 Validation Checklist
+
+Phase 1 requirements are validated in this SOW if all are explicitly listed in scope and deliverables:
+- Authentication & RBAC (Super Admin/Admin/Manager/User)
+- Inbox operations (filters, search, status lifecycle)
+- Messaging (send/receive, status tracking, retry queue, DLQ)
+- Telegram + IRC integrations (inbound/outbound)
+- Real-time updates (WebSocket events)
+- Collaboration (tags, notes, assignments)
+- Audit logging (action log retained per Phase 1 requirements)
+- Storage (attachments + raw payloads via Cloudflare R2)
+
+---
+
+## 5. Phase 1 Timeline (High-Level)
+
+- **Duration:** 2 weeks total
+- **Week 1:** Auth/RBAC, data model, inbox APIs, Telegram + IRC ingestion, UI skeleton
+- **Week 2:** Messaging send/retry, real-time updates, integration testing, audit logging
+
+---
+
+## 6. Out of Scope (Phase 2+)
 
 - Platforms: WhatsApp, WeChat, Meta (FB/Instagram), X/Twitter
 - Multi-tenant support or credential vault
@@ -89,7 +111,7 @@ Phase 1 is accepted when:
 
 ---
 
-## 5. Assumptions & Dependencies
+## 7. Assumptions & Dependencies
 
 - Single-tenant deployment
 - Telegram bot token and IRC credentials available
@@ -98,7 +120,7 @@ Phase 1 is accepted when:
 
 ---
 
-## 6. Risks
+## 8. Risks
 
 - Telegram/IRC connector instability → mitigated by retry queue and monitoring
 - Credential availability delays → mitigated by early collection of integration keys

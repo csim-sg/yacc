@@ -15,8 +15,8 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
 | SV-001 | Fix SOW.md to specify Phase 1 = Telegram + IRC; Phase 2 = WhatsApp/WeChat/Meta/X | Completed | P0 | Product Owner | - | SOW.md updated with Phase 1 Telegram + IRC, Phase 2 WhatsApp/WeChat/Meta/X, enums retain email/slack; references ADR-003 and GOV-006; Architect review approved | PVTI_lAHOAB4wV84BNGcwzgj_5rA | 8 |
-| SV-002 | Validate all Phase 1 requirements captured in updated SOW (auth, RBAC, inbox APIs, messaging, Telegram, IRC, WebSocket, retry queue) | Ready | P0 | Product Owner | SV-001 | Phase 1 requirements include Telegram + IRC, exclude Phase 2 channels; enums list future channels without Phase 1 delivery commitments | PVTI_lAHOAB4wV84BNGcwzgj_5sI | 9 |
-| SV-003 | Update Phase 1 timeline (2 weeks) to include Telegram + IRC integration tasks | Ready | P1 | Product Owner | SV-001 | Phase 1 timeline includes Telegram + IRC tasks; Phase 2 timeline schedules WhatsApp/WeChat/Meta/X; timeline notes reference ADR-003 and GOV-006 | PVTI_lAHOAB4wV84BNGcwzgj_5r8 | 16 |
+| SV-002 | Validate all Phase 1 requirements captured in updated SOW (auth, RBAC, inbox APIs, messaging, Telegram, IRC, WebSocket, retry queue) | Completed | P0 | Product Owner | SV-001 | SOW includes validation checklist covering all Phase 1 requirements; Phase 2 channels explicitly excluded | PVTI_lAHOAB4wV84BNGcwzgj_5sI | 9 |
+| SV-003 | Update Phase 1 timeline (2 weeks) to include Telegram + IRC integration tasks | Completed | P1 | Product Owner | SV-001 | SOW includes Phase 1 timeline (2 weeks) with Telegram + IRC tasks; Phase 2 channels deferred | PVTI_lAHOAB4wV84BNGcwzgj_5r8 | 16 |
 
 ## 2. Backend Tasks
 
