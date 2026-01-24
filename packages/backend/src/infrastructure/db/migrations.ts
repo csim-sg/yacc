@@ -92,12 +92,12 @@ export async function runMigrations() {
         CREATE TYPE channel_type AS ENUM (
           'telegram',
           'irc',
+          'email',
+          'slack',
           'whatsapp',
           'wechat',
           'meta',
-          'x',
-          'email',
-          'slack'
+          'x'
         );
       EXCEPTION
         WHEN duplicate_object THEN null;
@@ -105,6 +105,10 @@ export async function runMigrations() {
     `);
 
     await db.execute(sql`
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'telegram';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'irc';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'email';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'slack';
       ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'whatsapp';
       ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'wechat';
       ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'meta';
