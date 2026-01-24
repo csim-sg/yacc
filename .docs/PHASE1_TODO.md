@@ -35,6 +35,7 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 | BE-012 | Implement message retry endpoint (POST /conversations/:id/messages/:msgId/retry) | Not Started | P1 | Backend | BE-011 | Requeues failed message, updates status to pending |
 | BE-013 | Set up Redis + BullMQ for message retry queue | Not Started | P0 | Backend | - | Redis connection working, BullMQ jobs processing |
 | BE-014 | Implement exponential backoff for retries (1m, 5m, 30m; 3 attempts max) | Not Started | P0 | Backend | BE-013 | Failed messages retried with correct backoff schedule |
+| BE-014A | Fix retry queue removal and backoff schedule alignment | Not Started | P0 | Backend | BE-013 | removeFromQueue uses supported job lookup; backoff is 1m/5m/30m |
 | BE-015 | Implement dead-letter queue (DLQ) for failed messages | Not Started | P1 | Backend | BE-014 | Messages with 3 failed attempts moved to DLQ |
 | BE-016 | Set up Socket.io WebSocket server | Not Started | P0 | Backend | - | WebSocket server running on configured port |
 | BE-017 | Implement message.received event (push on inbound message) | Not Started | P0 | Backend | BE-016 | Event emitted when inbound message received |
@@ -66,6 +67,8 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 | FE-013 | Implement message.received event listener (real-time inbox update) | Not Started | P0 | Frontend | FE-012, BE-017 | New inbound messages appear in inbox without refresh |
 | FE-014 | Implement message.sent event listener (update message status in UI) | Not Started | P0 | Frontend | FE-012, BE-018 | Message status changes to sent in real-time |
 | FE-015 | Implement message.failed event listener (show failed status) | Not Started | P0 | Frontend | FE-012, BE-019 | Failed messages updated in UI, retry button appears |
+| FE-012A | Split WebSocket client files to comply with one-definition-per-file rule | Not Started | P0 | Frontend | FE-012 | WebSocket constants/types/service split into single-definition files |
+| FE-012B | Add WebSocket client observability (metrics, traces, SLO) | Not Started | P0 | Frontend | FE-012 | Metrics/traces emitted; SLO documented in governance log |
 | FE-016 | Implement admin panel - IRC configuration (server, port, username, password inputs) | Not Started | P0 | Frontend | FE-002, BE-026 | Form to save IRC credentials, validation working |
 | FE-017 | Implement IRC connection test button (connects to server, shows success/error) | Not Started | P0 | Frontend | FE-016, BE-027 | Button triggers test, displays result message |
 | FE-018 | Implement IRC connection status display (connected/retrying/disconnected) | Not Started | P0 | Frontend | FE-016 | Status badge visible in admin panel, updates in real-time |
@@ -131,6 +134,7 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 | DOC-006 | Create API documentation (OpenAPI/Swagger for all Phase 1 endpoints) | Not Started | P2 | Backend | BE-025 | API docs generated, hosted |
 | DOC-007 | Create environment variables reference (IRC, R2, Redis, DB) | Not Started | P1 | Backend | INT-010 | All env vars documented with descriptions |
 | DOC-008 | Create deployment guide for Phase 1 (Docker setup, env vars, migrations) | Not Started | P1 | Backend | BE-025 | Step-by-step deployment instructions |
+| DOC-009 | Add governance log entry for FE-012 WebSocket client changes | Not Started | P0 | Architect | FE-012B | GOV_LOG entry created with compliance checklist and Mermaid diagram |
 
 ## 8. Handoff Tasks
 
@@ -180,6 +184,17 @@ This todo list reflects the corrected Phase 1 scope based on architectural decis
 3. Team: Begin P0 tasks in parallel (Backend, Frontend, Shared)
 4. QA: Start creating test cases once core endpoints are ready
 5. Weekly sync: Track progress, unblock dependencies
+
+## Developer Handoff Todo (PR #131 Blockers)
+
+| ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria |
+|----|------|--------|----------|----------|--------------|---------------------|
+| DEV-131-01 | Split WebSocket constants/types/service to one-definition-per-file (no barrel exports) | Not Started | P0 | Frontend | FE-012 | Each file exports a single definition; direct imports only |
+| DEV-131-02 | Add WebSocket observability (metrics, traces, SLO) | Not Started | P0 | Frontend | FE-012 | Metrics and traces emitted; SLO documented |
+| DEV-131-03 | Fix retry queue removal logic and enforce 1m/5m/30m schedule | Completed | P0 | Backend | BE-013 | removeFromQueue uses proper BullMQ API; backoff schedule aligned to 1m/5m/30m |
+| DEV-131-04 | Remove non-MVP channel types or document ADR | Completed | P0 | Backend | BE-002 | channel_type limited to IRC only for Phase 1 MVP |
+| DEV-131-05 | Add governance log entry for FE-012 changes | Not Started | P0 | Architect | DEV-131-02 | GOV_LOG entry with checklist + Mermaid diagram |
+| DEV-131-06 | Align PR summary with actual diff and reference ADR ID | Not Started | P0 | Frontend | DEV-131-01 | PR description matches changes; ADR ID referenced |
 
 ---
 

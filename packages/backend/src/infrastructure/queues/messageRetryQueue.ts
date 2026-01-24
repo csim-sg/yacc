@@ -17,7 +17,7 @@ import logger from '../utils/logger';
 const RETRY_QUEUE_NAME = 'message-retry';
 const DLQ_QUEUE_NAME = 'message-dlq';
 
-// Retry schedule (exponential backoff)
+// Retry schedule (strict 1m, 5m, 30m per attempt)
 const RETRY_DELAYS_MS = [60000, 300000, 1800000]; // 1m, 5m, 30m
 const MAX_ATTEMPTS = 3;
 
@@ -28,10 +28,7 @@ const QUEUE_OPTIONS = {
     removeOnComplete: 10, // Remove completed jobs after 10
     removeOnFail: 100, // Remove failed jobs after 100
     attempts: MAX_ATTEMPTS,
-    backoff: {
-      type: 'exponential',
-      delay: RETRY_DELAYS_MS[0],
-    },
+    // No built-in backoff - we manage delays manually for strict 1m/5m/30m schedule
   },
   limiter: {
     max: 100, // Max 100 concurrent jobs
@@ -165,9 +162,12 @@ export async function enqueueRetry(
 ): Promise<Job<RetryJobData>> {
   const queue = getRetryQueue();
 
+  // Use strict 1m/5m/30m delay schedule based on attempt number
+  const retryDelay = RETRY_DELAYS_MS[Math.min(data.attemptNumber - 1, RETRY_DELAYS_MS.length - 1)] || 0;
+
   const job = await queue.add(data, {
     jobId: `retry-${data.messageId}-attempt-${data.attemptNumber}`,
-    delay,
+    delay: retryDelay,
     removeOnComplete: 10,
     removeOnFail: 100,
   });
@@ -177,7 +177,7 @@ export async function enqueueRetry(
     conversationId: data.conversationId,
     platform: data.platform,
     attempt: data.attemptNumber,
-    nextRetryIn: delay,
+    nextRetryIn: retryDelay,
   });
 
   return job;
@@ -190,13 +190,23 @@ export async function enqueueRetry(
  */
 export async function removeFromQueue(messageId: string): Promise<void> {
   const queue = getRetryQueue();
-  const jobs = await queue.getJobs(['waiting', 'delayed'], {
-    message: messageId,
-  });
+  const jobs = await queue.getJobs(['waiting', 'delayed']);
 
+  let removedCount = 0;
   for (const job of jobs) {
-    await job.remove();
-    logger.info('Message removed from retry queue', { messageId });
+    if (job.data?.messageId === messageId) {
+      await job.remove();
+      removedCount++;
+    }
+  }
+
+  if (removedCount > 0) {
+    logger.info('Message removed from retry queue', {
+      messageId,
+      removedCount,
+    });
+  } else {
+    logger.debug('No retry jobs found for message', { messageId });
   }
 }
 
