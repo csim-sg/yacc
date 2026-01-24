@@ -104,6 +104,13 @@ export async function runMigrations() {
       END $$;
     `);
 
+    await db.execute(sql`
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'whatsapp';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'wechat';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'meta';
+      ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'x';
+    `);
+
     console.log('✅ Enums created');
 
     // Create tables
