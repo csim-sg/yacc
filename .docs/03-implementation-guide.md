@@ -546,7 +546,7 @@ Push to main
   ↓
 GitHub Actions: frontend-deploy.yml
   ├── Build React app (pnpm build)
-  ├── Upload dist/ to AWS S3
+  ├── Upload dist/ to Cloudflare R2
   ├── Invalidate CloudFront cache
   ↓
 SPA live at https://app.example.com

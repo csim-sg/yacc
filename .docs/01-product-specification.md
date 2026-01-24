@@ -24,7 +24,7 @@
 ## 1. Product Overview
 
 ### Concept
-**YACC (Yet Another Chat Client)** is a cloud-hosted, single-tenant omni-channel chat platform that centralizes social communications (Phase 1: Telegram groups/channels and IRC; Phase 2: WhatsApp, WeChat, Meta/Facebook/Instagram, and X) into one unified inbox. Built with React, Node.js, PostgreSQL, and deployed to AWS S3 + CloudFront (frontend) + VPS (backend), with Cloudflare R2 for attachment and raw payload storage.
+**YACC (Yet Another Chat Client)** is a cloud-hosted, single-tenant omni-channel chat platform that centralizes social communications (Phase 1: Telegram groups/channels and IRC; Phase 2: WhatsApp, WeChat, Meta/Facebook/Instagram, and X) into one unified inbox. Built with React, Node.js, PostgreSQL, and deployed to Cloudflare R2 + CDN for frontend assets and file storage, with backend on VPS.
 
 **Initial Release (Phase 1)**: Unified Inbox + Auth + Basic Ops + Telegram/IRC messaging  
 **Phase 2**: WhatsApp/WeChat/Meta/X channels + advanced features

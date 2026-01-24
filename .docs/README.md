@@ -336,7 +336,7 @@ Just-in-time and temporary working documents. May be cleaned up periodically.
 - **Queue**: Redis + BullMQ (message retry with exponential backoff)
 - **Search**: PostgreSQL FTS (MVP) → Elasticsearch (Phase 2)
 - **Real-Time**: Socket.io (WebSocket with 1-hour backlog)
-- **Frontend Hosting**: AWS S3 + CloudFront (static SPA)
+- **Frontend Hosting**: Cloudflare R2 + CDN (static SPA)
 - **Backend Hosting**: Docker on VPS (single-tenant MVP)
 
 ### Architecture
