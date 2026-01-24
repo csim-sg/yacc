@@ -1,60 +1,85 @@
 /**
- * Routing-Controllers Authorization
+ * Routing-Controllers Authorization (BetterAuth)
  * Custom authorization checker and current user checker for routing-controllers
- * Uses simple JWT token from simple-auth controller
+ * Uses BetterAuth session validation
  */
 
 import { Action } from 'routing-controllers';
+import type { Request } from 'express';
+import { auth } from '@yacc/backend/infrastructure/auth/better-auth';
 import { db } from '@yacc/backend/infrastructure/db/client';
 import { users } from '@yacc/backend/infrastructure/db/schema';
 import { eq } from 'drizzle-orm';
+import type { AuthUser } from '@yacc/backend/types/auth.types';
 
 /**
- * Decode simple JWT token
+ * Extended Request interface with auth properties
+ * Temporarily extends Request until proper type augmentation is set up
  */
-function decodeToken(token: string): any {
-  try {
-    const payload = JSON.parse(Buffer.from(token, 'base64url').toString());
-    // Check expiration
-    if (payload.exp < Date.now()) {
-      return null;
-    }
-    return payload;
-  } catch (error) {
-    return null;
-  }
+interface AuthRequest extends Request {
+  user?: AuthUser;
+  session?: {
+    id: string;
+    userId: string;
+    expiresAt: Date;
+  };
 }
 
 /**
  * Authorization checker for routing-controllers
- * Validates Bearer token and checks user permissions
+ * Validates BetterAuth session and checks user roles/permissions
+ *
+ * Used by routing-controllers @Authorized decorator
  */
 export async function authorizationChecker(
   action: Action,
   roles: string[]
 ): Promise<boolean> {
   try {
-    // Extract token from Authorization header
-    const authHeader = action.request.headers['authorization'];
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return false;
-    }
+    const request = action.request as AuthRequest;
 
-    const token = authHeader.substring(7);
-    const payload = decodeToken(token);
-
-    if (!payload) {
-      return false;
-    }
-
-    // Fetch full user from database
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, payload.userId),
+    // BetterAuth automatically extracts Bearer token from Authorization header
+    const session = await auth.api.getSession({
+      headers: request.headers,
     });
 
-    if (!user || user.status !== 'active') {
+    if (!session) {
       return false;
     }
+
+    // Fetch full user from database to get role and status
+    const userId = session.user.id as string;
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+
+    if (!user) {
+      return false;
+    }
+
+    // Check user status - inactive or suspended users cannot login
+    if (user.status === 'inactive' || user.status === 'suspended') {
+      return false;
+    }
+
+    // Attach user to request (for currentUserChecker)
+    request.user = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      status: user.status,
+      emailVerified: user.emailVerified,
+      createdAt: user.createdAt,
+      lastLoginAt: user.lastLoginAt,
+    } as AuthUser;
+
+    // Attach session to request
+    request.session = {
+      id: session.session.id as string,
+      userId: user.id,
+      expiresAt: session.session.expiresAt as Date,
+    };
 
     // If no specific roles required, just check if authenticated
     if (!roles || roles.length === 0) {
@@ -70,40 +95,46 @@ export async function authorizationChecker(
 
 /**
  * Current user checker for routing-controllers
- * Returns the current authenticated user
+ * Returns current authenticated user for use in controllers
+ *
+ * Used by routing-controllers @CurrentUser decorator
  */
-export async function currentUserChecker(action: Action): Promise<any> {
+export async function currentUserChecker(
+  action: Action
+): Promise<AuthUser | undefined> {
   try {
-    // Extract token from Authorization header
-    const authHeader = action.request.headers['authorization'];
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return null;
-    }
+    const request = action.request as AuthRequest;
 
-    const token = authHeader.substring(7);
-    const payload = decodeToken(token);
-
-    if (!payload) {
-      return null;
-    }
-
-    // Fetch full user from database
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, payload.userId),
+    // BetterAuth automatically extracts Bearer token from Authorization header
+    const session = await auth.api.getSession({
+      headers: request.headers,
     });
 
-    if (!user || user.status !== 'active') {
-      return null;
+    if (!session) {
+      return undefined;
+    }
+
+    // Fetch full user from database to get role and status
+    const userId = session.user.id as string;
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+
+    if (!user || user.status === 'inactive' || user.status === 'suspended') {
+      return undefined;
     }
 
     return {
       id: user.id,
       email: user.email,
-      role: user.role,
       name: user.name,
+      role: user.role,
+      status: user.status,
       emailVerified: user.emailVerified,
-    };
+      createdAt: user.createdAt,
+      lastLoginAt: user.lastLoginAt,
+    } as AuthUser;
   } catch (error) {
-    return null;
+    return undefined;
   }
 }

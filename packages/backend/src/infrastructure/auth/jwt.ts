@@ -1,6 +1,22 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+// CRITICAL: Production validation for JWT secret (TD-002 from GOV-008)
+const jwtSecret = process.env.JWT_SECRET;
+
+if (!jwtSecret) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'FATAL: JWT_SECRET is required in production. ' +
+      'Set JWT_SECRET environment variable before starting the server.'
+    );
+  }
+  console.warn(
+    '⚠️  WARNING: Using default JWT secret for development. ' +
+    'Set JWT_SECRET environment variable in production!'
+  );
+}
+
+const JWT_SECRET = jwtSecret || 'your-secret-key-change-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 export interface JWTPayload {

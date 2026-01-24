@@ -13,6 +13,22 @@ import * as schema from '../db/schema';
 const ACCESS_TOKEN_TTL = parseInt(process.env.ACCESS_TOKEN_TTL_SECONDS || '172800'); // 48h default
 // Note: REFRESH_TOKEN_TTL is managed automatically by BetterAuth via session.expiresIn
 
+// CRITICAL: Production validation for JWT secret (TD-002 from GOV-008)
+const jwtSecret = process.env.BETTER_AUTH_SECRET || process.env.JWT_SECRET;
+
+if (!jwtSecret) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'FATAL: JWT_SECRET or BETTER_AUTH_SECRET is required in production. ' +
+      'Set one of these environment variables before starting the server.'
+    );
+  }
+  console.warn(
+    '⚠️  WARNING: Using default JWT secret for development. ' +
+    'Set JWT_SECRET or BETTER_AUTH_SECRET environment variable in production!'
+  );
+}
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: 'pg',
@@ -24,8 +40,8 @@ export const auth = betterAuth({
     },
   }),
 
-  // Secret for signing tokens
-  secret: process.env.BETTER_AUTH_SECRET || process.env.JWT_SECRET || 'dev-secret-change-in-production',
+  // Secret for signing tokens (with dev fallback)
+  secret: jwtSecret || 'dev-secret-change-in-production',
 
   // Session configuration
   session: {

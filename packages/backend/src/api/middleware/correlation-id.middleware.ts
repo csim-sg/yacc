@@ -1,12 +1,27 @@
 import { Request, Response, NextFunction } from 'express';
 import { AsyncLocalStorage } from 'async_hooks';
 import { randomUUID } from 'crypto';
-import { createChildLogger } from '../../infrastructure/logging/logger.js';
+import { createChildLogger, logger } from '../../infrastructure/logging/logger.js';
 import type { Logger } from 'pino';
+import type { AuthUser } from '../../types/auth.types.js';
+
+/**
+ * Extended Request interface with correlation ID and logger
+ */
+interface CorrelationRequest extends Request {
+  correlationId?: string;
+  logger?: Logger;
+  user?: AuthUser;
+  session?: {
+    id: string;
+    userId: string;
+    expiresAt: Date;
+  };
+}
 
 /**
  * Async context for correlation ID
- * 
+ *
  * Stores correlation ID and request-scoped logger in async context
  * Ensures correlation ID propagates across service layers automatically.
  */
@@ -17,41 +32,41 @@ export const asyncLocalStorage = new AsyncLocalStorage<{
 
 /**
  * Correlation ID middleware
- * 
+ *
  * Extracts or generates a correlation ID for request tracing.
  * Attaches a child logger (with correlation ID) to the request.
  * Sets X-Correlation-ID header in response.
- * 
+ *
  * @order MUST be first middleware in chain
- * 
+ *
  * @example
  * // In index.ts:
  * app.use(correlationIdMiddleware);   // FIRST - inject correlation ID
  * app.use(requestLoggingMiddleware);  // SECOND - log HTTP requests
- * 
+ *
  * @returns Express middleware function
  */
 export function correlationIdMiddleware(
-  req: Request,
+  req: CorrelationRequest,
   res: Response,
   next: NextFunction
 ): void {
   // Extract correlation ID from header or generate new
-  const correlationId = 
+  const correlationId =
     (req.headers['x-correlation-id'] as string) ||
     (req.headers['x-request-id'] as string) ||
     randomUUID();
-  
+
   // Set response header for tracing
   res.setHeader('X-Correlation-ID', correlationId);
-  
+
   // Create child logger with correlation ID
   const childLogger = createChildLogger(correlationId);
-  
+
   // Attach to request object
-  (req as any).correlationId = correlationId;
-  (req as any).logger = childLogger;
-  
+  req.correlationId = correlationId;
+  req.logger = childLogger;
+
   // Store in async context (for service layer logging)
   asyncLocalStorage.run({ correlationId, logger: childLogger }, () => {
     next();
