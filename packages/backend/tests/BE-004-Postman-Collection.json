@@ -1,0 +1,440 @@
+{
+  "info": {
+    "_postman_id": "be004-password-reset",
+    "name": "BE-004 Password Reset Testing",
+    "description": "Manual test collection for BE-004 password reset functionality",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Scenario 1: Valid Password Reset Flow",
+      "item": [
+        {
+          "name": "1.1 - Forgot Password (Existing User)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"test@example.com\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/forgot-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "forgot-password"]
+            },
+            "description": "Request password reset for existing user"
+          },
+          "response": []
+        },
+        {
+          "name": "1.3 - Reset Password with Valid Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"REPLACE_WITH_TOKEN_FROM_CONSOLE\", \"newPassword\": \"NewPassword123!\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/reset-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Complete password reset with valid token"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Scenario 2: Email Enumeration Prevention",
+      "item": [
+        {
+          "name": "2.1 - Forgot Password (Existing Email)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"test@example.com\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/forgot-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "forgot-password"]
+            },
+            "description": "Forgot password with existing user email"
+          },
+          "response": []
+        },
+        {
+          "name": "2.2 - Forgot Password (Non-Existent Email)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"nonexistent-user-9999@example.com\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/forgot-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "forgot-password"]
+            },
+            "description": "Forgot password with non-existent email (should still return 200)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Scenario 3: Token Expiration",
+      "item": [
+        {
+          "name": "3.1 - Forgot Password (Capture Token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"test@example.com\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/forgot-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "forgot-password"]
+            },
+            "description": "Get token for expiration test (capture from console)"
+          },
+          "response": []
+        },
+        {
+          "name": "3.3 - Reset Password with Expired Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"EXPIRED_TOKEN_HERE\", \"newPassword\": \"ExpiredTest123!\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/reset-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Try to use expired token (should fail with generic error)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Scenario 4: Token Reuse Prevention",
+      "item": [
+        {
+          "name": "4.1 - Forgot Password (Capture Token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"test@example.com\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/forgot-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "forgot-password"]
+            },
+            "description": "Get token for reuse test (capture from console)"
+          },
+          "response": []
+        },
+        {
+          "name": "4.2 - First Password Reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"TOKEN_FROM_CONSOLE\", \"newPassword\": \"FirstReset123!\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/reset-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "First password reset (should succeed)"
+          },
+          "response": []
+        },
+        {
+          "name": "4.3 - Second Reset Attempt (Should Fail)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"TOKEN_FROM_CONSOLE\", \"newPassword\": \"SecondReset456!\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/reset-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Reuse same token (should fail)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Scenario 5: Password Requirements Validation",
+      "item": [
+        {
+          "name": "5.2 - Test Too Short Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"TOKEN_HERE\", \"newPassword\": \"Pass1\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/reset-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Should reject password < 8 characters"
+          },
+          "response": []
+        },
+        {
+          "name": "5.3 - Test No Uppercase",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"TOKEN_HERE\", \"newPassword\": \"password123\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/reset-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Should reject password without uppercase"
+          },
+          "response": []
+        },
+        {
+          "name": "5.4 - Test No Number",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"TOKEN_HERE\", \"newPassword\": \"PasswordWithout\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/reset-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Should reject password without number"
+          },
+          "response": []
+        },
+        {
+          "name": "5.5 - Test Valid Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"TOKEN_HERE\", \"newPassword\": \"ValidPassword123\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/reset-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Should accept valid password"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Scenario 6: Invalid Token Variations",
+      "item": [
+        {
+          "name": "6.1 - Test Token Too Short",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"abc123\", \"newPassword\": \"ValidPassword123\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/reset-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Should reject short token"
+          },
+          "response": []
+        },
+        {
+          "name": "6.2 - Test Non-Hex Characters",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\", \"newPassword\": \"ValidPassword123\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/reset-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Should reject non-hex token"
+          },
+          "response": []
+        },
+        {
+          "name": "6.3 - Test Random Valid Hex (Doesn't Exist)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"newPassword\": \"ValidPassword123\"}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/auth/reset-password",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Should reject non-existent token"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
