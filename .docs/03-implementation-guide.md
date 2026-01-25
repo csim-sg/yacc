@@ -473,57 +473,61 @@ export async function evaluateRules(
 
 ```
 yacc-client/
-├── packages/
-│   ├── common/
-│   │   ├── src/
-│   │   │   ├── types/
-│   │   │   ├── schemas/
-│   │   │   ├── constants/
-│   │   │   └── utils/
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   │
-│   ├── backend/
-│   │   ├── src/
-│   │   │   ├── index.ts
-│   │   │   ├── api/
-│   │   │   ├── domain/
-│   │   │   ├── services/
-│   │   │   ├── connectors/
-│   │   │   ├── infrastructure/
-│   │   │   └── config/
-│   │   ├── tests/
-│   │   ├── package.json
-│   │   ├── tsconfig.json
-│   │   └── Dockerfile
-│   │
-│   └── frontend/
-│       ├── src/
-│       │   ├── components/
-│       │   ├── pages/
-│       │   ├── stores/
-│       │   ├── services/
-│       │   ├── types/
-│       │   └── hooks/
-│       ├── tests/
-│       ├── public/
-│       ├── package.json
-│       ├── tsconfig.json
-│       ├── vite.config.ts
-│       └── playwright.config.ts
-│
-├── .github/workflows/
-│   ├── lint.yml
-│   ├── tests.yml
-│   ├── backend-deploy.yml
-│   └── frontend-deploy.yml
-│
-├── .docs/
-├── docker-compose.yml
-├── turbo.json
-├── pnpm-workspace.yaml
-└── package.json
-```
+ ├── packages/
+ │   ├── common/
+ │   │   ├── src/
+ │   │   │   ├── types/
+ │   │   │   ├── schemas/
+ │   │   │   ├── constants/
+ │   │   │   └── utils/
+ │   │   ├── package.json
+ │   │   └── tsconfig.json
+ │   │
+ │   ├── backend/
+ │   │   ├── src/
+ │   │   │   ├── index.ts
+ │   │   │   ├── controllers/         ← API controllers (from api/controllers/)
+ │   │   │   ├── middleware/          ← Middleware (from api/middleware/)
+ │   │   │   ├── decorators/          ← Custom decorators (from api/decorators/)
+ │   │   │   ├── services/            ← Business logic (merged from domain/services/ + services/)
+ │   │   │   ├── config/              ← Configuration files (all auth, db, logging, email, redis, r2, queues)
+ │   │   │   ├── connectors/          ← Platform connectors (Telegram, IRC)
+ │   │   │   ├── websockets/          ← WebSocket logic
+ │   │   │   ├── workers/             ← Background workers
+ │   │   │   ├── types/               ← Type definitions
+ │   │   │   └── utils/               ← Utility functions
+ │   │   ├── tests/
+ │   │   ├── package.json
+ │   │   ├── tsconfig.json
+ │   │   └── Dockerfile
+ │   │
+ │   └── frontend/
+ │       ├── src/
+ │       │   ├── components/
+ │       │   ├── pages/
+ │       │   ├── stores/
+ │       │   ├── services/
+ │       │   ├── types/
+ │       │   └── hooks/
+ │       ├── tests/
+ │       ├── public/
+ │       ├── package.json
+ │       ├── tsconfig.json
+ │       ├── vite.config.ts
+ │       └── playwright.config.ts
+ │
+ ├── .github/workflows/
+ │   ├── lint.yml
+ │   ├── tests.yml
+ │   ├── backend-deploy.yml
+ │   └── frontend-deploy.yml
+ │
+ ├── .docs/
+ ├── docker-compose.yml
+ ├── turbo.json
+ ├── pnpm-workspace.yaml
+ └── package.json
+ ```
 
 ### Backend Deployment Flow
 

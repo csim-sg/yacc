@@ -17,15 +17,6 @@ import { config } from './config/config';
 
 const app = express();
 
-// ===== MIDDLEWARE ORDER (CRITICAL) =====
-// 1. Correlation ID - Inject correlation ID into request context
-app.use(correlationIdMiddleware);
-// 2. Request Logging - Log HTTP requests with correlation ID
-app.use(requestLoggingMiddleware);
-// 3. Body Parsing - Parse JSON and URL-encoded bodies
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
 // ===== SETUP ROUTING-CONTROLLERS =====
 useExpressServer(app, {
   controllers: [AuthController, SimpleAuthController, ConversationsController, AuditController, HealthController],
@@ -37,6 +28,11 @@ useExpressServer(app, {
     forbidNonWhitelisted: true,
   },
   classTransformer: true,
+  middlewares: [
+    // Middleware order is critical: registered in this order
+    correlationIdMiddleware,    // 1. Inject correlation ID
+    requestLoggingMiddleware,    // 2. Log HTTP requests
+  ],
 });
 
 // ===== SETUP EXPRESS SERVER =====

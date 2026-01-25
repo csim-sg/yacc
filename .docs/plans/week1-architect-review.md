@@ -145,7 +145,7 @@ ERROR [25:28] Binding element 'message' implicitly has an 'any' type.
 
 #### MANDATORY IMPLEMENTATION
 
-**File:** `packages/backend/src/infrastructure/logging/logger.ts`
+**File:** `packages/backend/src/config/logging.ts` (Pino logger)
 
 ```typescript
 import pino from 'pino';
@@ -157,7 +157,7 @@ const logLevel = process.env.LOG_LEVEL || 'info';
 
 const loggerOptions: LoggerOptions = {
   level: logLevel,
-  
+
   // Production: JSON logs for machine parsing
   // Development: Pretty-print for human readability
   ...(!isProduction && {
@@ -170,7 +170,7 @@ const loggerOptions: LoggerOptions = {
       },
     },
   }),
-  
+
   // Structured log format
   formatters: {
     level: (label) => ({ level: label }),
@@ -179,10 +179,10 @@ const loggerOptions: LoggerOptions = {
       hostname: bindings.hostname,
     }),
   },
-  
+
   // ISO 8601 timestamps
   timestamp: pino.stdTimeFunctions.isoTime,
-  
+
   // Serialize errors properly
   serializers: {
     err: pino.stdSerializers.err,
@@ -204,13 +204,13 @@ export function createChildLogger(correlationId: string): Logger {
 export const auditLogger: Logger = logger.child({ audit: true });
 ```
 
-**File:** `packages/backend/src/api/middleware/correlation-id.middleware.ts` (NEW)
+**File:** `packages/backend/src/middleware/correlation-id.middleware.ts` (NEW)
 
 ```typescript
 import { Request, Response, NextFunction } from 'express';
 import { AsyncLocalStorage } from 'async_hooks';
 import { randomUUID } from 'crypto';
-import { createChildLogger } from '../../infrastructure/logging/logger.js';
+import { createChildLogger } from '../config/logging.js';
 import type { Logger } from 'pino';
 
 // Async context for correlation ID
@@ -270,11 +270,11 @@ export function getLogger(): Logger {
 }
 ```
 
-**File:** `packages/backend/src/api/middleware/request-logging.middleware.ts` (NEW)
+**File:** `packages/backend/src/middleware/request-logging.middleware.ts` (NEW)
 
 ```typescript
 import pinoHttp from 'pino-http';
-import { logger } from '../../infrastructure/logging/logger.js';
+import { logger } from '../config/logging.js';
 
 /**
  * HTTP request/response logging middleware
@@ -346,9 +346,9 @@ export const requestLoggingMiddleware = pinoHttp({
 
 ```typescript
 import express from 'express';
-import { correlationIdMiddleware } from './api/middleware/correlation-id.middleware.js';
-import { requestLoggingMiddleware } from './api/middleware/request-logging.middleware.js';
-import { logger } from './infrastructure/logging/logger.js';
+import { correlationIdMiddleware } from './middleware/correlation-id.middleware.js';
+import { requestLoggingMiddleware } from './middleware/request-logging.middleware.js';
+import { logger } from './config/logging.js';
 
 const app = express();
 
@@ -396,11 +396,11 @@ npm install -D @types/pino @types/pino-http
 - [ ] Remove Winston: `npm uninstall winston`
 - [ ] Install Pino: `npm install pino pino-http pino-pretty`
 - [ ] Delete `utils/logger.ts` (Winston implementation)
-- [ ] Create `infrastructure/logging/logger.ts` (Pino implementation)
-- [ ] Create `api/middleware/correlation-id.middleware.ts`
-- [ ] Create `api/middleware/request-logging.middleware.ts`
+- [ ] Create `config/logging.ts` (Pino implementation)
+- [ ] Create `middleware/correlation-id.middleware.ts`
+- [ ] Create `middleware/request-logging.middleware.ts`
 - [ ] Update `index.ts` (add middleware in correct order)
-- [ ] Update all imports: `utils/logger` → `infrastructure/logging/logger`
+- [ ] Update all imports: `utils/logger` → `config/logging`
 - [ ] Write unit tests (90%+ coverage)
 - [ ] Write integration tests (HTTP logging flow)
 - [ ] Create ADR-004 documenting this decision
@@ -411,7 +411,7 @@ npm install -D @types/pino @types/pino-http
 
 #### ✅ VALIDATION RESULT: Current Implementation CORRECT
 
-**File:** `packages/backend/src/infrastructure/auth/better-auth.ts`
+**File:** `packages/backend/src/config/auth.ts` (BetterAuth configuration)
 
 **Current Implementation:**
 ```typescript
@@ -439,8 +439,8 @@ export const auth = betterAuth({
 ```typescript
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { db } from '../db/client.js';
-import { auditLogger } from '../logging/logger.js';
+import { db } from './db.js';
+import { auditLogger } from './logging.js';
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -582,12 +582,12 @@ Expires: ${new Date(Date.now() + 60 * 60 * 1000).toISOString()} (60 minutes)
 
 #### REQUIRED IMPLEMENTATION
 
-**File:** `packages/backend/src/api/decorators/require-role.decorator.ts` (NEW)
+**File:** `packages/backend/src/decorators/require-role.decorator.ts` (NEW)
 
 ```typescript
 import { createParamDecorator } from 'routing-controllers';
-import { UnauthorizedError, ForbiddenError } from '../errors/http-errors.js';
-import type { AuthUser } from '../../types/auth.types.js';
+import { UnauthorizedError, ForbiddenError } from '../utils/errors.js';
+import type { AuthUser } from '../types/auth.types.js';
 
 type UserRole = 'super_admin' | 'admin' | 'manager' | 'user';
 
@@ -628,12 +628,12 @@ export function RequireRole(roles: UserRole | UserRole[]) {
 }
 ```
 
-**File:** `packages/backend/src/api/decorators/require-permission.decorator.ts` (NEW)
+**File:** `packages/backend/src/decorators/require-permission.decorator.ts` (NEW)
 
 ```typescript
 import { createParamDecorator } from 'routing-controllers';
-import { UnauthorizedError, ForbiddenError } from '../errors/http-errors.js';
-import type { AuthUser } from '../../types/auth.types.js';
+import { UnauthorizedError, ForbiddenError } from '../utils/errors.js';
+import type { AuthUser } from '../types/auth.types.js';
 
 // Permission matrix (from Product Owner requirements)
 const PERMISSIONS: Record<string, string[]> = {
@@ -737,7 +737,7 @@ export function hasPermission(user: AuthUser, permission: string): boolean {
 import { JsonController, Post, Get, Param, Body } from 'routing-controllers';
 import { RequireRole } from '../decorators/require-role.decorator.js';
 import { RequirePermission } from '../decorators/require-permission.decorator.js';
-import type { AuthUser } from '../../types/auth.types.js';
+import type { AuthUser } from '../types/auth.types.js';
 
 @JsonController('/api/users')
 export class UsersController {
@@ -799,51 +799,60 @@ export class UsersController {
 
 ## 3. Code Organization Standards
 
-### 3.1 Required Directory Structure
+### 3.1 Required Directory Structure (FLAT ARCHITECTURE - Implemented Jan 25, 2026)
 
 ```
 packages/backend/src/
-├── api/                                    ← HTTP layer
-│   ├── controllers/                        ← routing-controllers
-│   │   ├── auth.controller.ts              ✅ One controller per file
-│   │   ├── conversations.controller.ts
-│   │   └── users.controller.ts
-│   ├── middleware/                         ← Express middleware
-│   │   ├── auth.middleware.ts              ✅ Exists (BetterAuth integration)
-│   │   ├── correlation-id.middleware.ts    ❌ CREATE (BE-027)
-│   │   ├── error.middleware.ts             ✅ Exists
-│   │   ├── rbac.middleware.ts              ❌ CREATE (BE-005)
-│   │   └── request-logging.middleware.ts   ❌ CREATE (BE-027)
-│   └── decorators/                         ← Custom decorators
-│       ├── require-permission.decorator.ts ❌ CREATE (BE-005)
-│       └── require-role.decorator.ts       ❌ CREATE (BE-005)
-├── domain/                                 ← Business logic layer
-│   └── services/                           ← Domain services
-│       ├── auth.service.ts                 ❌ CREATE (BE-003)
-│       ├── conversation.service.ts
-│       └── user.service.ts
-├── infrastructure/                         ← External integrations
-│   ├── auth/                               ← Authentication
-│   │   └── better-auth.ts                  ✅ Exists
-│   ├── db/                                 ← Database
-│   │   ├── client.ts                       ✅ Exists
-│   │   ├── schema.ts                       ✅ Exists (BE-002)
-│   │   └── migrations/                     ✅ Exists
-│   ├── queues/                             ← Message queues
-│   │   └── message-retry.queue.ts          ❌ CREATE (BE-013 - Done, check)
-│   └── logging/                            ← Logging infrastructure
-│       ├── logger.ts                       ⚠️ REPLACE (Winston → Pino)
-│       ├── correlation-id.ts               ❌ CREATE (BE-027)
-│       └── audit-logger.ts                 ❌ CREATE (BE-027)
-├── utils/                                  ← Shared utilities
-│   ├── errors.ts                           ✅ Exists (HTTP error classes)
-│   ├── logger.ts                           ⚠️ DELETE (Winston, to be replaced)
-│   └── validators.ts                       ❌ CREATE (Zod schemas)
-├── types/                                  ← Type definitions
-│   ├── express.d.ts                        ❌ CREATE (augment Request with user, logger)
-│   └── auth.types.ts                       ❌ CREATE (AuthUser, JWT payload)
-└── index.ts                                ✅ Exists (server entry point)
+├── controllers/                            ← API controllers
+│   ├── auth.controller.ts                 ✅ One controller per file
+│   ├── conversations.controller.ts
+│   ├── audit.controller.ts
+│   ├── health.controller.ts
+│   └── simple-auth.controller.ts
+├── middleware/                             ← Express middleware
+│   ├── auth.middleware.ts                  ✅ BetterAuth integration
+│   ├── auth-betterauth.middleware.ts       ✅ BetterAuth middleware
+│   ├── routing-controllers-auth.ts         ✅ routing-controllers auth
+│   ├── correlation-id.middleware.ts        ✅ Request correlation
+│   ├── request-logging.middleware.ts       ✅ HTTP logging
+│   └── rbac.middleware.ts                ⚠️ CREATE (BE-005)
+├── decorators/                             ← Custom decorators
+│   ├── require-permission.decorator.ts     ✅ Permission checks
+│   └── require-role.decorator.ts          ✅ Role checks
+├── services/                               ← Business logic (merged from domain/services/ + services/)
+│   ├── auth.service.ts                    ✅ Auth logic
+│   ├── conversation.service.ts              ✅ Conversation operations
+│   ├── audit.service.ts                   ✅ Audit logging
+│   └── MessageStatusTracker.ts            ✅ Message tracking
+├── config/                                 ← Configuration files
+│   ├── auth.ts                           ✅ BetterAuth + JWT + Password config (merged)
+│   ├── db.ts                             ✅ DB client + schema (merged)
+│   ├── config.ts                         ✅ App configuration
+│   ├── config.schema.ts                   ✅ Config validation
+│   ├── logging.ts                        ✅ Pino logger config
+│   ├── email.ts                          ✅ Email service config
+│   ├── redis.ts                          ✅ Redis client config
+│   ├── r2.ts                             ✅ Cloudflare R2 config
+│   └── queues.ts                         ✅ BullMQ queues config
+├── connectors/                             ← Platform connectors
+│   ├── base/                             ✅ Base connector classes
+│   │   ├── BaseConnector.ts
+│   │   └── ConnectorFactory.ts
+│   ├── telegram/                          ⚠️ TO BE IMPLEMENTED
+│   └── irc/                              ⚠️ TO BE IMPLEMENTED
+├── websockets/                              ← WebSocket logic
+│   └── WSConstants.ts                    ✅ WS event types
+├── workers/                                 ← Background workers
+│   └── messageRetryWorker.ts             ✅ Message retry processing
+├── types/                                   ← Type definitions
+│   └── auth.types.ts                      ✅ Auth types
+├── utils/                                   ← Utility functions
+│   ├── logger.ts                          ⚠️ PENDING (verify Winston → Pino completed)
+│   └── errors.ts                          ✅ HTTP error classes
+└── index.ts                                ✅ Server entry point
 ```
+
+**Note:** Layered architecture (`api/`, `domain/`, `infrastructure/`) was removed and replaced with flat structure in commit `75338be` (Jan 25, 2026).
 
 ### 3.2 Violations Detected
 
@@ -1017,11 +1026,11 @@ export interface ResetPasswordDto {
 
 #### Current Implementation (CORRECT)
 
-**File:** `packages/backend/src/api/middleware/auth-betterauth.middleware.ts`
+**File:** `packages/backend/src/middleware/auth-betterauth.middleware.ts`
 
 ```typescript
 import type { ExpressMiddlewareInterface } from 'routing-controllers';
-import { auth } from '../../infrastructure/auth/better-auth.js';
+import { auth } from '../config/auth.js';
 
 export class AuthBetterAuthMiddleware implements ExpressMiddlewareInterface {
   async use(req: any, res: any, next: (err?: any) => any): Promise<void> {
@@ -1056,9 +1065,9 @@ export class AuthBetterAuthMiddleware implements ExpressMiddlewareInterface {
 
 ```typescript
 import type { ExpressMiddlewareInterface } from 'routing-controllers';
-import { auth } from '../../infrastructure/auth/better-auth.js';
-import { db } from '../../infrastructure/db/client.js';
-import { users } from '../../infrastructure/db/schema.js';
+import { auth } from '../config/auth.js';
+import { db } from '../config/db.js';
+import { users } from '../config/db.js';
 import { eq } from 'drizzle-orm';
 
 export class AuthBetterAuthMiddleware implements ExpressMiddlewareInterface {
@@ -1111,7 +1120,7 @@ export class AuthBetterAuthMiddleware implements ExpressMiddlewareInterface {
 
 ```typescript
 // ❌ WRONG - Loses correlation ID context
-import { logger } from '../../infrastructure/logging/logger.js';
+import { logger } from '../config/logging.js';
 
 export class AuthController {
   @Post('/login')
@@ -1142,7 +1151,7 @@ export class AuthController {
 
 ```typescript
 // ✅ CORRECT - Get logger from async context
-import { getLogger } from '../../api/middleware/correlation-id.middleware.js';
+import { getLogger } from '../middleware/correlation-id.middleware.js';
 
 export class AuthService {
   async validateCredentials(email: string, password: string) {
@@ -1257,7 +1266,7 @@ packages/backend/tests/
 **File:** `tests/setup.ts`
 
 ```typescript
-import { db, pool } from '../src/infrastructure/db/client.js';
+import { db, pool } from '../src/config/db.js';
 import { migrate } from 'drizzle-orm/pg-core/migrator';
 import { sql } from 'drizzle-orm';
 
