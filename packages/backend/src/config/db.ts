@@ -1,7 +1,6 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pkg from 'pg';
-import * as schema from './schema.js';
-import { config } from '../../config/config';
+import { config } from './config';
 
 const { Pool } = pkg;
 
@@ -9,7 +8,9 @@ const pool = new Pool({
   connectionString: config.database.url,
 });
 
-export const db = drizzle(pool, { schema });
+// Create drizzle instance without schema param initially
+// Schema will be inferred from table definitions below
+export const db = drizzle(pool);
 
 // Health check
 export async function checkDatabaseConnection(): Promise<boolean> {

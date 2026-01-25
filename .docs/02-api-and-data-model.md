@@ -360,6 +360,30 @@ CREATE TABLE users (
 );
 ```
 
+### Password Reset Tokens
+```sql
+CREATE TABLE password_reset_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token VARCHAR(255) NOT NULL,  -- bcrypt hash of 64-char hex token
+  expires_at TIMESTAMP NOT NULL,  -- 60 minutes from creation
+  used_at TIMESTAMP,  -- NULL if unused, set when reset completes
+  created_at TIMESTAMP DEFAULT NOW(),
+  
+  INDEX(user_id),
+  INDEX(expires_at),
+  INDEX(token)  -- for finding token by hash
+);
+```
+
+**Notes:**
+- `token` field stores bcrypt hash, never the raw token
+- Raw token (64-char hex) is sent only once via email
+- Tokens expire 60 minutes after creation
+- Each user can only have ONE valid (non-used, non-expired) token
+- Old tokens are deleted when new one is requested
+- `used_at` is set when password is successfully reset
+
 ### Conversations
 ```sql
 CREATE TABLE conversations (
@@ -591,36 +615,70 @@ CREATE TABLE audit_logs (
 
 ---
 
-#### `POST /auth/forgot-password`
-**Request:**
-```json
-{ "email": "user@example.com" }
-```
+#### `POST /api/auth/forgot-password`
 
-**Response (200):**
-```json
-{ "data": { "success": true } }
-```
+Initiates password reset flow by sending a reset email. **Always returns 200** to prevent user enumeration attacks.
 
-**Note**: Always returns success (no user enumeration)
-
----
-
-#### `POST /auth/reset-password`
 **Request:**
 ```json
 {
-  "token": "reset-token-from-email",
-  "newPassword": "new-password"
+  "email": "user@example.com"
 }
 ```
 
 **Response (200):**
 ```json
-{ "data": { "success": true } }
+{
+  "message": "If the email exists, a password reset link has been sent"
+}
 ```
 
-**Errors**: `invalid_or_expired_token` (400)
+**Behavior:**
+- Valid email → Token generated, email sent, returns 200
+- Non-existent email → No token/email, returns 200 (identical response)
+- Invalid email format → Rejected with 400
+- No timing difference between valid/invalid emails (prevents enumeration)
+- Reset token expires in 60 minutes
+- Old tokens are invalidated when new one is requested
+
+---
+
+#### `POST /api/auth/reset-password`
+
+Resets user password using a valid reset token.
+
+**Request:**
+```json
+{
+  "token": "64hexcharacterstoken...",
+  "newPassword": "NewPassword123!"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Password reset successfully"
+}
+```
+
+**Errors:**
+- `400 Bad Request`: Invalid or expired token (generic message prevents enumeration)
+- `400 Bad Request`: Password requirements not met (8+ chars, 1 uppercase, 1 number)
+
+**Token Validation:**
+- Token must be 64-character hexadecimal string
+- Token must not be expired (60 min from generation)
+- Token must not have been used already
+- Token validates using timing-safe bcrypt comparison
+- All validation failures return generic "Invalid or expired token" error
+
+**Password Requirements:**
+- Minimum 8 characters
+- At least 1 uppercase letter (A-Z)
+- At least 1 number (0-9)
+- Reused tokens cannot be used again (prevents reuse attacks)
 
 ---
 

@@ -13,6 +13,43 @@ See [01-product-specification.md](./01-product-specification.md) for full scope 
 
 ---
 
+## Package Manager: pnpm
+
+YACC uses **pnpm** for monorepo management. 
+
+**Installation:**
+```bash
+npm install -g pnpm@9
+pnpm --version  # v9.x required
+```
+
+**Common Commands:**
+
+| Command | Purpose |
+|---------|---------|
+| `pnpm install` | Install all workspace dependencies |
+| `pnpm dev` | Start all dev servers |
+| `pnpm test` | Run tests in all packages |
+| `pnpm build` | Build all packages |
+| `pnpm lint` | Run linter across all packages |
+
+**Workspace Commands (--filter):**
+
+```bash
+pnpm --filter @yacc/backend test      # Backend tests only
+pnpm --filter @yacc/frontend dev      # Frontend dev server only
+pnpm --filter @yacc/common lint       # Common package linter
+```
+
+**Why pnpm?**
+- Monorepo workspaces (native support)
+- Content-addressable storage (disk efficient)
+- Strict dependency resolution
+- 2-3x faster than npm
+- Integrates seamlessly with Turborepo
+
+---
+
 ## Common Gotchas
 
 | Gotcha | Solution |

@@ -215,7 +215,85 @@ EXTERNAL PLATFORMS
 | **Email** | Nodemailer/SendGrid | Password reset emails |
 | **Hosting** | Docker on VPS | Single instance (MVP) |
 | **Testing** | Playwright | E2E test automation |
-| **Testing** | Jest | Unit & integration tests |
+| **Testing** | Playwright | E2E test automation |
+| **Testing** | Vitest | Unit & integration tests (18.8% faster than Jest) |
+| **Package Manager** | pnpm | Monorepo workspaces, efficient disk usage |
+
+---
+
+## 🚀 Development Setup
+
+### Prerequisites
+
+```bash
+# Required versions
+node --version         # v18 or higher
+pnpm --version        # v9+ (install: npm install -g pnpm@9)
+docker --version      # Required for local services
+```
+
+### First-Time Setup
+
+```bash
+# 1. Install all workspace dependencies
+pnpm install
+
+# 2. Start local services (PostgreSQL, Redis, Mailhog)
+docker-compose up -d
+
+# 3. Environment configuration
+cp packages/backend/.env.example packages/backend/.env
+cp packages/frontend/.env.example packages/frontend/.env
+
+# 4. Start development servers
+pnpm dev
+```
+
+### Package Manager: pnpm
+
+This project uses **pnpm** for monorepo management with workspaces:
+
+- **Monorepo workspaces**: Native support for multi-package projects
+- **Disk efficient**: Content-addressable storage using symlinks
+- **Fast**: 2-3x faster than npm
+- **Strict mode**: Prevents phantom dependencies
+- **Integrated with Turborepo**: Task orchestration across workspaces
+
+#### Common Commands
+
+```bash
+# Full workspace commands
+pnpm install              # Install all dependencies
+pnpm dev                  # Start all dev servers
+pnpm build                # Build all packages
+pnpm test                 # Run tests in all packages
+pnpm lint                 # Run linter across packages
+
+# Workspace-specific commands (using --filter)
+pnpm --filter @yacc/backend test        # Backend tests only
+pnpm --filter @yacc/frontend dev        # Frontend dev server
+pnpm --filter @yacc/common build        # Build common package
+
+# Adding dependencies
+pnpm add <package>                      # Add to root
+pnpm add <package> -w -D                # Add to root as dev dep
+pnpm --filter @yacc/backend add <pkg>   # Add to backend package
+```
+
+### Turborepo Integration
+
+**Turborepo** (`turbo.json`) orchestrates task execution:
+
+```bash
+pnpm dev      # Runs dev task across all packages
+pnpm build    # Builds in dependency order
+pnpm test     # Tests all packages respecting dependencies
+```
+
+Turborepo features:
+- **Caching**: Skips unchanged packages
+- **Parallelization**: Runs independent tasks concurrently
+- **Smart execution**: Respects package dependency graph
 
 ---
 

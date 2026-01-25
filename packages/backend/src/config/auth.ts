@@ -43,8 +43,11 @@ export const auth = betterAuth({
     requireEmailVerification: false, // Set true when email service ready
     minPasswordLength: 8, // ✅ AC 6: Minimum 8 characters
     sendResetPassword: async ({ user, url }) => {
-      // TODO: Integrate with email service
-      console.log(`[Auth] Password reset for ${user.email}: ${url}`);
+      // Integrate with email service
+      // Note: BetterAuth sends reset links via its built-in password reset flow
+      // Our custom /forgot-password endpoint also triggers email via our service
+      console.log(`[BetterAuth] Password reset link for ${user.email}: ${url}`);
+      // In Phase 2, integrate with emailService.sendPasswordResetEmail()
     },
   },
 

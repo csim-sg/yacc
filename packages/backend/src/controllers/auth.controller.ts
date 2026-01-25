@@ -1,16 +1,141 @@
 /**
  * Auth Controller
- * Handles authentication via BetterAuth with routing-controllers
+ * Handles authentication including:
+ * - BetterAuth routes (sign-in, sign-up, sign-out, etc.)
+ * - Custom password reset flow (forgot-password, reset-password)
  */
 
-import { All, Controller, Req, Res } from 'routing-controllers';
+import { All, Controller, Post, Req, Res, Body } from 'routing-controllers';
 import { auth } from '../config/auth';
+import { db, users } from '../config/db';
+import { eq } from 'drizzle-orm';
+import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/password-reset.schema';
+import {
+  generateResetToken,
+  resetPassword,
+} from '../services/password-reset.service';
+import { emailService } from '../config/email';
+
+interface AuthRequest extends Request {
+  correlationId?: string;
+}
 
 @Controller('/api/auth')
 export class AuthController {
   /**
+   * POST /api/auth/forgot-password
+   * Request password reset email (ALWAYS returns 200 to prevent email enumeration)
+   *
+   * Request: ForgotPasswordRequest { "email": "user@example.com" }
+   * Response: ForgotPasswordResponse { "message": "..." }
+   * 
+   * @see packages/common/src/requests/password-reset.request.ts
+   * @see packages/common/src/responses/password-reset.response.ts
+   */
+  @Post('/forgot-password')
+  async forgotPassword(@Body() body: any, @Req() req: AuthRequest): Promise<any> {
+    const correlationId = req.correlationId || 'unknown';
+
+    try {
+      // Validate input
+      const { email } = ForgotPasswordSchema.parse(body);
+
+      // Try to find user
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+
+      // IMPORTANT: Always return success to prevent email enumeration
+      if (!user) {
+        console.debug('Forgot password attempt with non-existent email', {
+          correlationId,
+          email,
+        });
+        return {
+          message: 'If the email exists, a password reset link has been sent',
+        };
+      }
+
+      // Generate token
+      const token = await generateResetToken(user.id, correlationId);
+
+      // Send email
+      const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+      await emailService.sendPasswordResetEmail(email, resetLink, token);
+
+      console.info('Password reset token generated and email sent', {
+        correlationId,
+        userId: user.id,
+      });
+
+      // Return same response as if email didn't exist (prevent enumeration)
+      return {
+        message: 'If the email exists, a password reset link has been sent',
+      };
+    } catch (error: any) {
+      // Log error but still return success response (prevent enumeration)
+      console.error('Forgot password error', {
+        correlationId,
+        error: error.message,
+        stack: error.stack,
+      });
+
+      return {
+        message: 'If the email exists, a password reset link has been sent',
+      };
+    }
+  }
+
+  /**
+   * POST /api/auth/reset-password
+   * Reset password using token
+   *
+   * Request: ResetPasswordRequest { "token": "64-char-hex-token", "newPassword": "NewPassword123!" }
+   * Response: ResetPasswordResponse { "success": true, "message": "Password reset successfully" }
+   * Error: 400 { "error": "Invalid or expired token" }
+   * 
+   * @see packages/common/src/requests/password-reset.request.ts
+   * @see packages/common/src/responses/password-reset.response.ts
+   */
+  @Post('/reset-password')
+  async resetPasswordHandler(
+    @Body() body: any,
+    @Req() req: AuthRequest,
+  ): Promise<any> {
+    const correlationId = req.correlationId || 'unknown';
+
+    try {
+      // Validate input
+      const { token, newPassword } = ResetPasswordSchema.parse(body);
+
+      // Reset password (throws if token invalid/expired)
+      await resetPassword(token, newPassword, correlationId);
+
+      console.info('Password reset successful', { correlationId });
+
+      return {
+        success: true,
+        message: 'Password reset successfully',
+      };
+    } catch (error: any) {
+      console.error('Reset password error', {
+        correlationId,
+        error: error.message,
+        stack: error.stack,
+      });
+
+      // Return generic error to prevent token enumeration
+      throw new Error('Invalid or expired token');
+    }
+  }
+
+  /**
    * Handle all BetterAuth routes
    * Routes: /sign-in/email, /sign-up/email, /sign-out, /refresh-token, etc.
+   *
+   * This wildcard route MUST be last so custom routes above take precedence
    */
   @All('/*')
   async handleAuth(@Req() req: any, @Res() res: any): Promise<any> {
@@ -19,7 +144,7 @@ export class AuthController {
     const protocol = req.protocol || 'http';
     const host = req.get('host') || 'localhost:3000';
     const fullUrl = `${protocol}://${host}${req.originalUrl || req.url}`;
-    
+
     const request = new Request(fullUrl, {
       method: req.method,
       headers: req.headers as any,
@@ -28,7 +153,7 @@ export class AuthController {
 
     try {
       const response = await auth.handler(request);
-      
+
       // Set headers
       response.headers.forEach((value: string, key: string) => {
         res.setHeader(key, value);
