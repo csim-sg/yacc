@@ -115,7 +115,7 @@ After message stored:
 | **Email** | Nodemailer / SendGrid | Password reset emails |
 | **Hosting** | VPS (single-tenant MVP) | Node API + SPA on S3/Cloudflare |
 | **Testing** | Playwright | E2E testing |
-| **Testing** | Jest | Unit & integration tests |
+| **Testing** | Vitest | Unit & integration tests (native ESM, 18.8% faster) |
 
 ---
 
@@ -804,8 +804,9 @@ REACT_APP_WS_URL=https://api.example.com
 
 1. **Code Coverage Target**: ≥ 85% for all new code
    - Exception: Infrastructure/config code can be lower if simple
-   - Use Jest for unit/integration tests
+   - Use **Vitest** for unit/integration tests (native ESM, 18.8% faster than Jest)
    - Use Playwright for E2E tests
+   - **Reference**: ADR-006 (Jest → Vitest Migration, approved 2026-01-25)
 
 2. **Test Organization**:
    - Unit tests co-located near source files or in `__tests__/` folder
