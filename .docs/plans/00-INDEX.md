@@ -252,7 +252,10 @@ This directory contains comprehensive planning documentation for Week 1 developm
 ### Development Phase (Days 1-4)
 
 **Estimated:** 28 hours (3.5 days)  
-**Status:** ⏳ Blocked (pending Day 0 completion)  
+**Status:** 🟡 In Progress (2 of 4 core tasks completed)  
+**Completed Tasks:** BE-001, BE-002, BE-013, BE-027, BE-003  
+**Current Task:** BE-004 (Forgot Password)  
+**Next Task:** BE-005 (RBAC)  
 
 #### Day 1: BE-027 Structured Logging
 
@@ -267,17 +270,24 @@ This directory contains comprehensive planning documentation for Week 1 developm
 
 #### Day 2-3: BE-003 + BE-005 (Parallel)
 
-**BE-003: BetterAuth (10h)**
-- [ ] Create branch `task/BE-003-betterauth`
-- [ ] Implement login endpoint (POST /api/auth/login)
-- [ ] Implement logout endpoint (POST /api/auth/logout)
-- [ ] Implement JWT token management
-- [ ] Implement user status validation
-- [ ] Write tests (95%+ coverage)
-- [ ] Manual testing (Postman: 4 scenarios)
-- [ ] Create PR
-- [ ] Request Architect review
-- [ ] PR merged
+**BE-003: BetterAuth (10h)** ✅ DONE
+- [x] Create branch `task/BE-003-betterauth`
+- [x] Implement login endpoint (POST /api/auth/login)
+- [x] Implement logout endpoint (POST /api/auth/logout)
+- [x] Implement JWT token management
+- [x] Implement user status validation
+- [x] Implement password validation (8+ chars, uppercase, number)
+- [x] Implement Express type augmentations
+- [x] Fix middleware registration (use routing-controllers)
+- [x] Write tests (95%+ coverage)
+- [x] Manual testing (Postman: 4 scenarios)
+- [x] Create PR (PR #152)
+- [x] Request Architect review
+- [x] Request Product Owner review
+- [x] Address all AC violations
+- [x] Create ADR-005 (Infrastructure/Config Pattern)
+- [x] Update GOV-008
+- [x] PR merged
 - [ ] **BE-003 DONE** ✅
 
 **BE-005: RBAC (6h) - Parallel**
@@ -369,8 +379,16 @@ This directory contains comprehensive planning documentation for Week 1 developm
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| Done (BE-001, 002, 013, 028) | 4 | 36% |
-| Ready (BE-003, 004, 005, 027) | 4 | 36% |
+| Product Owner | ✅ Approved | None (all requirements clear) |
+| Architect | ✅ Approved | ADR-004 + GOV-008 + Pino + Decorators + Infrastructure Config Pattern |
+| QA | ⏳ Pending | Awaiting implementation |
+| 
+| ### Task Status
+| 
+| | Status | Count | Percentage |
+|--------|-------|------------|
+| Done (BE-001, 002, 013, 027, 028) | 5 | 45% |
+| Ready (BE-004, 005, 027) | 3 | 27% |
 | Backlog (BE-020, 025, 026) | 3 | 27% |
 | **Total Week 1 Scope** | **11** | **100%** |
 
