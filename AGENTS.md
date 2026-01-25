@@ -321,6 +321,145 @@ Complete specifications in `.docs/`:
 
 ---
 
+## 🎯 Your Preferences & Constraints (CRITICAL)
+
+### Development Workflow Preferences
+1. **Sequential Development**: "Do it 1 by 1, make it simple"
+   - One task at a time (not parallel)
+   - Each task gets its own feature branch
+   - Each task has its own PR after completion
+   - Simpler, cleaner workflow
+
+2. **Documentation Synchronization**: "Update document if the status not same as project"
+   - Keep `.docs/plans/00-INDEX.md` in sync with actual implementation status
+   - Update ADRs and governance logs when decisions are made
+   - Mark tasks as DONE/In Progress/Ready based on actual state
+
+3. **Infrastructure Setup**: Use Docker Compose for local development
+   - PostgreSQL database
+   - Redis cache
+   - Mailhog for email testing
+   - Don't worry about multi-environment setup yet
+
+4. **Git Workflow**: Create branches, push to repo, create PRs against `dev` branch
+   - No force pushes unless explicitly requested
+   - No direct commits to dev/main without PR review
+   - Each PR should have a clear commit message following your conventions
+
+### Code Architecture Constraints (STRICT - Non-negotiable)
+
+1. **No `any` Types Allowed** (Enforcement: LSP errors, linter warnings)
+   - Use proper TypeScript interfaces extending `Request` from `express` module
+   - Never use `any` casting for Express/Node.js types
+   - Example: Use `AuthRequest extends Request` instead of `req as any`
+
+2. **Flat Folder Structure** (Not layered architecture)
+   - ❌ NO: `api/`, `domain/`, `infrastructure/` nested folders
+   - ✅ YES: Flat structure:
+     - `controllers/` - All API controllers
+     - `middleware/` - All middleware
+     - `services/` - All business logic
+     - `config/` - Configuration objects (data only, no class instances)
+     - `infrastructure/` - Client initialization (singleton classes)
+     - `connectors/`, `websockets/`, `workers/`, `types/`, `utils/`
+
+3. **Routing-Controllers Best Practices** (Follow framework standards)
+   - Use `middlewares` option in `useExpressServer()` to register middleware
+   - ❌ NO: Use `app.use()` for middleware registration
+   - ✅ YES: Pass middlewares via routing-controllers config
+   - Ensures proper integration with authorization flow
+
+4. **One Definition Per File** (Separation of concerns)
+   - One class per file
+   - One interface per file (unless closely related)
+   - One service per file
+   - Clear, single responsibility principle
+
+5. **Config vs Infrastructure Pattern** (ADR-005 approved)
+   - **Config folder**: Simple `const` objects with env var references
+     - Example: `{ port: process.env.PORT, dbUrl: process.env.DATABASE_URL }`
+     - NO class definitions, NO initialization logic
+   - **Infrastructure folder**: Singleton client classes
+     - Example: `class DatabaseClient { constructor() { ... } }`
+     - Handles initialization, connection pooling, singleton pattern
+   - Reason: "I don't want clean architecture. I want to keep it simple and clean."
+
+6. **No Global `/api` Prefix** (Add to controllers individually)
+   - ❌ NO: Global `@Controller('/api/users')`
+   - ✅ YES: Individual routes like `@Controller('/users')` with `@Post('/login')` → `/users/login`
+   - Add `/api` prefix only when needed for routing clarity
+
+### Testing & Quality Standards
+
+1. **Code Coverage Target**: ≥ 85% for all new code
+   - Exception: Infrastructure/config code can be lower if simple
+   - Use Jest for unit/integration tests
+   - Use Playwright for E2E tests
+
+2. **Test Organization**:
+   - Unit tests co-located near source files or in `__tests__/` folder
+   - E2E tests in `packages/frontend/e2e/` (Playwright)
+   - Mock external services (Telegram, IRC) in tests
+
+3. **Error Handling**:
+   - Always return proper HTTP status codes (200, 201, 400, 401, 403, 404, 500)
+   - Include error message in response body
+   - Log errors with correlation ID for tracing
+
+### Documentation Standards (MANDATORY)
+
+1. **Keep These Documents Updated**:
+   - `.docs/plans/00-INDEX.md` - Track task progress, approvals, status
+   - `.docs/adr/` - Architecture decision records (ADR-XXX)
+   - `.docs/governance/GOV-008-week1-workarounds.md` - Governance & workarounds
+   - `.docs/03-implementation-guide.md` - Tech decisions & architecture
+
+2. **PR Requirements**:
+   - Clear commit messages (describe WHY, not just WHAT)
+   - Reference related issues/PRs in description
+   - Link ADR if architectural change made
+   - Include test coverage info
+   - Update relevant `.docs/` files in same PR
+
+3. **ADR Requirements** (When ADR is needed):
+   - Change affects multiple services/teams
+   - Introduces new technology or pattern
+   - Impacts security, cost, scalability, or data
+   - Changes core architecture principle
+   - Use template: `.docs/adr/ADR-001-monorepo-turborepo-setup.md`
+
+### Communication & Review Process
+
+1. **PR Review Flow**:
+   - I (Architect) will review all PRs for alignment with constraints
+   - Block PRs that violate architecture rules
+   - Request changes with clear explanations
+   - Approve when all constraints met
+
+2. **Issue Escalation**:
+   - Ask questions early if requirements unclear
+   - Reference relevant docs in questions
+   - Provide context: what you tried, what went wrong, what options you see
+
+3. **Documentation Issues**:
+   - If docs are unclear, say so immediately
+   - Update docs before moving to next task
+   - Keep governance log in sync with decisions
+
+### Your Proven Workflow (From BE-003)
+✅ Works well, continue this pattern:
+1. Create feature branch from `dev`
+2. Implement feature with tests (85%+ coverage)
+3. Update `.docs/` files if needed
+4. Create PR with clear description + ADR reference if applicable
+5. Wait for architect review (me)
+6. Fix any issues raised
+7. Merge to dev when approved
+8. Update planning documents (00-INDEX.md)
+9. Move to next task
+
+---
+
 ## ⚠️ Important Notes
 
 1. **Single-Tenant MVP**: Credentials stored in env vars (Telegram token, IRC password). Multi-tenant with vault (Phase 2).
@@ -353,6 +492,6 @@ Complete specifications in `.docs/`:
 
 ---
 
-**Last Updated**: January 17, 2026  
-**Status**: MVP specification complete, ready for Phase 1 implementation  
+**Last Updated**: January 25, 2026  
+**Status**: Phase 1 Development in Progress (BE-003 Complete, BE-004 Ready)  
 **Questions?** See `.docs/05-quick-reference.md` → "Quick Links" section
