@@ -9,32 +9,57 @@ A single-tenant, cloud-hosted omni-channel social inbox that unifies Telegram, I
 ## 🚀 Quick Start (5 minutes)
 
 ### Prerequisites
+
 ```bash
-node -v          # Should be v18+
-pnpm -v          # Should be v9+ (or: npm install -g pnpm@9)
-docker -v        # Should be available
+# Node.js v18 or higher
+node --version
+
+# pnpm v9 (if not installed: npm install -g pnpm@9)
+pnpm --version
+
+# Docker (for local database/services)
+docker --version
 ```
 
-### First-Time Setup
+### Installation & Setup
+
 ```bash
-# 1. Clone & install
+# 1. Clone repository
 git clone https://github.com/antpolis/yacc-client.git
 cd yacc-client
+
+# 2. Install dependencies (all workspaces)
 pnpm install
 
-# 2. Start local services (PostgreSQL, Redis, Mailhog)
+# 3. Start local services (PostgreSQL, Redis, Mailhog)
 docker-compose up -d
 
-# 3. Environment setup
+# 4. Setup environment files
 cp packages/backend/.env.example packages/backend/.env
 cp packages/frontend/.env.example packages/frontend/.env
 
-# 4. Start development servers
+# 5. Start development servers (all packages)
 pnpm dev
 
-# 5. Open in browser
+# 6. Open in browser
 # Frontend: http://localhost:5173
 # Backend:  http://localhost:3000/api
+# Mailhog:  http://localhost:1025 (email testing)
+```
+
+### Package Manager: pnpm
+
+This project uses **pnpm** for monorepo management with workspaces. pnpm offers:
+
+- ✅ **Faster**: 2-3x faster than npm
+- ✅ **Disk efficient**: Content-addressable storage (symlinks)
+- ✅ **Strict mode**: Prevents phantom dependencies
+- ✅ **Monorepo support**: Native workspace integration
+
+All commands in this README use `pnpm`. If you don't have it:
+
+```bash
+npm install -g pnpm@9
 ```
 
 ---

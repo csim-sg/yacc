@@ -27,6 +27,59 @@ This is the **frontend package** for YACC. This guide supplements the root `AGEN
 - **Socket.io-client**: WebSocket client
 - **Playwright**: E2E testing
 
+## 🔧 Development Setup
+
+### Prerequisites
+
+```bash
+node --version         # v18+
+pnpm --version        # v9+ (install: npm install -g pnpm@9)
+```
+
+### First-Time Setup
+
+```bash
+# From repo root, install all workspace dependencies
+pnpm install
+
+# Or install frontend-only dependencies
+pnpm --filter @yacc/frontend install
+```
+
+### Common Frontend Commands
+
+```bash
+pnpm --filter @yacc/frontend dev       # Start Vite dev server (port 5173)
+pnpm --filter @yacc/frontend build     # Build for production
+pnpm --filter @yacc/frontend test      # Run E2E tests (Playwright)
+pnpm --filter @yacc/frontend lint      # Run ESLint
+
+# Or from frontend directory
+cd packages/frontend
+pnpm dev              # Same as above
+pnpm build
+pnpm test
+pnpm lint
+```
+
+### Backend Dependency
+
+Frontend requires the backend API to be running:
+
+```bash
+# In one terminal: start backend
+pnpm --filter @yacc/backend dev
+
+# In another terminal: start frontend
+pnpm --filter @yacc/frontend dev
+```
+
+Both will be accessible:
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:3000
+
+---
+
 ## 📂 Folder Structure
 
 ### Current Structure

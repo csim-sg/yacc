@@ -301,8 +301,8 @@ app.use(express.json());             // 3. THIRD - body parsing
 ### Phase 1: Core Logger (BE-027 - Week 1 Day 1)
 
 **Tasks:**
-- [ ] Install dependencies: `npm install pino pino-http pino-pretty`
-- [ ] Install dev dependencies: `npm install -D @types/pino @types/pino-http`
+- [ ] Install dependencies: `pnpm add pino pino-http pino-pretty`
+- [ ] Install dev dependencies: `pnpm add -D @types/pino @types/pino-http`
 - [ ] Create `infrastructure/logging/logger.ts` (base Pino logger)
 - [ ] Create `api/middleware/correlation-id.middleware.ts` (AsyncLocalStorage)
 - [ ] Create `api/middleware/request-logging.middleware.ts` (pino-http)
@@ -488,9 +488,9 @@ Rollback to Winston if:
    ```
 
 2. **Reinstall Winston**
-   ```bash
-   npm install winston
-   ```
+    ```bash
+    pnpm add winston
+    ```
 
 3. **Restore Winston Logger**
    ```bash

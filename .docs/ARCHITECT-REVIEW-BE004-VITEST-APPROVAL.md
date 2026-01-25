@@ -466,7 +466,7 @@ Merge to dev: APPROVED ✅
 
 ### Test Results Evidence
 
-**Command**: `cd packages/backend && npm test`
+**Command**: `pnpm --filter @yacc/backend test` (or `cd packages/backend && pnpm test`)
 
 **Output Summary**:
 ```

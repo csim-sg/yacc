@@ -56,6 +56,55 @@ packages/backend/src/
   └── infrastructure/   # DON'T create this (files go directly in src)
 ```
 
+## 🔧 Development Setup
+
+### Prerequisites
+
+```bash
+node --version         # v18+
+pnpm --version        # v9+ (install: npm install -g pnpm@9)
+```
+
+### First-Time Setup
+
+```bash
+# From repo root, install all workspace dependencies
+pnpm install
+
+# Or install backend-only dependencies
+pnpm --filter @yacc/backend install
+```
+
+### Common Backend Commands
+
+```bash
+pnpm --filter @yacc/backend dev        # Start backend server (port 3000)
+pnpm --filter @yacc/backend test       # Run backend tests
+pnpm --filter @yacc/backend build      # Build backend for production
+pnpm --filter @yacc/backend lint       # Run ESLint
+
+# Or from backend directory
+cd packages/backend
+pnpm dev              # Same as above
+pnpm test
+pnpm build
+pnpm lint
+```
+
+### Database Setup
+
+Backend requires PostgreSQL. Start local instance:
+
+```bash
+# From repo root
+docker-compose up -d  # Starts PostgreSQL, Redis, Mailhog
+
+# Run migrations (if applicable)
+pnpm --filter @yacc/backend migrate
+```
+
+---
+
 ## 🔧 Key Technical Constraints
 
 ### 1. No `any` Types

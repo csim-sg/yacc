@@ -7,6 +7,60 @@ This is the **common/shared package** for YACC. This guide supplements the root 
 - **Runtime**: Node.js + Browser (isomorphic)
 - **Purpose**: Shared types, database schema, utilities used by both backend and frontend
 
+## 🔧 Development Setup
+
+### Prerequisites
+
+```bash
+node --version         # v18+
+pnpm --version        # v9+ (install: npm install -g pnpm@9)
+```
+
+### First-Time Setup
+
+```bash
+# From repo root, install all workspace dependencies
+pnpm install
+
+# Or install common package only
+pnpm --filter @yacc/common install
+```
+
+### Common Package Commands
+
+```bash
+pnpm --filter @yacc/common test       # Run common package tests
+pnpm --filter @yacc/common build      # Build package (TypeScript)
+pnpm --filter @yacc/common lint       # Run ESLint
+
+# Or from common directory
+cd packages/common
+pnpm test
+pnpm build
+pnpm lint
+```
+
+### Adding Dependencies to Common
+
+The common package is shared by backend and frontend. When adding dependencies, consider their audience:
+
+```bash
+# Add to common (shared by backend & frontend)
+pnpm --filter @yacc/common add lodash
+
+# Add dev dependency (types, testing tools, etc.)
+pnpm --filter @yacc/common add -D zod
+```
+
+**Important:** Changes to common package require rebuilds in dependent packages (backend, frontend). Use:
+
+```bash
+# Rebuild dependent packages
+pnpm --filter '@yacc/{backend,frontend}' build
+```
+
+---
+
 ## 🎯 Shared Package Responsibilities
 
 ### What You Maintain

@@ -116,6 +116,97 @@ After message stored:
 | **Hosting** | VPS (single-tenant MVP) | Node API + SPA on S3/Cloudflare |
 | **Testing** | Playwright | E2E testing |
 | **Testing** | Vitest | Unit & integration tests (native ESM, 18.8% faster) |
+| **Package Manager** | pnpm | Monorepo management with workspaces |
+
+---
+
+## 2.1 Package Manager: pnpm
+
+YACC uses **pnpm** for efficient monorepo management with workspaces.
+
+### Why pnpm?
+
+- **Efficient disk usage**: Content-addressable storage uses symlinks (vs npm's copy-everything approach)
+- **Better dependency resolution**: Strict mode prevents phantom dependencies (implicit parent dependencies)
+- **Native workspace support**: Built-in monorepo support without external plugins
+- **Performance**: 2-3x faster than npm, significantly lower memory footprint
+- **Package compatibility**: Works with all Node.js packages (npm/yarn compatible)
+
+### Installation
+
+```bash
+# Install pnpm globally
+npm install -g pnpm@9
+
+# Verify installation
+pnpm --version  # Should output v9.x
+```
+
+### Common Commands
+
+| Command | Purpose | Example |
+|---------|---------|---------|
+| `pnpm install` | Install all workspace dependencies | `pnpm install` |
+| `pnpm add <pkg>` | Add package to root workspace | `pnpm add lodash` |
+| `pnpm add <pkg> -w` | Add package to root (workspace flag) | `pnpm add typescript -w -D` |
+| `pnpm add <pkg> -D` | Add dev dependency to root | `pnpm add vitest -D` |
+| `pnpm dev` | Run all dev servers (Turborepo) | `pnpm dev` |
+| `pnpm build` | Build all packages (Turborepo) | `pnpm build` |
+| `pnpm test` | Run tests across all packages | `pnpm test` |
+| `pnpm lint` | Run linter across all packages | `pnpm lint` |
+
+### Workspace Filtering (--filter)
+
+The `--filter` flag targets specific workspaces:
+
+```bash
+# Run backend tests only
+pnpm --filter @yacc/backend test
+
+# Start frontend dev server
+pnpm --filter @yacc/frontend dev
+
+# Run linter in common package
+pnpm --filter @yacc/common lint
+
+# Add dependency to specific package
+pnpm --filter @yacc/backend add axios
+
+# Run script in multiple packages
+pnpm --filter '@yacc/{backend,frontend}' build
+```
+
+### Turborepo Integration
+
+**Turborepo** (`turbo.json`) orchestrates task execution across workspaces for efficiency:
+
+```bash
+# These use Turborepo for task scheduling:
+pnpm dev              # Runs all dev tasks in dependency order
+pnpm build            # Builds all packages in correct order
+pnpm test             # Runs all tests, respecting dependencies
+
+# Turborepo features:
+# - Caching: Skips unchanged packages
+# - Parallelization: Runs independent tasks concurrently
+# - Dependency order: Respects package dependency graph
+```
+
+### Workspace Structure
+
+```yaml
+# pnpm-workspace.yaml defines workspaces
+packages:
+  - packages/backend    # @yacc/backend
+  - packages/frontend   # @yacc/frontend
+  - packages/common     # @yacc/common
+```
+
+Each workspace:
+- Has its own `package.json`
+- Can depend on other workspaces
+- Can have its own dependencies
+- Shares root `node_modules` via pnpm hoisting
 
 ---
 
