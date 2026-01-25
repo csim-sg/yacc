@@ -98,15 +98,19 @@ packages/backend/
 
 **Test Command Changes**:
 ```bash
-# Before
+# Before (Jest)
 npm test                    # Jest
-
-# After
-npm test                    # Vitest (same command)
-npm test -- --watch        # Improved watch mode
+npm test -- --watch        # Watch mode
 npm test:coverage          # Coverage reporting
-npm test:ui                # Visual test dashboard
+
+# After (Vitest)
+pnpm test                   # Vitest (same command)
+pnpm test -- --watch       # Improved watch mode
+pnpm test:coverage         # Coverage reporting
+pnpm test:ui               # Visual test dashboard
 ```
+
+**Note**: Use `pnpm --filter @yacc/backend test` from repo root to run backend tests.
 
 ---
 
