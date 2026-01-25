@@ -490,7 +490,8 @@ yacc-client/
  │   │   │   ├── middleware/          ← Middleware (from api/middleware/)
  │   │   │   ├── decorators/          ← Custom decorators (from api/decorators/)
  │   │   │   ├── services/            ← Business logic (merged from domain/services/ + services/)
- │   │   │   ├── config/              ← Configuration files (all auth, db, logging, email, redis, r2, queues)
+ │   │   │   ├── config/              ← Configuration data (simple objects with env vars)
+ │   │   │   ├── infrastructure/      ← Client initialization (singleton classes: DB, Redis, R2, etc.)
  │   │   │   ├── connectors/          ← Platform connectors (Telegram, IRC)
  │   │   │   ├── websockets/          ← WebSocket logic
  │   │   │   ├── workers/             ← Background workers
@@ -719,9 +720,11 @@ FRONTEND_URL=https://app.example.com
 WS_HEARTBEAT_INTERVAL_SEC=60
 WS_BACKLOG_RETENTION_HOURS=1
 
-# Logging
-LOG_LEVEL=info
-```
+ # Logging
+ LOG_LEVEL=info
+ ```
+
+**Note**: For detailed guidance on configuration and infrastructure patterns, see **ADR-005: Simple Infrastructure and Config Pattern** (`docs/adr/ADR-005-infrastructure-config-pattern.md`). The config folder should contain simple objects with environment variables, while the infrastructure folder contains singleton classes for client initialization.
 
 ### Frontend (.env.local)
 
@@ -745,10 +748,11 @@ REACT_APP_WS_URL=https://api.example.com
 | **Retry Strategy** | Exponential backoff (1m, 5m, 30m) | Standard practice, reduces server load on failures |
 | **Notifications** | In-app only (email Phase 2) | Simplifies MVP, WebSocket delivery is instant |
 | **Bulk Action** | Best-effort (partial OK) | More pragmatic than all-or-nothing, better UX |
-| **Single/Multi-Tenant** | Single-tenant (MVP) | Simpler architecture, env vars for credentials, easier deployment |
-| **Conversation Threading** | One per group/channel | Clear mapping, avoids confusion with multiple threads |
-| **Rules Evaluation** | First match wins | Simple, predictable, avoids conflicting actions |
-| **Attachment Re-Hosting** | Download + R2 | Preserves files if platform deletes, faster delivery via CDN |
+ | **Single/Multi-Tenant** | Single-tenant (MVP) | Simpler architecture, env vars for credentials, easier deployment |
+ | **Conversation Threading** | One per group/channel | Clear mapping, avoids confusion with multiple threads |
+ | **Rules Evaluation** | First match wins | Simple, predictable, avoids conflicting actions |
+ | **Attachment Re-Hosting** | Download + R2 | Preserves files if platform deletes, faster delivery via CDN |
+ | **Infrastructure/Config Pattern** | Simple two-folder (config = data, infrastructure = clients) | Simple and clean approach, easy to test, clear separation (see ADR-005) |
 
 ---
 

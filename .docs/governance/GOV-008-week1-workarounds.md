@@ -569,6 +569,7 @@ graph LR
 ## Related Documents
 
 - **ADR-004:** Logging and Observability Strategy (`.docs/adr/ADR-004-logging-strategy.md`)
+- **ADR-005:** Simple Infrastructure and Config Pattern (`.docs/adr/ADR-005-infrastructure-config-pattern.md`) ← **NEW**
 - **GOV-002:** BE-026 Deferral Decision (referenced, not created yet)
 - **Week 1 Product Owner Review:** `.docs/plans/week1-product-owner-review.md`
 - **Week 1 Architect Review:** `.docs/plans/week1-architect-review.md`
@@ -582,6 +583,220 @@ graph LR
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-01-24 | Fullstack Developer | Initial creation |
+
+---
+
+## Appendix: Config and Infrastructure Pattern Clarification
+
+**Status:** ✅ ADOPTED (See ADR-005)
+**Date:** 2026-01-25
+**Reference:** ADR-005: Simple Infrastructure and Config Pattern
+
+### Background
+
+During PR #152 (BE-003: BetterAuth) review, the architect identified coding style violations in the config folder. The user clarified they want a **simple and clean** approach, not complex refactoring.
+
+### Decision: Simple Two-Folder Pattern
+
+Per ADR-005, the project adopts a **simple two-folder pattern**:
+
+#### Config Folder (`packages/backend/src/config/`)
+
+**Purpose**: Store configuration data only (no initialization, no business logic)
+
+**Rules**:
+- ✅ Export simple `const` objects with environment variable values
+- ✅ Can include basic type definitions in the same file
+- ❌ No function exports
+- ❌ No class instances
+- ❌ No initialization logic
+- ❌ No client creation
+
+**Example**:
+```typescript
+// packages/backend/src/config/auth.ts
+export const authConfig = {
+  betterAuthSecret: process.env.BETTER_AUTH_SECRET || process.env.JWT_SECRET,
+  accessTokenTtl: parseInt(process.env.ACCESS_TOKEN_TTL_SECONDS || '172800'),
+  refreshTokenTtlDays: parseInt(process.env.REFRESH_TOKEN_TTL_DAYS || '30'),
+};
+```
+
+**Rationale**:
+- Configuration is **data**, not code behavior
+- Easy to test and modify without side effects
+- Clear separation from initialization logic
+
+---
+
+#### Infrastructure Folder (`packages/backend/src/infrastructure/`)
+
+**Purpose**: Store client classes for initialization and instance access
+
+**Rules**:
+- ✅ Export **singleton classes** for external service clients
+- ✅ Classes handle initialization and provide instance access
+- ✅ Classes read configuration from `config/` folder
+- ❌ No business logic (belongs in `services/`)
+- ❌ No HTTP endpoints (belongs in `controllers/`)
+
+**Example**:
+```typescript
+// packages/backend/src/infrastructure/db/client.ts
+import { Pool } from 'pg';
+import { dbConfig } from '../../config/db';
+
+export class Database {
+  private static instance: Database;
+  private pool: Pool;
+
+  private constructor() {
+    this.pool = new Pool({
+      connectionString: dbConfig.url,
+      min: dbConfig.poolMin,
+      max: dbConfig.poolMax,
+    });
+  }
+
+  static getInstance(): Database {
+    if (!this.instance) {
+      this.instance = new Database();
+    }
+    return this.instance;
+  }
+
+  getPool(): Pool {
+    return this.pool;
+  }
+
+  async close(): Promise<void> {
+    await this.pool.end();
+  }
+}
+
+export const db = Database.getInstance();
+```
+
+**Rationale**:
+- **Single source of truth**: Client initialization is centralized
+- **Lazy initialization**: Clients are created only when needed
+- **Testability**: Easy to mock infrastructure in tests
+- **Clear ownership**: Infrastructure team owns client lifecycle
+
+---
+
+### Config Folder Violations in PR #152
+
+The following config files in PR #152 contain violations of the simple config pattern:
+
+| File | Violations | Required Action |
+|------|------------|-----------------|
+| `config/auth.ts` | Exports BetterAuth instance + JWT functions | Move to `infrastructure/auth/` |
+| `config/db.ts` | Exports Drizzle instance + schema + types | Move to `infrastructure/db/` |
+| `config/logging.ts` | Exports Pino logger + helper functions | Move to `infrastructure/logging/` |
+| `config/email.ts` | Exports EmailService class | Move to `services/` |
+| `config/redis.ts` | Exports singleton functions | Move to `infrastructure/redis/` |
+| `config/r2.ts` | Exports singleton functions | Move to `infrastructure/storage/r2/` |
+| `config/queues.ts` | Exports queue manager | Move to `infrastructure/queues/` |
+
+**Note**: The architectural review identified these violations, but the user clarified that a **simple approach** is preferred. The violations should be addressed incrementally, not blocking.
+
+---
+
+### Acceptable Config Pattern (Compliant Example)
+
+**Good Pattern**: `packages/backend/src/config/config.ts`
+
+✅ **Why it complies**:
+- Only exports a simple const object: `export const config: AppConfig = {...}`
+- All values read from `envConfig` (environment variables)
+- No functions, no class instances, no initialization logic
+- Type definition is in the same file (acceptable for config interface)
+
+---
+
+### Implementation Guidance
+
+#### When to Create Config File
+
+**Use Case**: You need to store configuration values from environment variables
+
+**Example**:
+```typescript
+// packages/backend/src/config/some-service.ts
+export const someServiceConfig = {
+  apiKey: process.env.SOME_SERVICE_API_KEY,
+  timeout: parseInt(process.env.SOME_SERVICE_TIMEOUT_MS || '5000'),
+  retries: parseInt(process.env.SOME_SERVICE_RETRIES || '3'),
+};
+```
+
+**Rules**:
+- ✅ Export simple `const` object
+- ✅ Use `process.env` for values
+- ✅ Provide sensible defaults
+- ❌ No functions, classes, or initialization
+
+#### When to Create Infrastructure Class
+
+**Use Case**: You need to initialize an external service client (Redis, R2, etc.)
+
+**Example**:
+```typescript
+// packages/backend/src/infrastructure/some-service/client.ts
+import { SomeServiceClient } from 'some-service-sdk';
+import { someServiceConfig } from '../../config/some-service';
+
+export class SomeService {
+  private static instance: SomeService;
+  private client: SomeServiceClient;
+
+  private constructor() {
+    this.client = new SomeServiceClient({
+      apiKey: someServiceConfig.apiKey,
+      timeout: someServiceConfig.timeout,
+    });
+  }
+
+  static getInstance(): SomeService {
+    if (!this.instance) {
+      this.instance = new SomeService();
+    }
+    return this.instance;
+  }
+
+  getClient(): SomeServiceClient {
+    return this.client;
+  }
+}
+
+export const someService = SomeService.getInstance();
+```
+
+**Rules**:
+- ✅ Export singleton class with `getInstance()`
+- ✅ Read config from `config/` folder
+- ✅ Provide method to get client instance
+- ❌ No business logic (belongs in `services/`)
+- ❌ No HTTP endpoints (belongs in `controllers/`)
+
+---
+
+### PR #152 Decision
+
+**Status**: ✅ **ACCEPTABLE** - Config approach is simple and clean per user requirements
+
+**Architect Review Findings**:
+- Config folder contains coding style violations (per strict architecture principles)
+- However, user clarified they want **simple and clean** approach
+- No complex refactoring required
+
+**Recommended Action**:
+1. ✅ **Approve PR #152** - Config pattern meets user's simple and clean requirement
+2. ⏳ **Incremental Migration** - Refactor config files over time (tracked in GOV-008)
+3. ⏳ **Create ADR-005** - Document the simple pattern for future reference
+
+**Reference**: ADR-005: Simple Infrastructure and Config Pattern
 
 ---
 
