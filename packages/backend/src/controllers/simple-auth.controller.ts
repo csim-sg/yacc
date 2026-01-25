@@ -5,10 +5,10 @@
  */
 
 import { Body, Controller, Get, Post, Req } from 'routing-controllers';
-import { db } from '@yacc/backend/infrastructure/db/client';
-import { users } from '@yacc/backend/infrastructure/db/schema';
+import { db } from '../config/db/client';
+import { users } from '../config/db/schema';
 import { eq } from 'drizzle-orm';
-import { verifyPassword } from '@yacc/backend/infrastructure/auth/password';
+import { verifyPassword } from '../config/auth';
 import crypto from 'crypto';
 
 interface LoginRequest {

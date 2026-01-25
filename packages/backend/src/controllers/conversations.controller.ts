@@ -17,8 +17,8 @@ import {
   HttpCode,
 } from 'routing-controllers';
 import { IsOptional, IsEnum, IsInt, IsString, IsUUID, Min, Max } from 'class-validator';
-import { conversationService } from '@yacc/backend/domain/services/conversation.service';
-import { auditService } from '@yacc/backend/domain/services/audit.service';
+import { conversationService } from '../services/conversation.service';
+import { auditService } from '../services/audit.service';
 
 // DTOs
 class ListConversationsQuery {

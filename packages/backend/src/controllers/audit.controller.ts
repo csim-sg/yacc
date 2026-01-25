@@ -12,7 +12,7 @@ import {
 } from 'routing-controllers';
 import { IsOptional, IsInt } from 'class-validator';
 import { Type } from 'class-transformer';
-import { auditService } from '@yacc/backend/domain/services/audit.service';
+import { auditService } from '../services/audit.service';
 
 // DTOs
 class GetConversationAuditLogsQuery {

@@ -4,7 +4,7 @@
  */
 
 import { All, Controller, Req, Res } from 'routing-controllers';
-import { auth } from '@yacc/backend/infrastructure/auth/better-auth';
+import { auth } from '../config/auth';
 
 @Controller('/api/auth')
 export class AuthController {

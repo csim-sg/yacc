@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { AsyncLocalStorage } from 'async_hooks';
 import { randomUUID } from 'crypto';
-import { createChildLogger, logger } from '../../infrastructure/logging/logger.js';
+import { createChildLogger, logger } from '../config/logging';
 import type { Logger } from 'pino';
-import type { AuthUser } from '../../types/auth.types.js';
+import type { AuthUser } from '../types/auth.types';
 
 /**
  * Extended Request interface with correlation ID and logger

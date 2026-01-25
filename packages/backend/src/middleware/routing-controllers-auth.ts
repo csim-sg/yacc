@@ -6,11 +6,11 @@
 
 import { Action } from 'routing-controllers';
 import type { Request } from 'express';
-import { auth } from '@yacc/backend/infrastructure/auth/better-auth';
-import { db } from '@yacc/backend/infrastructure/db/client';
-import { users } from '@yacc/backend/infrastructure/db/schema';
+import { auth } from '../config/auth';
+import { db } from '../config/db';
+import { users } from '../config/db';
 import { eq } from 'drizzle-orm';
-import type { AuthUser } from '@yacc/backend/types/auth.types';
+import type { AuthUser } from '../types/auth.types';
 
 /**
  * Extended Request interface with auth properties
