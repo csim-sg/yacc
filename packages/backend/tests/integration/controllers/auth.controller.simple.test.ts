@@ -4,25 +4,25 @@
  * These tests verify the API endpoint behavior for password reset
  * without requiring a real PostgreSQL database
  * 
- * Uses Jest mocks for database and email services
+ * Uses Vitest mocks for database and email services
  */
 
-import { describe, expect, it, beforeEach, jest } from '@jest/globals';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 
 /**
  * Mock implementations
  */
 const mockEmailService = {
-  sendPasswordResetEmail: jest.fn(async (email: string, resetLink: string) => {
+  sendPasswordResetEmail: vi.fn(async (email: string, resetLink: string) => {
     return { success: true, messageId: `msg-${Date.now()}` };
   }),
 };
 
 const mockPasswordResetService = {
-  generateResetToken: jest.fn(async (userId: string, correlationId: string) => {
+  generateResetToken: vi.fn(async (userId: string, correlationId: string) => {
     return `reset-token-${Date.now().toString(16)}`;
   }),
-  validateAndGetUserId: jest.fn(async (token: string) => {
+  validateAndGetUserId: vi.fn(async (token: string) => {
     // Reject tokens that are too short or invalid format
     if (token.length < 10) {
       return null;
@@ -36,7 +36,7 @@ const mockPasswordResetService = {
     }
     return 'user-id-123';
   }),
-  resetPassword: jest.fn(async (userId: string, password: string, correlationId: string) => {
+  resetPassword: vi.fn(async (userId: string, password: string, correlationId: string) => {
     if (!password || password.length < 8) {
       throw new Error('Password too short');
     }
@@ -51,7 +51,7 @@ const mockPasswordResetService = {
 };
 
 const mockUserService = {
-  getUserByEmail: jest.fn(async (email: string) => {
+  getUserByEmail: vi.fn(async (email: string) => {
     if (email === 'nonexistent@example.com') {
       return null;
     }
@@ -68,7 +68,7 @@ const mockUserService = {
  */
 describe('AuthController - Password Reset Integration (Mocked)', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('POST /api/auth/forgot-password', () => {

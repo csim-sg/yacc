@@ -1,14 +1,17 @@
 /**
- * Global Setup for Jest
+ * Global Setup for Vitest
  * Runs once before all test suites
  * 
- * Using CommonJS export for Jest compatibility
+ * Using ESM format for Vitest
  */
 
-const dotenv = require('dotenv');
-const path = require('path');
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-module.exports = async () => {
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export async function setup(): Promise<void> {
   // Load test environment variables from .env.test
   dotenv.config({ path: path.resolve(__dirname, '../.env.test') });
 
@@ -20,5 +23,5 @@ module.exports = async () => {
   process.env.DB_POOL_MIN = '1';
   process.env.DB_POOL_MAX = '2';
 
-  console.log('🧪 Jest global setup complete');
-};
+  console.log('🧪 Vitest global setup complete');
+}

@@ -1,11 +1,11 @@
 /**
- * Global Teardown for Jest
+ * Global Teardown for Vitest
  * Runs once after all test suites
  * 
- * Using CommonJS export for Jest compatibility
+ * Using ESM format for Vitest
  */
 
-module.exports = async () => {
+export async function teardown(): Promise<void> {
   // Clean up any remaining connections or resources
-  console.log('🧹 Jest global teardown complete');
-};
+  console.log('🧹 Vitest global teardown complete');
+}
