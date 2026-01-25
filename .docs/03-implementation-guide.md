@@ -756,6 +756,95 @@ REACT_APP_WS_URL=https://api.example.com
 
 ---
 
+## 8. Code Architecture Constraints (STRICT - Non-Negotiable)
+
+### Backend Code Standards
+
+1. **No `any` Types Allowed**
+   - Use proper TypeScript interfaces extending `Request` from `express` module
+   - Never use `any` casting for Express/Node.js types
+   - Example: `AuthRequest extends Request` instead of `req as any`
+
+2. **Flat Folder Structure** (NOT Layered Architecture)
+   - ✅ CORRECT:
+     - `controllers/` - All API controllers
+     - `middleware/` - All middleware
+     - `services/` - All business logic
+     - `config/` - Configuration objects (data only, no class instances)
+     - `infrastructure/` - Client initialization (singleton classes)
+     - `connectors/`, `websockets/`, `workers/`, `types/`, `utils/`
+   - ❌ WRONG: `api/`, `domain/`, `infrastructure/` nested folders
+
+3. **Routing-Controllers Best Practices**
+   - Use `middlewares` option in `useExpressServer()` to register middleware
+   - ❌ NO: Use `app.use()` for middleware registration
+   - ✅ YES: Pass middlewares via routing-controllers config
+
+4. **One Definition Per File**
+   - One class per file
+   - One interface per file (unless closely related)
+   - One service per file
+   - Clear single responsibility principle
+
+5. **Config vs Infrastructure Pattern** (ADR-005 Approved)
+   - **Config folder**: Simple `const` objects with env var references
+     - Example: `{ port: process.env.PORT, dbUrl: process.env.DATABASE_URL }`
+     - NO class definitions, NO initialization logic
+   - **Infrastructure folder**: Singleton client classes
+     - Example: `class DatabaseClient { constructor() { ... } }`
+     - Handles initialization, connection pooling, singleton pattern
+   - Rationale: "I don't want clean architecture. I want to keep it simple and clean."
+
+6. **No Global `/api` Prefix**
+   - ❌ NO: Global `@Controller('/api/users')`
+   - ✅ YES: Individual routes like `@Controller('/users')` with `@Post('/login')` → `/users/login`
+   - Add `/api` prefix only when needed for routing clarity
+
+### Testing & Quality Standards
+
+1. **Code Coverage Target**: ≥ 85% for all new code
+   - Exception: Infrastructure/config code can be lower if simple
+   - Use Jest for unit/integration tests
+   - Use Playwright for E2E tests
+
+2. **Test Organization**:
+   - Unit tests co-located near source files or in `__tests__/` folder
+   - E2E tests in `packages/frontend/e2e/` (Playwright)
+   - Mock external services (Telegram, IRC) in tests
+
+3. **Error Handling**:
+   - Always return proper HTTP status codes (200, 201, 400, 401, 403, 404, 500)
+   - Include error message in response body
+   - Log errors with correlation ID for tracing
+
+### Development Workflow
+
+1. **Sequential Development**: "Do it 1 by 1, make it simple"
+   - One task at a time (not parallel)
+   - Each task gets its own feature branch from `dev`
+   - Each task has its own PR after completion
+   - Clear, single-focus PRs
+
+2. **Git Workflow**:
+   - Create branches: `feature/BE-XXX-description` or `feature/FE-XXX-description`
+   - Push to repo (dev branch approves PRs)
+   - No force pushes unless explicitly requested
+   - No direct commits to dev/main without PR review
+
+3. **Documentation Synchronization**:
+   - Keep `.docs/plans/00-INDEX.md` in sync with implementation status
+   - Update ADRs and governance logs when decisions are made
+   - Mark tasks as DONE/In Progress/Ready based on actual state
+
+4. **PR Requirements**:
+   - Clear commit messages (describe WHY, not just WHAT)
+   - Reference related issues/PRs in description
+   - Link ADR if architectural change made
+   - Include test coverage info
+   - Update relevant `.docs/` files in same PR
+
+---
+
 **Version**: 2.0  
-**Last Updated**: January 20, 2026  
-**Status**: Complete & Ready for Implementation
+**Last Updated**: January 25, 2026  
+**Status**: Phase 1 Development in Progress (BE-003 Complete)

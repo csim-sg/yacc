@@ -926,11 +926,33 @@ If any check fails:
 
 ---
 
+---
+
+## Code Architecture Standards Reference
+
+For detailed code architecture constraints and development workflow standards, see:
+- **AGENTS.md** (root): Developer preferences and workflow
+- **03-implementation-guide.md** (section 8): Code architecture constraints (strict, non-negotiable)
+- **ADR-005**: Infrastructure and config pattern rationale
+
+**Key Standards**:
+1. No `any` types - use proper TypeScript interfaces
+2. Flat folder structure (no layered architecture)
+3. Routing-Controllers middleware registration via `middlewares` option
+4. One definition per file
+5. Config folder = data objects, Infrastructure folder = client classes
+6. No global `/api` prefix on controllers
+7. Code coverage ≥ 85% for all new code
+8. Sequential development (1 task at a time)
+
+---
+
 ## Document Metadata
 
 **Created:** 2026-01-24  
 **Status:** ✅ ACCEPTED (Architect: 2026-01-24)  
-**Version:** 1.0  
+**Version:** 1.1  
+**Last Updated:** 2026-01-25  
 **Next Review:** 2026-01-31 (End of Week 1)  
 **Review Frequency:** Weekly (Fridays 4:00 PM)  
 **Owner:** Architect + Product Owner  
