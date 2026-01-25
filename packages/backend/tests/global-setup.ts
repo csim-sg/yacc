@@ -1,10 +1,12 @@
 /**
  * Global Setup for Jest
  * Runs once before all test suites
+ * 
+ * Using CommonJS export for Jest compatibility
  */
 
-import dotenv from 'dotenv';
-import path from 'path';
+const dotenv = require('dotenv');
+const path = require('path');
 
 module.exports = async () => {
   // Load test environment variables from .env.test
@@ -12,7 +14,7 @@ module.exports = async () => {
 
   // Set test environment variables
   process.env.NODE_ENV = 'test';
-  process.env.LOG_LEVEL = 'error'; // Suppress logs during tests
+  process.env.LOG_LEVEL = 'error'; // Minimize logs during tests (error level is most restrictive)
 
   // Optional: Set up test database connection pool limits
   process.env.DB_POOL_MIN = '1';

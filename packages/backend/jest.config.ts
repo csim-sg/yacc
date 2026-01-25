@@ -9,12 +9,17 @@
  * - Coverage reporting (85%+ target)
  */
 
-export default {
+import type { Config } from 'jest';
+
+const config: Config = {
   // Preset for TypeScript support
   preset: 'ts-jest',
 
   // Test environment
   testEnvironment: 'node',
+
+  // Enable ESM module support
+  extensionsToTreatAsEsm: ['.ts'],
 
   // Root directories
   roots: ['<rootDir>/src', '<rootDir>/tests'],
@@ -26,13 +31,6 @@ export default {
     '**/tests/**/*.spec.ts',
   ],
 
-  // Module resolution
-  moduleNameMapper: {
-    '^@yacc/common/(.*)$': '<rootDir>/../common/src/$1',
-    '^@yacc/backend/(.*)$': '<rootDir>/src/$1',
-    '^@/(.*)$': '<rootDir>/src/$1',
-  },
-
   // Extensions
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
 
@@ -40,12 +38,14 @@ export default {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
+      extensionsToTreatAsEsm: ['.ts'],
       tsconfig: {
         module: 'ES2020',
         target: 'ES2020',
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
         resolveJsonModule: true,
+        skipLibCheck: true,
         baseUrl: '.',
         paths: {
           '@yacc/common/*': ['../common/src/*'],
@@ -54,6 +54,14 @@ export default {
         },
       },
     }],
+  },
+
+  // Module resolution - handles both .js extension imports and path aliases
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1', // Strip .js extensions from imports
+    '^@yacc/common/(.*)$': '<rootDir>/../common/src/$1',
+    '^@yacc/backend/(.*)$': '<rootDir>/src/$1',
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
 
   // Coverage configuration
@@ -91,3 +99,5 @@ export default {
   globalSetup: '<rootDir>/tests/global-setup.ts',
   globalTeardown: '<rootDir>/tests/global-teardown.ts',
 };
+
+export default config;

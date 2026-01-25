@@ -1,6 +1,8 @@
 /**
  * Global Teardown for Jest
  * Runs once after all test suites
+ * 
+ * Using CommonJS export for Jest compatibility
  */
 
 module.exports = async () => {
