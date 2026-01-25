@@ -26,11 +26,14 @@ export class AuthController {
    * POST /api/auth/forgot-password
    * Request password reset email (ALWAYS returns 200 to prevent email enumeration)
    *
-   * Request: { "email": "user@example.com" }
-   * Response: 200 { "message": "If the email exists, a password reset link has been sent" }
+   * Request: ForgotPasswordRequest { "email": "user@example.com" }
+   * Response: ForgotPasswordResponse { "message": "..." }
+   * 
+   * @see packages/common/src/requests/password-reset.request.ts
+   * @see packages/common/src/responses/password-reset.response.ts
    */
   @Post('/forgot-password')
-  async forgotPassword(@Body() body: any, @Req() req: AuthRequest): Promise<{ message: string }> {
+  async forgotPassword(@Body() body: any, @Req() req: AuthRequest): Promise<any> {
     const correlationId = req.correlationId || 'unknown';
 
     try {
@@ -89,15 +92,18 @@ export class AuthController {
    * POST /api/auth/reset-password
    * Reset password using token
    *
-   * Request: { "token": "64-char-hex-token", "newPassword": "NewPassword123!" }
-   * Response: 200 { "success": true, "message": "Password reset successfully" }
-   * Response: 400 { "error": "Invalid or expired token" }
+   * Request: ResetPasswordRequest { "token": "64-char-hex-token", "newPassword": "NewPassword123!" }
+   * Response: ResetPasswordResponse { "success": true, "message": "Password reset successfully" }
+   * Error: 400 { "error": "Invalid or expired token" }
+   * 
+   * @see packages/common/src/requests/password-reset.request.ts
+   * @see packages/common/src/responses/password-reset.response.ts
    */
   @Post('/reset-password')
   async resetPasswordHandler(
     @Body() body: any,
     @Req() req: AuthRequest,
-  ): Promise<{ success: boolean; message: string }> {
+  ): Promise<any> {
     const correlationId = req.correlationId || 'unknown';
 
     try {
