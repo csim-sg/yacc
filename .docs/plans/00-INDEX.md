@@ -1,26 +1,154 @@
-# Week 1 Planning Documents - Complete Index
+# Planning Documents - Week 1 & Week 2 Complete Index
 
-**Date:** 2026-01-24  
-**Session:** Week 1 Development & Completion  
-**Status:** ✅ COMPLETE - Week 1 All 4 Core Tasks Done (PR #154 ready for merge)  
+**Date:** 2026-01-26  
+**Session:** Week 1 Complete + Week 2 Planning Complete  
+**Status:** ✅ COMPLETE - Week 1 All 4 Core Tasks Done + Week 2 Planning Approved  
 
 ---
 
 ## 📋 Document Overview
 
-This directory contains comprehensive planning documentation for Week 1 development, including:
-- Product Owner requirements and acceptance criteria
-- Architect technical decisions and code examples
-- Execution roadmap with blocking requirements
-- Quick reference and navigation guide
+This directory contains comprehensive planning documentation for Weeks 1-2 development, including:
 
-**Total Documentation:** 4 files, ~3,900 lines, ~114 KB
+**Week 1 (COMPLETE):**
+- ✅ Product Owner requirements and acceptance criteria
+- ✅ Architect technical decisions and code examples
+- ✅ Execution roadmap with blocking requirements
+- ✅ Quick reference and navigation guide
+- ✅ All 4 core tasks completed (BE-027, BE-003, BE-004, BE-005)
+
+**Week 2 (READY FOR DEVELOPMENT):**
+- ✅ Product Owner requirements for 10 features (4 frontend + 2 backend + QA)
+- ✅ Architect technical decisions and integration patterns
+- ✅ Execution roadmap with day-by-day timeline
+- ✅ Quick reference cheat sheet
+- ✅ Zero blocking requirements - ready to start immediately
+
+**Total Documentation:** 8 files, ~8,173 lines, ~190 KB
 
 ---
 
 ## 📚 Document Catalog
 
-### 1. README.md (Quick Reference)
+### WEEK 2 DOCUMENTS (NEW - Ready for Development)
+
+#### 1. week2-quick-reference.md (One-Page Cheat Sheet)
+
+**Purpose:** Quick reference during Week 2 development  
+**Size:** 12 KB, 353 lines  
+**Read Time:** 5 minutes  
+**Status:** ✅ READY
+
+**What's Inside:**
+- ✅ Week 2 scope summary (10 tasks, 54-72 hours)
+- ✅ Key dates and milestones
+- ✅ Team capacity (sequential with parallelization)
+- ✅ Success criteria checklist
+- ✅ Approval status (PO ✅ + Architect ✅)
+- ✅ Critical path diagram
+- ✅ Definition of Done per task type
+- ✅ Daily standup template
+- ✅ Git workflow and common pitfalls
+
+**When to Read:** Keep open during entire Week 2
+
+---
+
+#### 2. week2-product-owner-review.md (Requirements & Acceptance Criteria)
+
+**Purpose:** Complete requirements for 10 features  
+**Size:** 56 KB, 2,005 lines  
+**Read Time:** 40-60 minutes  
+**Status:** ✅ READY
+
+**What's Inside:**
+- ✅ Executive Summary (10 tasks approved, 54-72 hours)
+- ✅ Task Status Review (FE-001 to FE-004, BE-006 to BE-007, QA tasks)
+- ✅ **Detailed Acceptance Criteria for 10 features:**
+  - FE-001: Frontend Auth Integration (8 requirement categories, 60+ criteria)
+  - FE-002: Login/Logout UI (10 acceptance criteria groups)
+  - FE-003: RBAC Navigation (10 acceptance criteria groups)
+  - FE-004: API Integration Layer (10 acceptance criteria groups)
+  - BE-006: WebSocket Infrastructure (10 acceptance criteria groups)
+  - BE-007: Message Routing & Status (10 acceptance criteria groups)
+  - QA-001: Integration Testing (comprehensive test matrix)
+  - QA-002: E2E Testing & Documentation (test scenarios)
+- ✅ Business Rules & Constraints (auth, WebSocket, messaging)
+- ✅ Out of Scope (explicitly excluded)
+- ✅ Testing Requirements (80-95% coverage per task)
+- ✅ Risk Register (8+ risks with mitigations)
+- ✅ Success Criteria (per-feature, per-task)
+
+**When to Read:** Before starting any Week 2 task
+
+---
+
+#### 3. week2-architect-review.md (Technical Architecture & Integration)
+
+**Purpose:** Technical decisions, integration patterns, code standards  
+**Size:** 36 KB, 1,296 lines  
+**Read Time:** 45-60 minutes  
+**Status:** ✅ READY
+
+**What's Inside:**
+- ✅ Executive Summary (all 10 tasks approved, zero architectural issues)
+- ✅ Approval Status (100% green)
+- ✅ **Technology Stack Decisions:**
+  - Frontend: TanStack Query, Zustand, BetterAuth, Tailwind CSS
+  - Backend: Socket.io, BullMQ, Drizzle, PostgreSQL
+  - Validation: Zod schema validation
+- ✅ **Integration Patterns:**
+  - Auth flow (token refresh, session recovery)
+  - API client + TanStack Query setup
+  - WebSocket + REST separation
+  - Message routing FSM (conversation lifecycle)
+  - BullMQ retry logic with exponential backoff
+- ✅ Code Organization Standards (flat architecture, no layering)
+- ✅ Type Safety Requirements (TypeScript strict mode)
+- ✅ Security Architecture (XSS, CSRF, auth, WebSocket)
+- ✅ Testing Strategy (pyramid, test database, E2E)
+- ✅ Performance Optimization (code splitting, caching)
+- ✅ Architectural Compliance (100% compliant)
+- ✅ Zero technical debt introduced
+- ✅ Risk Register (8+ risks with mitigations)
+
+**When to Read:** Before implementation, when making technical decisions
+
+---
+
+#### 4. week2-action-plan.md (Day-by-Day Execution)
+
+**Purpose:** Step-by-step execution guide with timelines  
+**Size:** 20 KB, 619 lines  
+**Read Time:** 30-40 minutes  
+**Status:** ✅ READY
+
+**What's Inside:**
+- ✅ Executive Summary (zero blocking requirements)
+- ✅ Approved Tasks (10 tasks with hours, dependencies, priority)
+- ✅ **Detailed Day-by-Day Timeline:**
+  - Pre-Dev: 1 hour setup
+  - Day 1-2: FE-001 Frontend Auth Integration (10-12h)
+  - Day 2-3: FE-002 Login/Logout UI (10-12h) + BE-006 parallel
+  - Day 3-4: FE-003 RBAC Navigation (8-10h) + BE-007 parallel
+  - Day 4-5: FE-004 API Integration (10-12h) + BE-007 continue
+  - Day 6: QA-001 Integration Testing (8h)
+  - Day 6-7: QA-002 E2E & Documentation (14h)
+  - Day 7-8: Final QA & Merge (2-4h)
+- ✅ Success Criteria (pre-dev + completion checklists)
+- ✅ Quality Gates (tests, coverage, linting, types, security)
+- ✅ Communication Plan (daily standup, milestone updates)
+- ✅ Risk Management (high/medium items with mitigation)
+- ✅ Contingency Plan (if behind schedule)
+- ✅ Rollback Plans (per-task failure scenarios)
+
+**When to Read:** Daily for task planning and tracking
+
+---
+
+### WEEK 1 DOCUMENTS (REFERENCE - Completed)
+
+#### 1. README.md (Quick Reference)
 
 **Purpose:** Navigation hub and quick reference  
 **Size:** 12 KB  
@@ -199,31 +327,76 @@ This directory contains comprehensive planning documentation for Week 1 developm
 
 ## 🎯 How to Use These Documents
 
-### For Quick Overview (15 minutes)
-1. Read `README.md` (5 min)
-2. Skim `week1-action-plan.md` Executive Summary + Timeline (10 min)
+### Week 2 Quick Start (30 minutes)
 
-### For Understanding Requirements (45 minutes)
-1. Read `README.md` (5 min)
-2. Read `week1-product-owner-review.md` Sections 1-3 (30 min)
-3. Read `week1-action-plan.md` Blocking Requirements (10 min)
+**Before Starting Week 2 Development:**
+1. Read `week2-quick-reference.md` (5 min) - Overview
+2. Read `week2-product-owner-review.md` Executive Summary (10 min) - Requirements
+3. Read `week2-architect-review.md` Executive Summary (5 min) - Technical decisions
+4. Skim `week2-action-plan.md` Timeline (10 min) - Today's work
 
-### For Technical Implementation (90 minutes)
-1. Read `README.md` (5 min)
-2. Read `week1-architect-review.md` Sections 1-3 (45 min)
-3. Read `week1-action-plan.md` Migration Checklists (20 min)
-4. Review code examples in architect review (20 min)
+**Keep Open During Development:**
+- `week2-quick-reference.md` - Quick answers
+- `week2-action-plan.md` - Today's timeline
+- `week2-product-owner-review.md` - Feature requirements
+- `week2-architect-review.md` - Technical patterns
 
-### For Day-to-Day Execution (10 minutes/day)
-1. Check `week1-action-plan.md` Timeline for today's tasks (5 min)
-2. Check `README.md` Progress Checklist (2 min)
-3. Update status in this index (3 min)
+### Week 2 Deep Dive (2-3 hours)
+
+**For Understanding All Requirements (90 minutes):**
+1. Read `week2-quick-reference.md` (5 min)
+2. Read `week2-product-owner-review.md` completely (60 min)
+3. Read `week2-action-plan.md` Executive Summary (15 min)
+4. Review Mermaid diagrams (10 min)
+
+**For Technical Implementation (90 minutes):**
+1. Read `week2-architect-review.md` Sections 1-4 (45 min)
+2. Review integration patterns and sequence diagrams (30 min)
+3. Bookmark code examples for reference (15 min)
+
+**For Day-to-Day Execution (10 minutes/day):**
+1. Check `week2-action-plan.md` Timeline for today's tasks (5 min)
+2. Verify success criteria for today's feature (3 min)
+3. Check risks and mitigations (2 min)
+
+### Week 1 Reference (For Context)
+
+**If Need to Review Week 1:**
+1. Read `week1-quick-reference.md` - Overview
+2. Read `week1-product-owner-review.md` - Requirements
+3. Read `week1-architect-review.md` - Technical decisions
+4. Follow `week1-action-plan.md` - Execution guide
 
 ---
 
 ## ✅ Progress Tracking
 
-### Pre-Development Phase (Day 0)
+### Week 2 Status (Pending Development)
+
+**Estimated:** 54-72 hours (7-9 hours per day)  
+**Status:** ⏳ Ready to Start  
+**Start Date:** 2026-01-27 (Monday)  
+**Target Completion:** 2026-02-02 (Sunday)  
+
+**Approved Tasks:**
+- [ ] FE-001: Frontend Auth Integration (10-12h)
+- [ ] FE-002: Login/Logout UI (10-12h)
+- [ ] FE-003: RBAC Navigation (8-10h)
+- [ ] FE-004: API Integration Layer (10-12h)
+- [ ] BE-006: WebSocket Infrastructure (12-14h)
+- [ ] BE-007: Message Routing & Status (14-16h)
+- [ ] QA-001: Integration Testing (8h)
+- [ ] QA-002: E2E Testing & Documentation (14h)
+- [ ] DOC-001: Documentation Updates (4h)
+- [ ] DOC-002: Architecture & Guides (4h)
+
+**Blocking Requirements Before Start:** NONE ✅ All cleared
+
+---
+
+### Week 1 Status (COMPLETE)
+
+#### Pre-Development Phase (Day 0)
 
 **Estimated:** 4 hours  
 **Status:** ⏳ Pending  
@@ -359,15 +532,28 @@ This directory contains comprehensive planning documentation for Week 1 developm
 
 ## 📊 Key Metrics
 
+### Week 1 & 2 Planning Coverage
+
+| Aspect | Week 1 | Week 2 | Total | Status |
+|--------|--------|--------|-------|--------|
+| Requirements (AC) | 50+ | 100+ | 150+ | ✅ Complete |
+| Technical Decisions | 20+ | 15+ | 35+ | ✅ Complete |
+| Testing Strategy | 30+ | 40+ | 70+ | ✅ Complete |
+| Code Examples | 25+ | 30+ | 55+ | ✅ Complete |
+| Mermaid Diagrams | 4 | 4 | 8 | ✅ Complete |
+| Integration Patterns | 3 | 5 | 8 | ✅ Complete |
+| Risk Items | 8+ | 8+ | 16+ | ✅ Complete |
+
 ### Documentation Coverage
 
 | Aspect | Coverage | Status |
 |--------|----------|--------|
-| Requirements (AC) | 50+ criteria defined | ✅ Complete |
-| Technical Decisions | 20+ code examples | ✅ Complete |
-| Testing Strategy | 30+ test scenarios | ✅ Complete |
+| Requirements (AC) | 150+ criteria defined | ✅ Complete |
+| Technical Decisions | 55+ code examples | ✅ Complete |
+| Testing Strategy | 70+ test scenarios | ✅ Complete |
 | Templates Provided | 2 (ADR-004, GOV-008) | ✅ Complete |
 | Migration Guides | 2 (Pino, Decorators) | ✅ Complete |
+| Integration Patterns | 8 documented | ✅ Complete |
 
 ### Approval Status
 
@@ -379,12 +565,22 @@ This directory contains comprehensive planning documentation for Week 1 developm
 
 ### Task Status
 
-| Status | Count | Percentage |
-|--------|-------|------------|
-| **Done** (BE-001, 002, 013, 027, 003, 004, 005) | **7** | **100%** |
-| **Week 1 Core Tasks Complete** | **4/4** | **100%** |
-| **All 71 Backend Tests Passing** | **71/71** | **100%** |
-| **Overall Coverage** | **85%+** | **✅ Target Met** |
+**Week 1 Tasks:**
+
+| Status | Count | Percentage | Details |
+|--------|-------|------------|---------|
+| **DONE** | **4/4** | **100%** | BE-027, BE-003, BE-004, BE-005 |
+| **All Tests Passing** | **71/71** | **100%** | 40 original + 31 new RBAC |
+| **Coverage Target** | **85%+** | **✅ Met** | Min 85%, auth 95%, logging 90% |
+
+**Week 2 Tasks:**
+
+| Status | Count | Percentage | Details |
+|--------|-------|------------|---------|
+| **Planning Complete** | **10/10** | **100%** | FE: 4, BE: 2, QA: 2, Docs: 2 |
+| **Requirements Defined** | **100+ AC** | **100%** | All acceptance criteria documented |
+| **Architecture Approved** | **10/10** | **100%** | Zero blocking requirements |
+| **Timeline Ready** | **8 days** | **100%** | Day-by-day breakdown provided |
 
 ---
 
@@ -457,17 +653,35 @@ This directory contains comprehensive planning documentation for Week 1 developm
 ## ✅ Index Complete
 
 **Total Planning Documentation:**
-- 📄 Files: 5 (including this index)
-- 📏 Lines: ~4,300
-- 💾 Size: ~125 KB
-- 🕐 Read Time: 2-3 hours (complete)
-- ⏱️ Skim Time: 30 minutes (summaries only)
+- 📄 Files: 8 (4 Week 1 + 4 Week 2 + index)
+- 📏 Lines: ~8,173 (4,270 Week 1 + 4,273 Week 2)
+- 💾 Size: ~190 KB (96 KB Week 1 + 124 KB Week 2)
+- 🕐 Read Time: 4-5 hours (complete both weeks)
+- ⏱️ Skim Time: 1 hour (summaries + timelines)
 
-**Status:** Ready for execution  
-**Next Action:** Read README.md → Start Day 0 pre-development
+**Week 1 Status:** ✅ COMPLETE (4/4 tasks done, 71/71 tests passing)  
+**Week 2 Status:** ✅ PLANNING COMPLETE (ready for development)  
+**Next Action:** Start Week 2 development on 2026-01-27
 
 ---
 
-**Created:** 2026-01-24  
+## 📋 Quick Navigation
+
+**For Week 2 Development:**
+1. Start: `week2-quick-reference.md` (5 min overview)
+2. Requirements: `week2-product-owner-review.md` (40-60 min deep dive)
+3. Technical: `week2-architect-review.md` (45-60 min deep dive)
+4. Execution: `week2-action-plan.md` (reference daily)
+
+**For Week 1 Reference:**
+1. Overview: `week1-quick-reference.md`
+2. Requirements: `week1-product-owner-review.md`
+3. Technical: `week1-architect-review.md`
+4. Execution: `week1-action-plan.md`
+
+---
+
+**Created:** 2026-01-24 (Week 1) + 2026-01-26 (Week 2)  
 **Last Updated:** 2026-01-26  
-**Status:** ✅ COMPLETE - Week 1 Implementation Done
+**Status:** ✅ Week 1 COMPLETE - Week 2 PLANNING COMPLETE  
+**Ready For:** Immediate Week 2 Development Start
