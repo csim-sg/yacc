@@ -9,7 +9,6 @@ import { authorizationChecker, currentUserChecker } from './middleware/routing-c
 import { correlationIdMiddleware } from './middleware/correlation-id.middleware';
 import { requestLoggingMiddleware } from './middleware/request-logging.middleware';
 import { AuthController } from './controllers/auth.controller';
-import { SimpleAuthController } from './controllers/simple-auth.controller';
 import { ConversationsController } from './controllers/conversations.controller';
 import { AuditController } from './controllers/audit.controller';
 import { HealthController } from './controllers/health.controller';
