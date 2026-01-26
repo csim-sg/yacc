@@ -3,6 +3,7 @@
  *
  * Top navigation bar with:
  * - Application branding/logo
+ * - Mobile menu toggle button
  * - Logout button with user info
  * - Responsive design
  * - Accessibility features
@@ -10,12 +11,16 @@
 
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
+
+interface HeaderProps {
+  onMenuClick?: () => void;
+}
 
 /**
  * Header Component
  */
-export function Header(): JSX.Element {
+export function Header({ onMenuClick }: HeaderProps): ReactElement {
   const { user, logout, isLoading } = useAuth();
   const navigate = useNavigate();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -58,8 +63,31 @@ export function Header(): JSX.Element {
       <header className="bg-base-100 shadow-sm border-b border-base-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
+            {/* Logo and Mobile Menu Button */}
             <div className="flex items-center gap-3">
+              {/* Mobile menu toggle */}
+              <button
+                onClick={onMenuClick}
+                className="btn btn-ghost btn-circle lg:hidden"
+                aria-label="Toggle menu"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-6 h-6"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                  />
+                </svg>
+              </button>
+
+              {/* Logo */}
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                 <span className="text-primary-content font-bold text-lg">Y</span>
               </div>

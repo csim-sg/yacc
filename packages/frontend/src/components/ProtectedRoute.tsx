@@ -2,31 +2,41 @@
  * Protected Route Component
  * 
  * Route protection wrapper that redirects unauthenticated users to login page
- * Supports optional role-based access control
+ * Supports role-based access control with role hierarchy
  * 
  * Aligned with custom api-client.ts and AuthContext
+ * Uses React Router for navigation
  */
 
 import { ReactNode } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  meetsRoleRequirement,
+  type RoleType,
+} from '../lib/navigation';
 
 /**
  * Protected Route Props
  */
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredRole?: 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'USER';
+  requiredRole?: RoleType;
   fallback?: ReactNode;
 }
 
 /**
  * Protected Route Component
  * 
- * Renders children if user is authenticated
- * Redirects to login page if not authenticated
- * Optionally checks role if requiredRole is provided
+ * Renders children if user is authenticated and has required role
+ * Redirects to login if not authenticated
+ * Redirects to inbox if insufficient permissions
  * 
- * NOTE: Will use tanstack/react-router in FE-004 for navigation
+ * Supports role hierarchy:
+ * - SUPER_ADMIN: All access
+ * - ADMIN: Admin+ access
+ * - MANAGER: Manager+ access
+ * - USER: User+ access (lowest)
  */
 export function ProtectedRoute({
   children,
@@ -34,30 +44,34 @@ export function ProtectedRoute({
   fallback,
 }: ProtectedRouteProps): ReactNode {
   const { user, isAuthenticated, isLoading } = useAuth();
-  
-  // Placeholder navigation - will replace with tanstack/react-router in FE-004
-  const navigate = (to: string) => {
-    console.log(`[ProtectedRoute] Navigating to ${to}`);
-    if (typeof window !== 'undefined') {
-      window.location.href = to;
-    }
-  };
 
   // Show loading state
   if (isLoading) {
-    return <>{fallback || <div>Loading...</div>}</>;
+    return (
+      <>
+        {fallback || (
+          <div className="min-h-screen flex items-center justify-center bg-base-200">
+            <div className="text-center">
+              <span className="loading loading-spinner loading-lg text-primary"></span>
+              <p className="mt-4 text-base-content/70">Loading...</p>
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
-    navigate('/login');
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   // Check role if required
-  if (requiredRole && user?.role !== requiredRole) {
-    navigate('/');
-    return null;
+  if (requiredRole && user) {
+    const userRole = user.role as RoleType;
+    if (!meetsRoleRequirement(userRole, requiredRole)) {
+      return <Navigate to="/inbox" replace />;
+    }
   }
 
   // Render children
