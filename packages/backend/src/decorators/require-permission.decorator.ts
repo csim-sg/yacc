@@ -1,66 +1,9 @@
-import { createParamDecorator } from 'routing-controllers';
-import { ForbiddenError } from '../../utils/errors.js';
-import type { AuthUser } from '../../types/auth.types.js';
+import { createParamDecorator, ForbiddenError } from 'routing-controllers';
+import type { AuthUser } from '../types/auth.types';
+import { PERMISSIONS } from '../types/auth.types';
 
-/**
- * Permission matrix (from product owner requirements)
- * 
- * @see .docs/01-product-specification.md (User Roles & Permissions)
- * @see .docs/plans/week1-product-owner-review.md (Section 3.3: Permission Matrix)
- */
-const PERMISSIONS: Record<string, string[]> = {
-  super_admin: [
-    'conversations.view_all',
-    'conversations.assign',
-    'conversations.change_priority',
-    'messages.send',
-    'messages.retry',
-    'tags.create',
-    'tags.apply',
-    'notes.create',
-    'users.create',
-    'users.update',
-    'users.delete',
-    'users.manage_roles',
-    'integrations.manage',
-    'routing_rules.manage',
-    'audit.view',
-    'audit.export',
-    'raw_payloads.view',
-  ],
-  admin: [
-    'conversations.view_all',
-    'conversations.assign',
-    'conversations.change_priority',
-    'messages.send',
-    'messages.retry',
-    'tags.create',
-    'tags.apply',
-    'notes.create',
-    'audit.view',
-    'audit.export',
-    'raw_payloads.view',
-  ],
-  manager: [
-    'conversations.view_all',
-    'conversations.assign',
-    'conversations.change_priority',
-    'messages.send',
-    'tags.create',
-    'tags.apply',
-    'notes.create',
-    'audit.view',
-    'audit.export',
-    'raw_payloads.view',
-  ],
-  user: [
-    'conversations.view_assigned',
-    'messages.send',
-    'tags.create',
-    'tags.apply',
-    'notes.create',
-  ],
-};
+// PERMISSIONS matrix is defined and exported in auth.types.ts
+// This avoids duplication and keeps a single source of truth
 
 /**
  * Decorator to require specific permission for endpoint access
@@ -88,7 +31,7 @@ const PERMISSIONS: Record<string, string[]> = {
  * 
  * @param permission - Permission string (e.g., 'users.create')
  */
-export function RequirePermission(permission: string) {
+export function RequirePermission(permission: string | AuthUser) {
   return createParamDecorator({
     required: true,
     value: (action) => {
