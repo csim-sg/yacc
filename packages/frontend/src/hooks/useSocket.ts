@@ -2,10 +2,11 @@
  * useSocket Hook
  *
  * React hook for Socket.io client integration
- * Provides connection state and management methods
+ * Provides Socket.io client connection state and event handling
  *
  * Features:
- * - Connection state (isConnected, error)
+ * - Connection state management (disconnected/connecting/connected)
+ * - Error state tracking
  * - Connect/disconnect methods
  * - Event emission
  * - Automatic cleanup on unmount
@@ -15,17 +16,14 @@
  * import { useSocket } from '../hooks/useSocket';
  *
  * function MyComponent() {
- *   const { isConnected, error, connect, disconnect, emit } = useSocket();
+ *   const { isConnected, error, connect, disconnect, emit, on } = useSocket();
  *
  *   return (
  *     <div>
+ *       {isConnected ? 'Connected' : 'Disconnected'}
  *       {error && <div className="error">{error}</div>}
- *       <button onClick={connect} disabled={isConnected}>
- *         {isConnected ? 'Connected' : 'Connect'}
- *       </button>
- *       <button onClick={disconnect} disabled={!isConnected}>
- *         Disconnect
- *       </button>
+ *       <button onClick={connect}>Connect</button>
+ *       <button onClick={disconnect}>Disconnect</button>
  *       <button onClick={() => emit('message:send', { body: 'Hello' })}>
  *         Send Message
  *       </button>
@@ -35,13 +33,13 @@
  * ```
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { socketClient } from '../lib/socket';
 
 /**
  * Hook return type
  */
-interface UseSocketReturn {
+export interface UseSocketReturn {
   /** Connection state */
   isConnected: boolean;
 
@@ -55,57 +53,22 @@ interface UseSocketReturn {
   disconnect: () => void;
 
   /** Emit event to server */
-  emit<T extends keyof ReturnType<typeof socketClient.emit>>(
-    event: T,
-    data?: Parameters<ReturnType<typeof socketClient.emit>[T]>
-  ): void;
+  emit: (event: string, data?: any) => void;
 
   /** Register event listener */
-  on<T extends keyof ReturnType<typeof socketClient.on>>(
-    event: T,
-    listener: Parameters<ReturnType<typeof socketClient.on>[T]>
-  ): void;
-
-  /** Unregister event listener */
-  off<T extends keyof ReturnType<typeof socketClient.off>>(
-    event: T,
-    listener?: Parameters<ReturnType<typeof socketClient.off>[T]>
-  ): void;
+  on: (event: string, listener: (...args: any[]) => void;
 }
 
 /**
  * useSocket Hook
  *
- * Manages Socket.io client connection and event handling
+ * Manages Socket.io client connection and provides methods to interact with it
  *
- * @returns Hook object with connection state and methods
- *
- * @example
- * ```typescript
- * function MyComponent() {
- *   const { isConnected, error, connect, disconnect, emit } = useSocket();
- *
- *   return (
- *     <div>
- *       {error && <div className="error">{error}</div>}
- *       <button onClick={connect} disabled={isConnected}>
- *         {isConnected ? 'Connected' : 'Connect'}
- *       </button>
- *       <button onClick={disconnect} disabled={!isConnected}>
- *         Disconnect
- *       </button>
- *       <button onClick={() => emit('message:send', { body: 'Hello' })}>
- *         Send Message
- *       </button>
- *     </div>
- *   );
- * }
- * ```
+ * @returns UseSocketReturn object with socket methods and state
  */
 export function useSocket(): UseSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const connectionStateRef = useRef<'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'>('disconnected');
 
   // Connect to WebSocket server
   const connect = useCallback(() => {
@@ -130,56 +93,44 @@ export function useSocket(): UseSocketReturn {
 
   // Emit event to server
   const emit = useCallback((
-    event: keyof ReturnType<typeof socketClient.emit>,
-    data?: Parameters<ReturnType<typeof socketClient.emit>[typeof event]>
-  ): void => {
+    event: string,
+    data?: any
+  ) => {
     setError(null);
     try {
-      socketClient.emit(event as any, data);
+      socketClient.emit(event, data);
     } catch (err) {
       console.error('[useSocket] Emit error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to emit event');
+      setError(err instanceof Error ? err.message : 'Failed to send event');
     }
   }, []);
 
   // Register event listener
   const on = useCallback((
-    event: keyof ReturnType<typeof socketClient.on>,
-    listener: Parameters<ReturnType<typeof socketClient.on>[typeof event]>
-  ): void => {
+    event: string,
+    listener: (...args: any[]) => void
+  ) => {
+    if (typeof event !== 'string') {
+      console.error('[useSocket] Event name must be a string:', event);
+      return;
+    }
+
     try {
-      socketClient.on(event as any, listener);
+      socketClient.on(event, listener);
     } catch (err) {
       console.error('[useSocket] Register listener error:', err);
       setError(err instanceof Error ? err.message : 'Failed to register listener');
     }
   }, []);
 
-  // Unregister event listener
-  const off = useCallback((
-    event: keyof ReturnType<typeof socketClient.off>,
-    listener?: Parameters<ReturnType<typeof socketClient.off>[typeof event]>
-  ): void => {
-    try {
-      socketClient.off(event as any, listener as any);
-    } catch (err) {
-      console.error('[useSocket] Unregister listener error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to unregister listener');
-    }
-  }, []);
-
-  // Listen for connection state changes from Socket.io client
+  // Listen for connection state changes
   useEffect(() => {
     socketClient.on('connection:state', (data: any) => {
-      connectionStateRef.current = data.state;
       setIsConnected(data.state === 'connected');
       setError(null);
-
-      console.log('[useSocket] Connection state:', data.state);
     });
 
     socketClient.on('connect_error', (err: Error) => {
-      console.error('[useSocket] Connection error:', err);
       setError(err.message);
     });
 
@@ -197,6 +148,5 @@ export function useSocket(): UseSocketReturn {
     disconnect,
     emit,
     on,
-    off,
   };
 }

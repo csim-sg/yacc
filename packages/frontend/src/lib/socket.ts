@@ -25,14 +25,10 @@
  *
  * // Send events
  * socketClient.emit('message:send', { conversationId, body });
- *
- * // Disconnect
- * socketClient.disconnect();
  * ```
  */
 
-import { io, Socket } from 'socket.io-client';
-import { useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
 
 /**
  * Socket.io Client Configuration
@@ -45,7 +41,7 @@ export interface SocketConfig {
   authToken?: string;
 
   /** Reconnection attempt delays (milliseconds) */
-  reconnectionDelay?: number[];
+  reconnectionDelay?: number;
 
   /** Maximum reconnection attempts */
   reconnectionAttempts?: number;
@@ -72,7 +68,7 @@ export type ConnectionState =
  * Singleton Socket.io client wrapper for YACC frontend
  */
 class SocketClientClass {
-  private socket: Socket | null = null;
+  private socket: any | null = null;
   private config: SocketConfig;
   private currentState: ConnectionState = 'disconnected';
   private listeners: Map<string, Set<Function>> = new Map();
@@ -82,7 +78,7 @@ class SocketClientClass {
 
   constructor(config: SocketConfig) {
     this.config = {
-      reconnectionDelay: this.reconnectionTimeouts,
+      reconnectionDelay: this.reconnectionTimeouts[0],
       reconnectionAttempts: 10,
       timeout: 10000,
       debug: false,
@@ -105,7 +101,7 @@ class SocketClientClass {
     // Initialize Socket.io client with options
     const socketOptions: any = {
       reconnection: true,
-      reconnectionDelay: this.config.reconnectionDelay as number[],
+      reconnectionDelay: this.config.reconnectionDelay as number,
       reconnectionAttempts: this.config.reconnectionAttempts,
       timeout: this.config.timeout,
       transports: ['websocket', 'polling'],
@@ -117,7 +113,7 @@ class SocketClientClass {
 
     // Add correlation ID to handshake auth
     this.correlationId = this.generateCorrelationId();
-    socketOptions.extraHeaders = {
+    (socketOptions as any).extraHeaders = {
       'X-Request-ID': this.correlationId,
     };
 
@@ -220,6 +216,13 @@ class SocketClientClass {
   }
 
   /**
+   * Check if connected
+   */
+  isConnected(): boolean {
+    return this.currentState === 'connected' && this.socket?.connected === true;
+  }
+
+  /**
    * Register built-in Socket.io event listeners
    */
   private registerBuiltinListeners(): void {
@@ -277,9 +280,6 @@ class SocketClientClass {
 
     if (previousState !== state) {
       this.log('Connection state changed', { from: previousState, to: state });
-
-      // Emit connection state change event
-      this.socket?.emit('connection:state', { state, previous: previousState });
     }
   }
 
@@ -299,13 +299,6 @@ class SocketClientClass {
       console.log(`[Socket.io Client] [${timestamp}] ${message}`, data || '');
     }
   }
-
-  /**
-   * Check if connected
-   */
-  isConnected(): boolean {
-    return this.currentState === 'connected' && this.socket?.connected === true;
-  }
 }
 
 /**
@@ -321,64 +314,3 @@ const socketClientInstance = new SocketClientClass({
  * Export singleton instance
  */
 export const socketClient = socketClientInstance;
-
-/**
- * React Hook for using Socket.io in components
- *
- * Usage:
- * ```typescript
- * import { socketClient } from '../lib/socket';
- * import { useSocket } from '../hooks/useSocket';
- *
- * function MyComponent() {
- *   const { isConnected, emit, on, off, connect, disconnect } = useSocket();
- *
- *   const handleNewMessage = (data) => {
- *     console.log('New message:', data);
- *   };
- *
- *   return (
- *     <div>
- *       {isConnected ? 'Connected' : 'Disconnected'}
- *       <button onClick={() => connect()}>Connect</button>
- *       <button onClick={() => disconnect()}>Disconnect</button>
- *       <button onClick={() => emit('message:send', { body: 'Hello' })}>
- *         Send Message
- *       </button>
- *     </div>
- *   );
- * }
- * ```
- */
-export function useSocket() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Listen for connection state changes
-  useEffect(() => {
-    socketClient.on('connection:state', (data: any) => {
-      setIsConnected(data.state === 'connected');
-      setError(null);
-    });
-
-    // Listen for connection errors
-    socketClient.on('connect_error', (err: Error) => {
-      setError(err.message);
-    });
-
-    return () => {
-      socketClient.off('connection:state');
-      socketClient.off('connect_error');
-    };
-  }, []);
-
-  return {
-    isConnected,
-    error,
-    connect: () => socketClient.connect(),
-    disconnect: () => socketClient.disconnect(),
-    emit: (event: string, data?: any) => socketClient.emit(event, data),
-    on: (event: string, listener: (...args: any[]) => void) => socketClient.on(event, listener),
-    off: (event: string, listener?: (...args: any[]) => void) => socketClient.off(event, listener),
-  };
-}
