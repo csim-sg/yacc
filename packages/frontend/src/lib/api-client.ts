@@ -146,11 +146,11 @@ async function attemptTokenRefresh(): Promise<boolean> {
 /**
  * Queue a request during token refresh
  */
-function queueRequest(callback: () => void): void {
+function queueRequest(callback: () => Promise<void>): void {
   if (isRefreshing) {
     pendingRequests.push(callback);
   } else {
-    callback();
+    void callback();
   }
 }
 
@@ -188,7 +188,7 @@ async function apiFetch<T>(
   }
   
   const url = `${API_BASE_URL}${endpoint}`;
-  let lastError: Error | null;
+  let lastError: Error | null = null;
   let attempt = 0;
   
   while (attempt <= retries) {
@@ -206,7 +206,7 @@ async function apiFetch<T>(
       
       // Response interceptor - handle success
       if (response.ok) {
-        return await response.json();
+        return await response.json() as T;
       }
       
       // Response interceptor - handle 401 Unauthorized
@@ -215,13 +215,17 @@ async function apiFetch<T>(
         
         if (refreshed) {
           // Queue retry after refresh completes
-          await new Promise<void>((resolve) => {
-            queueRequest(() => {
-              const result = apiFetch<T>(endpoint, {
-                ...options,
-                retries: 0, // Don't retry after refresh
-              });
-              resolve(result);
+          return await new Promise<T>((resolve, reject) => {
+            queueRequest(async () => {
+              try {
+                const result = await apiFetch<T>(endpoint, {
+                  ...options,
+                  retries: 0, // Don't retry after refresh
+                });
+                resolve(result);
+              } catch (error: unknown) {
+                reject(error);
+              }
             });
           });
         } else {
@@ -229,14 +233,12 @@ async function apiFetch<T>(
           window.location.href = '/login';
           throw new Error('Token expired. Please log in again.');
         }
-        
-        return;
       }
       
       // Response interceptor - handle 403 Forbidden
       if (response.status === 403) {
-        const error = await response.json();
-        throw new Error(error.error || 'You do not have permission to access this resource');
+        const errorData = await response.json() as Record<string, string>;
+        throw new Error(errorData.error || 'You do not have permission to access this resource');
       }
       
       // Response interceptor - handle 500+ server errors
@@ -251,8 +253,8 @@ async function apiFetch<T>(
       }
       
       // Other errors (400, 404, etc.)
-      const error = await response.json();
-      lastError = new Error(error.error || 'Request failed');
+      const errorData = await response.json() as Record<string, string>;
+      lastError = new Error(errorData.error || 'Request failed');
       throw lastError;
       
     } catch (error: unknown) {
@@ -271,6 +273,9 @@ async function apiFetch<T>(
       throw lastError;
     }
   }
+  
+  // Final error if all retries exhausted
+  throw lastError || new Error('Request failed');
 }
 
 /**
