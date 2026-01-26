@@ -23,6 +23,10 @@ const CHANNEL_LABELS: Record<ChannelType, string> = {
   irc: 'IRC',
   email: 'Email',
   slack: 'Slack',
+  whatsapp: 'WhatsApp',
+  wechat: 'WeChat',
+  meta: 'Meta',
+  x: 'X (Twitter)',
 };
 
 const PRIORITY_BADGE: Record<ConversationPriority, string> = {
