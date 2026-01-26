@@ -7,14 +7,17 @@
  * - Login/Logout UI (FE-002)
  * - Role-based navigation (FE-003)
  * - Route protection with role checking
+ * - TanStack Query for data fetching (FE-004)
  */
 
 import { useState, type ReactElement } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Navigation } from './components/Navigation';
 import { Header } from './components/Header';
+import { queryClient } from './lib/query-client';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { InboxPage } from './pages/InboxPage';
@@ -201,15 +204,23 @@ function AppRoutes(): ReactElement {
 
 /**
  * App Component
- * Root component with AuthProvider wrapping
+ * Root component with providers wrapping (Auth + React Query)
+ *
+ * Provider Order (important):
+ * 1. QueryClientProvider (outer) - Provides React Query context
+ * 2. AuthProvider - Provides authentication context
+ * 3. BrowserRouter - Provides routing context
+ * 4. AppRoutes - Application routes
  */
 function App(): ReactElement {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

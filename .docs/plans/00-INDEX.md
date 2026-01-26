@@ -371,24 +371,31 @@ This directory contains comprehensive planning documentation for Weeks 1-2 devel
 
 ## ✅ Progress Tracking
 
-### Week 2 Status (Pending Development)
+### Week 2 Status (In Progress - Day 3 of 8)
 
 **Estimated:** 54-72 hours (7-9 hours per day)  
-**Status:** ⏳ Ready to Start  
+**Status:** 🟢 In Progress (3/10 tasks merged)  
 **Start Date:** 2026-01-27 (Monday)  
+**Current Date:** 2026-01-26 (Sunday) - Pre-development Phase  
 **Target Completion:** 2026-02-02 (Sunday)  
 
-**Approved Tasks:**
-- [ ] FE-001: Frontend Auth Integration (10-12h)
-- [ ] FE-002: Login/Logout UI (10-12h)
-- [ ] FE-003: RBAC Navigation (8-10h)
-- [ ] FE-004: API Integration Layer (10-12h)
-- [ ] BE-006: WebSocket Infrastructure (12-14h)
-- [ ] BE-007: Message Routing & Status (14-16h)
-- [ ] QA-001: Integration Testing (8h)
-- [ ] QA-002: E2E Testing & Documentation (14h)
-- [ ] DOC-001: Documentation Updates (4h)
-- [ ] DOC-002: Architecture & Guides (4h)
+**Task Progress:**
+- [x] FE-001: Frontend Auth Integration (10-12h) - ✅ MERGED
+- [x] FE-002: Login/Logout UI (10-12h) - ✅ MERGED
+- [x] FE-003: RBAC Navigation (8-10h) - ✅ MERGED
+- [ ] FE-004: API Integration Layer (10-12h) - ⏳ READY TO START
+- [ ] BE-006: WebSocket Infrastructure (12-14h) - ⏳ Ready (FE-003 unblocked)
+- [ ] BE-007: Message Routing & Status (14-16h) - ⏳ Blocked by BE-006
+- [ ] QA-001: Integration Testing (8h) - ⏳ Blocked by FE-004 + BE-006
+- [ ] QA-002: E2E Testing & Documentation (14h) - ⏳ Blocked by features
+- [ ] DOC-001: Documentation Updates (4h) - ⏳ Can start parallel
+- [ ] DOC-002: Architecture & Guides (4h) - ⏳ Can start parallel
+
+**Merged Today (2026-01-26):**
+- ✅ FE-003: RBAC-Based Navigation (Commit 3a73cc6, Squash merge)
+  - PR: #157 (if exists)
+  - Changes: 6 files, +1,015 lines, 42+ E2E tests
+  - Status: Feature branch cleaned up, ready for FE-004
 
 **Blocking Requirements Before Start:** NONE ✅ All cleared
 
@@ -422,15 +429,61 @@ This directory contains comprehensive planning documentation for Weeks 1-2 devel
 
 ---
 
-### Development Phase (Days 1-4)
+### Week 2 Development Phase (Days 1-8)
 
-**Estimated:** 28 hours (3.5 days)  
-**Status:** 🟢 In Progress (3 of 4 core tasks completed)  
-**Completed Tasks:** BE-001, BE-002, BE-013, BE-027, BE-003, BE-004  
-**Current Task:** BE-005 (RBAC)  
-**Next Task:** Frontend Integration  
+**Estimated:** 54-72 hours (7-9 hours per day)  
+**Status:** 🟢 In Progress (3 of 10 tasks completed, Day 3 complete)  
+**Completed Tasks:** FE-001, FE-002, FE-003  
+**Current Task:** Merge FE-003 + Prepare FE-004 (Jan 26)  
+**Next Tasks:** FE-004 (Jan 27+) + BE-006 parallel  
 
-#### Day 1: BE-027 Structured Logging
+#### FE-003: RBAC-Based Navigation ✅ COMPLETE & MERGED
+
+**Merge Date:** 2026-01-26 (Today)  
+**Commit:** 3a73cc602136c730ff5865687e510a541828c124  
+**Merge Type:** Squash merge (clean history)  
+**Branch Status:** task/FE-003-rbac-nav - DELETED (cleaned up)  
+
+**What Was Delivered:**
+- ✅ Role-based navigation system with 4 user roles
+- ✅ Role hierarchy enforcement (USER < MANAGER < ADMIN < SUPER_ADMIN)
+- ✅ Navigation component with responsive mobile drawer
+- ✅ ProtectedRoute updated with role hierarchy support
+- ✅ App.tsx refactored with MainLayout and AuthProvider
+- ✅ 42+ comprehensive E2E tests (Playwright)
+- ✅ WCAG 2.1 AA accessibility compliance
+- ✅ Zero TypeScript errors (after channel label fix)
+
+**Files Changed:**
+- `packages/frontend/src/App.tsx` - Refactored with MainLayout
+- `packages/frontend/src/components/Header.tsx` - Updated for navigation
+- `packages/frontend/src/components/Navigation.tsx` - NEW (193 lines)
+- `packages/frontend/src/components/ProtectedRoute.tsx` - Updated (54 lines)
+- `packages/frontend/src/lib/navigation.ts` - NEW (120 lines)
+- `packages/frontend/tests/fe-003-rbac-nav.spec.ts` - NEW (469 lines)
+- `packages/frontend/src/pages/ConversationPage.tsx` - Channel labels fix
+
+**Post-Merge Verification:**
+- ✅ Git log shows squashed commit (1 commit with all changes)
+- ✅ No conflicts in dev branch
+- ✅ Remote branch updated successfully
+- ✅ Feature branch deleted (local + remote)
+- ✅ Type checking passes (npx tsc --noEmit)
+- ✅ Channel type labels completed (whatsapp, wechat, meta, x)
+
+**Unblocked By This Merge:**
+- ✅ FE-004: API Integration Layer (was blocked by FE-003, now READY)
+- ✅ BE-006: WebSocket Infrastructure (can start in parallel with FE-004)
+
+**Next Steps:**
+1. Create FE-004 feature branch from dev
+2. Assign FE-004 to developer
+3. Start FE-004 development (Day 3-4, ~10-12h)
+4. Parallel: Start BE-006 (Day 3-5, ~12-14h)
+
+---
+
+#### Day 1: BE-027 Structured Logging (Week 1)
 
 - [x] Create branch `task/BE-027-structured-logging`
 - [x] Verify Pino implementation complete
