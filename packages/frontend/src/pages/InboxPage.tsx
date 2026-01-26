@@ -174,7 +174,7 @@ export function InboxPage() {
   } = useQuery<ListConversationsResponse, { error?: string; message?: string }>({
     queryKey: ['conversations', listParams],
     queryFn: () => conversationsService.list(listParams),
-    placeholderData: (previous) => previous ?? undefined,
+    placeholderData: (previous: ListConversationsResponse | undefined) => previous ?? undefined,
   });
 
   const conversations: ConversationListItem[] = conversationsData?.data ?? [];
