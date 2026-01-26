@@ -1,5 +1,4 @@
-import { createParamDecorator } from 'routing-controllers';
-import { ForbiddenError } from '../../utils/errors.js';
+import { createParamDecorator, ForbiddenError } from 'routing-controllers';
 
 /**
  * User roles in the system

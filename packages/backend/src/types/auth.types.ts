@@ -98,69 +98,96 @@ export interface ChangePasswordDto {
 }
 
 /**
- * Permission in the system
+ * Permission in the system (namespaced format for clarity)
  */
 export type Permission =
-  | 'create_user'
-  | 'edit_user'
-  | 'delete_user'
-  | 'manage_roles'
-  | 'view_audit_logs'
-  | 'export_audit_logs'
-  | 'manage_integrations'
-  | 'manage_routing_rules'
-  | 'reply_to_conversation'
-  | 'assign_conversation'
-  | 'tag_conversation'
-  | 'create_note'
-  | 'view_raw_payload';
+  | 'conversations.view_all'
+  | 'conversations.view_assigned'
+  | 'conversations.assign'
+  | 'conversations.change_priority'
+  | 'messages.send'
+  | 'messages.retry'
+  | 'tags.create'
+  | 'tags.apply'
+  | 'notes.create'
+  | 'users.create'
+  | 'users.update'
+  | 'users.delete'
+  | 'users.manage_roles'
+  | 'integrations.manage'
+  | 'routing_rules.manage'
+  | 'audit.view'
+  | 'audit.export'
+  | 'raw_payloads.view';
 
 /**
  * Permission matrix for each role
+ * Each role explicitly defines all permissions it has
+ * 
+ * @see .docs/plans/week1-product-owner-review.md (Section 3.3: Permission Matrix)
  */
 export const PERMISSIONS: Record<UserRole, Permission[]> = {
   super_admin: [
-    'create_user',
-    'edit_user',
-    'delete_user',
-    'manage_roles',
-    'view_audit_logs',
-    'export_audit_logs',
-    'manage_integrations',
-    'manage_routing_rules',
-    'reply_to_conversation',
-    'assign_conversation',
-    'tag_conversation',
-    'create_note',
-    'view_raw_payload',
+    'conversations.view_all',
+    'conversations.view_assigned',
+    'conversations.assign',
+    'conversations.change_priority',
+    'messages.send',
+    'messages.retry',
+    'tags.create',
+    'tags.apply',
+    'notes.create',
+    'users.create',
+    'users.update',
+    'users.delete',
+    'users.manage_roles',
+    'integrations.manage',
+    'routing_rules.manage',
+    'audit.view',
+    'audit.export',
+    'raw_payloads.view',
   ],
   admin: [
-    'view_audit_logs',
-    'export_audit_logs',
-    'manage_routing_rules',
-    'reply_to_conversation',
-    'assign_conversation',
-    'tag_conversation',
-    'create_note',
-    'view_raw_payload',
+    'conversations.view_all',
+    'conversations.view_assigned',
+    'conversations.assign',
+    'conversations.change_priority',
+    'messages.send',
+    'messages.retry',
+    'tags.create',
+    'tags.apply',
+    'notes.create',
+    'audit.view',
+    'audit.export',
+    'raw_payloads.view',
   ],
   manager: [
-    'reply_to_conversation',
-    'assign_conversation',
-    'tag_conversation',
-    'create_note',
-    'view_audit_logs',
-    'view_raw_payload',
+    'conversations.view_all',
+    'conversations.view_assigned',
+    'conversations.assign',
+    'conversations.change_priority',
+    'messages.send',
+    'tags.create',
+    'tags.apply',
+    'notes.create',
+    'audit.view',
+    'audit.export',
+    'raw_payloads.view',
   ],
   user: [
-    'reply_to_conversation',
-    'tag_conversation',
-    'create_note',
+    'conversations.view_assigned',
+    'messages.send',
+    'tags.create',
+    'tags.apply',
+    'notes.create',
   ],
 };
 
 /**
- * Role hierarchy (higher role includes lower roles' permissions)
+ * Role hierarchy (for reference only - MVP uses flat permission matrix)
+ * 
+ * NOTE: In MVP, each role has explicitly defined permissions (flat matrix).
+ * Hierarchy is NOT used for permission inheritance to follow least-privilege principle.
  */
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
   super_admin: 4,
@@ -170,15 +197,30 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
 };
 
 /**
- * Check if user has permission
+ * Check if user has permission (programmatic helper)
+ * 
+ * @param user - Authenticated user object
+ * @param permission - Permission to check
+ * @returns true if user has permission, false otherwise
+ * 
+ * @example
+ * ```typescript
+ * if (hasPermission(user, 'users.create')) {
+ *   // User can create users
+ * }
+ * ```
  */
 export function hasPermission(user: AuthUser, permission: Permission): boolean {
+  if (!user) return false;
   const userPermissions = PERMISSIONS[user.role] || [];
   return userPermissions.includes(permission);
 }
 
 /**
- * Check if user has minimum role level
+ * Check if user has minimum role level (reference only)
+ * 
+ * NOTE: For MVP, use hasPermission() instead of role levels
+ * Role levels provided for future multi-tenant RBAC
  */
 export function hasMinimumRole(user: AuthUser, minimumRole: UserRole): boolean {
   const userRoleLevel = ROLE_HIERARCHY[user.role] || 0;
