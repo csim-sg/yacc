@@ -1,21 +1,51 @@
 /**
- * API Client for YACC Backend
- * Base configuration for all API requests
+ * API Client with Interceptors for YACC Backend
+ * 
+ * Enhanced with:
+ * - Request interceptor (add Authorization header, X-Request-ID)
+ * - Response interceptor (handle 401/403/500 errors)
+ * - Automatic token refresh on 401 with request queuing
+ * - Retry logic with exponential backoff
+ * - Request timeout handling
+ * 
+ * Aligned with BetterAuth endpoints:
+ * - POST /api/auth/sign-in/email (login)
+ * - POST /api/auth/sign-out (logout)
+ * - GET /api/auth/get-session (session)
+ * - POST /api/auth/refresh-token (token refresh)
+ * - POST /api/auth/forgot-password (reset email)
+ * - POST /api/auth/reset-password (reset password)
  */
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 export interface ApiError {
   error: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
+
+/**
+ * Fetch options with timeout and retry configuration
+ */
+interface FetchOptions extends RequestInit {
+  timeout?: number;
+  retries?: number;
+}
+
+/**
+ * Token refresh state management
+ * Prevents multiple concurrent refresh requests
+ */
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+let pendingRequests: Array<() => void> = [];
 
 /**
  * Get stored JWT token
@@ -39,68 +69,207 @@ export function clearToken(): void {
 }
 
 /**
- * Base fetch wrapper with auth handling
- * Supports BetterAuth token extraction from response headers
+ * Decode JWT token without verification
+ * BetterAuth uses JWT standard (seconds for exp)
  */
-async function apiFetch<T = any>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const token = getToken();
+function decodeToken(token: string): { exp?: number } {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Check if token is expired
+ */
+export function isTokenExpired(token: string): boolean {
+  const { exp } = decodeToken(token);
+  if (!exp) return true; // If no exp, assume valid
   
+  // JWT exp is in seconds, Date.now() is in ms
+  return Date.now() >= exp * 1000;
+}
+
+/**
+ * Refresh access token
+ * Uses BetterAuth's refresh-token endpoint
+ */
+async function attemptTokenRefresh(): Promise<boolean> {
+  // Prevent multiple concurrent refresh attempts
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+  
+  isRefreshing = true;
+  
+  refreshPromise = (async (): Promise<boolean> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/refresh-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Send session cookie
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.token) {
+          // BetterAuth returns new token in response
+          setToken(data.token);
+          
+          // Process all pending requests
+          pendingRequests.forEach((callback) => callback());
+          pendingRequests = [];
+          
+          console.log('✅ Token refreshed successfully');
+          return true;
+        }
+      }
+      
+      return false;
+    } catch (error: unknown) {
+      console.error('❌ Token refresh failed:', error);
+      return false;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+  
+  return refreshPromise;
+}
+
+/**
+ * Queue a request during token refresh
+ */
+function queueRequest(callback: () => void): void {
+  if (isRefreshing) {
+    pendingRequests.push(callback);
+  } else {
+    callback();
+  }
+}
+
+/**
+ * Enhanced fetch with interceptors
+ * - Adds Authorization header
+ * - Handles 401 (token refresh or redirect)
+ * - Handles 403 (permission denied)
+ * - Handles 500+ (server errors)
+ * - Retry logic with exponential backoff
+ * - Request timeout handling
+ */
+async function apiFetch<T>(
+  endpoint: string,
+  options: FetchOptions = {}
+): Promise<T> {
+  const {
+    timeout = 30000, // 30 seconds default
+    retries = 3, // Retry 3 times
+    ...fetchOptions
+  } = options;
+  
+  const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'X-Request-ID': crypto.randomUUID(),
   };
-
-  if (options.headers) {
-    Object.assign(headers, options.headers);
-  }
-
+  
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-
+  
+  if (fetchOptions.headers) {
+    Object.assign(headers, fetchOptions.headers);
+  }
+  
   const url = `${API_BASE_URL}${endpoint}`;
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      credentials: 'include', // Important: Send cookies for refresh token
-    });
-
-    // Extract access token from response header (BetterAuth)
-    const authToken = response.headers.get('set-auth-token');
-    if (authToken) {
-      setToken(authToken);
-    }
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      // Handle 401 Unauthorized - token expired or invalid
-      if (response.status === 401) {
-        clearToken();
-        // Optionally trigger a re-login or refresh flow here
+  let lastError: Error | null;
+  let attempt = 0;
+  
+  while (attempt <= retries) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      
+      const response = await fetch(url, {
+        ...fetchOptions,
+        headers,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // Response interceptor - handle success
+      if (response.ok) {
+        return await response.json();
       }
-
-      throw {
-        status: response.status,
-        error: data.error || data.message || 'Request failed',
-        details: data.details,
-      };
+      
+      // Response interceptor - handle 401 Unauthorized
+      if (response.status === 401) {
+        const refreshed = await attemptTokenRefresh();
+        
+        if (refreshed) {
+          // Queue retry after refresh completes
+          await new Promise<void>((resolve) => {
+            queueRequest(() => {
+              const result = apiFetch<T>(endpoint, {
+                ...options,
+                retries: 0, // Don't retry after refresh
+              });
+              resolve(result);
+            });
+          });
+        } else {
+          clearToken();
+          window.location.href = '/login';
+          throw new Error('Token expired. Please log in again.');
+        }
+        
+        return;
+      }
+      
+      // Response interceptor - handle 403 Forbidden
+      if (response.status === 403) {
+        const error = await response.json();
+        throw new Error(error.error || 'You do not have permission to access this resource');
+      }
+      
+      // Response interceptor - handle 500+ server errors
+      if (response.status >= 500) {
+        if (attempt < retries) {
+          const backoff = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+          console.log(`⚠️ Server error (${response.status}), retrying in ${backoff}ms (attempt ${attempt + 1}/${retries})`);
+          await new Promise<void>((resolve) => setTimeout(resolve, backoff));
+          attempt++;
+          continue;
+        }
+      }
+      
+      // Other errors (400, 404, etc.)
+      const error = await response.json();
+      lastError = new Error(error.error || 'Request failed');
+      throw lastError;
+      
+    } catch (error: unknown) {
+      // Network error or timeout
+      if (error && (error as Error).name === 'AbortError') {
+        if (attempt < retries) {
+          const backoff = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+          console.log(`⚠️ Request timeout (${timeout}ms), retrying in ${backoff}ms (attempt ${attempt + 1}/${retries})`);
+          await new Promise<void>((resolve) => setTimeout(resolve, backoff));
+          attempt++;
+          continue;
+        }
+      }
+      
+      lastError = error as Error;
+      throw lastError;
     }
-
-    return data;
-  } catch (error: any) {
-    // Network error or JSON parse error
-    if (!error.status) {
-      throw {
-        status: 0,
-        error: 'Network error. Please check your connection.',
-      };
-    }
-    throw error;
   }
 }
 
@@ -108,30 +277,33 @@ async function apiFetch<T = any>(
  * HTTP Methods
  */
 export const api = {
-  get: <T = any>(endpoint: string, options?: RequestInit) =>
+  get: <T>(endpoint: string, options?: FetchOptions) =>
     apiFetch<T>(endpoint, { ...options, method: 'GET' }),
-
-  post: <T = any>(endpoint: string, body?: any, options?: RequestInit) =>
+  
+  post: <T>(endpoint: string, body?: unknown, options?: FetchOptions) =>
     apiFetch<T>(endpoint, {
       ...options,
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,
     }),
-
-  patch: <T = any>(endpoint: string, body?: any, options?: RequestInit) =>
+  
+  patch: <T>(endpoint: string, body?: unknown, options?: FetchOptions) =>
     apiFetch<T>(endpoint, {
       ...options,
       method: 'PATCH',
       body: body ? JSON.stringify(body) : undefined,
     }),
-
-  delete: <T = any>(endpoint: string, options?: RequestInit) =>
-    apiFetch<T>(endpoint, { ...options, method: 'DELETE' }),
-
-  put: <T = any>(endpoint: string, body?: any, options?: RequestInit) =>
+  
+  put: <T>(endpoint: string, body?: unknown, options?: FetchOptions) =>
     apiFetch<T>(endpoint, {
       ...options,
       method: 'PUT',
       body: body ? JSON.stringify(body) : undefined,
+    }),
+  
+  delete: <T>(endpoint: string, options?: FetchOptions) =>
+    apiFetch<T>(endpoint, {
+      ...options,
+      method: 'DELETE',
     }),
 };
