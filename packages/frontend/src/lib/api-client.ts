@@ -45,7 +45,6 @@ interface FetchOptions extends RequestInit {
  */
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
-let pendingRequests: Array<() => void> = [];
 
 /**
  * Get stored JWT token
@@ -95,15 +94,16 @@ export function isTokenExpired(token: string): boolean {
 /**
  * Refresh access token
  * Uses BetterAuth's refresh-token endpoint
+ * Prevents multiple concurrent refresh attempts
  */
 async function attemptTokenRefresh(): Promise<boolean> {
-  // Prevent multiple concurrent refresh attempts
+  // Reuse existing refresh promise if already refreshing
   if (isRefreshing && refreshPromise) {
     return refreshPromise;
   }
-  
+
   isRefreshing = true;
-  
+
   refreshPromise = (async (): Promise<boolean> => {
     try {
       const response = await fetch(`${API_BASE_URL}/refresh-token`, {
@@ -113,23 +113,18 @@ async function attemptTokenRefresh(): Promise<boolean> {
         },
         credentials: 'include', // Send session cookie
       });
-      
+
       if (response.ok) {
-        const data = await response.json();
-        
+        const data = await response.json() as Record<string, string>;
+
         if (data.token) {
           // BetterAuth returns new token in response
           setToken(data.token);
-          
-          // Process all pending requests
-          pendingRequests.forEach((callback) => callback());
-          pendingRequests = [];
-          
           console.log('✅ Token refreshed successfully');
           return true;
         }
       }
-      
+
       return false;
     } catch (error: unknown) {
       console.error('❌ Token refresh failed:', error);
@@ -139,19 +134,8 @@ async function attemptTokenRefresh(): Promise<boolean> {
       refreshPromise = null;
     }
   })();
-  
-  return refreshPromise;
-}
 
-/**
- * Queue a request during token refresh
- */
-function queueRequest(callback: () => void): void {
-  if (isRefreshing) {
-    pendingRequests.push(callback);
-  } else {
-    callback();
-  }
+  return refreshPromise;
 }
 
 /**
@@ -188,7 +172,7 @@ async function apiFetch<T>(
   }
   
   const url = `${API_BASE_URL}${endpoint}`;
-  let lastError: Error | null;
+  let lastError: Error | null = null;
   let attempt = 0;
   
   while (attempt <= retries) {
@@ -206,37 +190,30 @@ async function apiFetch<T>(
       
       // Response interceptor - handle success
       if (response.ok) {
-        return await response.json();
+        return await response.json() as T;
       }
       
       // Response interceptor - handle 401 Unauthorized
       if (response.status === 401) {
         const refreshed = await attemptTokenRefresh();
-        
+
         if (refreshed) {
-          // Queue retry after refresh completes
-          await new Promise<void>((resolve) => {
-            queueRequest(() => {
-              const result = apiFetch<T>(endpoint, {
-                ...options,
-                retries: 0, // Don't retry after refresh
-              });
-              resolve(result);
-            });
+          // Retry request with new token
+          return await apiFetch<T>(endpoint, {
+            ...options,
+            retries: 0, // Don't retry after refresh to avoid infinite loop
           });
         } else {
           clearToken();
           window.location.href = '/login';
           throw new Error('Token expired. Please log in again.');
         }
-        
-        return;
       }
       
       // Response interceptor - handle 403 Forbidden
       if (response.status === 403) {
-        const error = await response.json();
-        throw new Error(error.error || 'You do not have permission to access this resource');
+        const errorData = await response.json() as Record<string, string>;
+        throw new Error(errorData.error || 'You do not have permission to access this resource');
       }
       
       // Response interceptor - handle 500+ server errors
@@ -251,8 +228,8 @@ async function apiFetch<T>(
       }
       
       // Other errors (400, 404, etc.)
-      const error = await response.json();
-      lastError = new Error(error.error || 'Request failed');
+      const errorData = await response.json() as Record<string, string>;
+      lastError = new Error(errorData.error || 'Request failed');
       throw lastError;
       
     } catch (error: unknown) {
@@ -271,6 +248,9 @@ async function apiFetch<T>(
       throw lastError;
     }
   }
+  
+  // Final error if all retries exhausted
+  throw lastError || new Error('Request failed');
 }
 
 /**

@@ -13,7 +13,7 @@
  * Uses custom api-client.ts for API calls
  */
 
-import { createContext, useContext, useState, useEffect, ReactNode, type JSXElement } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, type ReactElement } from 'react';
 import { api } from '../lib/api-client';
 
 /**
@@ -50,60 +50,61 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  * Wraps application to provide auth context to all children
  * Manages authentication state and provides helper functions
  */
-export function AuthProvider({ children }: { children: ReactNode }): JSXElement {
+export function AuthProvider({ children }: { children: ReactNode }): ReactElement {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Load user session on mount
-   * Uses GET /api/auth/get-session endpoint
-   */
-  useEffect(() => {
-    const loadSession = async () => {
-      setIsLoading(true);
-      setError(null);
+   /**
+    * Load user session on mount
+    * Uses GET /api/auth/get-session endpoint
+    */
+   useEffect(() => {
+     const loadSession = async (): Promise<void> => {
+       setIsLoading(true);
+       setError(null);
 
-      try {
-        const session = await api.get('/api/auth/get-session');
-        if (session) {
-          setUser(session);
-        }
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Failed to load session';
-        console.error('Auth: Failed to load session', { error: message });
-        setError(message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+       try {
+         const session = await api.get<User>('/api/auth/get-session');
+         if (session) {
+           setUser(session as User);
+         }
+       } catch (err: unknown) {
+         const message = err instanceof Error ? err.message : 'Failed to load session';
+         console.error('Auth: Failed to load session', { error: message });
+         setError(message);
+       } finally {
+         setIsLoading(false);
+       }
+     };
 
-    loadSession();
-  }, []);
+     void loadSession();
+   }, []);
 
-  /**
-   * Login function
-   * Uses POST /api/auth/sign-in/email endpoint
-   */
-  const login = async (email: string, password: string): Promise<void> => {
-    setIsLoading(true);
-    setError(null);
+   /**
+    * Login function
+    * Uses POST /api/auth/sign-in/email endpoint
+    */
+   const login = async (email: string, password: string): Promise<void> => {
+     setIsLoading(true);
+     setError(null);
 
-    try {
-      const response = await api.post('/api/auth/sign-in/email', {
-        body: { email, password },
-      });
+     try {
+       const response = await api.post<User>('/api/auth/sign-in/email', {
+         email,
+         password,
+       });
 
-      setUser(response);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Login failed';
-      console.error('Auth: Login failed', { error: message });
-      setError(message);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+       setUser(response as User);
+     } catch (err: unknown) {
+       const message = err instanceof Error ? err.message : 'Login failed';
+       console.error('Auth: Login failed', { error: message });
+       setError(message);
+       throw err;
+     } finally {
+       setIsLoading(false);
+     }
+   };
 
   /**
    * Logout function
@@ -126,14 +127,28 @@ export function AuthProvider({ children }: { children: ReactNode }): JSXElement 
     }
   };
 
-  /**
-   * Load user function
-   * Restores session by calling GET /api/auth/get-session
-   * Called when app starts or user returns to app
-   */
-  const loadUser = async (): Promise<void> => {
-    await loadSession();
-  };
+   /**
+    * Load user function
+    * Restores session by calling GET /api/auth/get-session
+    * Called when app starts or user returns to app
+    */
+   const loadUser = async (): Promise<void> => {
+     setIsLoading(true);
+     setError(null);
+
+     try {
+       const session = await api.get<User>('/api/auth/get-session');
+       if (session) {
+         setUser(session as User);
+       }
+     } catch (err: unknown) {
+       const message = err instanceof Error ? err.message : 'Failed to load session';
+       console.error('Auth: Failed to load session', { error: message });
+       setError(message);
+     } finally {
+       setIsLoading(false);
+     }
+   };
 
   /**
    * Clear error function

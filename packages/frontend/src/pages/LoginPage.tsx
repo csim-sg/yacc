@@ -1,28 +1,37 @@
 /**
- * Login Page
- * Handles user authentication with email/password
+ * Login Page Component
+ *
+ * Renders the login form with:
+ * - Email and password inputs
+ * - Client-side form validation
+ * - Server-side error handling
+ * - Loading states
+ * - Forgot password link
+ * - Mobile responsive design
+ * - WCAG 2.1 AA accessibility
  */
 
-import { useState, FormEvent } from 'react';
-import { useAuthStore } from '../stores/auth.store';
+import { useState, type FormEvent } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 
-export function LoginPage() {
+export function LoginPage(): JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { login, isLoading, error, clearError } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     clearError();
 
     try {
       await login(email, password);
-      navigate('/');
-    } catch (err) {
-      console.error('Login failed:', err);
+      navigate('/inbox');
+    } catch (err: unknown) {
+      // Error is handled by AuthContext and displayed in the form
+      console.error('Login failed:', err instanceof Error ? err.message : String(err));
     }
   };
 
