@@ -41,9 +41,11 @@
  */
 
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { apiClient } from '../api/client';
 import { SendMessageResponseSchema, type SendMessageResponse } from '../api/schemas';
 import { queryKeys } from '../lib/queryClient';
+import { generateTempId } from '../lib/generateTempId';
 
 /**
  * Send message request payload
@@ -63,8 +65,9 @@ export interface SendMessageRequest {
  * useSendMessage Hook
  *
  * Mutation hook for sending messages in a conversation
+ * Supports optimistic updates for better UX
  *
- * @returns Mutation object with mutate, mutateAsync, isPending, error, and data
+ * @returns Mutation object with mutate, mutateAsync, isPending, error, data, and optimistic helpers
  *
  * @example
  * // Using mutateAsync (with try/catch)
@@ -94,10 +97,17 @@ export interface SendMessageRequest {
  *   }
  * );
  */
-export function useSendMessage(): UseMutationResult<SendMessageResponse, Error, SendMessageRequest> {
+export function useSendMessage(): UseMutationResult<SendMessageResponse, Error, SendMessageRequest> & {
+  generateTempId: () => string;
+} {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  // Wrapper function to generate temp IDs for optimistic updates
+  const generateTempIdHelper = useCallback(() => {
+    return generateTempId();
+  }, []);
+
+  const mutation = useMutation({
     // Mutation function that calls the API
     mutationFn: async (data: SendMessageRequest) => {
       const response = await apiClient.post(
@@ -142,4 +152,9 @@ export function useSendMessage(): UseMutationResult<SendMessageResponse, Error, 
       });
     },
   });
+
+  return {
+    ...mutation,
+    generateTempId: generateTempIdHelper,
+  };
 }
