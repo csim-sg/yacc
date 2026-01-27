@@ -18,11 +18,11 @@ import { All, Controller, Post, Req, Res, Body } from 'routing-controllers';
 import type { Request, Response } from 'express';
 import { auth } from '../config/auth';
 import { db } from '../config/db';
-import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/password-reset.schema';
+import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
 import {
-  generateResetToken,
-  resetPassword,
-} from '../services/password-reset.service';
+   generateResetToken,
+   resetPassword,
+} from '../services/passwordReset.service';
 import { emailService } from '../config/email';
 
 /**

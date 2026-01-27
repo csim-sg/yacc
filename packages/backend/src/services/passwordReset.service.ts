@@ -8,7 +8,7 @@ import * as bcrypt from 'bcryptjs';
 import { db } from '../config/db.js';
 import { passwordResetTokens, users } from '../config/db.js';
 import { eq, isNull, and, lt } from 'drizzle-orm';
-import { validatePassword } from './password-validation.service.js';
+import { validatePassword } from './passwordValidation.service.js';
 import { auditService } from './audit.service.js';
 
 /**

@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import { authService, type User } from '../services/auth.service';
-import { getToken, clearToken } from '../lib/api-client';
+import { getToken, clearToken } from '../lib/apiClient';
 
 interface AuthState {
   user: User | null;

@@ -33,7 +33,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { MessagesListSchema, MessageSchema, type MessagesList } from '../api/schemas';
-import { queryKeys } from '../lib/query-client';
+import { queryKeys } from '../lib/queryClient';
 
 /**
  * Message filter options

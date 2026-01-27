@@ -42,7 +42,7 @@
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { AssignConversationResponseSchema, type AssignConversationResponse } from '../api/schemas';
-import { queryKeys } from '../lib/query-client';
+import { queryKeys } from '../lib/queryClient';
 
 /**
  * Assign conversation request payload

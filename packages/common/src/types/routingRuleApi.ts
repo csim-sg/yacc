@@ -2,7 +2,7 @@
  * Routing Rule API Types
  */
 
-import type { RuleCondition, RuleAction } from './routing-rule';
+import type { RuleCondition, RuleAction } from './routingRule';
 import type { ValueOf } from './utils';
 
 export interface CreateRoutingRuleRequest {

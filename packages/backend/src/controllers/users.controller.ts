@@ -7,7 +7,7 @@ import {
   Body,
   BadRequestError,
 } from 'routing-controllers';
-import { RequireRole } from '../decorators/require-role.decorator';
+import { RequireRole } from '../decorators/requireRole.decorator';
 import type { AuthUser } from '../types/auth.types';
 
 /**

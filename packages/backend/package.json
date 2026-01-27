@@ -10,7 +10,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint src",
     "type-check": "tsc --noEmit",
     "db:seed": "tsx scripts/seed-admin.ts",
     "db:fixtures": "tsx scripts/seed-test-fixtures.ts"

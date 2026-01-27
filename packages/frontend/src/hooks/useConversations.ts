@@ -36,7 +36,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { ConversationsListSchema, type ConversationsList } from '../api/schemas';
-import { queryKeys } from '../lib/query-client';
+import { queryKeys } from '../lib/queryClient';
 
 /**
  * Conversation filter options

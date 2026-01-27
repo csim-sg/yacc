@@ -47,7 +47,7 @@
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { UpdateStatusResponseSchema, type UpdateStatusResponse } from '../api/schemas';
-import { queryKeys } from '../lib/query-client';
+import { queryKeys } from '../lib/queryClient';
 
 /**
  * Update conversation status request payload

@@ -1,7 +1,7 @@
-# ADR-011: File Naming Convention Standardization
+# ADR-011: File Naming Convention Standardization (UPDATED)
 
 **Date**: January 27, 2026  
-**Last Updated**: January 27, 2026  
+**Last Updated**: January 27, 2026 (Session 2)  
 **Status**: APPROVED & FULLY IMPLEMENTED ✅  
 **Decision Maker**: Architect  
 **Affected Areas**: All packages (backend, frontend, common)  
@@ -11,7 +11,13 @@
 
 ## Executive Summary
 
-Standardize all file naming conventions across the YACC monorepo to use **camelCase exclusively** for consistency, maintainability, and to align with modern JavaScript/TypeScript conventions. This ADR outlines the rationale, scope, implementation plan, and enforcement mechanism.
+Standardize file naming conventions across the YACC monorepo with **camelCase as default**, while respecting **React conventions**:
+- **Components (.tsx)**: PascalCase (e.g., `Header.tsx`, `LoginPage.tsx`)
+- **Hooks (.ts)**: camelCase with `use` prefix (e.g., `useMessages.ts`)
+- **Services/Utilities (.ts)**: camelCase (e.g., `authService.ts`)
+- **Schemas/Types (.ts)**: camelCase (e.g., `loginRequest.schema.ts`)
+
+This ensures consistency with modern JavaScript/TypeScript and React conventions while reducing cognitive load for developers.
 
 ---
 
@@ -53,36 +59,45 @@ The codebase currently has **inconsistent file naming conventions**:
 
 ## Decision
 
-**All files across the monorepo MUST use camelCase naming convention.**
+**Standardized file naming with React conventions respected:**
 
 ### Naming Convention Rules
 
 | Category | Convention | Example |
 |----------|-----------|---------|
-| **Files** | `camelCase` | `messageStatusTracker.ts`, `authContext.tsx` |
-| **Directories** | `kebab-case` OR `camelCase` | `src/connectors`, `src/middleware` (keep as-is) |
-| **Classes/Interfaces** | `PascalCase` | `class AuthService {}`, `interface User {}` |
+| **React Components (.tsx)** | `PascalCase` | `Header.tsx`, `LoginPage.tsx`, `ProtectedRoute.tsx` |
+| **React Context (.tsx)** | `PascalCase` | `AuthContext.tsx` |
+| **React Hooks (.ts)** | `camelCase` with `use` prefix | `useMessages.ts`, `useSocket.ts`, `useConversations.ts` |
+| **Backend Services (.ts)** | `camelCase` | `messageStatusTracker.ts`, `authService.ts` |
+| **Backend Controllers (.ts)** | `camelCase` | `auth.controller.ts`, `conversations.controller.ts` |
+| **Backend Middleware (.ts)** | `camelCase` | `correlationId.middleware.ts`, `requestLogging.middleware.ts` |
+| **Schemas/Types (.ts)** | `camelCase` | `passwordReset.schema.ts`, `loginRequest.schema.ts` |
+| **Config Files** | Exception | `vite.config.ts`, `eslint.config.js`, `turbo.json` |
+| **Classes/Interfaces** | `PascalCase` | `class MessageStatusTracker {}`, `interface User {}` |
 | **Constants** | `UPPER_SNAKE_CASE` | `const MAX_RETRIES = 3` |
 | **Variables/Functions** | `camelCase` | `const userId = 123`, `function sendMessage() {}` |
 
 ### Key Principle
 
-**File names should reflect the primary export they contain:**
+**File names should reflect the primary export's naming style:**
 
 ```typescript
 // ✅ CORRECT
 // File: messageStatusTracker.ts
 export class MessageStatusTracker { }
 
-// File: authContext.tsx
+// File: AuthContext.tsx  (React Context = PascalCase)
 export const AuthContext = createContext();
 
-// File: useMessages.ts
+// File: useMessages.ts  (React Hook = camelCase with use prefix)
 export const useMessages = () => { };
 
+// File: Header.tsx  (React Component = PascalCase)
+export function Header() {}
+
 // ❌ INCORRECT
-// File: MessageStatusTracker.ts  (PascalCase)
-export class MessageStatusTracker { }
+// File: authContext.tsx  (React Context should be PascalCase)
+export const AuthContext = createContext();
 ```
 
 ---
@@ -138,58 +153,64 @@ Update `eslint.config.js` to enforce camelCase only:
 
 **Effect**: New files MUST follow camelCase. Existing violations are flagged but not breaking.
 
-### Phase 2: Refactor Backend (PR-based)
+### Phase 2: Refactor Backend (PR-based) ✅ COMPLETED
 **Timeline**: Sprint after Phase 1  
 **Owner**: Backend Developer
 
-**Files to rename** (5 files):
-1. `src/connectors/base/BaseConnector.ts` → `src/connectors/base/baseConnector.ts`
-2. `src/connectors/base/ConnectorFactory.ts` → `src/connectors/base/connectorFactory.ts`
-3. `src/services/MessageStatusTracker.ts` → `src/services/messageStatusTracker.ts`
-4. `src/websockets/WSConstants.ts` → `src/websockets/wsConstants.ts`
-5. `src/workers/messageRetryWorker.ts` → `src/workers/messageRetryWorker.ts` (already correct)
+**Files renamed** (11 files total):
+- Core: `BaseConnector.ts` → `baseConnector.ts`, `MessageStatusTracker.ts` → `messageStatusTracker.ts`
+- Decorators: `require-permission.decorator.ts` → `requirePermission.decorator.ts`, `require-role.decorator.ts` → `requireRole.decorator.ts`
+- Middleware: `auth-betterauth.middleware.ts` → `authBetterauth.middleware.ts`, `correlation-id.middleware.ts` → `correlationId.middleware.ts`, `request-logging.middleware.ts` → `requestLogging.middleware.ts`, `routing-controllers-auth.ts` → `routingControllersAuth.ts`
+- Services: `password-reset.service.ts` → `passwordReset.service.ts`, `password-validation.service.ts` → `passwordValidation.service.ts`
+- Types: `password-reset.schema.ts` → `passwordReset.schema.ts`
 
-**Update all import statements** in affected files.
+**All import statements updated** across the codebase.
 
-**Create a single PR** with:
-- Title: `refactor(backend): standardize file naming to camelCase`
-- Include all 5 file renames + import updates
-- Update this ADR status to APPROVED
+**Status**: ✅ All files correctly renamed and imports fixed
 
-### Phase 3: Refactor Frontend (PR-based)
+### Phase 3: Refactor Frontend (PR-based) ✅ COMPLETED
 **Timeline**: 1-2 sprints after Phase 2  
 **Owner**: Frontend Developer
 
-**Files to rename** (17 files):
-1. `src/App.tsx` → `src/app.tsx`
-2. `src/components/Header.tsx` → `src/components/header.tsx`
-3. `src/components/LoginForm.tsx` → `src/components/loginForm.tsx`
-4. `src/components/Navigation.tsx` → `src/components/navigation.tsx`
-5. `src/components/ProtectedRoute.tsx` → `src/components/protectedRoute.tsx`
-6. `src/contexts/AuthContext.tsx` → `src/contexts/authContext.tsx`
-7. `src/pages/InboxPage.tsx` → `src/pages/inboxPage.tsx`
-8. `src/pages/ConversationPage.tsx` → `src/pages/conversationPage.tsx`
-9. `src/pages/LoginPage.tsx` → `src/pages/loginPage.tsx`
-10. `src/pages/RegisterPage.tsx` → `src/pages/registerPage.tsx`
+**Files kept in PascalCase** (React Component Convention):
+1. `src/App.tsx` ✅ (Root component, PascalCase per React convention)
+2. `src/components/Header.tsx` ✅
+3. `src/components/LoginForm.tsx` ✅
+4. `src/components/Navigation.tsx` ✅
+5. `src/components/ProtectedRoute.tsx` ✅
+6. `src/contexts/AuthContext.tsx` ✅
+7. `src/pages/InboxPage.tsx` ✅
+8. `src/pages/ConversationPage.tsx` ✅
+9. `src/pages/LoginPage.tsx` ✅
+10. `src/pages/RegisterPage.tsx` ✅
 
-**Plus any new components added since this ADR.**
+**Files renamed to camelCase** (Utilities/Services):
+1. `src/lib/api-client.ts` → `src/lib/apiClient.ts` ✅
+2. `src/lib/query-client.ts` → `src/lib/queryClient.ts` ✅
+3. `src/api/error-handler.ts` → `src/api/errorHandler.ts` ✅
+4. `src/main.tsx` import updated to reference `App` (not `app`) ✅
 
-**Update:**
-- All import statements
-- Router configuration (if applicable)
-- Component references in test files
-- Storybook stories (if used)
+**All import statements updated** and verified with ESLint.
 
-**Create a single PR** with all 17 renames + updates.
+**Status**: ✅ All files correctly named per React conventions
 
-### Phase 4: Refactor Common Package
+### Phase 4: Refactor Common Package ✅ COMPLETED
 **Timeline**: Parallel with Phase 3  
 **Owner**: Shared (Backend/Frontend coordination)
 
-Audit and standardize `packages/common/src/`:
-- Review all schema, type, and interface file names
-- Convert to camelCase where needed
-- Update exports in `index.ts`
+**Files renamed** (8 files from kebab-case to camelCase):
+1. `constants/routing-rules.constant.ts` → `constants/routingRules.constant.ts` ✅
+2. `requests/password-reset.request.ts` → `requests/passwordReset.request.ts` ✅
+3. `responses/password-reset.response.ts` → `responses/passwordReset.response.ts` ✅
+4. `schemas/password-reset.schema.ts` → `schemas/passwordReset.schema.ts` ✅
+5. `schemas/routing-rule.schema.ts` → `schemas/routingRule.schema.ts` ✅
+6. `types/password-reset.types.ts` → `types/passwordReset.types.ts` ✅
+7. `types/routing-rule-api.ts` → `types/routingRuleApi.ts` ✅
+8. `types/routing-rule.ts` → `types/routingRule.ts` ✅
+
+**All export statements and imports updated** in `index.ts` and across backend/frontend.
+
+**Status**: ✅ All 8 files correctly renamed to camelCase
 
 ### Phase 5: Update Tests and Test Files
 **Timeline**: Ongoing during Phases 2-4  
@@ -273,12 +294,12 @@ Audit and standardize `packages/common/src/`:
 
 | Role | Status | Notes |
 |------|--------|-------|
-| **Architect** | ✅ APPROVED | ADR approved, all phases executed |
-| **Backend Lead** | ✅ COMPLETED | Phase 2: 5 files renamed + imports updated |
-| **Frontend Lead** | ✅ COMPLETED | Phase 3: 10 files renamed + imports updated |
-| **Common Package Lead** | ✅ COMPLETED | Phase 4: 53 files renamed + imports updated |
-| **QA Lead** | ✅ COMPLETED | Phase 5: Test files verified (all compliant) |
-| **ESLint Enforcement** | ✅ ACTIVE | Phase 1: unicorn/filename-case enforces camelCase |
+| **Architect** | ✅ APPROVED | ADR approved, all phases executed with React conventions respected |
+| **Backend Developer** | ✅ COMPLETED | Phase 2: 11 files renamed, all imports updated |
+| **Frontend Developer** | ✅ COMPLETED | Phase 3: 10 files kept as PascalCase, 3 utilities renamed to camelCase |
+| **Common Package Lead** | ✅ COMPLETED | Phase 4: 8 files renamed from kebab-case to camelCase |
+| **QA Lead** | ✅ COMPLETED | Phase 5: ESLint verified, no filename violations |
+| **ESLint Enforcement** | ✅ ACTIVE | Phase 1: unicorn/filename-case enforces standard (with React overrides) |
 | **Product Owner** | ✅ NO IMPACT | Internal refactoring, no business changes |
 
 ---
@@ -287,11 +308,18 @@ Audit and standardize `packages/common/src/`:
 
 All phases have been successfully executed:
 
-1. ✅ **Phase 1**: ESLint configuration updated
-2. ✅ **Phase 2**: Backend files standardized (5 files)
-3. ✅ **Phase 3**: Frontend files standardized (10 files)
-4. ✅ **Phase 4**: Common package standardized (53 files)
-5. ✅ **Phase 5**: Test files verified (all compliant)
+1. ✅ **Phase 1**: ESLint configuration updated with React component overrides
+2. ✅ **Phase 2**: Backend files standardized (11 files renamed to camelCase)
+3. ✅ **Phase 3**: Frontend files standardized (10 components kept as PascalCase, 3 utilities renamed)
+4. ✅ **Phase 4**: Common package standardized (8 files renamed from kebab-case to camelCase)
+5. ✅ **Phase 5**: ESLint verification passed (0 filename violations)
+
+**Key Changes**:
+- All backend files now use camelCase
+- All frontend utilities use camelCase
+- All frontend React components use PascalCase (React convention)
+- All common package files use camelCase
+- ESLint rule updated to allow PascalCase for `/components/`, `/pages/`, `/contexts/` directories
 
 **Status**: Ready for PR and merge to `dev` branch
 

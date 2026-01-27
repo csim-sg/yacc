@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RuleConditionFieldEnum, RuleConditionOperatorEnum } from '../constants/routing-rules.constant';
+import { RuleConditionFieldEnum, RuleConditionOperatorEnum } from '../constants/routingRules.constant';
 
 export const RuleConditionSchema = z.object({
   field: RuleConditionFieldEnum,

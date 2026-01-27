@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RuleActionTypeEnum } from '../constants/routing-rules.constant';
+import { RuleActionTypeEnum } from '../constants/routingRules.constant';
 
 export const RuleActionSchema = z.object({
   type: RuleActionTypeEnum,
