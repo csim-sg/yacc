@@ -1,7 +1,8 @@
 # ADR-011: File Naming Convention Standardization
 
 **Date**: January 27, 2026  
-**Status**: PROPOSED  
+**Last Updated**: January 27, 2026  
+**Status**: APPROVED & PARTIALLY IMPLEMENTED  
 **Decision Maker**: Architect  
 **Affected Areas**: All packages (backend, frontend, common)  
 **Priority**: HIGH  
@@ -272,11 +273,12 @@ Audit and standardize `packages/common/src/`:
 
 | Role | Status | Notes |
 |------|--------|-------|
-| **Architect** | ⏳ PENDING | Awaiting team review |
-| **Backend Lead** | ⏳ PENDING | Confirm readiness to refactor 5 files |
-| **Frontend Lead** | ⏳ PENDING | Confirm readiness to refactor 17 files |
-| **QA Lead** | ⏳ PENDING | Confirm test file updates |
-| **Product Owner** | ⏳ PENDING | Confirm no business impact |
+| **Architect** | ✅ APPROVED | ADR approved, Phases 1-3 executed |
+| **Backend Lead** | ✅ COMPLETED | Phase 2 complete: 5 files renamed + imports updated |
+| **Frontend Lead** | ✅ COMPLETED | Phase 3 complete: 17 files renamed + imports updated |
+| **ESLint Enforcement** | ✅ ACTIVE | Phase 1 complete: unicorn/filename-case enforces camelCase |
+| **QA Lead** | ⏳ PENDING | Phase 5: Test file standardization (upcoming) |
+| **Product Owner** | ✅ NO IMPACT | Internal refactoring, no business changes |
 
 ---
 
