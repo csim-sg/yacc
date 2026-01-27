@@ -4,11 +4,11 @@
  * Factory pattern for creating platform connector instances.
  */
 
-import type { Platform } from '@yacc/common/types/Platform.type';
-import type { ConnectorConfig } from '@yacc/common/types/ConnectorConfig.type';
-import type { IConnector } from '@yacc/common/types/IConnector.interface';
-import type { ValidationError } from '@yacc/common/types/ValidationError.interface';
-import { ConnectionError } from '@yacc/common/types/ConnectionError.class';
+import type { Platform } from '@yacc/common/types/platform.type';
+import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
+import type { IConnector } from '@yacc/common/types/iConnector.interface';
+import type { ValidationError } from '@yacc/common/types/validationError.interface';
+import { ConnectionError } from '@yacc/common/types/connectionError.class';
 
 // ============================================
 // Placeholder imports (will be replaced when connectors are implemented)

@@ -6,7 +6,7 @@
  */
 
 import { eq } from 'drizzle-orm';
-import type { Platform } from '@yacc/common/types/Platform.type';
+import type { Platform } from '@yacc/common/types/platform.type';
 import { db } from '../infrastructure/db/client';
 import { messages } from '../infrastructure/db/schema';
 import { enqueueRetry } from '../infrastructure/queues/messageRetryQueue';
