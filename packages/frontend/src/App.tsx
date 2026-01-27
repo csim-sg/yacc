@@ -17,6 +17,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Navigation } from './components/Navigation';
 import { Header } from './components/Header';
+import { ReconnectingIndicator } from './components/ReconnectingIndicator';
 import { queryClient } from './lib/queryClient';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/registerPage';
@@ -103,7 +104,9 @@ function AppRoutes(): ReactElement {
   }
 
   return (
-    <Routes>
+    <>
+      <ReconnectingIndicator />
+      <Routes>
       {/* Public routes (no layout) */}
       <Route
         path="/login"
@@ -199,6 +202,7 @@ function AppRoutes(): ReactElement {
       {/* Catch all - redirect to inbox for auth, login for public */}
       <Route path="*" element={<Navigate to="/inbox" replace />} />
     </Routes>
+    </>
   );
 }
 
