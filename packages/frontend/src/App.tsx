@@ -19,7 +19,7 @@ import { Navigation } from './components/Navigation';
 import { Header } from './components/Header';
 import { queryClient } from './lib/queryClient';
 import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
+import { RegisterPage } from './pages/registerPage';
 import { InboxPage } from './pages/InboxPage';
 import { ConversationPage } from './pages/ConversationPage';
 

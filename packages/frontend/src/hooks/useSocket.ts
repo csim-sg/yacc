@@ -56,7 +56,7 @@ export interface UseSocketReturn {
   emit: (event: string, data?: any) => void;
 
   /** Register event listener */
-  on: (event: string, listener: (...args: any[]) => void;
+  on: (event: string, listener: (...args: any[]) => void) => void;
 }
 
 /**
