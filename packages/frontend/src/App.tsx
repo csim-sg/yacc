@@ -13,15 +13,15 @@
 import { useState, type ReactElement } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { Navigation } from './components/Navigation';
-import { Header } from './components/Header';
+import { AuthProvider, useAuth } from './contexts/authContext';
+import { ProtectedRoute } from './components/protectedRoute';
+import { Navigation } from './components/navigation';
+import { Header } from './components/header';
 import { queryClient } from './lib/query-client';
-import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
-import { InboxPage } from './pages/InboxPage';
-import { ConversationPage } from './pages/ConversationPage';
+import { LoginPage } from './pages/loginPage';
+import { RegisterPage } from './pages/registerPage';
+import { InboxPage } from './pages/inboxPage';
+import { ConversationPage } from './pages/conversationPage';
 
 /**
  * Public Route wrapper

@@ -9,7 +9,7 @@
  * - Accessibility features
  */
 
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/authContext';
 import { useNavigate } from 'react-router-dom';
 import { useState, type ReactElement } from 'react';
 

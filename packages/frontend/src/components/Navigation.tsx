@@ -15,7 +15,7 @@
 
 import { useMemo, type ReactElement } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/authContext';
 import {
   getAccessibleNavItems,
   type NavigationItem,

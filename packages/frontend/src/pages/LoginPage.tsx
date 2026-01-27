@@ -12,7 +12,7 @@
  */
 
 import { useState, type FormEvent } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/authContext';
 import { useNavigate, Link } from 'react-router-dom';
 
 export function LoginPage(): JSX.Element {
