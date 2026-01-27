@@ -3,7 +3,7 @@
  * Handles conversation list API calls
  */
 
-import { api } from '../lib/api-client';
+import { api } from '../lib/apiClient';
 
 export type ConversationStatus = 'open' | 'pending' | 'resolved';
 export type ConversationPriority = 'low' | 'medium' | 'high' | 'urgent';

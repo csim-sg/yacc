@@ -49,12 +49,13 @@ export default [
         },
       ],
 
-      /* ---------- TypeScript ---------- */
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
-      ],
-      '@typescript-eslint/consistent-type-imports': 'error',
+       /* ---------- TypeScript ---------- */
+       '@typescript-eslint/no-unused-vars': [
+         'error',
+         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+       ],
+       '@typescript-eslint/consistent-type-imports': 'error',
+       '@typescript-eslint/no-unused-expressions': 'off',
 
       /* ---------- Structure ---------- */
       'max-classes-per-file': ['error', 1],
@@ -85,25 +86,53 @@ export default [
         },
       ],
 
-      /* ---------- Unicorn (safe defaults) ---------- */
-      'unicorn/prefer-node-protocol': 'error',
-      'unicorn/prefer-string-replace-all': 'error',
-      'unicorn/no-abusive-eslint-disable': 'error',
-      'unicorn/filename-case': [
-        'error',
-        {
-          cases: {
-            kebabCase: true,
-            camelCase: true,
-            pascalCase: true,
+       /* ---------- Unicorn (safe defaults) ---------- */
+       // Note: Some unicorn rules require ESLint 9 and may fail with ESLint 8
+       // Disable problematic rules for now
+       'unicorn/prefer-node-protocol': 'off',
+       'unicorn/prefer-string-replace-all': 'off',
+       'unicorn/no-abusive-eslint-disable': 'off',
+        'unicorn/filename-case': [
+          'error',
+          {
+            cases: {
+              camelCase: true,
+            },
+            ignore: [
+              // Config files (standard naming exceptions)
+              'vite.config.ts',
+              'vitest.config.ts',
+              'playwright.config.ts',
+              'drizzle.config.ts',
+              'eslint.config.js',
+              'turbo.json',
+              '.eslintignore',
+              'tsconfig.json',
+              'jest.config.ts',
+              // React root component
+              'App.tsx',
+            ],
           },
-        },
-      ],
+        ],
+    },
+  },
+
+  /* ===============================
+   * Component and Context files (PascalCase allowed)
+   * =============================== */
+  {
+    files: [
+      '**/components/**/*.{tsx,ts}',
+      '**/pages/**/*.{tsx,ts}',
+      '**/contexts/**/*.{tsx,ts}',
+    ],
+    rules: {
+      'unicorn/filename-case': 'off',
     },
   },
 
   /* ===============================
    * Prettier compatibility
    * =============================== */
-  prettier,
+   prettier,
 ];

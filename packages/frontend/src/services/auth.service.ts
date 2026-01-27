@@ -3,23 +3,23 @@
  * Handles all auth-related API calls using BetterAuth
  */
 
-import { api, clearToken } from '../lib/api-client';
+import { api, clearToken } from '../lib/apiClient';
 
 export interface User {
-  id: number;
-  email: string;
-  name: string;
-  role: 'super_admin' | 'admin' | 'manager' | 'user';
-  status: 'active' | 'inactive' | 'suspended';
-  emailVerified?: boolean;
-  image?: string;
-  createdAt: string;
-  updatedAt?: string;
+   id: number;
+   email: string;
+   name: string;
+   role: 'super_admin' | 'admin' | 'manager' | 'user';
+   status: 'active' | 'inactive' | 'suspended';
+   emailVerified?: boolean;
+   image?: string;
+   createdAt: string;
+   updatedAt?: string;
 }
 
 export interface LoginRequest {
-  email: string;
-  password: string;
+   email: string;
+   password: string;
 }
 
 // BetterAuth response format

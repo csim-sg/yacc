@@ -6,10 +6,10 @@
  */
 
 import { Worker, Job } from 'bullmq';
-import type { RetryJobData } from '@yacc/common/types/RetryJobData.interface';
+import type { RetryJobData } from '@yacc/common/types/retryJobData.interface';
 import { enqueueRetry } from '../infrastructure/queues/messageRetryQueue';
 import logger from '../utils/logger';
-import type { IConnector } from '@yacc/common/types/IConnector.interface';
+import type { IConnector } from '@yacc/common/types/iConnector.interface';
 
 // ============================================
 // Worker Configuration

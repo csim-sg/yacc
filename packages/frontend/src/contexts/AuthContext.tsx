@@ -14,7 +14,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, ReactNode, type ReactElement } from 'react';
-import { api } from '../lib/api-client';
+import { api } from '../lib/apiClient';
 
 /**
  * User type matching BetterAuth response

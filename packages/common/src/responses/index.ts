@@ -3,4 +3,4 @@
  * Centralized exports for all response types
  */
 
-export type { ForgotPasswordResponse, ResetPasswordResponse } from './password-reset.response';
+export type { ForgotPasswordResponse, ResetPasswordResponse } from './passwordReset.response';

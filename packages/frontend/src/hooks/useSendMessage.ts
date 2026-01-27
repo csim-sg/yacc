@@ -43,7 +43,7 @@
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { SendMessageResponseSchema, type SendMessageResponse } from '../api/schemas';
-import { queryKeys } from '../lib/query-client';
+import { queryKeys } from '../lib/queryClient';
 
 /**
  * Send message request payload

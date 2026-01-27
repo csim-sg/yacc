@@ -10,22 +10,8 @@ import {
   Authorized,
   Param,
 } from 'routing-controllers';
-import { IsOptional, IsInt } from 'class-validator';
-import { Type } from 'class-transformer';
 import { auditService } from '../services/audit.service';
-
-// DTOs
-class GetConversationAuditLogsQuery {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  page?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  limit?: number;
-}
+import { GetConversationAuditLogsRequest } from '@yacc/common/requests/audit/getConversationAuditLogs.request';
 
 /**
  * Audit logs are conversation-scoped only
@@ -39,11 +25,11 @@ export class AuditController {
    * Get audit logs for a specific conversation
    * Audit logs are conversation-scoped only, Manager+ access
    */
-  @Get('/:conversationId/audit-logs')
-  async getConversationAuditLogs(
-    @Param('conversationId') conversationId: string,
-    @QueryParams() query: GetConversationAuditLogsQuery,
-  ) {
+   @Get('/:conversationId/audit-logs')
+   async getConversationAuditLogs(
+     @Param('conversationId') conversationId: string,
+     @QueryParams() query: GetConversationAuditLogsRequest,
+   ) {
     const result = await auditService.getConversationAuditLogs({
       conversationId,
       page: query.page,

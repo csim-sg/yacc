@@ -17,7 +17,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Navigation } from './components/Navigation';
 import { Header } from './components/Header';
-import { queryClient } from './lib/query-client';
+import { queryClient } from './lib/queryClient';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { InboxPage } from './pages/InboxPage';

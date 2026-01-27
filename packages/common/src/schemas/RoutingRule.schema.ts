@@ -1,16 +1,33 @@
+/**
+ * Routing Rule Schemas
+ */
 import { z } from 'zod';
-import { RoutingRuleStatusEnum } from '../constants/statuses.constant';
-import { RuleConditionSchema } from './RuleCondition.schema';
-import { RuleActionSchema } from './RuleAction.schema';
 
-export const RoutingRuleSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string().min(1).max(255),
-  status: RoutingRuleStatusEnum,
-  priority: z.number().int().min(0),
-  conditions: z.array(RuleConditionSchema),
-  actions: z.array(RuleActionSchema),
-  lastRunAt: z.string().datetime().optional(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+export const CreateRoutingRuleRequestSchema = z.object({
+  name: z.string().min(1).max(100),
+  conditions: z.array(z.object({
+    field: z.enum(['channel', 'keyword', 'sender', 'tag', 'time']),
+    operator: z.enum(['eq', 'in', 'contains', 'matches', 'gt', 'lt']),
+    value: z.union([z.string(), z.array(z.string())]),
+  })),
+  actions: z.array(z.object({
+    type: z.enum(['assign', 'tag', 'priority']),
+    value: z.string(),
+  })),
+  priority: z.coerce.number().int().positive(),
+});
+
+export const UpdateRoutingRuleRequestSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  status: z.enum(['active', 'disabled']).optional(),
+  conditions: z.array(z.object({
+    field: z.enum(['channel', 'keyword', 'sender', 'tag', 'time']),
+    operator: z.enum(['eq', 'in', 'contains', 'matches', 'gt', 'lt']),
+    value: z.union([z.string(), z.array(z.string())]),
+  })).optional(),
+  actions: z.array(z.object({
+    type: z.enum(['assign', 'tag', 'priority']),
+    value: z.string(),
+  })).optional(),
+  priority: z.coerce.number().int().positive().optional(),
 });
