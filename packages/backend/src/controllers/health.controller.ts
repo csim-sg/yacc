@@ -11,39 +11,14 @@ import { checkDatabaseConnection } from '../../infrastructure/db/client';
 import { checkRedisHealth } from '../../infrastructure/redis';
 import { checkR2Health, isR2Configured } from '../../infrastructure/r2';
 import logger from '../../utils/logger';
-
-// ============================================
-// Health Status Types
-// ============================================
-
-/**
- * Overall health status
- */
-export type HealthStatus = 'healthy' | 'degraded' | 'unhealthy';
-
-/**
- * Dependency health status
- */
-interface DependencyHealth {
-  name: string;
-  status: 'up' | 'down';
-  latencyMs?: number;
-  error?: string;
-}
-
-/**
- * Service-Level Objective (SLO) thresholds
- */
-interface HealthSLO {
-  maxLatencyMs: number;
-  errorThresholdPercent: number;
-}
-
-// Default SLOs
-const DEFAULT_SLO: HealthSLO = {
-  maxLatencyMs: 1000, // 1 second max latency
-  errorThresholdPercent: 5, // 5% error rate threshold
-};
+import type {
+  HealthStatus,
+  DependencyHealth,
+  HealthSLO,
+  HealthResponse,
+  LivenessResponse,
+  ReadinessResponse,
+} from '@yacc/common/responses/health/healthResponse.response';
 
 /**
  * Complete health response

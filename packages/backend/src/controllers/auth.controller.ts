@@ -20,21 +20,11 @@ import { auth } from '../config/auth';
 import { db } from '../config/db';
 import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
 import {
-   generateResetToken,
-   resetPassword,
+  generateResetToken,
+  resetPassword,
 } from '../services/passwordReset.service';
 import { emailService } from '../config/email';
-
-/**
- * Extended Express Request with correlation ID
- * Properly typed to avoid 'any' type violations
- */
-interface AuthRequest extends Request {
-  correlationId?: string;
-  headers: {
-    authorization?: string;
-  };
-}
+import type { AuthRequestType } from '@yacc/common/requests/auth/authRequest.type';
 
 @Controller('/api/auth')
 export class AuthController {
@@ -49,7 +39,7 @@ export class AuthController {
    * @see packages/common/src/responses/password-reset.response.ts
    */
   @Post('/forgot-password')
-  async forgotPassword(@Body() body: typeof ForgotPasswordSchema, @Req() req: AuthRequest): Promise<{ message: string }> {
+  async forgotPassword(@Body() body: typeof ForgotPasswordSchema, @Req() req: AuthRequestType): Promise<{ message: string }> {
     const correlationId = req.correlationId || 'unknown';
 
     try {
@@ -117,7 +107,7 @@ export class AuthController {
   @Post('/reset-password')
   async resetPasswordHandler(
     @Body() body: typeof ResetPasswordSchema,
-    @Req() req: AuthRequest,
+    @Req() req: AuthRequestType,
   ): Promise<{ success: boolean; message: string }> {
     const correlationId = req.correlationId || 'unknown';
 
@@ -159,7 +149,7 @@ export class AuthController {
    * - /refresh-token (token refresh with Bearer plugin)
    */
   @All('/*')
-  async handleAuth(@Req() req: AuthRequest, @Res() res: Response): Promise<void> {
+  async handleAuth(@Req() req: AuthRequestType, @Res() res: Response): Promise<void> {
     // Convert Express request to BetterAuth format
     // Need full URL for Request constructor
     const protocol = req.protocol || 'http';

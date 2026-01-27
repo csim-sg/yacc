@@ -16,83 +16,13 @@ import {
   CurrentUser,
   HttpCode,
 } from 'routing-controllers';
-import { IsOptional, IsEnum, IsInt, IsString, IsUUID, Min, Max } from 'class-validator';
 import { conversationService } from '../services/conversation.service';
 import { auditService } from '../services/audit.service';
-
-// DTOs
-class ListConversationsQuery {
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number;
-
-  @IsOptional()
-  @IsString()
-  channel?: string;
-
-  @IsOptional()
-  @IsEnum(['open', 'pending', 'resolved'])
-  status?: 'open' | 'pending' | 'resolved';
-
-  @IsOptional()
-  @IsEnum(['low', 'medium', 'high', 'urgent'])
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
-
-  @IsOptional()
-  @IsUUID()
-  assignedUserId?: string;
-
-  @IsOptional()
-  @IsString()
-  search?: string;
-
-  @IsOptional()
-  @IsString()
-  dateFrom?: string;
-
-  @IsOptional()
-  @IsString()
-  dateTo?: string;
-
-  @IsOptional()
-  unread?: boolean;
-
-  @IsOptional()
-  @IsEnum(['lastActivity', 'created', 'priority'])
-  sortBy?: 'lastActivity' | 'created' | 'priority';
-
-  @IsOptional()
-  @IsEnum(['asc', 'desc'])
-  sortOrder?: 'asc' | 'desc';
-}
-
-class UpdateStatusBody {
-  @IsEnum(['open', 'pending', 'resolved'])
-  status!: 'open' | 'pending' | 'resolved';
-}
-
-class UpdatePriorityBody {
-  @IsEnum(['low', 'medium', 'high', 'urgent'])
-  priority!: 'low' | 'medium' | 'high' | 'urgent';
-}
-
-class AssignBody {
-  @IsUUID()
-  @IsOptional()
-  assignedUserId!: string | null;
-}
-
-class TagBody {
-  @IsInt()
-  tagId!: number;
-}
+import { ListConversationsRequest } from '@yacc/common/requests/conversations/listConversations.request';
+import { UpdateStatusRequest } from '@yacc/common/requests/conversations/updateStatus.request';
+import { UpdatePriorityRequest } from '@yacc/common/requests/conversations/updatePriority.request';
+import { AssignRequest } from '@yacc/common/requests/conversations/assign.request';
+import { TagRequest } from '@yacc/common/requests/conversations/tag.request';
 
 @JsonController('/api/conversations')
 @Authorized()
@@ -104,7 +34,7 @@ export class ConversationsController {
   @Get('/')
   async listConversations(@Req() req: any) {
     const query = req?.query || {};
-    const normalizedQuery: ListConversationsQuery = {
+    const normalizedQuery: ListConversationsRequest = {
       page: query.page ? Number(query.page) : undefined,
       limit: query.limit ? Number(query.limit) : undefined,
       channel: query.channel,
@@ -152,7 +82,7 @@ export class ConversationsController {
   @HttpCode(200)
   async updateStatus(
     @Param('id') id: string,
-    @Body() body: UpdateStatusBody,
+    @Body() body: UpdateStatusRequest,
     @CurrentUser() user: any
   ) {
     const result = await conversationService.updateStatus(id, body.status);
@@ -181,7 +111,7 @@ export class ConversationsController {
   @HttpCode(200)
   async updatePriority(
     @Param('id') id: string,
-    @Body() body: UpdatePriorityBody,
+    @Body() body: UpdatePriorityRequest,
     @CurrentUser() user: any
   ) {
     const result = await conversationService.updatePriority(id, body.priority);
@@ -210,7 +140,7 @@ export class ConversationsController {
   @HttpCode(200)
   async assignConversation(
     @Param('id') id: string,
-    @Body() body: AssignBody,
+    @Body() body: AssignRequest,
     @CurrentUser() user: any
   ) {
     const result = await conversationService.assignConversation(id, body.assignedUserId);
@@ -242,7 +172,7 @@ export class ConversationsController {
   @HttpCode(201)
   async addTag(
     @Param('id') id: string,
-    @Body() body: TagBody,
+    @Body() body: TagRequest,
     @CurrentUser() user: any
   ) {
     await conversationService.addTag(id, body.tagId);
