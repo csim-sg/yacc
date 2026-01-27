@@ -15,12 +15,15 @@
  */
 
 import type { FC } from 'react';
+import { MessageStatus } from '../MessageStatus';
+import type { Message } from '../../api/schemas';
 
 interface TimelineMessageProps {
-  message: any; // TODO: Use Message type from @yacc/common
+  message: Message;
   showSender: boolean;
   isOwn: boolean;
   className?: string;
+  onRetryMessage?: (messageId: string) => void;
 }
 
 /**
@@ -31,18 +34,22 @@ export const TimelineMessage: FC<TimelineMessageProps> = ({
   showSender,
   isOwn,
   className = '',
+  onRetryMessage,
 }) => {
+  const senderName = message.sender?.name || 'Unknown User';
+  const senderInitial = senderName?.charAt(0).toUpperCase() || '?';
+
   return (
     <div
       className={`flex gap-3 py-2 ${isOwn ? 'flex-row-reverse' : ''} ${className}`}
       data-message-id={message.id}
       role="article"
-      aria-label={`Message from ${message.senderName} at ${message.createdAt}`}
+      aria-label={`Message from ${senderName} at ${message.createdAt}`}
     >
       {/* Avatar */}
       {showSender && (
         <div className="flex-shrink-0 w-8 h-8 bg-base-300 rounded-full flex items-center justify-center text-xs font-semibold">
-          {message.senderName?.charAt(0).toUpperCase() || '?'}
+          {senderInitial}
         </div>
       )}
 
@@ -55,13 +62,18 @@ export const TimelineMessage: FC<TimelineMessageProps> = ({
         {showSender && (
           <div className="flex items-center gap-2 mb-1">
             <span className={`text-sm font-semibold ${isOwn ? 'text-right w-full' : ''}`}>
-              {message.senderName}
+              {senderName}
             </span>
             <span className="text-xs text-base-content/50">
-              {new Date(message.createdAt).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
+              {message.createdAt instanceof Date
+                ? message.createdAt.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : new Date(message.createdAt).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
             </span>
           </div>
         )}
@@ -77,22 +89,8 @@ export const TimelineMessage: FC<TimelineMessageProps> = ({
 
         {/* Status indicator (only for own messages) */}
         {isOwn && message.status && (
-          <div className="flex justify-end items-center gap-1 mt-1 text-xs text-base-content/60">
-            {message.status === 'pending' && (
-              <>
-                <span className="loading loading-spinner loading-xs" />
-                <span>Sending...</span>
-              </>
-            )}
-            {message.status === 'sent' && (
-              <>
-                <span>✓</span>
-                <span>Sent</span>
-              </>
-            )}
-            {message.status === 'failed' && (
-              <span className="text-error">Failed</span>
-            )}
+          <div className="flex justify-end items-center gap-1 mt-1">
+            <MessageStatus message={message} onRetry={onRetryMessage} />
           </div>
         )}
       </div>
