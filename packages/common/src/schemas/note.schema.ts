@@ -1,6 +1,3 @@
-/**
- * Note Schema
- */
 import { z } from 'zod';
 
 export const NoteSchema = z.object({
@@ -9,5 +6,4 @@ export const NoteSchema = z.object({
   authorId: z.string().uuid(),
   authorName: z.string(),
   body: z.string().min(1).max(5000),
-  createdAt: z.string().datetime(),
 });

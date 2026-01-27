@@ -16,7 +16,7 @@ import type { ValidationError } from '@yacc/common/types/ValidationError.interfa
 import type { ConnectorMessage } from '@yacc/common/types/ConnectorMessage.interface';
 import type { MessageSendError } from '@yacc/common/types/MessageSendError.interface';
 import type { ConnectorConfig } from '@yacc/common/types/ConnectorConfig.type';
-import { MessageStatusTracker } from '../../services/MessageStatusTracker';
+import { MessageStatusTracker } from '../../services/messageStatusTracker';
 
 // ============================================
 // Abstract Base Connector Class

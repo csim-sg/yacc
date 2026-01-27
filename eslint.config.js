@@ -89,16 +89,26 @@ export default [
       'unicorn/prefer-node-protocol': 'error',
       'unicorn/prefer-string-replace-all': 'error',
       'unicorn/no-abusive-eslint-disable': 'error',
-      'unicorn/filename-case': [
-        'error',
-        {
-          cases: {
-            kebabCase: true,
-            camelCase: true,
-            pascalCase: true,
-          },
-        },
-      ],
+       'unicorn/filename-case': [
+         'error',
+         {
+           cases: {
+             camelCase: true,
+           },
+           ignore: [
+             // Config files (standard naming exceptions)
+             'vite.config.ts',
+             'vitest.config.ts',
+             'playwright.config.ts',
+             'drizzle.config.ts',
+             'eslint.config.js',
+             'turbo.json',
+             '.eslintignore',
+             'tsconfig.json',
+             'jest.config.ts',
+           ],
+         },
+       ],
     },
   },
 

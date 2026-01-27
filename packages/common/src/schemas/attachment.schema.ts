@@ -1,6 +1,3 @@
-/**
- * Attachment Schema
- */
 import { z } from 'zod';
 
 export const AttachmentSchema = z.object({
@@ -10,7 +7,7 @@ export const AttachmentSchema = z.object({
   storageKey: z.string(),
   type: z.string(),
   name: z.string(),
-  size: z.number(),
+  size: z.number().int().nonnegative(),
   uploadedById: z.string().uuid().optional(),
   uploadedAt: z.string().datetime(),
 });

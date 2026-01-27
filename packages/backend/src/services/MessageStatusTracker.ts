@@ -10,7 +10,7 @@ import type { Platform } from '@yacc/common/types/Platform.type';
 import { db } from '../infrastructure/db/client';
 import { messages } from '../infrastructure/db/schema';
 import { enqueueRetry } from '../infrastructure/queues/messageRetryQueue';
-import { MessageEvents } from '../websockets/WSConstants';
+import { MessageEvents } from '../websockets/wsConstants';
 import logger from '../utils/logger';
 
 // ============================================
