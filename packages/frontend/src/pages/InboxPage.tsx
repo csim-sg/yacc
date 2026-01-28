@@ -3,10 +3,12 @@
  * Main conversation list view with hideable sidebar
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth.store';
+import { UnreadBadge } from '../components/UnreadBadge';
+import { useUnreadBadges } from '../hooks/useUnreadBadges';
 import {
   conversationsService,
   type ConversationListItem,
@@ -41,12 +43,27 @@ const PRIORITY_VALUES: ConversationPriority[] = ['low', 'medium', 'high', 'urgen
 const CHANNEL_VALUES: Phase1ChannelType[] = [...PHASE1_CHANNELS];
 
 export function InboxPage() {
+  const navigate = useNavigate();
   const { user, logout, isLoading: authLoading } = useAuthStore();
+  const { markAsRead } = useUnreadBadges();
   const [searchParams, setSearchParams] = useSearchParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [initializedFromUrl, setInitializedFromUrl] = useState(false);
 
   const [page, setPage] = useState(1);
+
+  /**
+   * Handle conversation click - mark as read and navigate
+   */
+  const handleConversationClick = useCallback(
+    (conversationId: number) => {
+      if (conversationId > 0) {
+        markAsRead(conversationId);
+      }
+      navigate(`/conversations/${conversationId}`);
+    },
+    [markAsRead, navigate]
+  );
   const [channel, setChannel] = useState<Phase1ChannelType | 'all'>('all');
   const [status, setStatus] = useState<ConversationStatus | 'all'>('all');
   const [priority, setPriority] = useState<ConversationPriority | 'all'>('all');
@@ -697,10 +714,10 @@ export function InboxPage() {
                 {!isLoading && !error && conversations.length > 0 && (
                   <div className="space-y-3">
                     {conversations.map((conversation: ConversationListItem) => (
-                      <Link
+                      <button
                         key={conversation.id}
-                        to={`/conversations/${conversation.id}`}
-                        className="block p-4 rounded-lg border border-base-200 hover:border-primary/40 transition-colors"
+                        onClick={() => handleConversationClick(conversation.id)}
+                        className="block w-full text-left p-4 rounded-lg border border-base-200 hover:border-primary/40 transition-colors"
                       >
                         <div className="flex flex-col gap-3">
                           <div className="flex flex-wrap items-center gap-2">
@@ -713,11 +730,7 @@ export function InboxPage() {
                             <span className={`badge badge-sm ${PRIORITY_BADGE[conversation.priority]}`}>
                               {conversation.priority}
                             </span>
-                            {conversation.unreadCount && conversation.unreadCount > 0 && (
-                              <span className="badge badge-sm badge-primary">
-                                {conversation.unreadCount} unread
-                              </span>
-                            )}
+                            <UnreadBadge count={conversation.unreadCount || 0} />
                           </div>
 
                           <div className="flex flex-col lg:flex-row lg:items-center gap-3">
@@ -753,7 +766,7 @@ export function InboxPage() {
                             </div>
                           )}
                         </div>
-                      </Link>
+                      </button>
                     ))}
 
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
