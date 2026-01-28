@@ -6,10 +6,11 @@
 
 import { Action } from 'routing-controllers';
 import type { Request } from 'express';
-import { auth } from '../config/auth';
-import { db } from '../config/db';
-import { users } from '../config/db';
+import { BetterAuthClient } from '../infrastructure/better-auth.client';
+import { Database } from '../infrastructure/db.client';
+import { users, session } from '../infrastructure/db.schema';
 import { eq } from 'drizzle-orm';
+import { config } from '../config/config';
 import type { AuthUser } from '../types/auth.types';
 
 /**
@@ -24,6 +25,20 @@ interface AuthRequest extends Request {
     expiresAt: Date;
   };
 }
+
+// Initialize database and auth with DI pattern
+const db = new Database(config.database);
+const auth = new BetterAuthClient(
+  db.getDrizzle(),
+  { users, session, verification: users, account: users },
+  {
+    secret: config.auth.betterAuthSecret,
+    accessTokenTtl: config.auth.accessTokenTtlSeconds,
+    refreshTokenTtlDays: Math.floor(config.auth.refreshTokenTtlSeconds / 86400), // Convert seconds to days
+    betterAuthSecret: config.auth.betterAuthSecret,
+    trustedOrigins: [config.frontend.url],
+  }
+).getAuth();
 
 /**
  * Authorization checker for routing-controllers
@@ -49,7 +64,8 @@ export async function authorizationChecker(
 
     // Fetch full user from database to get role and status
     const userId = session.user.id as string;
-    const user = await db.query.users.findFirst({
+    const drizzle = db.getDrizzle();
+    const user = await drizzle.query.users.findFirst({
       where: eq(users.id, userId),
     });
 
@@ -116,7 +132,8 @@ export async function currentUserChecker(
 
     // Fetch full user from database to get role and status
     const userId = session.user.id as string;
-    const user = await db.query.users.findFirst({
+    const drizzle = db.getDrizzle();
+    const user = await drizzle.query.users.findFirst({
       where: eq(users.id, userId),
     });
 

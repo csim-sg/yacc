@@ -16,15 +16,25 @@
 
 import { All, Controller, Post, Req, Res, Body } from 'routing-controllers';
 import type { Request, Response } from 'express';
-import { auth } from '../config/auth';
-import { db } from '../config/db';
+import { BetterAuthClient } from '../infrastructure/better-auth.client';
+import { Database } from '../infrastructure/db.client';
+import { users, session, verification, account } from '../infrastructure/db.schema';
+import { eq } from 'drizzle-orm';
+import { config } from '../config/config';
 import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
 import {
   generateResetToken,
   resetPassword,
 } from '../services/passwordReset.service';
-import { emailService } from '../config/email';
 import type { AuthRequestType } from '@yacc/common/requests/auth/authRequest.type';
+
+// Initialize database and auth with DI pattern
+const db = new Database(config.database);
+const auth = new BetterAuthClient(
+  db.getDrizzle(),
+  { users, session, verification: users, account: users },
+  config.auth
+).getAuth();
 
 @Controller('/api/auth')
 export class AuthController {
