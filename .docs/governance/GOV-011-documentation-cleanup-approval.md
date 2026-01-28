@@ -302,6 +302,47 @@ Per AGENTS.md constraints, the Enterprise Solution Architect has final authority
 
 ---
 
+## Addendum 1: ADR-005 Infrastructure Implementation (2026-01-28)
+
+### Context
+
+Following GOV-011 approval, implementation of ADR-005 (Infrastructure and Config Pattern) has begun with additional refinements documented in an addendum.
+
+### Decision
+
+**Addendum Created:** `ADR-005-infrastructure-config-pattern.addendum-1-flat-structure-di-pattern.md`
+
+**Key Refinements:**
+1. **Flat Infrastructure Folder**: No subfolders (`db/`, `redis/`, etc.) - all files at same level under `infrastructure/`
+2. **DI Pattern**: Classes accept dependencies in constructor instead of singleton `getInstance()` pattern
+3. **Testability**: Improved - services can inject mock infrastructure clients
+
+### Related Documentation
+
+**Parent ADR:** ADR-005 (Infrastructure and Config Pattern)
+**Addendum:** ADR-005-infrastructure-config-pattern.addendum-1-flat-structure-di-pattern.md
+
+### Implementation Status
+
+**Created Files:**
+- ✅ `infrastructure/db.client.ts` - Database class (DI pattern)
+- ✅ `infrastructure/db.schema.ts` - Schema definitions (flat structure)
+- ✅ `infrastructure/redis.client.ts` - Redis class (DI pattern)
+- ✅ `infrastructure/logger.ts` - Logger class (DI pattern)
+- ✅ `infrastructure/r2.client.ts` - R2 storage class (DI pattern)
+- ✅ `infrastructure/better-auth.client.ts` - BetterAuth class (DI pattern)
+
+**In Progress:**
+- 🔄 Import updates across 20+ services/controllers/middleware files
+- 🔄 Service refactoring to accept DI dependencies
+
+**Next Actions:**
+- Continue updating imports in services and controllers
+- Refactor services to accept infrastructure clients in constructors
+- Complete ADR-005 Phase 1 & 2 implementation
+
+---
+
 ## Decision Record
 
 | Aspect | Detail |

@@ -18,7 +18,7 @@ const app = express();
 
 // ===== SETUP ROUTING-CONTROLLERS =====
 useExpressServer(app, {
-  controllers: [AuthController, SimpleAuthController, ConversationsController, AuditController, HealthController],
+  controllers: [AuthController, ConversationsController, AuditController, HealthController],
   authorizationChecker: authorizationChecker,
   currentUserChecker: currentUserChecker,
   defaultErrorHandler: true,

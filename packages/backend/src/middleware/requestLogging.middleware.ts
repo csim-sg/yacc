@@ -1,5 +1,5 @@
 import pinoHttp from 'pino-http';
-import { logger } from '../config/logging';
+import { Logger } from '../../infrastructure/logger';
 
 /**
  * HTTP request/response logging middleware

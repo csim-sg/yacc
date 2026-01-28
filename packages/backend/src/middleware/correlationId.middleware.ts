@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { AsyncLocalStorage } from 'async_hooks';
 import { randomUUID } from 'crypto';
-import { createChildLogger, logger } from '../config/logging';
-import type { Logger } from 'pino';
+import { Logger } from '../../infrastructure/logger';
+import { config } from '../../config/config';
 import type { AuthUser } from '../types/auth.types';
 
 /**
@@ -29,6 +29,9 @@ export const asyncLocalStorage = new AsyncLocalStorage<{
   correlationId: string;
   logger: Logger;
 }>();
+
+// Create base logger instance
+const baseLogger = new Logger(config.logging);
 
 /**
  * Correlation ID middleware
@@ -60,8 +63,8 @@ export function correlationIdMiddleware(
   // Set response header for tracing
   res.setHeader('X-Correlation-ID', correlationId);
 
-  // Create child logger with correlation ID
-  const childLogger = createChildLogger(correlationId);
+   // Create child logger with correlation ID
+   const childLogger = baseLogger.createChildLogger(correlationId);
 
   // Attach to request object
   req.correlationId = correlationId;
@@ -105,5 +108,5 @@ export function getCorrelationId(): string | undefined {
  * // Output: { "level": "info", "correlationId": "abc123", "action": "create_user", "msg": "User created" }
  */
 export function getLogger(): Logger {
-  return asyncLocalStorage.getStore()?.logger || logger;
+  return asyncLocalStorage.getStore()?.logger || baseLogger;
 }
