@@ -6,7 +6,8 @@
 
 import { S3Client } from '@aws-sdk/client-s3';
 import type { Region, S3ClientConfig } from '@aws-sdk/client-s3';
-import logger from '../utils/logger';
+import { Logger } from '../infrastructure/logger';
+import { config } from './config';
 
 // ============================================
 // Configuration

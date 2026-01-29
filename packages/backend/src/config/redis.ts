@@ -5,7 +5,8 @@
  */
 
 import Redis from 'ioredis';
-import logger from '../utils/logger';
+import { Logger } from '../infrastructure/logger';
+import { config } from './config';
 
 // ============================================
 // Configuration
