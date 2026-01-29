@@ -100,15 +100,3 @@ export const MESSAGE_BACKLOG_DURATION_MS = 3600000;
  * Typing indicator timeout in milliseconds (5 seconds)
  */
 export const TYPING_TIMEOUT_MS = 5000;
-
-// ============================================
-// Export
-// ============================================
-
-export {
-  MessageEvents,
-  ConversationEvents,
-  NotificationEvents,
-  PresenceEvents,
-  WebSocketEventType,
-};

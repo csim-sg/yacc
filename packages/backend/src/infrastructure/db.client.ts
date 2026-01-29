@@ -23,12 +23,12 @@ export class Database {
   /**
    * Initialize database connection with provided config
    */
-  constructor(dbConfig: { url: string } = { url: config.database.url }) {
+  constructor(dbConfig: { url: string } = { url: config.app.databaseUrl }) {
     this.pool = new Pool({
       connectionString: dbConfig.url,
     });
 
-    this.drizzleInstance = drizzle(this.pool);
+    this.drizzleInstance = drizzle({client: this.pool});
   }
 
   /**

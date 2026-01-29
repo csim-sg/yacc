@@ -1,3 +1,9 @@
+/**
+ * Backend Application Entry Point
+ *
+ * Initializes all infrastructure, sets up routing controllers, and starts HTTP + WebSocket servers
+ */
+
 import 'reflect-metadata';
 import 'dotenv/config';
 import express from 'express';
@@ -8,7 +14,10 @@ import { authorizationChecker, currentUserChecker } from './middleware/routingCo
 import { correlationIdMiddleware } from './middleware/correlationId.middleware';
 import { requestLoggingMiddleware } from './middleware/requestLogging.middleware';
 import { AuthController } from './controllers/auth.controller';
-import { ConversationsController, AuditController, HealthController } from './controllers';
+import { ConversationsController } from './controllers/conversations.controller';
+import { AuditController } from './controllers/audit.controller';
+import { HealthController } from './controllers/health.controller';
+import { WebSocketServer } from './websockets/websocket.server';
 import { Database } from './infrastructure/db.client';
 import { RedisClient } from './infrastructure/redis.client';
 import { R2Client } from './infrastructure/r2.client';
@@ -16,6 +25,12 @@ import { Logger } from './infrastructure/logger';
 import { BetterAuthClient } from './infrastructure/better-auth.client';
 import { users, session, verification, account } from './infrastructure/db.schema';
 import { config } from './config/config';
+
+/**
+ * Application entry point
+ *
+ * Sets up all infrastructure and starts the server
+ */
 
 const app = express();
 
@@ -26,7 +41,7 @@ const r2 = new R2Client();
 const logger = new Logger(config.logging);
 const auth = new BetterAuthClient(
   db.getDrizzle(),
-  { users: users, session: users, verification: users, account: users },
+  { users, session, verification, account: users },
   config.auth
 );
 
@@ -48,17 +63,11 @@ useExpressServer(app, {
   ],
 });
 
-// ===== SETUP EXPRESS SERVER =====
+// ===== SETUP WEBSOCKET SERVER =====
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: config.frontend.url,
-    credentials: true,
-    exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
-  },
-});
+const wsServer = new WebSocketServer(server);
 
-// ===== DATABASE AND STARTUP =====
+// ===== SETUP SERVER STARTUP =====
 async function start() {
   try {
     console.log('✓ Configuration validated successfully');
@@ -67,12 +76,33 @@ async function start() {
     console.log(`  - Log Level: ${config.logging.level}`);
 
     // Check database connection
-    const dbConnected = await checkDatabaseConnection();
+    const dbConnected = await db.checkConnection();
     if (!dbConnected) {
       throw new Error('Failed to connect to database');
     }
 
-    // Start server
+    // Check Redis connection
+    const redisConnected = await redis.checkHealth();
+    if (!redisConnected) {
+      console.warn('⚠️  Redis connection failed - WebSocket features will be degraded');
+    } else {
+      console.log('✓ Redis connected');
+    }
+
+    // Check R2 connection
+    const r2Configured = r2.isConfigured();
+    if (r2Configured) {
+      const r2Connected = await r2.checkHealth();
+      if (r2Connected) {
+        console.log('✓ R2 storage connected');
+      } else {
+        console.warn('⚠️  R2 storage connection failed - file uploads will be degraded');
+      }
+    } else {
+      console.log('ℹ️  R2 storage not configured - file uploads disabled');
+    }
+
+    // Start HTTP + WebSocket server
     server.listen(config.app.port, () => {
       console.log(`🚀 Server running on port ${config.app.port}`);
       console.log(`📍 API: http://localhost:${config.app.port}/api`);
