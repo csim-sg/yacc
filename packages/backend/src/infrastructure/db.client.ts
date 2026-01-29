@@ -1,69 +1,40 @@
 /**
- * Database Client
+ * Database Client (Singleton)
  *
  * Initializes and provides access to PostgreSQL database connection
- * Follows ADR-005: Infrastructure folder for client initialization with DI
+ * Follows ADR-005: Infrastructure folder for client initialization
  */
 
 import { drizzle } from 'drizzle-orm/node-postgres';
-import pkg from 'pg';
 import { config } from '../config/config';
+import { Pool } from 'pg';
 
-const { Pool } = pkg;
+// Singleton: Initialize connection pool once at module load
+const pool = new Pool({
+  connectionString: config.database.url,
+  min: 2,
+  max: 10,
+});
+
+export const dbClient = drizzle({client: pool});
 
 /**
- * Database client class
- * Manages PostgreSQL connection pool and Drizzle ORM instance
- * Uses DI pattern: accepts config in constructor
+ * Check database connection health
  */
-export class Database {
-  private pool: Pool;
-  private drizzleInstance: any;
-
-  /**
-   * Initialize database connection with provided config
-   */
-  constructor(dbConfig: { url: string } = { url: config.app.databaseUrl }) {
-    this.pool = new Pool({
-      connectionString: dbConfig.url,
-    });
-
-    this.drizzleInstance = drizzle({client: this.pool});
+export async function checkDatabaseConnection(): Promise<boolean> {
+  try {
+    const result = await pool.query('SELECT NOW()');
+    console.log('✅ Database connected:', result.rows[0]);
+    return true;
+  } catch (error) {
+    console.error('❌ Database connection failed:', error);
+    return false;
   }
+}
 
-  /**
-   * Get PostgreSQL pool
-   */
-  getPool(): Pool {
-    return this.pool;
-  }
-
-  /**
-   * Get Drizzle ORM instance
-   */
-  getDrizzle(): any {
-    return this.drizzleInstance;
-  }
-
-  /**
-   * Check database connection health
-   */
-  async checkConnection(): Promise<boolean> {
-    try {
-      const result = await this.pool.query('SELECT NOW()');
-      console.log('✅ Database connected:', result.rows[0]);
-      return true;
-    } catch (error) {
-      console.error('❌ Database connection failed:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Close database connection
-   */
-  async close(): Promise<void> {
-    await this.pool.end();
-    console.log('Database connection closed');
-  }
+/**
+ * Get PostgreSQL pool (for direct access if needed)
+ */
+export function getPool(): Pool {
+  return pool;
 }

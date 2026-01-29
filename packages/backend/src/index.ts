@@ -18,12 +18,11 @@ import { ConversationsController } from './controllers/conversations.controller'
 import { AuditController } from './controllers/audit.controller';
 import { HealthController } from './controllers/health.controller';
 import { WebSocketServer } from './websockets/websocket.server';
-import { Database } from './infrastructure/db.client';
-import { RedisClient } from './infrastructure/redis.client';
-import { R2Client } from './infrastructure/r2.client';
-import { Logger } from './infrastructure/logger';
-import { BetterAuthClient } from './infrastructure/better-auth.client';
-import { users, session, verification, account } from './infrastructure/db.schema';
+import { dbClient, checkDatabaseConnection } from './infrastructure/db.client';
+import { redisClient } from './infrastructure/redis.client';
+import { r2Client } from './infrastructure/r2.client';
+import { logger, createChildLogger } from './infrastructure/logger';
+import { auth, getAuthInstance } from './infrastructure/better-auth.client';
 import { config } from './config/config';
 
 /**
@@ -34,16 +33,12 @@ import { config } from './config/config';
 
 const app = express();
 
-// ===== SETUP INFRASTRUCTURE WITH DI PATTERN =====
-const db = new Database(config.database);
-const redis = new RedisClient();
-const r2 = new R2Client();
-const logger = new Logger(config.logging);
-const auth = new BetterAuthClient(
-  db.getDrizzle(),
-  { users, session, verification, account: users },
-  config.auth
-);
+// ===== SETUP INFRASTRUCTURE WITH SINGLETON PATTERN =====
+const db = dbClient;
+const redis = redisClient;
+const r2 = r2Client;
+const log = logger;
+const authInstance = getAuthInstance();
 
 // ===== SETUP ROUTING-CONTROLLERS =====
 useExpressServer(app, {
@@ -61,6 +56,11 @@ useExpressServer(app, {
     correlationIdMiddleware,    // 1. Inject correlation ID
     requestLoggingMiddleware,    // 2. Log HTTP requests
   ],
+  cors: {
+    origin: config.frontend.url,
+    credentials: true,
+    exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
+  },
 });
 
 // ===== SETUP WEBSOCKET SERVER =====
@@ -76,13 +76,13 @@ async function start() {
     console.log(`  - Log Level: ${config.logging.level}`);
 
     // Check database connection
-    const dbConnected = await db.checkConnection();
+    const dbConnected = await checkDatabaseConnection();
     if (!dbConnected) {
       throw new Error('Failed to connect to database');
     }
 
     // Check Redis connection
-    const redisConnected = await redis.checkHealth();
+    const redisConnected = await redisClient.checkRedisHealth();
     if (!redisConnected) {
       console.warn('⚠️  Redis connection failed - WebSocket features will be degraded');
     } else {
@@ -90,9 +90,9 @@ async function start() {
     }
 
     // Check R2 connection
-    const r2Configured = r2.isConfigured();
+    const r2Configured = r2Client.isR2Configured();
     if (r2Configured) {
-      const r2Connected = await r2.checkHealth();
+      const r2Connected = await r2Client.checkR2Health();
       if (r2Connected) {
         console.log('✓ R2 storage connected');
       } else {
@@ -115,3 +115,4 @@ async function start() {
 }
 
 start();
+
