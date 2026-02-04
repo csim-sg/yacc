@@ -100,7 +100,11 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| DEV-001 | Fix @yacc/common type-check failures (schema filename casing duplicates) | Not Started | P0 | Architect | - | pnpm type-check passes; single canonical schema filenames in common |  | 164 |
+| DEV-001 | Fix @yacc/common type-check failures (RetryJobData type, auth imports) | **In Progress (75%)** | P0 | Backend | - | pnpm type-check passes for common + config files |  | 164 |
+| DEV-001a | Fix config file duplicate exports (r2.ts, redis.ts, email.ts, logging.ts) | Not Started | P0 | Backend | DEV-001 | No TS2323/TS2484 redeclaration errors | | 173 |
+| DEV-001b | Fix messageRetryWorker.ts import paths and module references | Not Started | P0 | Backend | DEV-001 | All imports resolve; no implicit any types | | 174 |
+| DEV-001c | Fix TypeScript moduleResolution (bundler vs node) and tsconfig | Not Started | P0 | Backend | DEV-001 | @yacc/common imports resolve; both packages build | | 175 |
+| DEV-001d | Standardize logger usage (Pino string formatting across backend) | Not Started | P0 | Backend | DEV-001 | All logger calls use string-based formatting | | 176 |
 | DEV-002 | Backend architecture alignment (remove wrapper/DI patterns, fix logger + auth wiring) | Not Started | P0 | Backend | DEV-001 | Backend uses infra singletons consistently; backend type-check passes |  | 165 |
 | DEV-003 | Eliminate any usage in backend (enforce no-any standard) | Not Started | P0 | Backend | DEV-002 | No any types remain in backend runtime code; backend type-check passes |  | 166 |
 | DEV-004 | Eliminate any usage in frontend (enforce no-any standard) | Not Started | P0 | Frontend | DEV-001 | No any types remain in frontend runtime code; frontend type-check passes |  | 167 |
