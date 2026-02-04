@@ -182,12 +182,4 @@ export async function closeRetryWorker(): Promise<void> {
   }
 }
 
-// ============================================
-// Export
-// ============================================
 
-export {
-  registerConnector,
-  getRetryWorker,
-  closeRetryWorker,
-};

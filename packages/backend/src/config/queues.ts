@@ -69,30 +69,37 @@ export function getDLQ(): Queue<RetryJobData> {
 function createRetryQueue(): Queue<RetryJobData> {
   const queue = new Queue<RetryJobData>(RETRY_QUEUE_NAME, QUEUE_OPTIONS);
 
-  queue.on('error', (error) => {
-    logger.error('Retry queue error', { error: error.message });
+  queue.on('error', (error: Error) => {
+    logger.error('Retry queue error: %s', error.message);
   });
 
-  queue.on('waiting', (jobId) => {
-    logger.debug('Job waiting', { jobId });
+  queue.on('waiting', (jobId: string) => {
+    logger.debug('Job waiting: %s', jobId);
   });
 
-  queue.on('active', (job, jobPromise) => {
-    logger.debug('Job active', { jobId: job.id });
+  // Use type casting to handle BullMQ event signatures
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (queue as any).on('active', (job: any) => {
+    logger.debug('Job active: %s', job?.id);
   });
 
-  queue.on('completed', (job, result) => {
-    logger.info('Job completed', { jobId: job.id, result });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (queue as any).on('completed', (job: any) => {
+    logger.info('Job completed: %s', job?.id);
   });
 
-  queue.on('failed', (job, error) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (queue as any).on('failed', (job: any, error: Error) => {
+    if (!job) return;
+
     // If max attempts reached, move to DLQ
     if (job.attemptsMade === job.opts?.attempts) {
-      logger.warn('Job failed, moving to DLQ', {
-        jobId: job.id,
-        attempts: job.attemptsMade,
-        error: error.message,
-      });
+      logger.warn(
+        'Job failed, moving to DLQ - jobId: %s, attempts: %d, error: %s',
+        job.id,
+        job.attemptsMade,
+        error.message
+      );
 
       // Move to DLQ
       getDLQ().add(job.data, {
@@ -101,16 +108,17 @@ function createRetryQueue(): Queue<RetryJobData> {
         delay: 0,
       });
     } else {
-      logger.warn('Job failed, will retry', {
-        jobId: job.id,
-        attempt: job.attemptsMade,
-        nextRetryIn: RETRY_DELAYS_MS[job.attemptsMade || 0],
-        error: error.message,
-      });
+      logger.warn(
+        'Job failed, will retry - jobId: %s, attempt: %d, nextRetryIn: %dms, error: %s',
+        job.id,
+        job.attemptsMade,
+        RETRY_DELAYS_MS[job.attemptsMade || 0],
+        error.message
+      );
     }
   });
 
-  logger.info(`Retry queue '${RETRY_QUEUE_NAME}' created`);
+  logger.info('Retry queue created: %s', RETRY_QUEUE_NAME);
 
   return queue;
 }
@@ -121,30 +129,30 @@ function createRetryQueue(): Queue<RetryJobData> {
 function createDLQ(): Queue<RetryJobData> {
   const queue = new Queue<RetryJobData>(DLQ_QUEUE_NAME, QUEUE_OPTIONS);
 
-  queue.on('error', (error) => {
-    logger.error('DLQ error', { error: error.message });
+  queue.on('error', (error: Error) => {
+    logger.error('DLQ error: %s', error.message);
   });
 
-  queue.on('waiting', (jobId) => {
-    logger.debug('DLQ job waiting', { jobId });
+  queue.on('waiting', (jobId: string) => {
+    logger.debug('DLQ job waiting: %s', jobId);
   });
 
-  queue.on('active', (job) => {
-    logger.debug('DLQ job active', { jobId: job.id });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (queue as any).on('active', (job: any) => {
+    logger.debug('DLQ job active: %s', job?.id);
   });
 
-  queue.on('completed', (job, result) => {
-    logger.info('DLQ job completed', { jobId: job.id });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (queue as any).on('completed', (job: any) => {
+    logger.info('DLQ job completed: %s', job?.id);
   });
 
-  queue.on('failed', (job, error) => {
-    logger.error('DLQ job failed permanently', {
-      jobId: job.id,
-      error: error.message,
-    });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (queue as any).on('failed', (job: any, error: Error) => {
+    logger.error('DLQ job failed permanently - jobId: %s, error: %s', job?.id, error.message);
   });
 
-  logger.info(`DLQ '${DLQ_QUEUE_NAME}' created`);
+  logger.info('DLQ created: %s', DLQ_QUEUE_NAME);
 
   return queue;
 }
@@ -153,12 +161,10 @@ function createDLQ(): Queue<RetryJobData> {
  * Enqueue message for retry
  *
  * @param data - Retry job data
- * @param delay - Initial delay in milliseconds (default: 0)
  * @returns Job instance
  */
 export async function enqueueRetry(
-  data: RetryJobData,
-  delay: number = 0
+  data: RetryJobData
 ): Promise<Job<RetryJobData>> {
   const queue = getRetryQueue();
 
@@ -172,13 +178,14 @@ export async function enqueueRetry(
     removeOnFail: 100,
   });
 
-  logger.info('Message enqueued for retry', {
-    messageId: data.messageId,
-    conversationId: data.conversationId,
-    platform: data.platform,
-    attempt: data.attemptNumber,
-    nextRetryIn: retryDelay,
-  });
+  logger.info(
+    'Message enqueued for retry - messageId: %s, conversationId: %s, platform: %s, attempt: %d, nextRetryIn: %dms',
+    data.messageId,
+    data.conversationId,
+    data.platform,
+    data.attemptNumber,
+    retryDelay
+  );
 
   return job;
 }
@@ -201,12 +208,9 @@ export async function removeFromQueue(messageId: string): Promise<void> {
   }
 
   if (removedCount > 0) {
-    logger.info('Message removed from retry queue', {
-      messageId,
-      removedCount,
-    });
+    logger.info('Message removed from retry queue - messageId: %s, removedCount: %d', messageId, removedCount);
   } else {
-    logger.debug('No retry jobs found for message', { messageId });
+    logger.debug('No retry jobs found for message - messageId: %s', messageId);
   }
 }
 
