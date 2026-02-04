@@ -6,12 +6,12 @@
 
 import { Action } from 'routing-controllers';
 import type { Request } from 'express';
-import { BetterAuthClient } from '../infrastructure/better-auth.client';
-import { Database } from '../infrastructure/db.client';
+import { dbClient } from '../infrastructure/db.client';
 import { users, session } from '../infrastructure/db.schema';
 import { eq } from 'drizzle-orm';
 import { config } from '../config/config';
 import type { AuthUser } from '../types/auth.types';
+import {getAuthInstance} from "@/infrastructure/better-auth.client";
 
 /**
  * Extended Request interface with auth properties
@@ -27,18 +27,7 @@ interface AuthRequest extends Request {
 }
 
 // Initialize database and auth with DI pattern
-const db = new Database(config.database);
-const auth = new BetterAuthClient(
-  db.getDrizzle(),
-  { users, session, verification: users, account: users },
-  {
-    secret: config.auth.betterAuthSecret,
-    accessTokenTtl: config.auth.accessTokenTtlSeconds,
-    refreshTokenTtlDays: Math.floor(config.auth.refreshTokenTtlSeconds / 86400), // Convert seconds to days
-    betterAuthSecret: config.auth.betterAuthSecret,
-    trustedOrigins: [config.frontend.url],
-  }
-).getAuth();
+const auth = getAuthInstance()
 
 /**
  * Authorization checker for routing-controllers

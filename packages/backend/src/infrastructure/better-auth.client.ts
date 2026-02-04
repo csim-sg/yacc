@@ -11,7 +11,7 @@ import { bearer } from 'better-auth/plugins';
 import type { Auth } from 'better-auth/types';
 import { dbClient } from './db.client';
 import { users, session, verification, account } from './db.schema';
-import { config } from '../config/config';
+import {config} from "@/config/config";
 
 const secret = config.auth.betterAuthSecret;
 

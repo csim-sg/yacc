@@ -17,7 +17,6 @@ const pool = new Pool({
 });
 
 export const dbClient = drizzle({client: pool});
-
 /**
  * Check database connection health
  */
