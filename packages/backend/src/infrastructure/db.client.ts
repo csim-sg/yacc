@@ -8,6 +8,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { config } from '../config/config';
 import { Pool } from 'pg';
+import {users} from "@/schemas/user.schema";
 
 // Singleton: Initialize connection pool once at module load
 const pool = new Pool({
@@ -16,7 +17,9 @@ const pool = new Pool({
   max: 10,
 });
 
-export const dbClient = drizzle({client: pool});
+export const dbClient = drizzle({
+  client: pool
+});
 /**
  * Check database connection health
  */
