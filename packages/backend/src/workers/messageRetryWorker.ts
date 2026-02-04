@@ -28,9 +28,9 @@ const connectorRegistry = new Map<string, IConnector>();
  * Register a connector instance for retry worker
  */
 export function registerConnector(platform: string, connector: IConnector): void {
-  connectorRegistry.set(platform, connector);
-  logger.info('Connector registered for retry worker', { platform });
-}
+   connectorRegistry.set(platform, connector);
+   logger.info('Connector registered for retry worker - platform: %s', platform);
+ }
 
 /**
  * Get connector instance by platform
@@ -63,33 +63,24 @@ export function getRetryWorker(): Worker<RetryJobData> {
      }
    );
 
-  // Worker event handlers
-  retryWorker.on('completed', (job, result) => {
-    logger.info('Retry job completed', {
-      jobId: job.id,
-      messageId: job.data.messageId,
-      platform: job.data.platform,
-      result,
-    });
-  });
+   // Worker event handlers
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   retryWorker.on('completed', (job: any, result: any) => {
+     logger.info('Retry job completed - jobId: %s, messageId: %s, platform: %s, result: %O', 
+       job?.id, job?.data?.messageId, job?.data?.platform, result);
+   });
 
-  retryWorker.on('failed', (job, error) => {
-    logger.error('Retry job failed', {
-      jobId: job.id,
-      messageId: job.data.messageId,
-      platform: job.data.platform,
-      attempt: job.data.attemptNumber,
-      error: error.message,
-      stack: error.stack,
-    });
-  });
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   retryWorker.on('failed', (job: any, error: any) => {
+     logger.error('Retry job failed - jobId: %s, messageId: %s, platform: %s, attempt: %d, error: %s, stack: %s',
+       job?.id, job?.data?.messageId, job?.data?.platform, job?.data?.attemptNumber, 
+       error?.message, error?.stack);
+   });
 
-  retryWorker.on('error', (error) => {
-    logger.error('Retry worker error', {
-      error: error.message,
-      stack: error.stack,
-    });
-  });
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   retryWorker.on('error', (error: any) => {
+     logger.error('Retry worker error - message: %s, stack: %s', error?.message, error?.stack);
+   });
 
   logger.info('Retry worker created');
 
@@ -100,14 +91,10 @@ export function getRetryWorker(): Worker<RetryJobData> {
  * Process a retry job
  */
 async function processRetryJob(job: Job<RetryJobData>): Promise<void> {
-  const { messageId, conversationId, platform, attemptNumber } = job.data;
+   const { messageId, conversationId, platform, attemptNumber } = job.data;
 
-  logger.info('Processing retry job', {
-    messageId,
-    conversationId,
-    platform,
-    attempt: attemptNumber,
-  });
+   logger.info('Processing retry job - messageId: %s, conversationId: %s, platform: %s, attempt: %d',
+     messageId, conversationId, platform, attemptNumber);
 
   try {
     // Get connector instance
@@ -150,22 +137,14 @@ async function processRetryJob(job: Job<RetryJobData>): Promise<void> {
     //   // socket.emit('message.failed', { messageId, error });
     // }
 
-    // For now, just log success (full implementation after DB layer)
-    logger.info('Message retry processed', {
-      messageId,
-      attempt: attemptNumber,
-      // Success: will be implemented with DB layer
-    });
+     // For now, just log success (full implementation after DB layer)
+     logger.info('Message retry processed - messageId: %s, attempt: %d', messageId, attemptNumber);
 
-  } catch (error) {
-    logger.error('Failed to process retry job', {
-      messageId,
-      conversationId,
-      platform,
-      attempt: attemptNumber,
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+   } catch (error) {
+     logger.error('Failed to process retry job - messageId: %s, conversationId: %s, platform: %s, attempt: %d, error: %s, stack: %s',
+       messageId, conversationId, platform, attemptNumber, 
+       error instanceof Error ? error.message : String(error),
+       error instanceof Error ? error.stack : 'unknown');
 
     // Rethrow to trigger BullMQ retry logic
     throw error;
