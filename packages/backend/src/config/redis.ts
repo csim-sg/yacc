@@ -5,8 +5,7 @@
  */
 
 import Redis from 'ioredis';
-import { Logger } from '../infrastructure/logger';
-import { config } from './config';
+import { logger } from '../infrastructure/logger';
 
 // ============================================
 // Configuration
@@ -17,7 +16,6 @@ const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379', 10);
 const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
 const REDIS_DB = parseInt(process.env.REDIS_DB || '0', 10);
 const REDIS_MAX_RETRIES = parseInt(process.env.REDIS_MAX_RETRIES || '3', 10);
-const REDIS_CONNECT_TIMEOUT = parseInt(process.env.REDIS_CONNECT_TIMEOUT || '10000', 10);
 
 // ============================================
 // Redis Client (Singleton)
@@ -52,34 +50,30 @@ function createRedisClient(): Redis {
     redisOptions.password = REDIS_PASSWORD;
   }
 
-  const client = new Redis(redisOptions);
+   const client = new Redis(redisOptions);
 
-  // Setup event listeners
-  client.on('connect', () => {
-    logger.info('Redis connected', {
-      host: REDIS_HOST,
-      port: REDIS_PORT,
-      db: REDIS_DB,
-    });
-  });
+   // Setup event listeners
+   client.on('connect', () => {
+     logger.info('Redis connected - host: %s, port: %d, db: %d', REDIS_HOST, REDIS_PORT, REDIS_DB);
+   });
 
-  client.on('ready', () => {
-    logger.info('Redis ready');
-  });
+   client.on('ready', () => {
+     logger.info('Redis ready');
+   });
 
-  client.on('error', (err: Error) => {
-    logger.error('Redis error', { error: err.message });
-  });
+   client.on('error', (err: Error) => {
+     logger.error('Redis error - message: %s', err.message);
+   });
 
-  client.on('close', () => {
-    logger.warn('Redis connection closed');
-  });
+   client.on('close', () => {
+     logger.warn('Redis connection closed');
+   });
 
-  client.on('reconnecting', (delay: number) => {
-    logger.warn('Redis reconnecting', { delay });
-  });
+   client.on('reconnecting', (delay: number) => {
+     logger.warn('Redis reconnecting - delay: %dms', delay);
+   });
 
-  return client;
+   return client;
 }
 
 /**
@@ -97,32 +91,28 @@ export async function closeRedisClient(): Promise<void> {
  * Check Redis connection health
  */
 export async function checkRedisHealth(): Promise<boolean> {
-  try {
-    const client = getRedisClient();
-    await client.ping();
-    return true;
-  } catch (error) {
-    logger.error('Redis health check failed', { error });
-    return false;
-  }
-}
+   try {
+     const client = getRedisClient();
+     await client.ping();
+     return true;
+   } catch (error) {
+     logger.error('Redis health check failed - error: %s', error instanceof Error ? error.message : String(error));
+     return false;
+   }
+ }
 
 /**
  * Flush all data in current Redis DB (use with caution!)
  */
 export async function flushRedis(): Promise<void> {
-  try {
-    const client = getRedisClient();
-    await client.flushdb();
-    logger.warn('Redis DB flushed');
-  } catch (error) {
-    logger.error('Failed to flush Redis DB', { error });
-    throw error;
-  }
-}
+   try {
+     const client = getRedisClient();
+     await client.flushdb();
+     logger.warn('Redis DB flushed');
+   } catch (error) {
+     logger.error('Failed to flush Redis DB - error: %s', error instanceof Error ? error.message : String(error));
+     throw error;
+   }
+ }
 
-// ============================================
-// Export
-// ============================================
 
-export { getRedisClient, closeRedisClient, checkRedisHealth, flushRedis };

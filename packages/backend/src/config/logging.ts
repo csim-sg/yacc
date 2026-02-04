@@ -97,39 +97,7 @@ export function createChildLogger(correlationId: string): Logger {
 export const auditLogger: Logger = logger.child({ audit: true });
 
 /**
- * Request metadata serializer
- * 
- * Excludes sensitive headers and body from logs
- * Prevents log injection attacks via structured headers
+ * Note: Request/Response serializers are available for future use
+ * if additional structured logging is needed for debugging.
+ * For now, using built-in Pino serializers (err, error) for error logging.
  */
-function serializeRequest(req: any) {
-  return {
-    id: req.id,
-    method: req.method,
-    url: req.url,
-    query: req.query,
-    params: req.params,
-    headers: {
-      'user-agent': req.headers['user-agent'],
-      'content-type': req.headers['content-type'],
-      'content-length': req.headers['content-length'],
-    },
-    remoteAddress: req.remoteAddress,
-    remotePort: req.remotePort,
-  };
-}
-
-/**
- * Response metadata serializer
- * 
- * Excludes sensitive response body (if any)
- */
-function serializeResponse(res: any) {
-  return {
-    statusCode: res.statusCode,
-    headers: {
-      'content-type': res.getHeader('content-type'),
-      'content-length': res.getHeader('content-length'),
-    },
-  };
-}

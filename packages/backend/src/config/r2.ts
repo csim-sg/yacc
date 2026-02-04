@@ -4,10 +4,9 @@
  * Manages S3-compatible R2 storage for payloads and attachments
  */
 
-import { S3Client } from '@aws-sdk/client-s3';
-import type { Region, S3ClientConfig } from '@aws-sdk/client-s3';
-import { Logger } from '../infrastructure/logger';
-import { config } from './config';
+import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import type { S3ClientConfig } from '@aws-sdk/client-s3';
+import { logger } from '../infrastructure/logger';
 
 // ============================================
 // Configuration
@@ -49,38 +48,34 @@ function createR2Client(): S3Client {
     throw new Error('Missing R2 credentials. Please set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY.');
   }
 
-  const config: S3ClientConfig = {
-    region: R2_REGION as Region,
-    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: R2_ACCESS_KEY_ID,
-      secretAccessKey: R2_SECRET_ACCESS_KEY,
-    },
-    maxAttempts: 3,
-  };
+   const config: S3ClientConfig = {
+     region: R2_REGION as string,
+     endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+     credentials: {
+       accessKeyId: R2_ACCESS_KEY_ID,
+       secretAccessKey: R2_SECRET_ACCESS_KEY,
+     },
+     maxAttempts: 3,
+   };
 
-  r2ClientConfig = config;
+   r2ClientConfig = config;
 
-  const client = new S3Client(config);
+   const client = new S3Client(config);
 
-  logger.info('R2 client created', {
-    accountId: R2_ACCOUNT_ID,
-    bucket: R2_BUCKET_NAME,
-    region: R2_REGION,
-  });
+   logger.info('R2 client created - accountId: %s, bucket: %s, region: %s', R2_ACCOUNT_ID, R2_BUCKET_NAME, R2_REGION);
 
-  return client;
+   return client;
 }
 
 /**
  * Get R2 client configuration (for use with signed URLs)
  */
 export function getR2ClientConfig(): S3ClientConfig {
-  if (!r2ClientConfig) {
-    getR2Client();
-  }
-  return r2ClientConfig;
-}
+   if (!r2ClientConfig) {
+     getR2Client();
+   }
+   return r2ClientConfig!;
+ }
 
 /**
  * Get public CDN URL for files
@@ -100,40 +95,29 @@ export function isR2Configured(): boolean {
  * Check R2 connection health
  */
 export async function checkR2Health(): Promise<boolean> {
-  try {
-    const client = getR2Client();
+   try {
+     const client = getR2Client();
 
-    // Check if we can list bucket contents (simple health check)
-    await client.listObjectsV2({
-      Bucket: R2_BUCKET_NAME,
-      MaxKeys: 0, // Only check if bucket is accessible
-    });
+     // Check if we can list bucket contents (simple health check)
+     await client.send(new ListObjectsV2Command({
+       Bucket: R2_BUCKET_NAME,
+       MaxKeys: 1, // Only check if bucket is accessible
+     }));
 
-    logger.info('R2 health check passed', {
-      bucket: R2_BUCKET_NAME,
-      region: R2_REGION,
-    });
+     logger.info('R2 health check passed - bucket: %s, region: %s', R2_BUCKET_NAME, R2_REGION);
 
-    return true;
-  } catch (error) {
-    logger.error('R2 health check failed', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return false;
-  }
-}
+     return true;
+   } catch (error) {
+     logger.error('R2 health check failed - error: %s', error instanceof Error ? error.message : String(error));
+     return false;
+   }
+ }
 
 // ============================================
-// Export
+// Export (Constants)
 // ============================================
 
 export {
-  getR2Client,
-  getR2ClientConfig,
-  getPublicUrl,
-  isR2Configured,
-  checkR2Health,
-
   // Constants
   R2_BUCKET_NAME,
   R2_REGION,

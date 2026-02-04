@@ -6,9 +6,10 @@
  */
 
 import { Worker, Job } from 'bullmq';
-import type { RetryJobData } from '@yacc/common/types/retryJobData.interface';
-import { enqueueRetry } from '../infrastructure/queues/messageRetryQueue';
-import logger from '../utils/logger';
+import type { RetryJobData } from '@yacc/common/types/RetryJobData.interface';
+import { enqueueRetry, getRetryQueue } from '../config/queues';
+import { logger } from '../infrastructure/logger';
+import { redisClient } from '../infrastructure/redis.client';
 import type { IConnector } from '@yacc/common/types/iConnector.interface';
 
 // ============================================
@@ -16,7 +17,6 @@ import type { IConnector } from '@yacc/common/types/iConnector.interface';
 // ============================================
 
 const WORKER_CONCURRENCY = 1; // Process 1 job at a time (can be increased)
-const JOB_ATTEMPTS = 3; // Max retry attempts per message
 
 // ============================================
 // Connector Registry (to be populated during app init)
@@ -49,18 +49,19 @@ let retryWorker: Worker<RetryJobData> | null = null;
  * Create or get retry worker singleton
  */
 export function getRetryWorker(): Worker<RetryJobData> {
-  if (retryWorker) {
-    return retryWorker;
-  }
+   if (retryWorker) {
+     return retryWorker;
+   }
 
-  retryWorker = new Worker<RetryJobData>(
-    'message-retry',
-    async (job) => processRetryJob(job),
-    {
-      connection: job.queue.client,
-      concurrency: WORKER_CONCURRENCY,
-    }
-  );
+   retryWorker = new Worker<RetryJobData>(
+     'message-retry',
+     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     async (job: any) => processRetryJob(job),
+     {
+       connection: redisClient,
+       concurrency: WORKER_CONCURRENCY,
+     }
+   );
 
   // Worker event handlers
   retryWorker.on('completed', (job, result) => {

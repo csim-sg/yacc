@@ -19,7 +19,7 @@ export class EmailService {
    * Phase 1: Logs to console
    * Phase 2: Uses real SMTP
    */
-  async sendPasswordResetEmail(email: string, resetLink: string, token: string) {
+   async sendPasswordResetEmail(email: string, resetLink: string) {
     const subject = 'Reset Your YACC Password';
     const html = `
       <h2>Password Reset Request</h2>

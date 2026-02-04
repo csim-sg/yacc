@@ -69,19 +69,20 @@ export function getDLQ(): Queue<RetryJobData> {
 function createRetryQueue(): Queue<RetryJobData> {
   const queue = new Queue<RetryJobData>(RETRY_QUEUE_NAME, QUEUE_OPTIONS);
 
-  queue.on('error', (error: Error) => {
-    logger.error('Retry queue error: %s', error.message);
-  });
+   queue.on('error', (error: Error) => {
+     logger.error('Retry queue error: %s', error.message);
+   });
 
-  queue.on('waiting', (jobId: string) => {
-    logger.debug('Job waiting: %s', jobId);
-  });
+   // Use type casting to handle BullMQ event signatures
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   (queue as any).on('waiting', (jobId: string) => {
+     logger.debug('Job waiting: %s', jobId);
+   });
 
-  // Use type casting to handle BullMQ event signatures
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (queue as any).on('active', (job: any) => {
-    logger.debug('Job active: %s', job?.id);
-  });
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   (queue as any).on('active', (job: any) => {
+     logger.debug('Job active: %s', job?.id);
+   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (queue as any).on('completed', (job: any) => {
@@ -102,7 +103,8 @@ function createRetryQueue(): Queue<RetryJobData> {
       );
 
       // Move to DLQ
-      getDLQ().add(job.data, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (getDLQ() as any).add(job.data, {
         ...job.opts,
         jobId: `dlq-${job.id}`,
         delay: 0,
@@ -164,19 +166,20 @@ function createDLQ(): Queue<RetryJobData> {
  * @returns Job instance
  */
 export async function enqueueRetry(
-  data: RetryJobData
-): Promise<Job<RetryJobData>> {
-  const queue = getRetryQueue();
+   data: RetryJobData
+ ): Promise<Job<RetryJobData>> {
+   const queue = getRetryQueue();
 
-  // Use strict 1m/5m/30m delay schedule based on attempt number
-  const retryDelay = RETRY_DELAYS_MS[Math.min(data.attemptNumber - 1, RETRY_DELAYS_MS.length - 1)] || 0;
+   // Use strict 1m/5m/30m delay schedule based on attempt number
+   const retryDelay = RETRY_DELAYS_MS[Math.min(data.attemptNumber - 1, RETRY_DELAYS_MS.length - 1)] || 0;
 
-  const job = await queue.add(data, {
-    jobId: `retry-${data.messageId}-attempt-${data.attemptNumber}`,
-    delay: retryDelay,
-    removeOnComplete: 10,
-    removeOnFail: 100,
-  });
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   const job = await (queue as any).add(data, {
+     jobId: `retry-${data.messageId}-attempt-${data.attemptNumber}`,
+     delay: retryDelay,
+     removeOnComplete: 10,
+     removeOnFail: 100,
+   });
 
   logger.info(
     'Message enqueued for retry - messageId: %s, conversationId: %s, platform: %s, attempt: %d, nextRetryIn: %dms',
