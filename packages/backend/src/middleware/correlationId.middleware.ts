@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { AsyncLocalStorage } from 'async_hooks';
 import { randomUUID } from 'crypto';
-import { Logger } from '../../infrastructure/logger';
-import { config } from '../../config/config';
+import { Logger } from '../infrastructure/logger';
+import { config } from '../config/config';
 import type { AuthUser } from '../types/auth.types';
 
 /**

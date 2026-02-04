@@ -1,12 +1,12 @@
-import { db } from '../../infrastructure/db/client.js';
-import { users, passwordResetTokens } from '../../infrastructure/db/schema.js';
+import { db } from '../../infrastructure/db/client';
+import { users, passwordResetTokens } from '../../infrastructure/db/schema';
 import { eq } from 'drizzle-orm';
 import {
   hashPassword,
   verifyPassword,
   generateResetToken,
-} from '../../infrastructure/auth/password.js';
-import { emailService } from '../../infrastructure/email/email.service.js';
+} from '../../infrastructure/auth/password';
+import { emailService } from '../../infrastructure/email/email.service';
 
 export class AuthService {
   /**

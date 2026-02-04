@@ -6,11 +6,9 @@
 
 import { Server } from 'socket.io';
 import { webSocketAuthMiddleware } from './auth.middleware';
-import { Logger } from '../infrastructure/logger';
+import { logger } from '../infrastructure/logger';
 import { config } from '../config/config';
 import { PING_INTERVAL_MS, CONNECTION_TIMEOUT_MS } from './wsConstants';
-
-const logger = new Logger(config.logging);
 
 /**
  * WebSocket server class

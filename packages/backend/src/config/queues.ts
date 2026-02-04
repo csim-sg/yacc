@@ -131,13 +131,14 @@ function createRetryQueue(): Queue<RetryJobData> {
 function createDLQ(): Queue<RetryJobData> {
   const queue = new Queue<RetryJobData>(DLQ_QUEUE_NAME, QUEUE_OPTIONS);
 
-  queue.on('error', (error: Error) => {
-    logger.error('DLQ error: %s', error.message);
-  });
+   queue.on('error', (error: Error) => {
+     logger.error('DLQ error: %s', error.message);
+   });
 
-  queue.on('waiting', (jobId: string) => {
-    logger.debug('DLQ job waiting: %s', jobId);
-  });
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   (queue as any).on('waiting', (jobId: string) => {
+     logger.debug('DLQ job waiting: %s', jobId);
+   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (queue as any).on('active', (job: any) => {

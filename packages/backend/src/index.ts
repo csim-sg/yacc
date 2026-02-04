@@ -19,8 +19,8 @@ import { AuditController } from './controllers/audit.controller';
 import { HealthController } from './controllers/health.controller';
 import { WebSocketServer } from './websockets/websocket.server';
 import { dbClient, checkDatabaseConnection } from './infrastructure/db.client';
-import { redisClient } from './infrastructure/redis.client';
-import { r2Client } from './infrastructure/r2.client';
+import { redisClient, checkRedisHealth } from './infrastructure/redis.client';
+import { r2Client, isR2Configured, checkR2Health } from './infrastructure/r2.client';
 import { logger, createChildLogger } from './infrastructure/logger';
 import { auth, getAuthInstance } from './infrastructure/better-auth.client';
 import { config } from './config/config';
@@ -81,26 +81,26 @@ async function start() {
       throw new Error('Failed to connect to database');
     }
 
-    // Check Redis connection
-    const redisConnected = await redisClient.checkRedisHealth();
-    if (!redisConnected) {
-      console.warn('⚠️  Redis connection failed - WebSocket features will be degraded');
-    } else {
-      console.log('✓ Redis connected');
-    }
+     // Check Redis connection
+     const redisConnected = await checkRedisHealth();
+     if (!redisConnected) {
+       console.warn('⚠️  Redis connection failed - WebSocket features will be degraded');
+     } else {
+       console.log('✓ Redis connected');
+     }
 
-    // Check R2 connection
-    const r2Configured = r2Client.isR2Configured();
-    if (r2Configured) {
-      const r2Connected = await r2Client.checkR2Health();
-      if (r2Connected) {
-        console.log('✓ R2 storage connected');
-      } else {
-        console.warn('⚠️  R2 storage connection failed - file uploads will be degraded');
-      }
-    } else {
-      console.log('ℹ️  R2 storage not configured - file uploads disabled');
-    }
+     // Check R2 connection
+     const r2Configured = isR2Configured();
+     if (r2Configured) {
+       const r2Connected = await checkR2Health();
+       if (r2Connected) {
+         console.log('✓ R2 storage connected');
+       } else {
+         console.warn('⚠️  R2 storage connection failed - file uploads will be degraded');
+       }
+     } else {
+       console.log('ℹ️  R2 storage not configured - file uploads disabled');
+     }
 
     // Start HTTP + WebSocket server
     server.listen(config.app.port, () => {

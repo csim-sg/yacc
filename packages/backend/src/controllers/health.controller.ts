@@ -7,11 +7,10 @@
  */
 
 import { All, Controller, Req, Res } from 'routing-controllers';
-import { Database } from '../../infrastructure/db.client';
-import { RedisClient } from '../../infrastructure/redis.client';
-import { R2Client } from '../../infrastructure/r2.client';
-import { Logger } from '../../infrastructure/logger';
-import { config } from '../../config/config';
+import { dbClient } from '../infrastructure/db.client';
+import { redisClient } from '../infrastructure/redis.client';
+import { logger } from '../infrastructure/logger';
+import { config } from '../config/config';
 import type {
   HealthStatus,
   DependencyHealth,
@@ -21,11 +20,7 @@ import type {
   ReadinessResponse,
 } from '@yacc/common/responses/health/healthResponse.response';
 
-// Initialize infrastructure clients with DI pattern
-const db = new Database(config.database);
-const redis = new RedisClient();
-const r2 = new R2Client();
-const logger = new Logger();
+// Use singleton infrastructure clients
 
 /**
  * Complete health response

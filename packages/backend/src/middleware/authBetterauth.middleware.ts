@@ -4,9 +4,9 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { BetterAuthClient } from '../../infrastructure/better-auth.client';
-import { Database } from '../../infrastructure/db.client';
-import { users } from '../../infrastructure/db.schema';
+import { BetterAuthClient } from '../infrastructure/better-auth.client';
+import { Database } from '../infrastructure/db.client';
+import { users } from '../infrastructure/db.schema';
 import { eq } from 'drizzle-orm';
 
 // User type for BetterAuth

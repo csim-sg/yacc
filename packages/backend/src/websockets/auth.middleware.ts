@@ -6,15 +6,12 @@
  */
 
 import { Socket } from 'socket.io';
-import { BetterAuthClient } from '../infrastructure/better-auth.client';
-import { Database } from '../infrastructure/db.client';
+import { auth } from '../infrastructure/better-auth.client';
+import { dbClient } from '../infrastructure/db.client';
 import { users } from '../infrastructure/db.schema';
 import { eq } from 'drizzle-orm';
-import { Logger } from '../infrastructure/logger';
+import { logger } from '../infrastructure/logger';
 import { config } from '../config/config';
-
-// Initialize logger instance
-const logger = new Logger(config.logging);
 
 /**
  * Extended Socket interface with authenticated user
@@ -100,10 +97,10 @@ export async function webSocketAuthMiddleware(
     }, 'WebSocket connection authenticated');
 
     next();
-  } catch (error) {
-    logger.getLogger().error({ socketId: socket.id, error: 'Failed to authenticate WebSocket connection', error });
-    next(new Error('Authentication failed'));
-  }
+   } catch (error) {
+     logger.error('WebSocket authentication failed - socketId: %s, error: %s', socket.id, error instanceof Error ? error.message : String(error));
+     next(new Error('Authentication failed'));
+   }
 }
 
 export type { AuthenticatedSocket };

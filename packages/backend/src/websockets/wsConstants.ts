@@ -47,10 +47,10 @@ export const PresenceEvents = {
  * All WebSocket event types
  */
 export type WebSocketEventType =
-  | MessageEvents[keyof typeof MessageEvents]
-  | ConversationEvents[keyof typeof ConversationEvents]
-  | NotificationEvents[keyof typeof NotificationEvents]
-  | PresenceEvents[keyof typeof PresenceEvents];
+   | typeof MessageEvents[keyof typeof MessageEvents]
+   | typeof ConversationEvents[keyof typeof ConversationEvents]
+   | typeof NotificationEvents[keyof typeof NotificationEvents]
+   | typeof PresenceEvents[keyof typeof PresenceEvents];
 
 // ============================================
 // WebSocket Configuration

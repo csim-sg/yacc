@@ -116,8 +116,4 @@ export class ConnectorFactory {
   }
 }
 
-// ============================================
-// Export
-// ============================================
 
-export { ConnectorFactory };
