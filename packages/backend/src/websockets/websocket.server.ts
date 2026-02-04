@@ -104,10 +104,7 @@ export class WebSocketServer {
    */
   private setupCleanup(): void {
     // Ping/heartbeat is handled by Socket.io automatically
-    logger.info('WebSocket ping/heartbeat configured', {
-      interval: PING_INTERVAL_MS,
-      timeout: CONNECTION_TIMEOUT_MS,
-    });
+    logger.info('WebSocket ping/heartbeat configured - interval: %d ms, timeout: %d ms', PING_INTERVAL_MS, CONNECTION_TIMEOUT_MS);
   }
 
   /**
