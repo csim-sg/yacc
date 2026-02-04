@@ -1,4 +1,4 @@
-import { IsString, IsInt } from 'class-validator';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 
 /**
  * Send Message Request

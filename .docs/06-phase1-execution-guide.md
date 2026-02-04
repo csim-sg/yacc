@@ -1,8 +1,8 @@
 # 06. Phase 1 Execution Guide
 
-**Last Updated**: January 24, 2026  
+**Last Updated**: February 4, 2026  
 **Status**: Ready for Development  
-**Total P0 Issues**: 22  
+**Total P0 Issues**: 27  
 **Governance**: ADR-003, GOV-006, GOV-007
 
 ---
@@ -96,6 +96,20 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | SV-002 | Validate Phase 1 requirements in execution guide | Completed | P0 | Product Owner | SV-001 | Validation checklist covers all Phase 1 requirements; Phase 2 excluded | PVTI_lAHOAB4wV84BNGcwzgj_5sI | 9 |
 | SV-003 | Update Phase 1 timeline (2 weeks) | Completed | P1 | Product Owner | SV-001 | Phase 1 timeline includes Telegram + IRC tasks; Phase 2 deferred | PVTI_lAHOAB4wV84BNGcwzgj_5r8 | 16 |
 
+### Repo Compliance Tasks (Build + Governance Blockers)
+
+| ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
+|----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
+| DEV-001 | Fix @yacc/common type-check failures (schema filename casing duplicates) | Not Started | P0 | Architect | - | pnpm type-check passes; single canonical schema filenames in common |  | 164 |
+| DEV-002 | Backend architecture alignment (remove wrapper/DI patterns, fix logger + auth wiring) | Not Started | P0 | Backend | DEV-001 | Backend uses infra singletons consistently; backend type-check passes |  | 165 |
+| DEV-003 | Eliminate any usage in backend (enforce no-any standard) | Not Started | P0 | Backend | DEV-002 | No any types remain in backend runtime code; backend type-check passes |  | 166 |
+| DEV-004 | Eliminate any usage in frontend (enforce no-any standard) | Not Started | P0 | Frontend | DEV-001 | No any types remain in frontend runtime code; frontend type-check passes |  | 167 |
+| DEV-005 | Remove barrel exports (index.ts) and enforce direct file imports | Not Started | P0 | Architect | DEV-001 | No index.ts barrel exports are consumed; imports are direct-file only |  | 168 |
+| DEV-006 | Remove package-lock.json (pnpm is the only supported package manager) | Not Started | P1 | Architect | - | package-lock.json removed; pnpm-lock.yaml remains authoritative |  | 169 |
+| DEV-007 | Stop tracking test env secrets file (packages/backend/.env.test) | Not Started | P1 | Backend | - | .env.test removed from repo; tests use safe env injection or example file |  | 170 |
+| DEV-008 | Replace console logging with pino + redact PII | Not Started | P1 | Backend | DEV-002 | No console.* in backend runtime paths; pino used with correlationId; PII redacted |  | 171 |
+| DEV-009 | Decide frontend auth token storage strategy (ADR) | Not Started | P2 | Architect | - | ADR/governance entry created; frontend aligns to chosen approach |  | 172 |
+
 ### Backend Tasks
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
@@ -113,13 +127,13 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | BE-011 | Implement message status tracking (pending → sent/failed) | Not Started | P0 | Backend | BE-010 | Status updates working, database reflects delivery state | PVTI_lAHOAB4wV84BNGcwzgj_54c | 30 |
 | BE-012 | Implement message retry endpoint (POST /conversations/:id/messages/:msgId/retry) | Not Started | P1 | Backend | BE-011 | Requeues failed message, updates status to pending | PVTI_lAHOAB4wV84BNGcwzgj_54Q | 22 |
 | BE-013 | Set up Redis + BullMQ for message retry queue | **Done** | P0 | Backend | - | Redis connection working, BullMQ jobs processing | PVTI_lAHOAB4wV84BNGcwzgj_55I | 23 |
-| BE-014 | Implement exponential backoff for retries (1m, 5m, 30m; 3 attempts max) | Not Started | P0 | Backend | BE-013 | Failed messages retried with correct backoff schedule |  |  |
+| BE-014 | Implement exponential backoff for retries (1m, 5m, 30m; 3 attempts max) | Not Started | P0 | Backend | BE-013 | Failed messages retried with correct backoff schedule |  | 26 |
 | BE-014A | Fix retry queue removal and backoff schedule alignment | Not Started | P0 | Backend | BE-013 | removeFromQueue uses supported job lookup; backoff is 1m/5m/30m |  |  |
 | BE-015 | Implement dead-letter queue (DLQ) for failed messages | Not Started | P1 | Backend | BE-014 | Messages with 3 failed attempts moved to DLQ |  |  |
-| BE-016 | Set up Socket.io WebSocket server | Ready | P0 | Backend | - | WebSocket server running on configured port |  |  |
-| BE-017 | Implement message.received event (push on inbound message) | Not Started | P0 | Backend | BE-016 | Event emitted when inbound message received |  |  |
+| BE-016 | Set up Socket.io WebSocket server | Ready | P0 | Backend | - | WebSocket server running on configured port |  | 28 |
+| BE-017 | Implement message.received event (push on inbound message) | Not Started | P0 | Backend | BE-016 | Event emitted when inbound message received |  | 27 |
 | BE-018 | Implement message.sent event (push on successful delivery) | Not Started | P0 | Backend | BE-016 | Event emitted when message status → sent | PVTI_lAHOAB4wV84BNGcwzgj_54g | 31 |
-| BE-019 | Implement message.failed event (push on delivery failure) | Not Started | P0 | Backend | BE-016 | Event emitted when message status → failed |  |  |
+| BE-019 | Implement message.failed event (push on delivery failure) | Not Started | P0 | Backend | BE-016 | Event emitted when message status → failed |  | 29 |
 | BE-020 | Set up Cloudflare R2 storage for raw payloads and attachments | **Ready** | P0 | Backend | - | R2 connection working, upload/download functional | PVTI_lAHOAB4wV84BNGcwzgkAlho | 106 |
 | BE-021 | Implement raw payload storage (store inbound platform payloads, 7-day retention) | Not Started | P1 | Backend | BE-020 | Payloads stored, scheduled cleanup working | PVTI_lAHOAB4wV84BNGcwzgj_54I | 24 |
 | BE-022 | Implement raw payload retrieval endpoint (GET /messages/:id/raw-payload, manager+ only) | Not Started | P1 | Backend | BE-021, BE-005 | Endpoint working with RBAC, audit-logged | PVTI_lAHOAB4wV84BNGcwzgj_54U | 21 |
@@ -937,6 +951,15 @@ Before marking Phase 1 as complete, ensure:
 | BE-026 | Create environment configuration scaffolding | https://github.com/csim-sg/yacc/issues/108 |
 | BE-027 | Set up structured logging infrastructure | https://github.com/csim-sg/yacc/issues/107 |
 | BE-028 | Create shared types package | https://github.com/csim-sg/yacc/issues/109 |
+| DEV-001 | Fix @yacc/common type-check failures (schema filename casing duplicates) | https://github.com/csim-sg/yacc/issues/164 |
+| DEV-002 | Backend architecture alignment (remove wrapper/DI patterns, fix logger + auth wiring) | https://github.com/csim-sg/yacc/issues/165 |
+| DEV-003 | Eliminate any usage in backend (enforce no-any standard) | https://github.com/csim-sg/yacc/issues/166 |
+| DEV-004 | Eliminate any usage in frontend (enforce no-any standard) | https://github.com/csim-sg/yacc/issues/167 |
+| DEV-005 | Remove barrel exports (index.ts) and enforce direct file imports | https://github.com/csim-sg/yacc/issues/168 |
+| DEV-006 | Remove package-lock.json (pnpm is the only supported package manager) | https://github.com/csim-sg/yacc/issues/169 |
+| DEV-007 | Stop tracking test env secrets file (packages/backend/.env.test) | https://github.com/csim-sg/yacc/issues/170 |
+| DEV-008 | Replace console logging with pino + redact PII | https://github.com/csim-sg/yacc/issues/171 |
+| DEV-009 | Decide frontend auth token storage strategy (ADR) | https://github.com/csim-sg/yacc/issues/172 |
 
 ---
 

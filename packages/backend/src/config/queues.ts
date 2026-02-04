@@ -5,10 +5,10 @@
  * with exponential backoff strategy
  */
 
-import { Queue, Worker, Job } from 'bullmq';
-import type { RetryJobData } from '@yacc/common/types/retryJobData.interface';
-import { getRedisClient } from '../infrastructure/redis';
-import logger from '../utils/logger';
+import { Queue, Job } from 'bullmq';
+import type { RetryJobData } from '@yacc/common/types/RetryJobData.interface';
+import { redisClient } from '../infrastructure/redis.client';
+import { logger } from '../infrastructure/logger';
 
 // ============================================
 // Configuration
@@ -23,7 +23,7 @@ const MAX_ATTEMPTS = 3;
 
 // Queue options
 const QUEUE_OPTIONS = {
-  connection: getRedisClient(),
+  connection: redisClient,
   defaultJobOptions: {
     removeOnComplete: 10, // Remove completed jobs after 10
     removeOnFail: 100, // Remove failed jobs after 100
@@ -261,15 +261,4 @@ export async function closeQueues(): Promise<void> {
   }
 }
 
-// ============================================
-// Export
-// ============================================
 
-export {
-  getRetryQueue,
-  getDLQ,
-  enqueueRetry,
-  removeFromQueue,
-  getQueueStats,
-  closeQueues,
-};

@@ -1,4 +1,4 @@
-import { IsOptional, IsInt } from 'class-validator';
+import { IsOptional, IsUUID } from 'class-validator';
 
 /**
  * Mark Notification As Read Request

@@ -1,5 +1,3 @@
-export interface ISearchableRequest {
+export class SearchableRequest {
   q?: string;
-  page?: number;
-  pageSize?: number;
 }
