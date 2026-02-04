@@ -7,11 +7,11 @@
 
 import { Socket } from 'socket.io';
 import { dbClient } from '../infrastructure/db.client';
-import { users } from '../infrastructure/db.schema';
+import { users } from '../schemas/user.schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '../infrastructure/logger';
 import { config } from '../config/config';
-import type { BetterAuthClient } from '../infrastructure/better-auth.client';
+import type { Auth } from 'better-auth/types';
 
 /**
  * Extended Socket interface with authenticated user
@@ -64,13 +64,11 @@ export async function webSocketAuthMiddleware(
        return next(new Error('Invalid session token'));
      }
 
-     // Fetch full user from database to get role and status
-     const userId = session.user.id as string;
-     const dbClient = dbClient as any; // TODO: Fix type
-     const drizzle = dbClient;
-     const user = await drizzle.query.users.findFirst({
-       where: eq(users.id, userId),
-     });
+      // Fetch full user from database to get role and status
+      const userId = session.user.id as string;
+      const user = await dbClient.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
 
      if (!user) {
        logger.warn('WebSocket connection rejected: User not found with socketId: %s, userId: %s', socket.id, userId);

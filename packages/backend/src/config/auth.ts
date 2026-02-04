@@ -14,7 +14,8 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { bearer } from 'better-auth/plugins';
 import { dbClient } from '../infrastructure/db.client';
-import { users, session, verification, account } from '../infrastructure/db.schema';
+import { users } from '../schemas/user.schema';
+import { session, verification, account } from '../schemas/betterAuth.schema';
 
 // Get TTL from env vars (with defaults)
 const ACCESS_TOKEN_TTL = parseInt(process.env.ACCESS_TOKEN_TTL_SECONDS || '172800'); // 48h default

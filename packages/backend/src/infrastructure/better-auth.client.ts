@@ -10,8 +10,9 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { bearer } from 'better-auth/plugins';
 import type { Auth } from 'better-auth/types';
 import { dbClient } from './db.client';
-import { users, session, verification, account } from './db.schema';
-import {config} from "@/config/config";
+import { users } from '../schemas/user.schema';
+import { session, verification, account } from '../schemas/betterAuth.schema';
+import { config } from '../config/config';
 
 const secret = config.auth.betterAuthSecret;
 

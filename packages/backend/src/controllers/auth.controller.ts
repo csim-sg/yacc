@@ -15,7 +15,7 @@ import { All, Controller, Post, Req, Res, Body } from 'routing-controllers';
 import type { Response } from 'express';
 import { auth } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
-import { users } from '../infrastructure/db.schema';
+import { users } from '../schemas/user.schema';
 import { eq } from 'drizzle-orm';
 import { EmailService } from '../config/email';
 import { generateResetToken, resetPassword } from '../services/passwordReset.service';
