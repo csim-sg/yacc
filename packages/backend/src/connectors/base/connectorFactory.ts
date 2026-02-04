@@ -34,22 +34,23 @@ export class ConnectorFactory {
    * @throws ConnectionError if platform is not supported
    */
   static createConnector<T extends Platform = Platform>(
-    platform: Platform,
+    platform: T,
     config: ConnectorConfig<T>
   ): IConnector<T> {
     switch (platform) {
-      case 'telegram':
-        return ConnectorFactory.createTelegramConnector(config as ConnectorConfig<'telegram'>);
-
-      case 'irc':
-        return ConnectorFactory.createIRCConnector(config as ConnectorConfig<'irc'>);
-
-      default:
+      case 'telegram': {
+        return ConnectorFactory.createTelegramConnector(config as ConnectorConfig<'telegram'>) as IConnector<T>;
+      }
+      case 'irc': {
+        return ConnectorFactory.createIRCConnector(config as ConnectorConfig<'irc'>) as IConnector<T>;
+      }
+      default: {
         throw new ConnectionError(
-          `Unsupported platform: ${platform}`,
-          platform,
+          `Unsupported platform: ${String(platform)}`,
+          String(platform),
           'UNSUPPORTED_PLATFORM'
         );
+      }
     }
   }
 
@@ -94,7 +95,7 @@ export class ConnectorFactory {
    * Validate platform config before creating connector
    */
   static async validateConfig<T extends Platform = Platform>(
-    platform: Platform,
+    platform: T,
     config: ConnectorConfig<T>
   ): Promise<true | { field: string; message: string }[]> {
     const connector = ConnectorFactory.createConnector(platform, config);

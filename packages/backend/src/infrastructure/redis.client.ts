@@ -7,41 +7,38 @@
 
 import Redis from 'ioredis';
 import { config } from '../config/config';
+import { logger } from './logger';
 
 // Singleton: Initialize connection once at module load
 const redis = new Redis({
   host: config.redis.host,
   port: config.redis.port,
-  password: config.redis.password,
+  password: config.redis.password || undefined,
   db: 0,
-  maxRetries: 3,
+  maxRetriesPerRequest: 3,
   enableReadyCheck: true,
   lazyConnect: false,
 });
 
 // Setup event listeners
 redis.on('connect', () => {
-  console.log('Redis connected', {
-    host: config.redis.host,
-    port: config.redis.port,
-    db: 0,
-  });
+  logger.info('Redis connected to %s:%d', config.redis.host, config.redis.port);
 });
 
 redis.on('ready', () => {
-  console.log('Redis ready');
+  logger.info('Redis ready');
 });
 
 redis.on('error', (err: Error) => {
-  console.error('Redis error', { error: err.message });
+  logger.error('Redis error: %s', err.message);
 });
 
 redis.on('close', () => {
-  console.log('Redis connection closed');
+  logger.info('Redis connection closed');
 });
 
 redis.on('reconnecting', (delay: number) => {
-  console.warn('Redis reconnecting', { delay });
+  logger.warn('Redis reconnecting with %d ms delay', delay);
 });
 
 export const redisClient = redis;
@@ -51,7 +48,7 @@ export const redisClient = redis;
  */
 export async function closeRedisClient(): Promise<void> {
   await redis.quit();
-  console.log('Redis connection closed');
+  logger.info('Redis connection closed');
 }
 
 /**
@@ -62,7 +59,6 @@ export async function checkRedisHealth(): Promise<boolean> {
     await redis.ping();
     return true;
   } catch (error) {
-    console.error('Redis health check failed', { error });
     return false;
   }
 }
@@ -73,9 +69,9 @@ export async function checkRedisHealth(): Promise<boolean> {
 export async function flushRedis(): Promise<void> {
   try {
     await redis.flushdb();
-    console.warn('Redis DB flushed');
+    logger.warn('Redis DB flushed');
   } catch (error) {
-    console.error('Failed to flush Redis DB', { error });
+    logger.error('Failed to flush Redis DB: %s', error instanceof Error ? error.message : String(error));
     throw error;
   }
 }

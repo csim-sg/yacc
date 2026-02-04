@@ -5,13 +5,14 @@
  * Follows ADR-005: Infrastructure folder for client initialization
  */
 
-import { S3Client } from '@aws-sdk/client-s3';
+import { S3Client, HeadBucketCommand, ListObjectsV2Command, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import type { S3ClientConfig } from '@aws-sdk/client-s3';
 import { config } from '../config/config';
 
 // Singleton: Initialize S3 client once at module load
 const s3Config: S3ClientConfig = {
-  region: config.storage.r2.region,
+  region: 'auto',
+  endpoint: config.storage.r2.endpoint,
   credentials: {
     accessKeyId: config.storage.r2.accessKey,
     secretAccessKey: config.storage.r2.secretKey,
@@ -53,22 +54,10 @@ export function isR2Configured(): boolean {
  */
 export async function checkR2Health(): Promise<boolean> {
   try {
-    // Check if we can list bucket contents (simple health check)
-    await r2Client.listObjectsV2({
-      Bucket: config.storage.r2.bucket,
-      MaxKeys: 0, // Only check if bucket is accessible
-    });
-
-    console.log('R2 health check passed', {
-      bucket: config.storage.r2.bucket,
-      region: config.storage.r2.region,
-    });
-
+    // Check if we can access the bucket
+    await r2Client.send(new HeadBucketCommand({ Bucket: config.storage.r2.bucket }));
     return true;
   } catch (error) {
-    console.error('R2 health check failed', {
-      error: error instanceof Error ? error.message : String(error),
-    });
     return false;
   }
 }
@@ -82,19 +71,18 @@ export async function uploadFile(
   contentType: string
 ): Promise<{ url: string; key: string }> {
   try {
-    await r2Client.putObject({
+    await r2Client.send(new PutObjectCommand({
       Bucket: config.storage.r2.bucket,
       Key: key,
       Body: body,
       ContentType: contentType,
-    });
+    }));
 
     return {
       url: getPublicUrl(key),
       key,
     };
   } catch (error) {
-    console.error('Failed to upload file to R2', { key, error });
     throw error;
   }
 }
@@ -104,14 +92,18 @@ export async function uploadFile(
  */
 export async function downloadFile(key: string): Promise<Buffer> {
   try {
-    const result = await r2Client.getObject({
+    const result = await r2Client.send(new GetObjectCommand({
       Bucket: config.storage.r2.bucket,
       Key: key,
-    });
+    }));
 
-    return result.Body as Buffer;
+    if (!result.Body) {
+      throw new Error('Empty response from R2');
+    }
+
+    const buffer = await result.Body.transformToByteArray();
+    return Buffer.from(buffer);
   } catch (error) {
-    console.error('Failed to download file from R2', { key, error });
     throw error;
   }
 }

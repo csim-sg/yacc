@@ -6,11 +6,13 @@
 
 export class ConnectionError extends Error {
   code?: string;
+  platform?: string;
   retryable: boolean = true;
 
-  constructor(message: string, code?: string) {
+  constructor(message: string, platform?: string, code?: string) {
     super(message);
     this.name = 'ConnectionError';
+    this.platform = platform;
     this.code = code;
   }
 }

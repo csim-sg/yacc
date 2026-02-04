@@ -8,6 +8,7 @@ export interface SendMessageResponse {
   messageId: string;
   externalMessageId: string;
   status: 'sent' | 'failed';
+  success: boolean;
   error?: string;
   sentAt: Date;
 }

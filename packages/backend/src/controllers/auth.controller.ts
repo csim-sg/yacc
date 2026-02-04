@@ -58,9 +58,9 @@ export class AuthController {
       // Generate token using password reset service
       const token = await generateResetToken(user.id, correlationId);
 
-      // Send email
-      const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
-      await emailService.sendPasswordResetEmail(email, resetLink, token);
+       // Send email
+       const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+       await emailService.sendPasswordResetEmail(email, resetLink);
 
       logger.info('Password reset token generated and email sent - correlationId: %s, userId: %s', correlationId, user.id);
 

@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { AsyncLocalStorage } from 'async_hooks';
 import { randomUUID } from 'crypto';
-import { Logger } from '../infrastructure/logger';
-import { config } from '../config/config';
+import { logger } from '../infrastructure/logger';
 import type { AuthUser } from '../types/auth.types';
+import type { Logger } from 'pino';
 
 /**
  * Extended Request interface with correlation ID and logger
@@ -31,7 +31,7 @@ export const asyncLocalStorage = new AsyncLocalStorage<{
 }>();
 
 // Create base logger instance
-const baseLogger = new Logger(config.logging);
+const baseLogger = logger;
 
 /**
  * Correlation ID middleware
@@ -60,15 +60,15 @@ export function correlationIdMiddleware(
     (req.headers['x-request-id'] as string) ||
     randomUUID();
 
-  // Set response header for tracing
-  res.setHeader('X-Correlation-ID', correlationId);
+   // Set response header for tracing
+   res.setHeader('X-Correlation-ID', correlationId);
 
-   // Create child logger with correlation ID
-   const childLogger = baseLogger.createChildLogger(correlationId);
+    // Create child logger with correlation ID
+    const childLogger = baseLogger.child({ correlationId });
 
-  // Attach to request object
-  req.correlationId = correlationId;
-  req.logger = childLogger;
+   // Attach to request object
+   req.correlationId = correlationId;
+   req.logger = childLogger;
 
   // Store in async context (for service layer logging)
   asyncLocalStorage.run({ correlationId, logger: childLogger }, () => {
@@ -103,8 +103,8 @@ export function getCorrelationId(): string | undefined {
  * @returns Logger with correlation ID or base logger
  * 
  * @example
- * const logger = getLogger();
- * logger.info({ action: 'create_user' }, 'User created');
+ * const contextLogger = getLogger();
+ * contextLogger.info({ action: 'create_user' }, 'User created');
  * // Output: { "level": "info", "correlationId": "abc123", "action": "create_user", "msg": "User created" }
  */
 export function getLogger(): Logger {
