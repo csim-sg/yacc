@@ -17,6 +17,7 @@ import { config } from './config/config';
 import { logger } from './config/logging';
 import { messageQueueService } from './services/message-queue.service';
 import { messageQueueProcessor } from './services/message-queue-processor';
+import { wsGateway } from './websockets/gateway';
 
 const app = express();
 
@@ -61,6 +62,11 @@ async function start() {
     if (!dbConnected) {
       throw new Error('Failed to connect to database');
     }
+
+    // Initialize WebSocket gateway
+    logger.info('Initializing WebSocket gateway...');
+    wsGateway.initialize(io);
+    logger.info('WebSocket gateway initialized successfully');
 
     // Initialize message queue service with processor
     logger.info('Initializing message queue service...');

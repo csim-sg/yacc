@@ -1,4 +1,5 @@
 import { logger } from '../config/logging';
+import { wsGateway } from '../websockets/gateway';
 import type { SendMessageJobPayload } from '../types/message-queue.types';
 
 /**
@@ -51,13 +52,14 @@ class QueueDatabaseIntegration {
       //   })
       //   .where(eq(messages.id, payload.messageId));
 
-      // TODO: Emit WebSocket event
-      // await emitGlobally('message.sent', {
-      //   messageId: payload.messageId,
-      //   conversationId: payload.conversationId,
-      //   status: 'sent',
-      //   platformMessageId,
-      // });
+      // Emit WebSocket event
+      wsGateway.emitGlobally('message.sent', {
+        messageId: payload.messageId,
+        conversationId: payload.conversationId,
+        status: 'sent',
+        platformMessageId,
+        timestamp: new Date().toISOString(),
+      });
 
       // TODO: Log audit event
       // await auditService.log({
@@ -120,8 +122,18 @@ class QueueDatabaseIntegration {
       //     .where(eq(messages.id, payload.messageId));
       // }
 
-      // TODO: Emit WebSocket event
-      // await emitGlobally('message.failed', update);
+      // Emit WebSocket event
+      wsGateway.emitGlobally('message.failed', {
+        messageId: payload.messageId,
+        conversationId: payload.conversationId,
+        status: attempt >= maxAttempts ? 'failed' : 'pending',
+        attempt,
+        maxAttempts,
+        error: error.message,
+        nextRetryTime,
+        isFinal: attempt >= maxAttempts,
+        timestamp: new Date().toISOString(),
+      });
 
       // TODO: Log audit event
       // await auditService.log({
@@ -173,13 +185,14 @@ class QueueDatabaseIntegration {
       //   })
       //   .where(eq(messages.id, payload.messageId));
 
-      // TODO: Emit WebSocket event
-      // await emitGlobally('message.retry_scheduled', {
-      //   messageId: payload.messageId,
-      //   conversationId: payload.conversationId,
-      //   attempt,
-      //   nextRetryTime,
-      // });
+      // Emit WebSocket event
+      wsGateway.emitGlobally('message.retry_scheduled', {
+        messageId: payload.messageId,
+        conversationId: payload.conversationId,
+        attempt,
+        nextRetryTime,
+        timestamp: new Date().toISOString(),
+      });
 
       // TODO: Log audit event
       // await auditService.log({
@@ -231,15 +244,16 @@ class QueueDatabaseIntegration {
       //   })
       //   .where(eq(messages.id, payload.messageId));
 
-      // TODO: Emit WebSocket event to admins
-      // await emitGlobally('queue.message_dlq', {
-      //   messageId: payload.messageId,
-      //   conversationId: payload.conversationId,
-      //   failureReason,
-      //   totalAttempts,
-      //   lastError,
-      //   requiresReview: true,
-      // });
+       // Emit WebSocket event to admins
+       wsGateway.emitGlobally('queue.message_dlq', {
+         messageId: payload.messageId,
+         conversationId: payload.conversationId,
+         failureReason,
+         totalAttempts,
+         lastError,
+         requiresReview: true,
+         timestamp: new Date().toISOString(),
+       });
 
       // TODO: Log audit event
       // await auditService.log({
