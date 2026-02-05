@@ -12,9 +12,7 @@ import type { Auth } from 'better-auth/types';
 import { dbClient } from './db.client';
 import { users } from '../schemas/user.schema';
 import { session, verification, account } from '../schemas/betterAuth.schema';
-import { config } from '../config/config';
-
-const secret = config.auth.betterAuthSecret;
+import { appConfig } from '../config/appConfig';
 
 /**
  * Initialize BetterAuth singleton
@@ -24,10 +22,10 @@ export const auth = betterAuth({
     provider: 'pg',
     schema: { users, session, verification, account },
   }),
-  secret: secret,
+  secret: appConfig.BETTER_AUTH_SECRET,
   session: {
-    expiresIn: config.auth.accessTokenTtlSeconds * 1000, // Convert to ms
-    refreshAgeInDays: Math.floor(config.auth.refreshTokenTtlSeconds / 86400), // Convert seconds to days
+    expiresIn: appConfig.ACCESS_TOKEN_TTL_SECONDS * 1000, // Convert to ms
+    refreshAgeInDays: Math.floor(appConfig.REFRESH_TOKEN_TTL_SECONDS / 86400), // Convert seconds to days
   },
   emailAndPassword: {
     enabled: true,
@@ -41,10 +39,10 @@ export const auth = betterAuth({
   ],
   advanced: {
     cookiePrefix: 'yacc-auth',
-    useSecureCookies: process.env.NODE_ENV === 'production',
+    useSecureCookies: appConfig.APP_ENV === 'production',
     generateId: () => crypto.randomUUID(),
   },
-  trustedOrigins: [process.env.FRONTEND_URL || config.frontend.url],
+  trustedOrigins: [appConfig.APP_FRONTEND_URL],
 });
 
 /**

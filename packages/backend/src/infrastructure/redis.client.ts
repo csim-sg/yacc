@@ -6,14 +6,14 @@
  */
 
 import Redis from 'ioredis';
-import { config } from '../config/config';
+import { appConfig } from '../config/appConfig';
 import { logger } from './logger';
 
 // Singleton: Initialize connection once at module load
 const redis = new Redis({
-  host: config.redis.host,
-  port: config.redis.port,
-  password: config.redis.password || undefined,
+  host: appConfig.REDIS_HOST,
+  port: appConfig.REDIS_PORT,
+  password: appConfig.REDIS_PASSWORD || undefined,
   db: 0,
   maxRetriesPerRequest: 3,
   enableReadyCheck: true,
@@ -22,7 +22,7 @@ const redis = new Redis({
 
 // Setup event listeners
 redis.on('connect', () => {
-  logger.info('Redis connected to %s:%d', config.redis.host, config.redis.port);
+  logger.info('Redis connected to %s:%d', appConfig.REDIS_HOST, appConfig.REDIS_PORT);
 });
 
 redis.on('ready', () => {

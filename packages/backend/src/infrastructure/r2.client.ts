@@ -7,15 +7,15 @@
 
 import { S3Client, HeadBucketCommand, ListObjectsV2Command, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import type { S3ClientConfig } from '@aws-sdk/client-s3';
-import { config } from '../config/config';
+import { appConfig } from '../config/appConfig';
 
 // Singleton: Initialize S3 client once at module load
 const s3Config: S3ClientConfig = {
   region: 'auto',
-  endpoint: config.storage.r2.endpoint,
+  endpoint: appConfig.CLOUDFLARE_R2_ENDPOINT,
   credentials: {
-    accessKeyId: config.storage.r2.accessKey,
-    secretAccessKey: config.storage.r2.secretKey,
+    accessKeyId: appConfig.CLOUDFLARE_R2_ACCESS_KEY,
+    secretAccessKey: appConfig.CLOUDFLARE_R2_SECRET_KEY,
   },
   maxAttempts: 3,
 };
@@ -33,7 +33,7 @@ export function getR2ClientConfig(): S3ClientConfig {
  * Get public CDN URL for files
  */
 export function getPublicUrl(storageKey: string): string {
-  const cdnUrl = config.storage.r2.cdnUrl || `https://pub-${config.storage.r2.endpoint}.r2.dev`;
+  const cdnUrl = appConfig.CLOUDFLARE_CDN_URL || `https://pub-${appConfig.CLOUDFLARE_R2_ENDPOINT}.r2.dev`;
   return `${cdnUrl}/${storageKey}`;
 }
 
@@ -42,10 +42,10 @@ export function getPublicUrl(storageKey: string): string {
  */
 export function isR2Configured(): boolean {
   return !!(
-    config.storage.r2.endpoint &&
-    config.storage.r2.accessKey &&
-    config.storage.r2.secretKey &&
-    config.storage.r2.bucket
+    appConfig.CLOUDFLARE_R2_ENDPOINT &&
+    appConfig.CLOUDFLARE_R2_ACCESS_KEY &&
+    appConfig.CLOUDFLARE_R2_SECRET_KEY &&
+    appConfig.CLOUDFLARE_R2_BUCKET
   );
 }
 
@@ -55,7 +55,7 @@ export function isR2Configured(): boolean {
 export async function checkR2Health(): Promise<boolean> {
   try {
     // Check if we can access the bucket
-    await r2Client.send(new HeadBucketCommand({ Bucket: config.storage.r2.bucket }));
+    await r2Client.send(new HeadBucketCommand({ Bucket: appConfig.CLOUDFLARE_R2_BUCKET }));
     return true;
   } catch (error) {
     return false;
@@ -71,12 +71,12 @@ export async function uploadFile(
   contentType: string
 ): Promise<{ url: string; key: string }> {
   try {
-    await r2Client.send(new PutObjectCommand({
-      Bucket: config.storage.r2.bucket,
-      Key: key,
-      Body: body,
-      ContentType: contentType,
-    }));
+     await r2Client.send(new PutObjectCommand({
+       Bucket: appConfig.CLOUDFLARE_R2_BUCKET,
+       Key: key,
+       Body: body,
+       ContentType: contentType,
+     }));
 
     return {
       url: getPublicUrl(key),
@@ -92,10 +92,10 @@ export async function uploadFile(
  */
 export async function downloadFile(key: string): Promise<Buffer> {
   try {
-    const result = await r2Client.send(new GetObjectCommand({
-      Bucket: config.storage.r2.bucket,
-      Key: key,
-    }));
+     const result = await r2Client.send(new GetObjectCommand({
+       Bucket: appConfig.CLOUDFLARE_R2_BUCKET,
+       Key: key,
+     }));
 
     if (!result.Body) {
       throw new Error('Empty response from R2');

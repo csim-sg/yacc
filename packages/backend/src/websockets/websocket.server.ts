@@ -7,7 +7,7 @@
 import { Server } from 'socket.io';
 import { webSocketAuthMiddleware } from './auth.middleware';
 import { logger } from '../infrastructure/logger';
-import { config } from '../config/config';
+import { appConfig } from '../config/appConfig';
 import { PING_INTERVAL_MS, CONNECTION_TIMEOUT_MS } from './wsConstants';
 
 /**
@@ -22,12 +22,12 @@ export class WebSocketServer {
   /**
    * Initialize WebSocket server
    */
-  constructor(httpServer: any) {
-    this.io = new Server(httpServer, {
-      cors: {
-        origin: config.frontend.url,
-        credentials: true,
-      },
+   constructor(httpServer: any) {
+     this.io = new Server(httpServer, {
+       cors: {
+         origin: appConfig.APP_FRONTEND_URL,
+         credentials: true,
+       },
       pingTimeout: PING_INTERVAL_MS,
       pingInterval: PING_INTERVAL_MS,
       transports: ['websocket'],

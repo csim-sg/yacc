@@ -21,9 +21,9 @@ import { WebSocketServer } from './websockets/websocket.server';
 import { dbClient, checkDatabaseConnection } from './infrastructure/db.client';
 import { redisClient, checkRedisHealth } from './infrastructure/redis.client';
 import { r2Client, isR2Configured, checkR2Health } from './infrastructure/r2.client';
-import { logger, createChildLogger } from './infrastructure/logger';
-import { auth, getAuthInstance } from './infrastructure/better-auth.client';
-import { config } from './config/config';
+import { logger } from './infrastructure/logger';
+import { auth } from './infrastructure/better-auth.client';
+import { appConfig } from './config/appConfig';
 
 /**
  * Application entry point
@@ -37,8 +37,7 @@ const app = express();
 const db = dbClient;
 const redis = redisClient;
 const r2 = r2Client;
-const log = logger;
-const authInstance = getAuthInstance();
+const authInstance = auth;
 
 // ===== SETUP ROUTING-CONTROLLERS =====
 useExpressServer(app, {
@@ -57,7 +56,7 @@ useExpressServer(app, {
     requestLoggingMiddleware,    // 2. Log HTTP requests
   ],
   cors: {
-    origin: config.frontend.url,
+    origin: appConfig.APP_FRONTEND_URL,
     credentials: true,
     exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
   },
@@ -71,9 +70,9 @@ const wsServer = new WebSocketServer(server);
 async function start() {
   try {
     console.log('✓ Configuration validated successfully');
-    console.log(`  - Environment: ${config.app.env}`);
-    console.log(`  - Port: ${config.app.port}`);
-    console.log(`  - Log Level: ${config.logging.level}`);
+    console.log(`  - Environment: ${appConfig.APP_ENV}`);
+    console.log(`  - Port: ${appConfig.APP_PORT}`);
+    console.log(`  - Log Level: ${appConfig.LOG_LEVEL}`);
 
     // Check database connection
     const dbConnected = await checkDatabaseConnection();
@@ -102,12 +101,12 @@ async function start() {
        console.log('ℹ️  R2 storage not configured - file uploads disabled');
      }
 
-    // Start HTTP + WebSocket server
-    server.listen(config.app.port, () => {
-      console.log(`🚀 Server running on port ${config.app.port}`);
-      console.log(`📍 API: http://localhost:${config.app.port}/api`);
-      console.log(`🔗 WebSocket: ws://localhost:${config.app.port}`);
-    });
+     // Start HTTP + WebSocket server
+     server.listen(appConfig.APP_PORT, () => {
+       console.log(`🚀 Server running on port ${appConfig.APP_PORT}`);
+       console.log(`📍 API: http://localhost:${appConfig.APP_PORT}/api`);
+       console.log(`🔗 WebSocket: ws://localhost:${appConfig.APP_PORT}`);
+     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);
