@@ -22,7 +22,7 @@ import { dbClient, checkDatabaseConnection } from './infrastructure/db.client';
 import { redisClient, checkRedisHealth } from './infrastructure/redis.client';
 import { r2Client, isR2Configured, checkR2Health } from './infrastructure/r2.client';
 import { logger } from './infrastructure/logger';
-import { auth } from './infrastructure/better-auth.client';
+import { betterAuthClient } from './infrastructure/better-auth.client';
 import { appConfig } from './config/appConfig';
 
 /**
@@ -37,7 +37,7 @@ const app = express();
 const db = dbClient;
 const redis = redisClient;
 const r2 = r2Client;
-const authInstance = auth;
+const authInstance = betterAuthClient;
 
 // ===== SETUP ROUTING-CONTROLLERS =====
 useExpressServer(app, {

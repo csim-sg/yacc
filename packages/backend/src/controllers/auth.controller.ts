@@ -13,7 +13,7 @@
 
 import { All, Controller, Post, Req, Res, Body } from 'routing-controllers';
 import type { Response } from 'express';
-import { auth } from '../infrastructure/better-auth.client';
+import { betterAuthClient } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
 import { users } from '../schemas/user.schema';
 import { eq } from 'drizzle-orm';
@@ -146,7 +146,7 @@ export class AuthController {
         body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
       });
 
-      const response = await auth.handler(request);
+      const response = await betterAuthClient.handler(request);
 
       // Set headers from response
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

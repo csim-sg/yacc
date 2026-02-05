@@ -15,9 +15,9 @@ import { session, verification, account } from '../schemas/betterAuth.schema';
 import { appConfig } from '../config/appConfig';
 
 /**
- * Initialize BetterAuth singleton
+ * BetterAuth singleton - export directly, no wrapper functions
  */
-export const auth = betterAuth({
+export const betterAuthClient = betterAuth({
   database: drizzleAdapter(dbClient, {
     provider: 'pg',
     schema: { users, session, verification, account },
@@ -44,10 +44,3 @@ export const auth = betterAuth({
   },
   trustedOrigins: [appConfig.APP_FRONTEND_URL],
 });
-
-/**
- * Get BetterAuth instance (for type safety)
- */
-export function getAuthInstance(): Auth {
-  return auth;
-}

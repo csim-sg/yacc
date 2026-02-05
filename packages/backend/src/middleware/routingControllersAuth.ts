@@ -11,7 +11,7 @@ import { users } from '../schemas/user.schema';
 import { eq } from 'drizzle-orm';
 import { appConfig } from '../config/appConfig';
 import type { AuthUser } from '../types/auth.types';
-import { betterAuthClient } from '@/infrastructure/better-auth.client';
+import { betterAuthClient } from '../infrastructure/better-auth.client';
 // TODO: Implement BetterAuth client
 // import { getAuthInstance } from '../infrastructure/better-auth.client';
 
@@ -43,11 +43,11 @@ export async function authorizationChecker(
   try {
     const request = action.request as AuthRequest;
 
-    // BetterAuth automatically extracts Bearer token from Authorization header
-    if (!betterAuthClient) {
-      return false;
-    }
-    const session = await betterAuthClient.api.getSession({
+     // BetterAuth automatically extracts Bearer token from Authorization header
+     if (!betterAuthClient) {
+       return false;
+     }
+     const session = await betterAuthClient.api.getSession({
       headers: request.headers,
     });
 
@@ -117,13 +117,13 @@ export async function currentUserChecker(
   try {
     const request = action.request as AuthRequest;
 
-    // BetterAuth automatically extracts Bearer token from Authorization header
-    if (!betterAuthClient) {
-      return undefined;
-    }
-    const session = await betterAuthClient.api.getSession({
-      headers: request.headers,
-    });
+     // BetterAuth automatically extracts Bearer token from Authorization header
+     if (!betterAuthClient) {
+       return undefined;
+     }
+     const session = await betterAuthClient.api.getSession({
+       headers: request.headers,
+     });
 
     if (!session) {
       return undefined;

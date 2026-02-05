@@ -11,7 +11,7 @@ import { users } from '../schemas/user.schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '../infrastructure/logger';
 import { appConfig } from '../config/appConfig';
-import type { Auth } from 'better-auth/types';
+import { betterAuthClient } from '../infrastructure/better-auth.client';
 
 /**
  * Extended Socket interface with authenticated user
@@ -23,16 +23,7 @@ interface AuthenticatedSocket extends Socket {
   name?: string;
 }
 
-/**
- * Get BetterAuth instance
- * TODO: Implement proper BetterAuth client initialization
- * @deprecated This function is a placeholder and not yet implemented
- */
-const getAuthInstance = (): any => {
-   // TODO: Implement BetterAuth client initialization
-   // Requires proper authentication infrastructure setup
-   return null as any;
-};
+
 
 /**
  * WebSocket authentication middleware
@@ -53,9 +44,8 @@ export async function webSocketAuthMiddleware(
        return next(new Error('Authentication token required'));
      }
 
-     // Validate session with BetterAuth
-     const auth = getAuthInstance();
-     const session = await auth.api.getSession({
+      // Validate session with BetterAuth
+      const session = await betterAuthClient.api.getSession({
        headers: socket.handshake.headers as any,
      });
 
