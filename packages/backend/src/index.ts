@@ -12,13 +12,17 @@ import { AuthController } from './controllers/auth.controller';
 import { ConversationsController } from './controllers/conversations.controller';
 import { AuditController } from './controllers/audit.controller';
 import { HealthController } from './controllers/health.controller';
+import { QueueController } from './controllers/queue.controller';
 import { config } from './config/config';
+import { logger } from './config/logging';
+import { messageQueueService } from './services/message-queue.service';
+import { messageQueueProcessor } from './services/message-queue-processor';
 
 const app = express();
 
 // ===== SETUP ROUTING-CONTROLLERS =====
 useExpressServer(app, {
-  controllers: [AuthController, SimpleAuthController, ConversationsController, AuditController, HealthController],
+  controllers: [AuthController, ConversationsController, AuditController, HealthController, QueueController],
   authorizationChecker: authorizationChecker,
   currentUserChecker: currentUserChecker,
   defaultErrorHandler: true,
@@ -58,14 +62,34 @@ async function start() {
       throw new Error('Failed to connect to database');
     }
 
+    // Initialize message queue service with processor
+    logger.info('Initializing message queue service...');
+    await messageQueueService.initialize(messageQueueProcessor);
+    logger.info('Message queue service initialized successfully');
+
+    // Setup graceful shutdown
+    process.on('SIGTERM', async () => {
+      logger.info('SIGTERM received - shutting down gracefully');
+      await messageQueueService.close();
+      process.exit(0);
+    });
+
+    process.on('SIGINT', async () => {
+      logger.info('SIGINT received - shutting down gracefully');
+      await messageQueueService.close();
+      process.exit(0);
+    });
+
     // Start server
     server.listen(config.app.port, () => {
       console.log(`🚀 Server running on port ${config.app.port}`);
       console.log(`📍 API: http://localhost:${config.app.port}/api`);
       console.log(`🔗 WebSocket: ws://localhost:${config.app.port}`);
+      logger.info(`Server started on port ${config.app.port}`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
+    logger.error({ error }, 'Failed to start server');
     process.exit(1);
   }
 }

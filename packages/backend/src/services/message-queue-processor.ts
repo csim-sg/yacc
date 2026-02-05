@@ -1,6 +1,7 @@
 import { Job } from 'bullmq';
 import { logger } from '../config/logging';
 import { SendMessageJobPayload } from '../types/message-queue.types';
+import { queueDatabaseIntegration } from './queue-database-integration';
 import type { BaseConnector } from '../connectors/base/baseConnector';
 
 /**
@@ -124,12 +125,15 @@ export async function messageQueueProcessor(job: Job<SendMessageJobPayload>): Pr
       'Message delivered successfully'
     );
 
-    // TODO: Update database message status to 'sent'
-    // await messageService.updateMessageStatus(messageId, 'sent', { platformMessageId: response.platformMessageId });
+    // Update database message status to 'sent'
+    await queueDatabaseIntegration.updateMessageSent(job.data, response.platformMessageId);
 
     // Mark job as complete (BullMQ will handle removal based on defaultJobOptions)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const attemptsMade = job.attemptsMade || 0;
+    const maxAttempts = job.opts.attempts || 3;
+    const nextRetryTime = new Date(Date.now() + 60000).toISOString(); // Default 1m
 
     logger.warn(
       {
@@ -137,20 +141,21 @@ export async function messageQueueProcessor(job: Job<SendMessageJobPayload>): Pr
         messageId,
         conversationId,
         platform: platformType,
-        attempt: (job.attemptsMade || 0) + 1,
-        maxAttempts: job.opts.attempts || 3,
+        attempt: attemptsMade + 1,
+        maxAttempts,
         error: errorMessage,
       },
       'Message delivery failed - will retry'
     );
 
-    // TODO: Update database message status to 'failed' with error details
-    // const failureReason = categorizeError(error);
-    // await messageService.updateMessageStatus(messageId, 'failed', {
-    //   error: errorMessage,
-    //   failureReason,
-    //   attempt: (job.attemptsMade || 0) + 1,
-    // });
+    // Update database message status with error details
+    await queueDatabaseIntegration.updateMessageFailed(
+      job.data,
+      error instanceof Error ? error : new Error(errorMessage),
+      attemptsMade,
+      maxAttempts,
+      nextRetryTime
+    );
 
     // Rethrow to trigger BullMQ retry mechanism
     throw error;

@@ -1,6 +1,7 @@
 import { Queue, Worker, Job } from 'bullmq';
 import { getRedisClient } from '../config/redis';
 import { logger } from '../config/logging';
+import { queueDatabaseIntegration } from './queue-database-integration';
 import {
   SendMessageJobPayload,
   SendMessageJobPayloadSchema,
@@ -279,6 +280,14 @@ class MessageQueueService {
           error: error.message,
         },
         'Message moved to dead-letter queue'
+      );
+
+      // Record in database that message is in DLQ
+      await queueDatabaseIntegration.recordMessageInDLQ(
+        job.data,
+        FailureReason.MAX_RETRIES_EXCEEDED,
+        job.attemptsMade || RETRY_CONFIG.MAX_ATTEMPTS,
+        error.message
       );
 
       // TODO: Emit via websocket gateway when available
