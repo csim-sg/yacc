@@ -11,6 +11,7 @@ import { users } from '../schemas/user.schema';
 import { eq } from 'drizzle-orm';
 import { appConfig } from '../config/appConfig';
 import type { AuthUser } from '../types/auth.types';
+import { betterAuthClient } from '@/infrastructure/better-auth.client';
 // TODO: Implement BetterAuth client
 // import { getAuthInstance } from '../infrastructure/better-auth.client';
 
@@ -27,10 +28,6 @@ interface AuthRequest extends Request {
   };
 }
 
-// TODO: Initialize BetterAuth properly when infrastructure is ready
-// const auth = getAuthInstance();
-const auth = null as any;
-
 /**
  * Authorization checker for routing-controllers
  * Validates BetterAuth session and checks user roles/permissions
@@ -44,61 +41,61 @@ export async function authorizationChecker(
   roles: string[]
 ): Promise<boolean> {
   try {
-    // const request = action.request as AuthRequest;
+    const request = action.request as AuthRequest;
 
-    // // BetterAuth automatically extracts Bearer token from Authorization header
-    // if (!auth) {
-    //   return false;
-    // }
-    // const session = await auth.api.getSession({
-    //   headers: request.headers,
-    // });
+    // BetterAuth automatically extracts Bearer token from Authorization header
+    if (!betterAuthClient) {
+      return false;
+    }
+    const session = await betterAuthClient.api.getSession({
+      headers: request.headers,
+    });
 
-    // if (!session) {
-    //   return false;
-    // }
+    if (!session) {
+      return false;
+    }
 
-    // // Fetch full user from database to get role and status
-    // const userId = session.user.id as string;
-    // const user = await dbClient.query.users.findFirst({
-    //   where: eq(users.id, userId),
-    // });
+    // Fetch full user from database to get role and status
+    const userId = session.user.id as string;
+    const user = await dbClient.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
 
-    // if (!user) {
-    //   return false;
-    // }
+    if (!user) {
+      return false;
+    }
 
-    // // Check user status - inactive or suspended users cannot login
-    // if (user.status === 'inactive' || user.status === 'suspended') {
-    //   return false;
-    // }
+    // Check user status - inactive or suspended users cannot login
+    if (user.status === 'inactive' || user.status === 'suspended') {
+      return false;
+    }
 
-    // // Attach user to request (for currentUserChecker)
-    // request.user = {
-    //   id: user.id,
-    //   email: user.email,
-    //   name: user.name,
-    //   role: user.role,
-    //   status: user.status,
-    //   emailVerified: user.emailVerified,
-    //   createdAt: user.createdAt,
-    //   lastLoginAt: user.lastLoginAt,
-    // } as AuthUser;
+    // Attach user to request (for currentUserChecker)
+    request.user = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      status: user.status,
+      emailVerified: user.emailVerified,
+      createdAt: user.createdAt,
+      lastLoginAt: user.lastLoginAt,
+    } as AuthUser;
 
-    // // Attach session to request
-    // request.session = {
-    //   id: session.session.id as string,
-    //   userId: user.id,
-    //   expiresAt: session.session.expiresAt as Date,
-    // };
+    // Attach session to request
+    request.session = {
+      id: session.session.id as string,
+      userId: user.id,
+      expiresAt: session.session.expiresAt as Date,
+    };
 
-    // // If no specific roles required, just check if authenticated
-    // if (!roles || roles.length === 0) {
-    //   return true;
-    // }
+    // If no specific roles required, just check if authenticated
+    if (!roles || roles.length === 0) {
+      return true;
+    }
 
-    // // Check if user has required role
-    // return roles.includes(user.role);
+    // Check if user has required role
+    return roles.includes(user.role);
 
     return false;
   } catch (error) {
@@ -118,40 +115,40 @@ export async function currentUserChecker(
   action: Action
 ): Promise<AuthUser | undefined> {
   try {
-    // const request = action.request as AuthRequest;
+    const request = action.request as AuthRequest;
 
-    // // BetterAuth automatically extracts Bearer token from Authorization header
-    // if (!auth) {
-    //   return undefined;
-    // }
-    // const session = await auth.api.getSession({
-    //   headers: request.headers,
-    // });
+    // BetterAuth automatically extracts Bearer token from Authorization header
+    if (!betterAuthClient) {
+      return undefined;
+    }
+    const session = await betterAuthClient.api.getSession({
+      headers: request.headers,
+    });
 
-    // if (!session) {
-    //   return undefined;
-    // }
+    if (!session) {
+      return undefined;
+    }
 
-    // // Fetch full user from database to get role and status
-    // const userId = session.user.id as string;
-    // const user = await dbClient.query.users.findFirst({
-    //   where: eq(users.id, userId),
-    // });
+    // Fetch full user from database to get role and status
+    const userId = session.user.id as string;
+    const user = await dbClient.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
 
-    // if (!user || user.status === 'inactive' || user.status === 'suspended') {
-    //   return undefined;
-    // }
+    if (!user || user.status === 'inactive' || user.status === 'suspended') {
+      return undefined;
+    }
 
-    // return {
-    //   id: user.id,
-    //   email: user.email,
-    //   name: user.name,
-    //   role: user.role,
-    //   status: user.status,
-    //   emailVerified: user.emailVerified,
-    //   createdAt: user.createdAt,
-    //   lastLoginAt: user.lastLoginAt,
-    // } as AuthUser;
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      status: user.status,
+      emailVerified: user.emailVerified,
+      createdAt: user.createdAt,
+      lastLoginAt: user.lastLoginAt,
+    } as AuthUser;
 
     return undefined;
   } catch (error) {
