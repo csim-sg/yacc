@@ -5,8 +5,5 @@
  * TODO: Implement request files in Phase 2
  */
 
-// Re-export all for convenience
-export type {
-  // TODO: Define these types
-  ISearchableRequest,
-};
+// TODO: Define and export request DTOs in Phase 2
+// export type { ISearchableRequest };

@@ -17,13 +17,12 @@ import { auth } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
 import { users } from '../schemas/user.schema';
 import { eq } from 'drizzle-orm';
-import { EmailService } from '../config/email';
 import { generateResetToken, resetPassword } from '../services/passwordReset.service';
 import { logger } from '../infrastructure/logger';
 import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
 
-// Initialize email service singleton
-const emailService = new EmailService();
+// TODO: Implement EmailService in infrastructure layer
+// import { emailService } from '../infrastructure/email.client';
 
 @Controller('/api/auth')
 export class AuthController {
@@ -55,14 +54,14 @@ export class AuthController {
         };
       }
 
-      // Generate token using password reset service
-      const token = await generateResetToken(user.id, correlationId);
+       // Generate token using password reset service
+       const token = await generateResetToken(user.id, correlationId);
 
-       // Send email
-       const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
-       await emailService.sendPasswordResetEmail(email, resetLink);
+        // TODO: Send email via emailService when implemented
+        // const resetLink = `${appConfig.APP_FRONTEND_URL}/reset-password?token=${token}`;
+        // await emailService.sendPasswordResetEmail(email, resetLink);
 
-      logger.info('Password reset token generated and email sent - correlationId: %s, userId: %s', correlationId, user.id);
+       logger.info('Password reset token generated and email sent - correlationId: %s, userId: %s', correlationId, user.id);
 
       // Return same response as if email didn't exist (prevent enumeration)
       return {

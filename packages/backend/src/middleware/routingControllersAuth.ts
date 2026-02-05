@@ -7,10 +7,9 @@
 import { Action } from 'routing-controllers';
 import type { Request } from 'express';
 import { dbClient } from '../infrastructure/db.client';
-// TODO: Export schema from db.client
-// import { users, session } from '../infrastructure/db.schema';
+import { users } from '../schemas/user.schema';
 import { eq } from 'drizzle-orm';
-import { config } from '../config/config';
+import { appConfig } from '../config/appConfig';
 import type { AuthUser } from '../types/auth.types';
 // TODO: Implement BetterAuth client
 // import { getAuthInstance } from '../infrastructure/better-auth.client';

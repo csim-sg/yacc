@@ -10,7 +10,7 @@ import { dbClient } from '../infrastructure/db.client';
 import { users } from '../schemas/user.schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '../infrastructure/logger';
-import { config } from '../config/config';
+import { appConfig } from '../config/appConfig';
 import type { Auth } from 'better-auth/types';
 
 /**

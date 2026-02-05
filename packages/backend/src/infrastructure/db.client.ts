@@ -6,11 +6,9 @@
  */
 
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { config } from '../config/config';
+import { appConfig } from '../config/appConfig';
 import { Pool } from 'pg';
-import {users} from "@/schemas/user.schema";
-import { appConfig } from '@/config/appConfig';
-import { schemas } from '@/schemas';
+import { schemas } from '../schemas';
 
 // Singleton: Initialize connection pool once at module load
 const pool = new Pool({
@@ -23,3 +21,15 @@ export const dbClient = drizzle({
   client: pool,
   schema: schemas,
 });
+
+/**
+ * Check database connection health
+ */
+export async function checkDatabaseConnection(): Promise<boolean> {
+  try {
+    await pool.query('SELECT NOW()');
+    return true;
+  } catch (error) {
+    return false;
+  }
+}

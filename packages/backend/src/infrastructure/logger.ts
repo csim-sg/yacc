@@ -7,13 +7,13 @@
 
 import pino from 'pino';
 import type { Logger, LoggerOptions } from 'pino';
-import { config } from '../config/config';
+import { appConfig } from '../config/appConfig';
 
 /**
  * Configuration
  */
-const isProduction = process.env.NODE_ENV === 'production';
-const logLevel = process.env.LOG_LEVEL || config.logging.level;
+const isProduction = appConfig.APP_ENV === 'production';
+const logLevel = appConfig.LOG_LEVEL;
 
 /**
  * Pino logger configuration
