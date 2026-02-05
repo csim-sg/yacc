@@ -28,12 +28,10 @@
 **QA/Testers:**
 - `04-qa-and-testing.md` - Test cases & regression suite
 - `01-product-specification.md` - User stories & acceptance criteria
-- `06-phase1-execution-guide.md` - Phase 1 execution plan
 
 **Product Owners & Designers:**
 - `01-product-specification.md` - Complete product scope
 - `05-quick-reference.md` - Features checklist
-- `06-phase1-execution-guide.md` - Phase 1 deliverables
 
 **Tech Leads & Architects:**
 - `03-implementation-guide.md` - Complete system architecture
@@ -129,26 +127,22 @@
 
 ---
 
-### 🔹 06-phase1-execution-guide.md
-**Phase 1 execution plan with complete scope and acceptance criteria**
 
-- Phase 1 scope (Telegram + IRC integration)
-- 22 P0 Backend issues with dependencies
-- Complete dependency graph (Mermaid diagram)
-- 3-week execution timeline
-- Week-by-week breakdown with daily tasks
-- Technical clarifications for all issues
-- Risk mitigation strategies
-- Environment variables reference
-- Testing strategy (unit, integration, E2E)
-- Handoff checklist
-
-**When to use:** Starting Phase 1, sprint planning, tracking progress  
-**Audience:** Backend developers, tech leads, architects
-
----
 
 ## 📋 Architecture Artifacts
+
+### 📁 architecture/ (Architect Reviews)
+
+Official architecture review documents and guidance.
+
+**Current Files:**
+- **INDEX-TS-RULE-CLARIFICATION.md** - Explains no barrel exports rule with exceptions
+- **ARCHITECT-REVIEW-BE006-PR177.md** - Review of BE-006 WebSocket infrastructure
+
+**When to use:** Understanding architecture patterns and decisions  
+**Audience:** Architects, developers making design decisions
+
+---
 
 ### 📁 adr/ (Architecture Decision Records)
 
@@ -189,10 +183,7 @@ Development planning documents, task tracking, and sprint planning.
 
 **Key Files:**
 - **00-INDEX.md**: Master planning index with task status
-- **BE-004-***: Backend task 4 planning docs
-- **BE-006-***: Backend task 6 planning docs
-- **FE-005-006-***: Frontend tasks 5-6 planning docs
-- **week1-***, **week2-***: Weekly planning documents
+- **BE-006-websocket-quick-start.md**: Quick start guide for WebSocket implementation
 
 **When to use:** Daily task tracking, sprint planning  
 **Audience:** Developers, tech leads, project managers
@@ -256,12 +247,12 @@ Development planning documents, task tracking, and sprint planning.
 
 ---
 
-## ✅ Updated: 2026-01-28
+## ✅ Updated: 2026-02-05
 
 **Status:** ✅ Clean structure, ready for development  
-**Total Files:** 53 (down from 93)  
-**Total Size:** 1.1MB (down from 1.7MB)  
-**Organization:** Core docs + ADR + Governance + Plans
+**Total Files:** 46 (cleaned up redundant docs)  
+**Organization:** Core docs + Architecture + ADR + Governance + Plans  
+**Latest:** BE-006 WebSocket infrastructure architecture review complete
 
 ---
 
@@ -276,7 +267,8 @@ Development planning documents, task tracking, and sprint planning.
 | System architecture | `03-implementation-guide.md` | 30 min |
 | Test cases | `04-qa-and-testing.md` | 20 min |
 | Quick reference | `05-quick-reference.md` | 5 min |
-| Phase 1 plan | `06-phase1-execution-guide.md` | 20 min |
+| Architecture review | `architecture/ARCHITECT-REVIEW-BE006-PR177.md` | 20 min |
+| Architecture patterns | `architecture/INDEX-TS-RULE-CLARIFICATION.md` | 10 min |
 | Architecture decisions | `adr/` | varies |
 | Decision approvals | `governance/` | varies |
 | Task tracking | `plans/00-INDEX.md` | varies |
