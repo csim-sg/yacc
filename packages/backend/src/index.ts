@@ -18,6 +18,7 @@ import { ConversationsController } from './controllers/conversations.controller'
 import { AuditController } from './controllers/audit.controller';
 import { HealthController } from './controllers/health.controller';
 import { WebSocketServer } from './websockets/websocket.server';
+import { setWebSocketGateway } from './services/websocket/websocket-gateway';
 import { dbClient, checkDatabaseConnection } from './infrastructure/db.client';
 import { redisClient, checkRedisHealth } from './infrastructure/redis.client';
 import { r2Client, isR2Configured, checkR2Health } from './infrastructure/r2.client';
@@ -65,6 +66,9 @@ useExpressServer(app, {
 // ===== SETUP WEBSOCKET SERVER =====
 const server = http.createServer(app);
 const wsServer = new WebSocketServer(server);
+
+// Initialize WebSocket gateway for services to access
+setWebSocketGateway(wsServer);
 
 // ===== SETUP SERVER STARTUP =====
 async function start() {
