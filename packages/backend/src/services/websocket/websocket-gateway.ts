@@ -13,6 +13,7 @@
 import type { WebSocketServer } from '../../websockets/websocket.server';
 import type { WebSocketEventMap } from '../../types/websocket.types';
 import { logger } from '../../infrastructure/logger';
+import { storeEvent } from './event-backlog.service';
 
 /**
  * Global WebSocket gateway instance
@@ -59,6 +60,8 @@ export function isWebSocketGatewayAvailable(): boolean {
  * Emit event to a conversation room
  * Safe for use from any service after gateway initialization
  *
+ * Events are automatically stored in backlog for reconnection replay
+ *
  * @param conversationId - Conversation ID
  * @param eventName - Event name (type-checked)
  * @param payload - Event payload (type-checked)
@@ -72,6 +75,15 @@ export async function emitToConversation<K extends keyof WebSocketEventMap>(
   try {
     const gateway = getWebSocketGateway();
     gateway.emitToConversation(conversationId, eventName, payload);
+
+    // Store in backlog for reconnection replay (best-effort, don't wait)
+    // Get subscribers for this conversation and store for each
+    const subscribers = gateway.getConversationSubscribers(conversationId);
+    for (const userId of subscribers) {
+      storeEvent(eventName, payload, conversationId, userId).catch(() => {
+        // Backlog storage is best-effort, ignore errors
+      });
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(
@@ -117,6 +129,9 @@ export async function emitToUser<K extends keyof WebSocketEventMap>(
  * Broadcast event globally to all connected clients
  * Safe for use from any service after gateway initialization
  *
+ * Events are automatically stored in backlog for reconnection replay
+ * For global events (presence, etc.), stored without conversation ID
+ *
  * @param eventName - Event name (type-checked)
  * @param payload - Event payload (type-checked)
  * @throws Error if gateway not initialized
@@ -128,6 +143,15 @@ export async function emitGlobally<K extends keyof WebSocketEventMap>(
   try {
     const gateway = getWebSocketGateway();
     gateway.emitGlobally(eventName, payload);
+
+    // Store in backlog for reconnection replay (best-effort)
+    // Get all connected users and store for each
+    const connectedUsers = gateway.getConnectedUserIds();
+    for (const userId of connectedUsers) {
+      storeEvent(eventName, payload, undefined, userId).catch(() => {
+        // Backlog storage is best-effort, ignore errors
+      });
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Failed to broadcast event globally - event: %s, error: %s', eventName, errorMessage);
