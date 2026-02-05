@@ -12,7 +12,6 @@ import { dbClient } from '../infrastructure/db.client';
 import { redisClient } from '../infrastructure/redis.client';
 import { checkR2Health, isR2Configured } from '../infrastructure/r2.client';
 import { logger } from '../infrastructure/logger';
-import { appConfig } from '../config/appConfig';
 import type {
   HealthStatus,
   DependencyHealth,
