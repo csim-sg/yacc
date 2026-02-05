@@ -43,9 +43,10 @@ You MUST maintain the following **authoritative architecture document sets**:
 ### Log Directory Structure
 
 .docs |
-    -- ARCHITECTURE_DECISION_RECORDS <= Architecture Decision Record
-    -- GOV_LOG <= Architecture Governance Log
-    -- temp <= Any temp documents
+    -- adr <= Architecture Decision Records (ADRs)
+    -- governance <= Architecture Governance Logs (GOV-XXX)
+    -- architecture <= Architecture assessment / core architecture docs
+    -- plans <= Execution plans / task tracking
     (3 core architecture docs + biz document)
 
 ###  Architecture Documents (3 CORE AREAS)

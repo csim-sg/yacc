@@ -7,62 +7,55 @@
  */
 
 import { All, Controller, Req, Res } from 'routing-controllers';
-import { checkDatabaseConnection } from '../../infrastructure/db/client';
-import { checkRedisHealth } from '../../infrastructure/redis';
-import { checkR2Health, isR2Configured } from '../../infrastructure/r2';
-import logger from '../../utils/logger';
+import type { Request, Response } from 'express';
+import { dbClient } from '../infrastructure/db.client';
+import { redisClient } from '../infrastructure/redis.client';
+import { checkR2Health, isR2Configured } from '../infrastructure/r2.client';
+import { logger } from '../infrastructure/logger';
 import type {
   HealthStatus,
   DependencyHealth,
   HealthSLO,
-  HealthResponse,
-  LivenessResponse,
-  ReadinessResponse,
 } from '@yacc/common/responses/health/healthResponse.response';
-
-/**
- * Complete health response
- */
-interface HealthResponse {
-  status: HealthStatus;
-  uptime: number;
-  timestamp: string;
-  dependencies: {
-    postgresql: DependencyHealth;
-    redis: DependencyHealth;
-    r2: DependencyHealth;
-  };
-  slo?: {
-    latencyMs: number;
-    errorRatePercent: number;
-    withinThreshold: boolean;
-  };
-}
-
-/**
- * Liveness probe response (is process running)
- */
-interface LivenessResponse {
-  status: 'alive' | 'dead';
-  timestamp: string;
-}
-
-/**
- * Readiness probe response (can handle traffic)
- */
-interface ReadinessResponse {
-  status: 'ready' | 'not_ready';
-  timestamp: string;
-  dependencies: {
-    postgresql: boolean;
-    redis: boolean;
-    r2: boolean;
-  };
-}
 
 // ============================================
 // Health Check Implementation
 // ============================================
+
+/**
+ * Check if database is connected
+ */
+async function checkDatabaseConnection(): Promise<boolean> {
+  try {
+    // Use Drizzle's query builder for health check
+    await dbClient.execute('SELECT 1' as any);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if Redis is connected
+ */
+async function checkRedisHealth(): Promise<boolean> {
+  try {
+    await redisClient.ping();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
+
+/**
+ * Default SLO thresholds
+ */
+const DEFAULT_SLO = {
+  maxLatencyMs: 1000,
+  errorThresholdPercent: 10,
+} as const;
 
 /**
  * Check PostgreSQL health with timeout
@@ -82,7 +75,7 @@ async function checkPostgreSQL(): Promise<DependencyHealth> {
     if (result) {
       const latencyMs = Date.now() - startTime;
 
-      logger.debug('PostgreSQL health check passed', { latencyMs });
+      logger.debug('PostgreSQL health check passed with %d ms latency', latencyMs);
 
       return {
         name: 'postgresql',
@@ -94,7 +87,7 @@ async function checkPostgreSQL(): Promise<DependencyHealth> {
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error('PostgreSQL health check failed', { error: errorMessage });
+    logger.error('PostgreSQL health check failed: %s', errorMessage);
 
     return {
       name: 'postgresql',
@@ -122,7 +115,7 @@ async function checkRedis(): Promise<DependencyHealth> {
     if (result) {
       const latencyMs = Date.now() - startTime;
 
-      logger.debug('Redis health check passed', { latencyMs });
+      logger.debug('Redis health check passed with %d ms latency', latencyMs);
 
       return {
         name: 'redis',
@@ -134,7 +127,7 @@ async function checkRedis(): Promise<DependencyHealth> {
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error('Redis health check failed', { error: errorMessage });
+    logger.error('Redis health check failed: %s', errorMessage);
 
     return {
       name: 'redis',
@@ -171,7 +164,7 @@ async function checkR2(): Promise<DependencyHealth> {
     if (result) {
       const latencyMs = Date.now() - startTime;
 
-      logger.debug('R2 health check passed', { latencyMs });
+      logger.debug('R2 health check passed with %d ms latency', latencyMs);
 
       return {
         name: 'r2',
@@ -183,7 +176,7 @@ async function checkR2(): Promise<DependencyHealth> {
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error('R2 health check failed', { error: errorMessage });
+    logger.error('R2 health check failed: %s', errorMessage);
 
     return {
       name: 'r2',
@@ -217,13 +210,18 @@ function calculateOverallHealth(
  */
 function calculateSLOs(
   dependencies: DependencyHealth[]
-): HealthSLO['latencyMs' | 'errorRatePercent' | 'withinThreshold'] {
+): {
+  latencyMs: number;
+  errorRatePercent: number;
+  withinThreshold: boolean;
+} {
   const latencyMs = Math.max(...dependencies.map((d) => d.latencyMs || 0));
   const upCount = dependencies.filter((d) => d.status === 'up').length;
   const errorRatePercent = ((dependencies.length - upCount) / dependencies.length) * 100;
 
-  const withinThreshold = latencyMs <= DEFAULT_SLO.maxLatencyMs &&
-                        errorRatePercent <= DEFAULT_SLO.errorThresholdPercent;
+  const withinThreshold =
+    latencyMs <= DEFAULT_SLO.maxLatencyMs &&
+    errorRatePercent <= DEFAULT_SLO.errorThresholdPercent;
 
   return {
     latencyMs,
@@ -249,7 +247,7 @@ export class HealthController {
    * GET /health - Complete health check with dependencies and SLOs
    */
   @All('/')
-  async getHealth(@Req() req: any, @Res() res: any): Promise<any> {
+  async getHealth(@Req() req: Request, @Res() res: Response): Promise<void> {
     try {
       // Check all dependencies in parallel
       const [postgresql, redis, r2] = await Promise.all([
@@ -266,16 +264,16 @@ export class HealthController {
       // Use process.uptime() instead of env variable
       const uptime = process.uptime();
 
-      logger.info('Health check completed', {
+      logger.info(
+        'Health check completed - status: %s, postgres: %s, redis: %s, r2: %s',
         status,
-        postgresql: postgresql.status,
-        redis: redis.status,
-        r2: r2.status,
-        slo,
-      });
+        postgresql.status,
+        redis.status,
+        r2.status
+      );
 
       // Return health response
-      return res.status(200).json({
+      res.status(200).json({
         status,
         uptime,
         timestamp: new Date().toISOString(),
@@ -289,17 +287,17 @@ export class HealthController {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      logger.error('Health check failed', { error: errorMessage });
+      logger.error('Health check failed: %s', errorMessage);
 
       // Return unhealthy status on error
-      return res.status(500).json({
+      res.status(500).json({
         status: 'unhealthy',
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
         dependencies: {
-          postgresql: { name: 'postgresql', status: 'down', error: errorMessage },
-          redis: { name: 'redis', status: 'down', error: errorMessage },
-          r2: { name: 'r2', status: 'down', error: errorMessage },
+          postgresql: { name: 'postgresql', status: 'down' as const, error: errorMessage },
+          redis: { name: 'redis', status: 'down' as const, error: errorMessage },
+          r2: { name: 'r2', status: 'down' as const, error: errorMessage },
         },
       });
     }
@@ -310,13 +308,13 @@ export class HealthController {
    * Kubernetes will restart pod if this returns non-200
    */
   @All('/live')
-  async getHealthLive(@Req() req: any, @Res() res: any): Promise<any> {
+  async getHealthLive(@Req() req: Request, @Res() res: Response): Promise<void> {
     // Simple liveness check - just returns alive if process is running
     // Kubernetes will restart pod if this fails
 
     logger.debug('Liveness probe');
 
-    return res.status(200).json({
+    res.status(200).json({
       status: 'alive',
       timestamp: new Date().toISOString(),
     });
@@ -327,7 +325,7 @@ export class HealthController {
    * Kubernetes stops sending traffic if this returns not_ready
    */
   @All('/ready')
-  async getHealthReady(@Req() req: any, @Res() res: any): Promise<any> {
+  async getHealthReady(@Req() req: Request, @Res() res: Response): Promise<void> {
     try {
       // Check all dependencies are ready
       const [postgresql, redis, r2] = await Promise.all([
@@ -341,14 +339,15 @@ export class HealthController {
       const r2Ready = r2.status === 'up';
       const allReady = postgresqlReady && redisReady && r2Ready;
 
-      logger.info('Readiness probe completed', {
-        postgresql: postgresqlReady ? 'up' : 'down',
-        redis: redisReady ? 'up' : 'down',
-        r2: r2Ready ? 'up' : 'down',
-        allReady,
-      });
+      logger.info(
+        'Readiness probe completed - postgres: %s, redis: %s, r2: %s, all_ready: %s',
+        postgresqlReady ? 'up' : 'down',
+        redisReady ? 'up' : 'down',
+        r2Ready ? 'up' : 'down',
+        allReady
+      );
 
-      return res.status(allReady ? 200 : 503).json({
+      res.status(allReady ? 200 : 503).json({
         status: allReady ? 'ready' : 'not_ready',
         timestamp: new Date().toISOString(),
         dependencies: {
@@ -360,9 +359,9 @@ export class HealthController {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      logger.error('Readiness probe failed', { error: errorMessage });
+      logger.error('Readiness probe failed: %s', errorMessage);
 
-      return res.status(503).json({
+      res.status(503).json({
         status: 'not_ready',
         timestamp: new Date().toISOString(),
         dependencies: {
@@ -374,10 +373,3 @@ export class HealthController {
     }
   }
 }
-
-// ============================================
-// Export
-// ============================================
-
-export type { HealthStatus, HealthResponse, LivenessResponse, ReadinessResponse };
-export { HealthController };

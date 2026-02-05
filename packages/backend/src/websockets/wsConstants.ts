@@ -47,10 +47,10 @@ export const PresenceEvents = {
  * All WebSocket event types
  */
 export type WebSocketEventType =
-  | MessageEvents[keyof typeof MessageEvents]
-  | ConversationEvents[keyof typeof ConversationEvents]
-  | NotificationEvents[keyof typeof NotificationEvents]
-  | PresenceEvents[keyof typeof PresenceEvents];
+   | typeof MessageEvents[keyof typeof MessageEvents]
+   | typeof ConversationEvents[keyof typeof ConversationEvents]
+   | typeof NotificationEvents[keyof typeof NotificationEvents]
+   | typeof PresenceEvents[keyof typeof PresenceEvents];
 
 // ============================================
 // WebSocket Configuration
@@ -100,15 +100,3 @@ export const MESSAGE_BACKLOG_DURATION_MS = 3600000;
  * Typing indicator timeout in milliseconds (5 seconds)
  */
 export const TYPING_TIMEOUT_MS = 5000;
-
-// ============================================
-// Export
-// ============================================
-
-export {
-  MessageEvents,
-  ConversationEvents,
-  NotificationEvents,
-  PresenceEvents,
-  WebSocketEventType,
-};

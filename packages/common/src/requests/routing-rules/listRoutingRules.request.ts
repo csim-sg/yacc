@@ -1,11 +1,11 @@
-import { IsOptional, IsInt, IsString, IsEnum } from 'class-validator';
-import { ISearchableRequest } from '../../types/searchable.request';
+import { IsOptional, IsInt, IsBoolean, Min, Max } from 'class-validator';
+import { SearchableRequest } from '../../types/searchableRequest.type';
 
 /**
  * List Routing Rules Request
  * Query parameters for listing routing rules
  */
-export class ListRoutingRulesRequest extends ISearchableRequest {
+export class ListRoutingRulesRequest extends SearchableRequest {
   @IsOptional()
   @IsInt()
   @Min(1)

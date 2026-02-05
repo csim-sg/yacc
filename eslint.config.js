@@ -44,7 +44,7 @@ export default [
             'sibling',
             'index',
           ],
-          'newlines-between': 'always',
+          'newlines-between': 'never',
           alphabetize: { order: 'asc', caseInsensitive: true },
         },
       ],

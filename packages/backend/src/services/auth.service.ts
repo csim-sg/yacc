@@ -1,12 +1,12 @@
-import { db } from '../../infrastructure/db/client.js';
-import { users, passwordResetTokens } from '../../infrastructure/db/schema.js';
 import { eq } from 'drizzle-orm';
 import {
   hashPassword,
   verifyPassword,
   generateResetToken,
-} from '../../infrastructure/auth/password.js';
-import { emailService } from '../../infrastructure/email/email.service.js';
+} from '../../infrastructure/auth/password';
+import { emailService } from '../../infrastructure/email/email.service';
+import {dbClient} from "@/infrastructure/db.client";
+import {users} from "@/schemas/user.schema";
 
 export class AuthService {
   /**
@@ -19,7 +19,7 @@ export class AuthService {
     role: 'super_admin' | 'admin' | 'manager' | 'user' = 'user'
   ) {
     // Check if user exists
-    const existing = await db.query.users.findFirst({
+    const existing = await dbClient.query.users.findFirst({
       where: eq(users.email, email),
     });
 

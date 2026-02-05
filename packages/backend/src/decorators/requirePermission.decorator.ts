@@ -1,5 +1,5 @@
 import { createParamDecorator, ForbiddenError } from 'routing-controllers';
-import type { AuthUser } from '../types/auth.types';
+import type { AuthUser, Permission } from '../types/auth.types';
 import { PERMISSIONS } from '../types/auth.types';
 
 // PERMISSIONS matrix is defined and exported in auth.types.ts
@@ -31,7 +31,7 @@ import { PERMISSIONS } from '../types/auth.types';
  * 
  * @param permission - Permission string (e.g., 'users.create')
  */
-export function RequirePermission(permission: string | AuthUser) {
+export function RequirePermission(permission: Permission) {
   return createParamDecorator({
     required: true,
     value: (action) => {
@@ -74,7 +74,7 @@ export function RequirePermission(permission: string | AuthUser) {
  * @param user - Authenticated user object
  * @param permission - Permission string to check
  */
-export function hasPermission(user: AuthUser, permission: string): boolean {
+export function hasPermission(user: AuthUser, permission: Permission): boolean {
   if (!user) return false;
   
   const userPermissions = PERMISSIONS[user.role] || [];

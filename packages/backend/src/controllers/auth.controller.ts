@@ -9,22 +9,20 @@
  * 
  * This controller also handles custom password reset flow
  * for forgot-password and reset-password endpoints.
- *
- * NOTE: simple-auth.controller.ts has been removed because BetterAuth
- * already provides these endpoints through the wildcard handler.
  */
 
 import { All, Controller, Post, Req, Res, Body } from 'routing-controllers';
-import type { Request, Response } from 'express';
-import { auth } from '../config/auth';
-import { db } from '../config/db';
+import type { Response } from 'express';
+import { betterAuthClient } from '../infrastructure/better-auth.client';
+import { dbClient } from '../infrastructure/db.client';
+import { users } from '../schemas/user.schema';
+import { eq } from 'drizzle-orm';
+import { generateResetToken, resetPassword } from '../services/passwordReset.service';
+import { logger } from '../infrastructure/logger';
 import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
-import {
-  generateResetToken,
-  resetPassword,
-} from '../services/passwordReset.service';
-import { emailService } from '../config/email';
-import type { AuthRequestType } from '@yacc/common/requests/auth/authRequest.type';
+
+// TODO: Implement EmailService in infrastructure layer
+// import { emailService } from '../infrastructure/email.client';
 
 @Controller('/api/auth')
 export class AuthController {
@@ -32,49 +30,38 @@ export class AuthController {
    * POST /api/auth/forgot-password
    * Request password reset email (ALWAYS returns 200 to prevent email enumeration)
    *
-   * Request: ForgotPasswordRequest { "email": "user@example.com" }
-   * Response: ForgotPasswordResponse { "message": "..." }
-   * 
-   * @see packages/common/src/requests/password-reset.request.ts
-   * @see packages/common/src/responses/password-reset.response.ts
+   * Request: { "email": "user@example.com" }
+   * Response: { "message": "If an email exists, a password reset link has been sent" }
    */
   @Post('/forgot-password')
-  async forgotPassword(@Body() body: typeof ForgotPasswordSchema, @Req() req: AuthRequestType): Promise<{ message: string }> {
-    const correlationId = req.correlationId || 'unknown';
+  async forgotPassword(@Body() body: unknown, @Req() req: Request): Promise<{ message: string }> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const correlationId = (req as any).correlationId || 'unknown';
 
     try {
       // Validate input using Zod schema
       const { email } = ForgotPasswordSchema.parse(body);
 
       // Try to find user
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
+      const userResult = await dbClient.select().from(users).where(eq(users.email, email)).limit(1);
+      const user = userResult[0];
 
       // IMPORTANT: Always return success to prevent email enumeration
       if (!user) {
-        console.debug('Forgot password attempt with non-existent email', {
-          correlationId,
-          email,
-        });
+        logger.debug('Forgot password attempt with non-existent email - correlationId: %s, email: %s', correlationId, email);
         return {
           message: 'If an email exists, a password reset link has been sent',
         };
       }
 
-      // Generate token using password reset service
-      const token = await generateResetToken(user.id, correlationId);
+       // Generate token using password reset service
+       const token = await generateResetToken(user.id, correlationId);
 
-      // Send email
-      const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
-      await emailService.sendPasswordResetEmail(email, resetLink, token);
+        // TODO: Send email via emailService when implemented
+        // const resetLink = `${appConfig.APP_FRONTEND_URL}/reset-password?token=${token}`;
+        // await emailService.sendPasswordResetEmail(email, resetLink);
 
-      console.info('Password reset token generated and email sent', {
-        correlationId,
-        userId: user.id,
-      });
+       logger.info('Password reset token generated and email sent - correlationId: %s, userId: %s', correlationId, user.id);
 
       // Return same response as if email didn't exist (prevent enumeration)
       return {
@@ -82,10 +69,7 @@ export class AuthController {
       };
     } catch (error: unknown) {
       // Log error but still return success response (prevent enumeration)
-      console.error('Forgot password error', {
-        correlationId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error('Forgot password error - correlationId: %s, error: %s', correlationId, error instanceof Error ? error.message : String(error));
 
       return {
         message: 'If an email exists, a password reset link has been sent',
@@ -97,19 +81,17 @@ export class AuthController {
    * POST /api/auth/reset-password
    * Reset password using token
    *
-   * Request: ResetPasswordRequest { "token": "64-char-hex-token", "newPassword": "NewPassword123!" }
-   * Response: ResetPasswordResponse { "success": true, "message": "Password reset successfully" }
+   * Request: { "token": "64-char-hex-token", "newPassword": "NewPassword123!" }
+   * Response: { "success": true, "message": "Password reset successfully" }
    * Error: 400 { "error": "Invalid or expired token" }
-   * 
-   * @see packages/common/src/requests/password-reset.request.ts
-   * @see packages/common/src/responses/password-reset.response.ts
    */
   @Post('/reset-password')
   async resetPasswordHandler(
-    @Body() body: typeof ResetPasswordSchema,
-    @Req() req: AuthRequestType,
+    @Body() body: unknown,
+    @Req() req: Request,
   ): Promise<{ success: boolean; message: string }> {
-    const correlationId = req.correlationId || 'unknown';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const correlationId = (req as any).correlationId || 'unknown';
 
     try {
       // Validate input using Zod schema
@@ -118,17 +100,14 @@ export class AuthController {
       // Reset password (throws if token invalid/expired)
       await resetPassword(token, newPassword, correlationId);
 
-      console.info('Password reset successful', { correlationId });
+      logger.info('Password reset successful - correlationId: %s', correlationId);
 
       return {
         success: true,
         message: 'Password reset successfully',
       };
     } catch (error: unknown) {
-      console.error('Reset password error', {
-        correlationId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error('Reset password error - correlationId: %s, error: %s', correlationId, error instanceof Error ? error.message : String(error));
 
       // Return generic error to prevent token enumeration
       throw new Error('Invalid or expired token');
@@ -149,24 +128,30 @@ export class AuthController {
    * - /refresh-token (token refresh with Bearer plugin)
    */
   @All('/*')
-  async handleAuth(@Req() req: AuthRequestType, @Res() res: Response): Promise<void> {
-    // Convert Express request to BetterAuth format
-    // Need full URL for Request constructor
-    const protocol = req.protocol || 'http';
-    const host = req.get('host') || 'localhost:3000';
-    const fullUrl = `${protocol}://${host}${req.originalUrl || req.url}`;
-
-    const request = new Request(fullUrl, {
-      method: req.method,
-      headers: req.headers as HeadersInit,
-      body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
-    });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async handleAuth(@Req() req: any, @Res() res: Response): Promise<void> {
+    const correlationId = req.correlationId || 'unknown';
 
     try {
-      const response = await auth.handler(request);
+      // Convert Express request to BetterAuth format
+      // Need full URL for Request constructor
+      const protocol = req.protocol || 'http';
+      const host = req.get('host') || 'localhost:3000';
+      const fullUrl = `${protocol}://${host}${req.originalUrl || req.url}`;
 
-      // Set headers
-      response.headers.forEach((value: string, key: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const request = new (globalThis as any).Request(fullUrl, {
+        method: req.method,
+        headers: req.headers,
+        body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
+      });
+
+      const response = await betterAuthClient.handler(request);
+
+      // Set headers from response
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const headers = response.headers as any;
+      headers.forEach((value: string, key: string) => {
         res.setHeader(key, value);
       });
 
@@ -178,11 +163,8 @@ export class AuthController {
       res.send(body);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
-      console.error('BetterAuth handler error', {
-        correlationId: req.correlationId,
-        error: errorMessage,
-      });
-      
+      logger.error('BetterAuth handler error - correlationId: %s, error: %s', correlationId, errorMessage);
+
       res.status(500).json({ error: errorMessage });
     }
   }

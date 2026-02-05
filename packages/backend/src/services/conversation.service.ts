@@ -1,13 +1,13 @@
-import { db } from '../../infrastructure/db/client.js';
+import { db } from '../../infrastructure/db/client';
 import {
   conversations,
   messages,
   conversationTags,
   tags,
-} from '../../infrastructure/db/schema.js';
+} from '../../infrastructure/db/schema';
 import { eq, and, desc, asc, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
-import { auditService } from './audit.service.js';
+import { auditService } from './audit.service';
 
 export interface ListConversationsParams {
   page?: number;

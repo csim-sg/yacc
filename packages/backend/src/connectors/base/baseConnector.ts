@@ -35,21 +35,21 @@ export abstract class BaseConnector<
   // Properties
   // ==========================================
 
-  public readonly platform: T;
-  protected config: TConfig | null;
-  protected connectionStatus: ConnectorStatus = 'disconnected';
-  protected reconnectAttempts: number = 0;
-  protected maxReconnectAttempts: number = 10;
-  protected reconnectBackoffMs: number[] = [1000, 2000, 4000, 8000, 16000, 30000];
+   public readonly platform: T;
+   protected config: TConfig | null = null;
+   protected connectionStatus: ConnectorStatus = 'disconnected';
+   protected reconnectAttempts: number = 0;
+   protected maxReconnectAttempts: number = 10;
+   protected reconnectBackoffMs: number[] = [1000, 2000, 4000, 8000, 16000, 30000];
 
-  // ==========================================
-  // Constructor
-  // ==========================================
+   // ==========================================
+   // Constructor
+   // ==========================================
 
-  constructor(platform: T) {
-    super();
-    this.platform = platform;
-  }
+   constructor(platform: T) {
+     super();
+     this.platform = platform;
+   }
 
   // ==========================================
   // Public Interface Methods (to be implemented by subclasses)
@@ -77,26 +77,54 @@ export abstract class BaseConnector<
   /**
    * Get current connection status
    */
-  public getConnectionStatus(): ConnectionInfo {
-    return {
-      status: this.connectionStatus,
-      lastConnectedAt: this.getLastConnectedAt(),
-      lastDisconnectedAt: this.getLastDisconnectedAt(),
-      reconnectAttempts: this.reconnectAttempts,
-      errorMessage: this.getErrorMessage(),
-    };
-  }
+   public getConnectionStatus(): ConnectionInfo {
+     return {
+       platform: this.platform as unknown as string,
+       status: this.connectionStatus,
+       connectedAt: this.getLastConnectedAt(),
+       disconnectedAt: this.getLastDisconnectedAt(),
+       reconnectAttempts: this.reconnectAttempts,
+       error: this.getErrorMessage(),
+     };
+   }
 
   /**
-   * Check if connector is currently connected
+   * Update connection status with status tracking
    */
-  public isConnected(): boolean {
-    return this.connectionStatus === 'connected';
-  }
+  protected updateConnectionStatus(status: ConnectorStatus, errorMessage?: string): void {
+    this.connectionStatus = status;
 
-  /**
-   * Validate configuration
-   */
+    // Emit appropriate event based on status
+    switch (status) {
+      case 'connected':
+        this.setLastConnectedAt(new Date());
+        this.reconnectAttempts = 0;
+        this.emit('connected');
+        break;
+      case 'disconnected':
+        this.setLastDisconnectedAt(new Date());
+        this.emit('disconnected');
+        break;
+      case 'connecting':
+        this.emit('connecting');
+        break;
+      case 'error':
+        this.setErrorMessage(errorMessage || 'Unknown error');
+        this.emit('error', { message: errorMessage, status });
+        break;
+      case 'reconnecting':
+        this.emit('reconnecting', this.reconnectAttempts);
+        break;
+       case 'failed': {
+         this.emit('reconnect_failed');
+         break;
+       }
+     }
+   }
+
+   /**
+    * Validate configuration
+    */
   public async validateConfig(config: TConfig): Promise<ValidationError[]> {
     const errors: ValidationError[] = [];
 
@@ -298,14 +326,15 @@ export abstract class BaseConnector<
     const errors: ValidationError[] = [];
 
     for (const field of fields) {
-      const value = config[field];
-      if (!value || (typeof value === 'string' && !value.trim())) {
-        errors.push({
-          field: field as string,
-          message: `${field} is required`,
-        });
-      }
-    }
+       const value = config[field];
+       const fieldName = String(field);
+       if (!value || (typeof value === 'string' && !value.trim())) {
+         errors.push({
+           field: fieldName,
+           message: `${fieldName} is required`,
+         });
+       }
+     }
 
     return errors;
   }
@@ -314,25 +343,22 @@ export abstract class BaseConnector<
    * Validate URL format
    */
   protected validateUrl(config: TConfig, field: keyof TConfig): ValidationError[] {
-    const errors: ValidationError[] = [];
+     const errors: ValidationError[] = [];
+     const fieldName = String(field);
 
-    if (config[field]) {
-      try {
-        new URL(config[field] as string);
-      } catch {
-        errors.push({
-          field: field as string,
-          message: `${field} must be a valid URL`,
-        });
-      }
-    }
+     if (config[field]) {
+       try {
+         new URL(config[field] as string);
+       } catch {
+         errors.push({
+           field: fieldName,
+           message: `${fieldName} must be a valid URL`,
+         });
+       }
+     }
 
     return errors;
   }
 }
 
-// ============================================
-// Export
-// ============================================
 
-export { BaseConnector };
