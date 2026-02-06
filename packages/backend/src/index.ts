@@ -4,16 +4,14 @@ import express from 'express';
 import { Server } from 'socket.io';
 import http from 'http';
 import { useExpressServer } from 'routing-controllers';
+import { SocketControllers } from 'socket-controllers';
 import { checkDatabaseConnection } from './infrastructure/db.client';
 import { authorizationChecker, currentUserChecker } from './middleware/routingControllersAuth';
 import { correlationIdMiddleware } from './middleware/correlationId.middleware';
 import { requestLoggingMiddleware } from './middleware/requestLogging.middleware';
 import { loginRateLimiter, passwordResetRateLimiter } from './middleware/rateLimit.middleware';
-import { AuthController } from './controllers/auth.controller';
-import { ConversationsController } from './controllers/conversations.controller';
-import { AuditController } from './controllers/audit.controller';
-import { HealthController } from './controllers/health.controller';
-import { QueueController } from './controllers/queue.controller';
+import { controllers } from './controllers';
+import { socketControllers } from './socket-controllers';
 import { config } from './config/config';
 import { logger } from './infrastructure/logger';
 import { messageQueueService } from './services/message-queue.service';
@@ -28,7 +26,7 @@ const app = express();
 // ===== SETUP ROUTING-CONTROLLERS =====
 // Register all middleware via routing-controllers to comply with architecture standards
 useExpressServer(app, {
-  controllers: [AuthController, ConversationsController, AuditController, HealthController, QueueController],
+  controllers: controllers,
   authorizationChecker: authorizationChecker,
   currentUserChecker: currentUserChecker,
   defaultErrorHandler: true,
@@ -75,12 +73,20 @@ async function start() {
       throw new Error('Failed to connect to database');
     }
 
-    // Initialize WebSocket gateway
-    logger.info('Initializing WebSocket gateway...');
-    wsGateway.initialize(io);
-    logger.info('WebSocket gateway initialized successfully');
+     // Initialize WebSocket gateway
+     logger.info('Initializing WebSocket gateway...');
+     wsGateway.initialize(io);
+     logger.info('WebSocket gateway initialized successfully');
 
-    // Register platform connectors
+     // Initialize socket-controllers for declarative WebSocket event handling
+      logger.info('Registering socket-controllers...');
+      new SocketControllers({
+        io,
+        controllers: socketControllers,
+      });
+      logger.info('Socket-controllers registered successfully');
+
+     // Register platform connectors
     logger.info('Registering platform connectors...');
     const telegramConnector = new TelegramConnector();
     const ircConnector = new IRCConnector();

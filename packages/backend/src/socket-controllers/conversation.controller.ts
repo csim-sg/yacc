@@ -11,7 +11,7 @@ import { logger } from '../infrastructure/logger';
 import type { ConversationUpdatedPayload } from '../types/websocket.types';
 
 @SocketController()
-export class ConversationSocketController {
+export class ConversationController {
   /**
    * Lifecycle: When client connects
    * Join conversation-related rooms and broadcast presence
