@@ -47,12 +47,11 @@
   - Strict mode compliant
 
 ### Middleware Registration
-- ✅ **APPROVED**: Middleware registration pattern
-  - Global middleware (`app.use()`) for correlationId and requestLogging
-  - Route-level middleware (`app.post()`) for rate limiting
-  - Pre-registers routes before routing-controllers takes over
-  - This is valid Express + routing-controllers pattern
-  - Does NOT violate architecture standards
+- ✅ **CORRECTED & APPROVED**: Middleware registration pattern (Updated per architecture rules)
+  - **Global middleware** (correlationId, requestLogging): Registered via `useExpressServer({ middlewares: [...] })` per AGENTS.md standard
+  - **Route-level middleware** (rate limiting): Uses `app.post()` to pre-register routes before routing-controllers setup
+  - Follows AGENTS.md architecture standard: "Use `middlewares` option in `useExpressServer()` to register middleware, NOT `app.use()`"
+  - Complies with routing-controllers best practices
 
 ### Rate Limiting Design
 - ✅ **APPROVED**: IP-based rate limiting

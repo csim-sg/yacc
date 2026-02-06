@@ -14,12 +14,12 @@
 
 ### Archive (Historical Reference)
 
-Historical planning documents from Week 1-2 have been consolidated. For reference on completed tasks:
-- BE-027: Structured Logging (Week 1 - Complete)
-- BE-003: BetterAuth (Week 1-2 - Complete) 
-- BE-004: Forgot Password (Week 1 - Complete)
-- BE-005: RBAC (Week 1 - Complete)
-- FE-001 to FE-006: Frontend Features (Week 2 - Complete)
+Historical planning documents from Week 1-2 have been consolidated into `.docs/plans/00-consolidated-active-plans.md`. For reference on completed tasks:
+- **BE-027**: Structured Logging (Week 1 - Complete) - See git history: commit 2f56987
+- **BE-003**: BetterAuth (Week 1-2 - Complete) - See `BE-003-COMPLETION-SUMMARY.md`
+- **BE-004**: Forgot Password (Week 1 - Complete) - See git history: commit 7089841
+- **BE-005**: RBAC (Week 1 - Complete) - See git history: commit 254f74c  
+- **FE-001 to FE-006**: Frontend Features (Week 2 - Complete) - See git history: commits 95ea616, b5eb3ad, 2376a22
 
 ---
 
@@ -56,8 +56,9 @@ Historical planning documents from Week 1-2 have been consolidated. For referenc
 3. Update task tracking in GitHub Project
 
 **Ready to Start**:
-- BE-004+: Deferred features (Phase 2+)
-- Frontend integration tasks
+- **BE-004**: Chat/Inbox Filtering Refinements (Phase 1 - Ready)
+- **BE-005+**: Phase 1 infrastructure tasks (WebSocket, Rules, Notifications)
+- **FE-004+**: Frontend integration tasks (API integration, WebSocket, chat UI)
 
 ---
 

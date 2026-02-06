@@ -25,18 +25,8 @@ import { IRCConnector } from './connectors/irc.connector';
 
 const app = express();
 
-// ===== SETUP EXPRESS MIDDLEWARE =====
-// Apply global middleware before routing-controllers
-app.use(correlationIdMiddleware);
-app.use(requestLoggingMiddleware);
-
-// Apply rate limiting to specific endpoints
-// Must be applied before routing-controllers since routing-controllers takes over routing
-app.post('/api/auth/sign-in/email', loginRateLimiter);
-app.post('/api/auth/forgot-password', passwordResetRateLimiter);
-app.post('/api/auth/reset-password', passwordResetRateLimiter);
-
 // ===== SETUP ROUTING-CONTROLLERS =====
+// Register all middleware via routing-controllers to comply with architecture standards
 useExpressServer(app, {
   controllers: [AuthController, ConversationsController, AuditController, HealthController, QueueController],
   authorizationChecker: authorizationChecker,
@@ -47,7 +37,19 @@ useExpressServer(app, {
     forbidNonWhitelisted: true,
   },
   classTransformer: true,
+  middlewares: [
+    // Global middleware - run for all requests before controllers
+    correlationIdMiddleware,
+    requestLoggingMiddleware,
+  ],
 });
+
+// ===== SETUP RATE LIMITING =====
+// Apply rate limiting to specific endpoints after routing-controllers setup
+// These use app.post() to pre-register routes before controllers process them
+app.post('/api/auth/sign-in/email', loginRateLimiter);
+app.post('/api/auth/forgot-password', passwordResetRateLimiter);
+app.post('/api/auth/reset-password', passwordResetRateLimiter);
 
 // ===== SETUP EXPRESS SERVER =====
 const server = http.createServer(app);
