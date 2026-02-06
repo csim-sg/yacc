@@ -1,7 +1,7 @@
 import type { Timestamp } from './Timestamp.interface';
 import type { MessageStatus } from './MessageStatus.type';
 import type { MessageDirection } from './MessageDirection.type';
-import type { Attachment } from './Attachment.interface';
+import type { Attachment } from './attachment.interface';
 
 export interface Message extends Timestamp {
   id: string;

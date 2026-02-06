@@ -4,16 +4,14 @@ import express from 'express';
 import { Server } from 'socket.io';
 import http from 'http';
 import { useExpressServer } from 'routing-controllers';
+import { SocketControllers } from 'socket-controllers';
 import { checkDatabaseConnection } from './infrastructure/db.client';
 import { authorizationChecker, currentUserChecker } from './middleware/routingControllersAuth';
 import { correlationIdMiddleware } from './middleware/correlationId.middleware';
 import { requestLoggingMiddleware } from './middleware/requestLogging.middleware';
 import { loginRateLimiter, passwordResetRateLimiter } from './middleware/rateLimit.middleware';
-import { AuthController } from './controllers/auth.controller';
-import { ConversationsController } from './controllers/conversations.controller';
-import { AuditController } from './controllers/audit.controller';
-import { HealthController } from './controllers/health.controller';
-import { QueueController } from './controllers/queue.controller';
+import { controllers } from './controllers';
+import { socketControllers } from './socket-controllers';
 import { config } from './config/config';
 import { logger } from './infrastructure/logger';
 import { messageQueueService } from './services/message-queue.service';
@@ -26,9 +24,10 @@ import { IRCConnector } from './connectors/irc.connector';
 const app = express();
 
 // ===== SETUP ROUTING-CONTROLLERS =====
-// Register all middleware via routing-controllers to comply with architecture standards
+// Register all middleware and configuration via routing-controllers to comply with architecture standards
+// Note: Rate limiting applied via @UseBefore decorator on auth controller methods, not here
 useExpressServer(app, {
-  controllers: [AuthController, ConversationsController, AuditController, HealthController, QueueController],
+  controllers: controllers,
   authorizationChecker: authorizationChecker,
   currentUserChecker: currentUserChecker,
   defaultErrorHandler: true,
@@ -37,19 +36,17 @@ useExpressServer(app, {
     forbidNonWhitelisted: true,
   },
   classTransformer: true,
+  cors: {
+    origin: config.frontend.url,
+    credentials: true,
+    exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
+  },
   middlewares: [
     // Global middleware - run for all requests before controllers
     correlationIdMiddleware,
     requestLoggingMiddleware,
   ],
 });
-
-// ===== SETUP RATE LIMITING =====
-// Apply rate limiting to specific endpoints after routing-controllers setup
-// These use app.post() to pre-register routes before controllers process them
-app.post('/auth/sign-in/email', loginRateLimiter);
-app.post('/auth/forgot-password', passwordResetRateLimiter);
-app.post('/auth/reset-password', passwordResetRateLimiter);
 
 // ===== SETUP EXPRESS SERVER =====
 const server = http.createServer(app);
@@ -75,12 +72,24 @@ async function start() {
       throw new Error('Failed to connect to database');
     }
 
-    // Initialize WebSocket gateway
-    logger.info('Initializing WebSocket gateway...');
-    wsGateway.initialize(io);
-    logger.info('WebSocket gateway initialized successfully');
+     // Initialize WebSocket gateway
+     logger.info('Initializing WebSocket gateway...');
+     wsGateway.initialize(io);
+     logger.info('WebSocket gateway initialized successfully');
 
-    // Register platform connectors
+      // Initialize socket-controllers for declarative WebSocket event handling
+       logger.info('Registering socket-controllers...');
+       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       new SocketControllers({
+         io,
+         controllers: socketControllers,
+         container: {
+           get: (Class: any) => new Class(),
+         },
+       });
+       logger.info('Socket-controllers registered successfully');
+
+     // Register platform connectors
     logger.info('Registering platform connectors...');
     const telegramConnector = new TelegramConnector();
     const ircConnector = new IRCConnector();

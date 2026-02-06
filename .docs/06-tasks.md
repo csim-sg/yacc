@@ -1,9 +1,10 @@
 # 06. Issues & User stories
 
-**Last Updated**: January 24, 2026  
-**Status**: Ready for Development  
+**Last Updated**: February 6, 2026  
+**Status**: Phase 1.4 Complete, Phase 1.5 Ready  
 **Total P0 Issues**: 22  
-**Governance**: ADR-003, GOV-006, GOV-007
+**Completed in Phase 1.4**: BE-007-010 (Inbox API + Conversation Detail), BE-203-205 (Code Review), QA-001 (31 integration tests)  
+**Governance**: ADR-003, GOV-006, GOV-007, GOV-012
 
 ---
 
@@ -126,6 +127,14 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | BE-023 | Implement attachment download and re-host (inbound files to R2, max 5 MB) | Not Started | P1 | Backend | BE-020 | Files downloaded from IRC, stored on R2, URLs returned |  |  |
 | BE-024 | Implement audit logging (all actions: assignments, tags, notes, status changes, rule executions, retries) | Not Started | P1 | Backend | BE-002 | All actions logged with actor, action, entity_type, entity_id, timestamp |  |  |
 | BE-025 | Set up email service (Nodemailer/SendGrid) | **Ready** | P2 | Backend | - | Email service configured, password reset emails functional | PVTI_lAHOAB4wV84BNGcwzgkAlhg | 105 |
+
+### Code Review Tasks (Phase 1.4)
+
+| ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
+|----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
+| BE-203 | Add observability to conversation endpoints (correlation IDs, request timing) | **Done** | P0 | Backend | BE-007-010 | Structured logging with correlation IDs, request timing (ms) on all conversation endpoints | PVTI_lAHOAB4wV84BNGcwzgj_5sA | 200 |
+| BE-204 | Enforce RBAC on all conversation endpoints (@Authorized decorators) | **Done** | P0 | Backend | BE-005, BE-007 | All endpoints require authentication, role-based access control enforced | PVTI_lAHOAB4wV84BNGcwzgj_5rU | 201 |
+| BE-205 | Verify type safety - remove 'any' types from conversation service | **Done** | P0 | Backend | BE-007-010 | Zero 'any' types, type guards implemented for null checks, full TypeScript safety | PVTI_lAHOAB4wV84BNGcwzgj_5sA | 202 |
 
 ### Frontend Tasks
 

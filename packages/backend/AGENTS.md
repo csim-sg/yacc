@@ -72,17 +72,83 @@ pnpm db:studio         # Open Drizzle Studio
 ### Flat Structure (Required)
 ```
 packages/backend/src/
-├── controllers/        # API endpoints (@JsonController)
-├── services/           # Business logic
-├── middleware/         # Express middleware
-├── config/             # Configuration objects (data only)
-├── infrastructure/     # Singleton clients (DB, Redis, Logger, etc.)
-├── types/              # TypeScript interfaces & DTOs
-├── connectors/         # External platform integrations
-├── websockets/         # Socket.io event handlers
-├── workers/            # BullMQ job processors
-├── utils/              # Utility functions
-└── index.ts            # App entry point
+├── controllers/
+│   ├── auth.controller.ts
+│   ├── conversations.controller.ts
+│   ├── audit.controller.ts
+│   ├── health.controller.ts
+│   ├── queue.controller.ts
+│   └── index.ts                    # ✅ EXPORT CONST ARRAY (see pattern below)
+├── socket-controllers/
+│   ├── conversation.controller.ts
+│   ├── message.controller.ts
+│   ├── typing.controller.ts
+│   ├── presence.controller.ts
+│   ├── reaction.controller.ts
+│   └── index.ts                    # ✅ EXPORT CONST ARRAY (see pattern below)
+├── services/                       # Business logic
+├── middleware/                     # Express middleware
+├── config/                         # Configuration objects (data only)
+├── schemas/
+│   ├── *.schema.ts
+│   └── index.ts                    # ✅ EXPORT CONST OBJECT (see pattern below)
+├── infrastructure/                 # Singleton clients (DB, Redis, Logger, etc.)
+├── types/                          # TypeScript interfaces & DTOs
+├── connectors/                     # External platform integrations
+├── websockets/                     # Socket.io event handlers
+├── workers/                        # BullMQ job processors
+├── utils/                          # Utility functions
+└── index.ts                        # App entry point
+```
+
+### Index Export Pattern (CRITICAL - Always Follow)
+
+**For `controllers/index.ts`, `socket-controllers/index.ts`, and similar:**
+```typescript
+// ✅ CORRECT: Export as const array
+import { AuthController } from './auth.controller';
+import { ConversationsController } from './conversations.controller';
+// ... more imports
+
+export const controllers = [
+  AuthController,
+  ConversationsController,
+  // ... more controllers
+];
+```
+
+**For `schemas/index.ts`:**
+```typescript
+// ✅ CORRECT: Export as const object
+import { attachments } from './attachment.schema';
+import { users } from './user.schema';
+// ... more imports
+
+export const schemas = {
+  attachments,
+  users,
+  // ... more schemas
+};
+```
+
+**In `src/index.ts`, use the const:**
+```typescript
+// ✅ CORRECT: Import const and use directly
+import { controllers } from './controllers';
+import { socketControllers } from './socket-controllers';
+import { schemas } from './schemas';
+
+// In routing-controllers setup:
+useExpressServer(app, {
+  controllers: controllers,  // ✅ Use const
+  // ...
+});
+
+// In socket-controllers setup:
+new SocketControllers({
+  io,
+  controllers: socketControllers,  // ✅ Use const
+});
 ```
 
 ### Anti-Patterns (DO NOT CREATE)
@@ -90,11 +156,14 @@ packages/backend/src/
 ❌ NO: packages/backend/src/api/controllers/
 ❌ NO: packages/backend/src/domain/services/
 ❌ NO: packages/backend/src/infrastructure/clients/ (flat structure only)
+❌ NO: export { AuthController } from './auth.controller' (use const array instead)
+❌ NO: [AuthController, ConversationsController] inline in index.ts (use const export)
 ```
 
 ### Key Constraints
 - ✅ **One definition per file** (one class, interface, or function)
-- ✅ **Direct imports** (no barrel exports with index.ts)
+- ✅ **Const arrays/objects in index.ts** (not default exports or named exports of individual items)
+- ✅ **Centralized registration** (all controllers/socket-controllers in const for easy maintenance)
 - ✅ **Flat structure** (no nested api/, domain/, infrastructure/ folders)
 
 📚 **For detailed folder structure**: See `.docs/agents/03-FOLDER-STRUCTURE.md`
@@ -128,6 +197,14 @@ packages/backend/src/
 6. **Type-Safe Database Queries**
    - Use Drizzle query builder
    - Never raw SQL strings
+
+7. **Index Files Export Constants (NOT Individual Exports)**
+   - ✅ Use `export const controllers = [...]`
+   - ✅ Use `export const socketControllers = [...]`
+   - ✅ Use `export const schemas = {...}`
+   - ❌ Never `export { AuthController } from './auth.controller'`
+   - ❌ Never inline arrays in src/index.ts
+   - **Why**: Centralizes registration, easier to maintain, reduces import noise
 
 ### Code Style Tools
 - **Linter**: ESLint
