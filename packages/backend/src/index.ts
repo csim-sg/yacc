@@ -24,7 +24,8 @@ import { IRCConnector } from './connectors/irc.connector';
 const app = express();
 
 // ===== SETUP ROUTING-CONTROLLERS =====
-// Register all middleware via routing-controllers to comply with architecture standards
+// Register all middleware and configuration via routing-controllers to comply with architecture standards
+// Note: Rate limiting applied via @UseBefore decorator on auth controller methods, not here
 useExpressServer(app, {
   controllers: controllers,
   authorizationChecker: authorizationChecker,
@@ -35,19 +36,17 @@ useExpressServer(app, {
     forbidNonWhitelisted: true,
   },
   classTransformer: true,
+  cors: {
+    origin: config.frontend.url,
+    credentials: true,
+    exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
+  },
   middlewares: [
     // Global middleware - run for all requests before controllers
     correlationIdMiddleware,
     requestLoggingMiddleware,
   ],
 });
-
-// ===== SETUP RATE LIMITING =====
-// Apply rate limiting to specific endpoints after routing-controllers setup
-// These use app.post() to pre-register routes before controllers process them
-app.post('/auth/sign-in/email', loginRateLimiter);
-app.post('/auth/forgot-password', passwordResetRateLimiter);
-app.post('/auth/reset-password', passwordResetRateLimiter);
 
 // ===== SETUP EXPRESS SERVER =====
 const server = http.createServer(app);

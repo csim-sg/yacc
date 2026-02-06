@@ -11,7 +11,7 @@
  * for forgot-password and reset-password endpoints.
  */
 
-import { All, Controller, Post, Req, Res, Body } from 'routing-controllers';
+import { All, Controller, Post, Req, Res, Body, UseBefore } from 'routing-controllers';
 import type { Response } from 'express';
 import { betterAuthClient } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
@@ -20,20 +20,23 @@ import { eq } from 'drizzle-orm';
 import { generateResetToken, resetPassword } from '../services/passwordReset.service';
 import { logger } from '../infrastructure/logger';
 import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
+import { loginRateLimiter, passwordResetRateLimiter } from '../middleware/rateLimit.middleware';
 
 // TODO: Implement EmailService in infrastructure layer
 // import { emailService } from '../infrastructure/email.client';
 
 @Controller('/auth')
 export class AuthController {
-  /**
-   * POST /auth/forgot-password
-   * Request password reset email (ALWAYS returns 200 to prevent email enumeration)
-   *
-   * Request: { "email": "user@example.com" }
-   * Response: { "message": "If an email exists, a password reset link has been sent" }
-   */
-  @Post('/forgot-password')
+   /**
+    * POST /auth/forgot-password
+    * Request password reset email (ALWAYS returns 200 to prevent email enumeration)
+    * Rate limited to prevent abuse
+    *
+    * Request: { "email": "user@example.com" }
+    * Response: { "message": "If an email exists, a password reset link has been sent" }
+    */
+   @Post('/forgot-password')
+   @UseBefore(passwordResetRateLimiter)
   async forgotPassword(@Body() body: unknown, @Req() req: Request): Promise<{ message: string }> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const correlationId = (req as any).correlationId || 'unknown';
@@ -77,15 +80,17 @@ export class AuthController {
     }
   }
 
-  /**
-   * POST /auth/reset-password
-   * Reset password using token
-   *
-   * Request: { "token": "64-char-hex-token", "newPassword": "NewPassword123!" }
-   * Response: { "success": true, "message": "Password reset successfully" }
-   * Error: 400 { "error": "Invalid or expired token" }
-   */
-  @Post('/reset-password')
+   /**
+    * POST /auth/reset-password
+    * Reset password using token
+    * Rate limited to prevent abuse
+    *
+    * Request: { "token": "64-char-hex-token", "newPassword": "NewPassword123!" }
+    * Response: { "success": true, "message": "Password reset successfully" }
+    * Error: 400 { "error": "Invalid or expired token" }
+    */
+   @Post('/reset-password')
+   @UseBefore(passwordResetRateLimiter)
   async resetPasswordHandler(
     @Body() body: unknown,
     @Req() req: Request,
@@ -114,22 +119,44 @@ export class AuthController {
     }
   }
 
-  /**
-   * Handle all BetterAuth routes
-   * Routes: /sign-in/email, /sign-up/email, /sign-out, /get-session, etc.
-   *
-   * This wildcard route MUST be last so custom routes above take precedence
-   * 
-   * BetterAuth provides:
-   * - /sign-in/email (login)
-   * - /sign-out (logout)
-   * - /get-session (session retrieval)
-   * - /sign-up/email (registration)
-   * - /refresh-token (token refresh with Bearer plugin)
-   */
-  @All('/*')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async handleAuth(@Req() req: any, @Res() res: Response): Promise<void> {
+   /**
+    * POST /auth/sign-in/email
+    * BetterAuth sign-in endpoint
+    * Rate limited to prevent brute force attacks
+    *
+    * Delegates to BetterAuth handler with rate limiting
+    */
+   @Post('/sign-in/email')
+   @UseBefore(loginRateLimiter)
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   async handleSignInEmail(@Req() req: any, @Res() res: Response): Promise<void> {
+     return this.delegateToAuth(req, res);
+   }
+
+   /**
+    * Handle all other BetterAuth routes
+    * Routes: /sign-up/email, /sign-out, /get-session, etc.
+    *
+    * This wildcard route MUST be last so custom routes above take precedence
+    * 
+    * BetterAuth provides:
+    * - /sign-out (logout)
+    * - /get-session (session retrieval)
+    * - /sign-up/email (registration)
+    * - /refresh-token (token refresh with Bearer plugin)
+    */
+   @All('/*')
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   async handleAuth(@Req() req: any, @Res() res: Response): Promise<void> {
+     return this.delegateToAuth(req, res);
+   }
+
+   /**
+    * Helper method to delegate requests to BetterAuth handler
+    * @private
+    */
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   private async delegateToAuth(req: any, res: Response): Promise<void> {
     const correlationId = req.correlationId || 'unknown';
 
     try {
