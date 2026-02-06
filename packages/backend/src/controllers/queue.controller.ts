@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, QueryParam } from 'routing-controllers';
+import { JsonController, Get, Post, Param, Body, QueryParam } from 'routing-controllers';
 import { logger } from '../infrastructure/logger';
 import { messageQueueService } from '../services/message-queue.service';
 import { messageQueueDLQService } from '../services/message-queue-dlq.service';
@@ -11,12 +11,12 @@ import type { QueueStatistics } from '../types/message-queue.types';
  * Allows admin operations on message retry queue and dead-letter queue.
  *
  * Endpoints:
- * - GET /queue/stats - Queue statistics
- * - GET /queue/dlq - List DLQ entries
- * - POST /queue/retry/{messageId} - Retry failed message
- * - GET /queue/job/{jobId} - Get job details
- * - GET /queue/dlq/stats - DLQ statistics
- * - POST /queue/dlq/retry - Bulk retry DLQ entries
+ * - GET /api/queue/stats - Queue statistics
+ * - GET /api/queue/dlq - List DLQ entries
+ * - POST /api/queue/retry/{messageId} - Retry failed message
+ * - GET /api/queue/job/{jobId} - Get job details
+ * - GET /api/queue/dlq/stats - DLQ statistics
+ * - POST /api/queue/dlq/retry - Bulk retry DLQ entries
  */
 
 interface QueueStatsResponse {
@@ -63,10 +63,10 @@ interface BulkRetryResponse {
   timestamp: string;
 }
 
-@Controller('/queue')
+@JsonController('/api/queue')
 export class QueueController {
   /**
-   * GET /queue/stats
+   * GET /api/queue/stats
    *
    * Get current queue statistics
    */
@@ -88,7 +88,7 @@ export class QueueController {
   }
 
   /**
-   * GET /queue/dlq
+   * GET /api/queue/dlq
    *
    * Get dead-letter queue entries with pagination
    */
@@ -130,7 +130,7 @@ export class QueueController {
   }
 
   /**
-   * POST /queue/retry/:messageId
+   * POST /api/queue/retry/:messageId
    *
    * Retry a failed message (move from DLQ back to main queue)
    */
@@ -156,7 +156,7 @@ export class QueueController {
   }
 
   /**
-   * POST /queue/dlq/retry
+   * POST /api/queue/dlq/retry
    *
    * Bulk retry multiple failed messages
    */
@@ -201,7 +201,7 @@ export class QueueController {
   }
 
   /**
-   * GET /queue/dlq/stats
+   * GET /api/queue/dlq/stats
    *
    * Get DLQ statistics and analysis
    */
@@ -227,7 +227,7 @@ export class QueueController {
   }
 
   /**
-   * GET /queue/job/:jobId
+   * GET /api/queue/job/:jobId
    *
    * Get details of a specific job
    */
@@ -274,7 +274,7 @@ export class QueueController {
   }
 
   /**
-   * POST /queue/dlq/clear/:messageId
+   * POST /api/queue/dlq/clear/:messageId
    *
    * Clear a DLQ entry (mark as processed/resolved)
    */
@@ -300,7 +300,7 @@ export class QueueController {
   }
 
   /**
-   * GET /queue/dlq/by-reason/:reason
+   * GET /api/queue/dlq/by-reason/:reason
    *
    * Get DLQ entries filtered by failure reason
    */
