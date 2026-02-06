@@ -25,40 +25,76 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 
 ## ✅ Current Status
 
+### Phase 1.4: MVP Core-First Execution (APPROVED)
+**Status**: 🚀 **IN PROGRESS - Week 1 (Feb 10-16)**  
+**Approval Date**: 2026-02-06  
+**Target Completion**: 2026-02-20  
+**Timeline**: 2-week sprint
+
+**MVP Scope**:
+- Backend: BE-007 (Inbox API), BE-008 (Conversation Detail), BE-009/010 (Messages), BE-017-019 (WebSocket Events)
+- Frontend: FE-008 (Inbox List), FE-009 (Conversation Detail), FE-010 (Reply Composer), FE-013-015 (WebSocket Listeners)
+- QA: QA-001-003 (Integration + E2E + Real-Time tests)
+
+**Success Criteria**:
+- ✅ Users can view unified inbox with filters
+- ✅ Users can read conversation messages
+- ✅ Users can send replies
+- ✅ Real-time updates work (message received/sent/failed)
+- ✅ Full RBAC enforcement (4 roles)
+- ✅ ≥85% test coverage
+
+**GitHub Issues Created**:
+- BE-007 (#183), BE-008 (#184), BE-009/010 (#185)
+- BE-017 (#186), BE-018 (#187), BE-019 (#188)
+- FE-008 (#189), FE-009 (#190), FE-010 (#191)
+- FE-013 (#192), FE-014 (#193), FE-015 (#194)
+- QA-001 (#195), QA-002 (#196), QA-003 (#197)
+
 ### BE-003: BetterAuth Authentication
 **Status**: ✅ **COMPLETE**  
 **PR**: #179 (feature/BE-003-completion)  
 **Test Coverage**: 194/194 passing (100%)  
-**Deliverables**:
-- BetterAuth infrastructure + Drizzle adapter
-- Email/password login with user status validation
-- Session management and token generation
-- Rate limiting (5 attempts/15min for login, 3 attempts/hour for password reset)
-- 28 integration tests + 13 endpoint tests + 17 service tests
-- Frontend integration guide
-- Security review (APPROVED)
-
-**Files**:
-- `packages/backend/src/config/auth.config.ts`
-- `packages/backend/src/infrastructure/better-auth.client.ts`
-- `packages/backend/src/infrastructure/email.client.ts`
-- `packages/backend/src/middleware/rateLimit.middleware.ts`
-- `packages/backend/tests/be-003-*.spec.ts` (3 test files)
-- `.docs/frontend/BE-003-INTEGRATION-GUIDE.md`
 
 ---
 
-## 🚀 Next Steps
+## 🚀 Week 1 Execution (Feb 10-16)
 
-**Immediate** (PR #179 remediation):
-1. Verify governance documentation is in sync
-2. Merge PR after approval
-3. Update task tracking in GitHub Project
+**Backend**:
+- [ ] BE-007: Inbox API (GET /conversations with filters) - DUE Feb 14
+- [ ] BE-008: Conversation Detail (GET /conversations/:id) - DUE Feb 14
 
-**Ready to Start**:
-- **BE-004**: Chat/Inbox Filtering Refinements (Phase 1 - Ready)
-- **BE-005+**: Phase 1 infrastructure tasks (WebSocket, Rules, Notifications)
-- **FE-004+**: Frontend integration tasks (API integration, WebSocket, chat UI)
+**Frontend**:
+- [ ] FE-008: Inbox List Page (UI scaffold with mocks) - DUE Feb 14
+- [ ] FE-009: Conversation Detail Page (UI scaffold with mocks) - DUE Feb 14
+
+**QA**:
+- [ ] Test case preparation and test data setup
+
+**Sync Points**:
+- API contract finalized: Feb 10 (morning)
+- Frontend UI ready with mocks: Feb 12 (EOD)
+- Backend ready for FE integration: Feb 14 (EOD)
+
+---
+
+## 🚀 Week 2 Execution (Feb 17-23)
+
+**Backend**:
+- [ ] BE-009/010: Message Retrieval & Send - DUE Feb 20
+- [ ] BE-017/018/019: WebSocket Events - DUE Feb 21
+
+**Frontend**:
+- [ ] FE-008/009 API Integration - DUE Feb 20
+- [ ] FE-010: Reply Composer - DUE Feb 20
+- [ ] FE-013/014/015: WebSocket Listeners - DUE Feb 21
+
+**QA**:
+- [ ] Run integration tests (BE)
+- [ ] Run E2E tests (FE)
+- [ ] Real-time test scenarios
+
+**MVP Complete**: Feb 20-21, 2026
 
 ---
 
