@@ -5,11 +5,11 @@
 
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
-import { db } from '../config/db.js';
-import { passwordResetTokens, users } from '../config/db.js';
+import { db } from '../config/db';
+import { passwordResetTokens, users } from '../config/db';
 import { eq, isNull, and, lt } from 'drizzle-orm';
-import { validatePassword } from './passwordValidation.service.js';
-import { auditService } from './audit.service.js';
+import { validatePassword } from './passwordValidation.service';
+import { auditService } from './audit.service';
 
 /**
  * Generate a password reset token for user

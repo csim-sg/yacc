@@ -6,11 +6,14 @@
 
 import { Action } from 'routing-controllers';
 import type { Request } from 'express';
-import { auth } from '../config/auth';
-import { db } from '../config/db';
-import { users } from '../config/db';
+import { dbClient } from '../infrastructure/db.client';
+import { users } from '../schemas/user.schema';
 import { eq } from 'drizzle-orm';
+import { appConfig } from '../config/appConfig';
 import type { AuthUser } from '../types/auth.types';
+import { betterAuthClient } from '../infrastructure/better-auth.client';
+// TODO: Implement BetterAuth client
+// import { getAuthInstance } from '../infrastructure/better-auth.client';
 
 /**
  * Extended Request interface with auth properties
@@ -30,6 +33,8 @@ interface AuthRequest extends Request {
  * Validates BetterAuth session and checks user roles/permissions
  *
  * Used by routing-controllers @Authorized decorator
+ * 
+ * TODO: Implement proper BetterAuth integration when infrastructure is ready
  */
 export async function authorizationChecker(
   action: Action,
@@ -38,8 +43,11 @@ export async function authorizationChecker(
   try {
     const request = action.request as AuthRequest;
 
-    // BetterAuth automatically extracts Bearer token from Authorization header
-    const session = await auth.api.getSession({
+     // BetterAuth automatically extracts Bearer token from Authorization header
+     if (!betterAuthClient) {
+       return false;
+     }
+     const session = await betterAuthClient.api.getSession({
       headers: request.headers,
     });
 
@@ -49,7 +57,7 @@ export async function authorizationChecker(
 
     // Fetch full user from database to get role and status
     const userId = session.user.id as string;
-    const user = await db.query.users.findFirst({
+    const user = await dbClient.query.users.findFirst({
       where: eq(users.id, userId),
     });
 
@@ -88,6 +96,8 @@ export async function authorizationChecker(
 
     // Check if user has required role
     return roles.includes(user.role);
+
+    return false;
   } catch (error) {
     return false;
   }
@@ -98,6 +108,8 @@ export async function authorizationChecker(
  * Returns current authenticated user for use in controllers
  *
  * Used by routing-controllers @CurrentUser decorator
+ * 
+ * TODO: Implement proper BetterAuth integration when infrastructure is ready
  */
 export async function currentUserChecker(
   action: Action
@@ -105,10 +117,13 @@ export async function currentUserChecker(
   try {
     const request = action.request as AuthRequest;
 
-    // BetterAuth automatically extracts Bearer token from Authorization header
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+     // BetterAuth automatically extracts Bearer token from Authorization header
+     if (!betterAuthClient) {
+       return undefined;
+     }
+     const session = await betterAuthClient.api.getSession({
+       headers: request.headers,
+     });
 
     if (!session) {
       return undefined;
@@ -116,7 +131,7 @@ export async function currentUserChecker(
 
     // Fetch full user from database to get role and status
     const userId = session.user.id as string;
-    const user = await db.query.users.findFirst({
+    const user = await dbClient.query.users.findFirst({
       where: eq(users.id, userId),
     });
 
@@ -134,6 +149,8 @@ export async function currentUserChecker(
       createdAt: user.createdAt,
       lastLoginAt: user.lastLoginAt,
     } as AuthUser;
+
+    return undefined;
   } catch (error) {
     return undefined;
   }

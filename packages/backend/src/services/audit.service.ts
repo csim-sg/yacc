@@ -1,5 +1,5 @@
-import { db } from '../config/db.js';
-import { auditLogs } from '../config/db.js';
+import { db } from '../config/db';
+import { auditLogs } from '../config/db';
 import { desc, eq, and } from 'drizzle-orm';
 
 /**

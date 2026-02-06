@@ -1,21 +1,26 @@
 # YACC Backend - Agent Guide
 
-This is the **backend package** for YACC. This guide supplements the root `AGENTS.md` with backend-specific guidance.
+This is the **backend package** for YACC. This guide provides essentials summaries with links to detailed guides in `.docs/agents/`.
 
-## 📍 Location
-- **Path**: `/packages/backend/`
-- **Runtime**: Node.js 18+
-- **Framework**: Express + routing-controllers
+---
 
-## 🎯 Backend Developer Responsibilities
+## 📍 PROJECT OVERVIEW
+
+**Path**: `/packages/backend/`  
+**Runtime**: Node.js 18+  
+**Framework**: Express + routing-controllers  
+**Database**: PostgreSQL + Drizzle ORM  
+**Real-Time**: Socket.io WebSocket gateway  
+**Message Queue**: Redis + BullMQ  
+**File Storage**: Cloudflare R2  
 
 ### What You Build
-- REST API endpoints (40+ endpoints across auth, inbox, messages, rules, etc.)
+- REST API endpoints (40+ across auth, inbox, messaging, rules)
 - WebSocket gateway for real-time events
-- Database models and migrations (PostgreSQL + Drizzle)
+- Database models & migrations
 - Business logic services (auth, messaging, search, rules engine, notifications, audit logging)
-- Connector implementations (Telegram, IRC)
-- Message queue workers (retry, DLQ processing)
+- External integrations (Telegram, IRC)
+- Message queue workers (retry, dead-letter queue)
 
 ### Key Dependencies
 - **Express + routing-controllers**: REST API framework
@@ -23,419 +28,341 @@ This is the **backend package** for YACC. This guide supplements the root `AGENT
 - **Drizzle**: Type-safe database ORM
 - **PostgreSQL**: Primary database
 - **Redis + BullMQ**: Message queue for retries
-- **Socket.io**: WebSocket for real-time updates
+- **Socket.io**: WebSocket for real-time
 - **Cloudflare R2**: File storage
-- **Pino**: Logging (replaces Winston for performance)
+- **Pino**: Structured logging
 
-## 📂 Folder Structure (STRICT - Non-Negotiable)
+📚 **For detailed overview**: See `.docs/agents/01-PROJECT-OVERVIEW.md`
 
-### Current Structure (Flat, NOT Layered)
+---
+
+## 🔧 BUILD & TEST COMMANDS
+
+### Quick Start
+```bash
+pnpm --filter @yacc/backend dev        # Start dev server (port 3000)
+pnpm --filter @yacc/backend test       # Run tests
+pnpm --filter @yacc/backend build      # Build for production
+pnpm --filter @yacc/backend lint       # Run ESLint
+```
+
+### Database Setup
+```bash
+docker-compose up -d                   # Start PostgreSQL, Redis, Mailhog
+pnpm --filter @yacc/backend migrate    # Run migrations
+```
+
+### From Backend Directory
+```bash
+cd packages/backend
+pnpm dev               # Start dev server
+pnpm test              # Run tests
+pnpm build             # Build
+pnpm lint              # Lint code
+pnpm db:migrate        # Run migrations
+pnpm db:studio         # Open Drizzle Studio
+```
+
+📚 **For detailed build commands**: See `.docs/agents/02-BUILD-COMMANDS.md`
+
+---
+
+## 📂 FOLDER STRUCTURE (STRICT)
+
+### Flat Structure (Required)
 ```
 packages/backend/src/
-├── controllers/        # API endpoints (@Controller, @Post, etc.)
-├── middleware/         # Express middleware
+├── controllers/        # API endpoints (@JsonController)
 ├── services/           # Business logic
+├── middleware/         # Express middleware
 ├── config/             # Configuration objects (data only)
-├── infrastructure/     # Singleton client classes
-├── connectors/         # Telegram, IRC implementations
-├── websockets/         # Socket.io gateway
-├── workers/            # BullMQ job handlers
-├── types/              # TypeScript interfaces & types
+├── infrastructure/     # Singleton clients (DB, Redis, Logger, etc.)
+├── types/              # TypeScript interfaces & DTOs
+├── connectors/         # External platform integrations
+├── websockets/         # Socket.io event handlers
+├── workers/            # BullMQ job processors
 ├── utils/              # Utility functions
 └── index.ts            # App entry point
 ```
 
-### Do NOT Create (Anti-Pattern)
+### Anti-Patterns (DO NOT CREATE)
 ```
-❌ WRONG: packages/backend/src/
-  ├── api/              # DON'T create this
-  │   ├── controllers/
-  │   └── middleware/
-  ├── domain/           # DON'T create this
-  │   └── services/
-  └── infrastructure/   # DON'T create this (files go directly in src)
+❌ NO: packages/backend/src/api/controllers/
+❌ NO: packages/backend/src/domain/services/
+❌ NO: packages/backend/src/infrastructure/clients/ (flat structure only)
 ```
 
-## 🔧 Development Setup
+### Key Constraints
+- ✅ **One definition per file** (one class, interface, or function)
+- ✅ **Direct imports** (no barrel exports with index.ts)
+- ✅ **Flat structure** (no nested api/, domain/, infrastructure/ folders)
 
-### Prerequisites
-
-```bash
-node --version         # v18+
-pnpm --version        # v9+ (install: npm install -g pnpm@9)
-```
-
-### First-Time Setup
-
-```bash
-# From repo root, install all workspace dependencies
-pnpm install
-
-# Or install backend-only dependencies
-pnpm --filter @yacc/backend install
-```
-
-### Common Backend Commands
-
-```bash
-pnpm --filter @yacc/backend dev        # Start backend server (port 3000)
-pnpm --filter @yacc/backend test       # Run backend tests
-pnpm --filter @yacc/backend build      # Build backend for production
-pnpm --filter @yacc/backend lint       # Run ESLint
-
-# Or from backend directory
-cd packages/backend
-pnpm dev              # Same as above
-pnpm test
-pnpm build
-pnpm lint
-```
-
-### Database Setup
-
-Backend requires PostgreSQL. Start local instance:
-
-```bash
-# From repo root
-docker-compose up -d  # Starts PostgreSQL, Redis, Mailhog
-
-# Run migrations (if applicable)
-pnpm --filter @yacc/backend migrate
-```
+📚 **For detailed folder structure**: See `.docs/agents/03-FOLDER-STRUCTURE.md`
 
 ---
 
-## 🔧 Key Technical Constraints
+## 💻 CODE STYLE GUIDELINES
 
-### 1. No `any` Types
-```typescript
-// ❌ WRONG
-const login = (req: any) => {
-  const user = req.user;
-};
+### Essentials (CRITICAL RULES)
 
-// ✅ CORRECT
-import { Request } from 'express';
-interface AuthRequest extends Request {
-  user?: AuthUser;
-  correlationId?: string;
-}
-const login = (req: AuthRequest) => {
-  const user = req.user;
-};
-```
+1. **No `any` Types**
+   - Always type variables, parameters, return values
+   - Create interfaces extending `Request` for Express types
 
-### 2. Config vs Infrastructure Pattern (ADR-005)
+2. **Config vs Infrastructure Pattern**
+   - **Config**: Plain data objects with env vars
+   - **Infrastructure**: Singleton client classes (DB, Redis, Logger)
 
-**Config Folder** (Simple data objects):
-```typescript
-// config/auth.ts - Simple object with env vars
-export const authConfig = {
-  jwtSecret: process.env.JWT_SECRET,
-  sessionDuration: parseInt(process.env.SESSION_DURATION_HOURS || '48'),
-  passwordMinLength: 8,
-};
-```
+3. **No Wrapper Classes**
+   - Use libraries directly (Drizzle, Pino, Redis)
+   - Don't create `DatabaseClient`, `LoggerService` wrappers
 
-**Infrastructure Folder** (Client initialization):
-```typescript
-// infrastructure/database-client.ts - Singleton class
-export class DatabaseClient {
-  private static instance: DatabaseClient;
-  private pool: PgPool;
+4. **One Definition Per File**
+   - One class/interface/function per file
+   - Clear, single responsibility
 
-  constructor() {
-    this.pool = new PgPool({
-      connectionString: process.env.DATABASE_URL,
-    });
-  }
+5. **Middleware Registration**
+   - Register via routing-controllers `middlewares` option
+   - NOT via `app.use()`
 
-  static getInstance() {
-    if (!DatabaseClient.instance) {
-      DatabaseClient.instance = new DatabaseClient();
-    }
-    return DatabaseClient.instance;
-  }
+6. **Type-Safe Database Queries**
+   - Use Drizzle query builder
+   - Never raw SQL strings
 
-  query(sql: string, params?: any[]) {
-    return this.pool.query(sql, params);
-  }
-}
-```
+### Code Style Tools
+- **Linter**: ESLint
+- **Formatter**: Prettier (optional)
+- **Type Checker**: TypeScript strict mode
 
-### 3. Routing-Controllers Middleware Registration
+📚 **For detailed code style**: See `.docs/agents/04-CODE-STYLE-GUIDELINES.md` + `DEVELOPER-AGENT-SYSTEM-PROMPT.md`
 
-```typescript
-// ❌ WRONG (DON'T DO THIS)
-const app = express();
-app.use(correlationIdMiddleware);
-app.use(requestLoggingMiddleware);
-useExpressServer(app, { /* ... */ });
+---
 
-// ✅ CORRECT (USE THIS)
-const app = express();
-useExpressServer(app, {
-  middlewares: [
-    correlationIdMiddleware,  // Injected by routing-controllers
-    requestLoggingMiddleware,
-  ],
-  controllers: [__dirname + '/controllers/**/*{.ts,.js}'],
-  // ... other config
-});
-```
+## 🧪 TESTING INSTRUCTIONS
 
-### 4. No Global `/api` Prefix
-
-```typescript
-// ❌ WRONG
-@Controller('/api/conversations')
-export class ConversationController {
-  @Post('/send')
-  async send() { /* ... */ }
-  // Route: POST /api/conversations/send ✗
-}
-
-// ✅ CORRECT
-@Controller('/conversations')
-export class ConversationController {
-  @Post('/send')
-  async send() { /* ... */ }
-  // Route: POST /conversations/send ✓ (no /api prefix on controller)
-}
-```
-
-### 5. One Definition Per File
-
-```
-✅ CORRECT:
-- controllers/conversation.controller.ts (ConversationController class)
-- controllers/message.controller.ts (MessageController class)
-- services/conversation.service.ts (ConversationService class)
-- services/message.service.ts (MessageService class)
-- types/conversation.types.ts (ConversationDTO interface)
-- types/message.types.ts (MessageDTO interface)
-
-❌ WRONG:
-- controllers/all.controller.ts (multiple controller classes)
-- services/business-logic.ts (multiple service classes)
-- types/all-types.ts (multiple interfaces)
-```
-
-## 📋 Development Workflow
-
-### Starting a New Task
-1. Create feature branch from `dev`:
-   ```bash
-   git checkout dev
-   git pull origin dev
-   git checkout -b feature/BE-XXX-description
-   ```
-
-2. Implement feature following constraints above
-3. Write tests (target ≥ 85% coverage)
-4. Update `.docs/` files if needed
-5. Create PR against `dev` branch with clear description
-6. Reference ADR if architectural decision made
-7. Wait for architect review
-
-### Code Review Checklist (Self-Check Before PR)
-- [ ] No `any` types used
-- [ ] Flat folder structure (no `api/`, `domain/`, `infrastructure/` folders)
-- [ ] Routing-controllers middleware via `middlewares` option
-- [ ] One definition per file
-- [ ] Config = data objects, Infrastructure = singleton classes
-- [ ] No global `/api` prefix on controllers
-- [ ] Tests ≥ 85% coverage
-- [ ] Clear commit messages
-- [ ] `.docs/` files updated if needed
-- [ ] ADR referenced if architectural change
-
-## 🧪 Testing Requirements
-
-### Jest Configuration
+### Quick Commands
 ```bash
-# Run unit tests
-npm run test:unit
-
-# Run integration tests
-npm run test:integration
-
-# Run with coverage
-npm run test:coverage
+pnpm --filter @yacc/backend test              # Run all tests
+pnpm --filter @yacc/backend test:coverage     # With coverage report
+pnpm --filter @yacc/backend test:watch        # Watch mode
 ```
 
-### Coverage Target
-- **Minimum**: 85% for all new code
-- **Exception**: Infrastructure/config can be lower if simple
-- **Location**: Co-locate tests with source files or in `__tests__/` folder
+### Testing Requirements
+- **Coverage Target**: 85% minimum for all new code
+- **Framework**: Vitest (Jest-compatible)
+- **Test Structure**: Describe/it blocks (BDD style)
+- **Location**: Co-locate with source or in `__tests__/` folder
+- **Exceptions**: Infrastructure/config can be lower if simple
 
-### Test Structure
+### Test Example
 ```typescript
-// services/conversation.service.test.ts
 describe('ConversationService', () => {
-  describe('createConversation', () => {
-    it('should create conversation with valid input', async () => {
-      // Setup, act, assert
-    });
+  it('should list conversations for user', async () => {
+    // Arrange, Act, Assert
   });
 });
 ```
 
-## 🔐 Security Standards
-
-### Error Handling
-- Return proper HTTP status codes (200, 201, 400, 401, 403, 404, 500)
-- Include error message in response body
-- Log errors with correlation ID
-- Never expose stack traces in production
-
-```typescript
-// ✅ CORRECT
-@Post('/login')
-async login(@Body() body: LoginDTO) {
-  try {
-    const user = await this.authService.login(body);
-    return { success: true, user };
-  } catch (error) {
-    const correlationId = this.req.correlationId;
-    this.logger.error({ correlationId, error: error.message });
-    throw new BadRequestException('Invalid credentials');
-  }
-}
-```
-
-### Authentication & Authorization
-- Use BetterAuth for all auth flows
-- Check user status (active/inactive/suspended)
-- Enforce role-based access via decorators
-- Log all authorization decisions
-
-## 📚 Key Files & Patterns
-
-### Backend Entry Point
-```
-packages/backend/src/index.ts
-- Initializes Express app
-- Registers middleware via routing-controllers
-- Connects to database
-- Starts WebSocket gateway
-- Starts BullMQ workers
-```
-
-### Auth Flow
-```
-packages/backend/src/config/auth.ts          # Config
-packages/backend/src/types/auth.types.ts     # Types
-packages/backend/src/middleware/routing-controllers-auth.ts  # Middleware
-packages/backend/src/controllers/auth.controller.ts  # Endpoints
-packages/backend/src/services/auth.service.ts       # Business logic
-```
-
-### Database
-```
-packages/backend/src/config/db.ts            # Config & Drizzle setup
-packages/backend/src/infrastructure/database-client.ts  # Client
-packages/common/src/db/schema.ts             # Tables (shared)
-```
-
-### WebSocket
-```
-packages/backend/src/websockets/gateway.ts   # Socket.io setup
-packages/backend/src/websockets/handlers/    # Event handlers
-```
-
-### Message Queue
-```
-packages/backend/src/infrastructure/queue-client.ts  # BullMQ setup
-packages/backend/src/workers/retry-worker.ts  # Retry handler
-packages/backend/src/workers/dlq-worker.ts    # Dead-letter handler
-```
-
-## 🎯 Common Tasks
-
-### Add New Endpoint
-1. Create controller: `controllers/your-feature.controller.ts`
-2. Create service: `services/your-feature.service.ts`
-3. Add types: `types/your-feature.types.ts`
-4. Write tests (85%+ coverage)
-5. Update API docs in `.docs/02-api-and-data-model.md`
-
-### Add New Database Table
-1. Define schema in `packages/common/src/db/schema.ts`
-2. Create migration (Drizzle migration)
-3. Create service to interact with table
-4. Write tests
-5. Update data model docs in `.docs/02-api-and-data-model.md`
-
-### Add New Job Type (BullMQ)
-1. Create worker: `workers/your-job.worker.ts`
-2. Enqueue job: `infrastructure/queue-client.ts`
-3. Start worker: Register in `index.ts`
-4. Write tests
-5. Add job type to `types/jobs.types.ts`
-
-## 📖 Documentation References
-
-- **AGENTS.md** (root): Overall project guidance
-- **03-implementation-guide.md**: Architecture, tech decisions, code patterns
-- **02-api-and-data-model.md**: API endpoints, database schema, WebSocket events
-- **ADR-005**: Infrastructure and config pattern (STRICT)
-- **04-qa-and-testing.md**: Testing strategy and test cases
-- **GOV-008**: Governance and technical debt tracking
-
-## 🔗 Backend-Specific Links
-
-| Document | Purpose |
-|----------|---------|
-| `.docs/02-api-and-data-model.md` | 40+ endpoints, request/response formats |
-| `.docs/03-implementation-guide.md` | Architecture, tech decisions, code examples |
-| `.docs/adr/ADR-005-infrastructure-config-pattern.md` | Config vs Infrastructure pattern |
-| `packages/backend/package.json` | Dependencies, scripts |
-| `packages/common/src/db/schema.ts` | Shared database schema |
-
-## ⚡ Quick Commands
-
-```bash
-# Development
-npm run dev                 # Start dev server with hot reload
-npm run build               # Build TypeScript
-npm start                   # Run built app
-
-# Testing
-npm run test                # Run all tests
-npm run test:coverage       # Run with coverage report
-npm run test:watch          # Run tests in watch mode
-
-# Linting
-npm run lint                # Check code style
-npm run lint:fix            # Fix linting issues
-
-# Database
-npm run db:migrate          # Run migrations
-npm run db:generate         # Generate migration files
-npm run db:studio           # Open Drizzle Studio
-```
-
-## 🚨 Common Pitfalls
-
-1. **Forgetting to register middleware via routing-controllers**: Always use `middlewares` option, not `app.use()`
-2. **Using `any` types**: Always create proper interfaces extending `Request`
-3. **Creating layered folder structure**: Use flat structure (controllers, services, config, infrastructure)
-4. **Not testing business logic**: Mock database and external services in tests
-5. **Forgetting to update documentation**: Update `.docs/` files in the same PR
-6. **Missing correlation ID in logs**: Always log with correlation ID for tracing
-7. **Exposing stack traces in errors**: Return generic error messages in production
-
-## 💬 When to Ask for Help
-
-- **Architecture questions**: Ask architect
-- **API design unclear**: Ask architect + frontend dev
-- **Database schema design**: Ask architect
-- **Testing strategy**: Ask QA
-- **Constraints unclear**: Reference AGENTS.md → Code Architecture Constraints section
+📚 **For detailed testing**: See `.docs/agents/05-TESTING-INSTRUCTIONS.md`
 
 ---
 
-**Last Updated**: January 25, 2026  
+## 🔐 SECURITY CONSIDERATIONS
+
+### Essentials (CRITICAL)
+
+1. **Error Handling**
+   - Return proper HTTP status codes (400, 401, 403, 404, 500)
+   - Never expose stack traces in production
+   - Log errors with correlation ID
+
+2. **Authentication**
+   - Use BetterAuth for all auth flows
+   - Check user status (active/inactive/suspended)
+   - Enforce RBAC via decorators
+
+3. **Input Validation**
+   - Use Zod schemas for request validation
+   - Never trust user input
+
+4. **Database Security**
+   - Drizzle prevents SQL injection (use query builder)
+   - No raw SQL strings
+
+5. **Secret Management**
+   - Store secrets in `.env` files (never committed)
+   - Load via `process.env`
+   - Don't log sensitive data (passwords, tokens, API keys)
+
+6. **Logging Security**
+   - Never log passwords, tokens, or API keys
+   - Always include correlation ID for tracing
+   - Log authentication/authorization decisions
+
+### Security Checklist
+- [ ] No stack traces exposed in errors
+- [ ] All inputs validated with Zod
+- [ ] No hardcoded secrets
+- [ ] No sensitive data in logs
+- [ ] Authentication enforced on protected endpoints
+- [ ] RBAC rules enforced
+- [ ] SQL queries use Drizzle (no raw SQL)
+- [ ] Error messages are generic (no info leakage)
+
+📚 **For detailed security**: See `.docs/agents/06-SECURITY-GUIDELINES.md`
+
+---
+
+## 📋 DEVELOPMENT WORKFLOW
+
+### Starting a Feature
+1. Create feature branch: `git checkout -b feature/BE-XXX-description`
+2. Implement feature following code style guidelines
+3. Write tests (85%+ coverage)
+4. Run `pnpm lint` to check code quality
+5. Update `.docs/` files if needed
+6. Commit with clear message
+7. Create PR against `dev` branch
+8. Wait for architect review
+
+### Pre-Commit Checklist
+- [ ] No `any` types used
+- [ ] Flat folder structure (no nested api/, domain/)
+- [ ] One definition per file
+- [ ] Tests ≥ 85% coverage
+- [ ] Lint passes
+- [ ] Clear commit message
+- [ ] `.docs/` files updated
+- [ ] ADR referenced (if architectural change)
+
+📚 **For detailed workflow**: See `.docs/agents/07-DEVELOPMENT-WORKFLOW.md`
+
+---
+
+## 🔗 KEY FILES & PATTERNS
+
+### Entry Point
+- `packages/backend/src/index.ts` — Initializes Express, middleware, database, WebSocket, workers
+
+### Auth Flow
+- `src/config/auth.ts` — Config
+- `src/types/auth.types.ts` — Types
+- `src/middleware/authBetterauth.middleware.ts` — Middleware
+- `src/controllers/auth.controller.ts` — Endpoints
+- `src/services/auth.service.ts` — Business logic
+
+### Database
+- `packages/common/src/db/schema.ts` — All table definitions
+- `src/infrastructure/db.client.ts` — Drizzle client
+
+### Real-Time (WebSocket)
+- `src/websockets/gateway.ts` — Socket.io setup
+- `src/websockets/handlers/` — Event handlers
+
+### Message Queue
+- `src/infrastructure/queue.client.ts` — BullMQ setup
+- `src/workers/` — Job processors
+
+📚 **For detailed patterns**: See `.docs/agents/08-KEY-PATTERNS.md`
+
+---
+
+## 🎯 COMMON TASKS
+
+### Add New Endpoint
+1. Create `controllers/feature.controller.ts`
+2. Create `services/feature.service.ts`
+3. Create `types/feature.types.ts`
+4. Write tests (85%+ coverage)
+5. Update API docs
+
+### Add New Database Table
+1. Define in `packages/common/src/db/schema.ts`
+2. Create migration
+3. Create service
+4. Write tests
+
+### Add New Job Type
+1. Create `workers/job-name.worker.ts`
+2. Enqueue in `infrastructure/queue.client.ts`
+3. Register in `index.ts`
+4. Write tests
+
+📚 **For detailed task guides**: See `.docs/agents/09-COMMON-TASKS.md`
+
+---
+
+## 📚 DOCUMENTATION ROADMAP
+
+| Topic | Location | Purpose |
+|-------|----------|---------|
+| **Project Overview** | `.docs/agents/01-PROJECT-OVERVIEW.md` | Detailed project context, goals, architecture |
+| **Build Commands** | `.docs/agents/02-BUILD-COMMANDS.md` | All build, test, debug, deploy commands |
+| **Folder Structure** | `.docs/agents/03-FOLDER-STRUCTURE.md` | Detailed folder organization & examples |
+| **Code Style** | `.docs/agents/04-CODE-STYLE-GUIDELINES.md` | Naming, formatting, patterns, examples |
+| **Testing** | `.docs/agents/05-TESTING-INSTRUCTIONS.md` | Mocking, fixtures, integration tests |
+| **Security** | `.docs/agents/06-SECURITY-GUIDELINES.md` | Validation, auth, secrets, logging |
+| **Workflow** | `.docs/agents/07-DEVELOPMENT-WORKFLOW.md` | Git flow, PR process, collaboration |
+| **Patterns** | `.docs/agents/08-KEY-PATTERNS.md` | Real-world code examples |
+| **Tasks** | `.docs/agents/09-COMMON-TASKS.md` | Step-by-step task guides |
+| **System Prompt** | `DEVELOPER-AGENT-SYSTEM-PROMPT.md` | 10 code patterns + 11 boilerplate patterns |
+
+---
+
+## 🤖 FOR AI DEVELOPER AGENTS
+
+**Primary Reference**: `DEVELOPER-AGENT-SYSTEM-PROMPT.md` (this directory)
+- 10 code patterns with examples
+- 11 boilerplate reduction patterns
+- 5 anti-patterns to avoid
+- 6 critical rules (non-negotiable)
+- Pre-commit checklist
+
+**Secondary Reference**: `.docs/agents/` (detailed guides)
+- Use for deep dives on specific topics
+- Reference when patterns need clarification
+- Examples for implementation details
+
+---
+
+## 🚨 COMMON PITFALLS
+
+1. ❌ Creating wrapper classes (DatabaseClient, LoggerService)
+2. ❌ Nested folder structures (api/, domain/, infrastructure/)
+3. ❌ Using `any` types
+4. ❌ Forgetting 85% test coverage
+5. ❌ Raw SQL instead of Drizzle
+6. ❌ Logging sensitive data (passwords, tokens)
+7. ❌ Not updating documentation
+8. ❌ Exposing stack traces in errors
+
+---
+
+## 💬 WHEN TO ASK FOR HELP
+
+- **Architecture questions** → Ask architect
+- **API design unclear** → Ask architect + frontend dev
+- **Database schema** → Ask architect
+- **Testing strategy** → Ask QA
+- **Code style questions** → See DEVELOPER-AGENT-SYSTEM-PROMPT.md
+- **Security concerns** → See `.docs/agents/06-SECURITY-GUIDELINES.md`
+
+---
+
+## 📌 QUICK REFERENCE
+
+**Setup**: `pnpm install && docker-compose up -d`  
+**Dev Server**: `pnpm --filter @yacc/backend dev`  
+**Tests**: `pnpm --filter @yacc/backend test`  
+**Type Check**: TypeScript in strict mode  
+**Lint**: `pnpm --filter @yacc/backend lint`  
+**Coverage Target**: 85% minimum  
+**Node Version**: 18+  
+**Package Manager**: pnpm  
+
+---
+
+**Last Updated**: January 29, 2026  
 **Maintained By**: Enterprise Architect  
-**Status**: Active (BE-003 Complete)
+**Status**: Active  
+**Related**: DEVELOPER-AGENT-SYSTEM-PROMPT.md, `.docs/agents/` guides

@@ -1,10 +1,11 @@
-import { IsOptional, IsInt } from 'class-validator';
+import { IsOptional, IsInt, Min, Max } from 'class-validator';
+import { SearchableRequest } from '../../types/searchableRequest.type';
 
 /**
  * List Integrations Request
  * Query parameters for listing all integrations
  */
-export class ListIntegrationsRequest extends ISearchableRequest {
+export class ListIntegrationsRequest extends SearchableRequest {
   @IsOptional()
   @IsInt()
   @Min(1)

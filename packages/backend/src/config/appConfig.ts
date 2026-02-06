@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export const envSchema = z.object({
   DATABASE_URL: z.string().url(),
+  DATABASE_MIN_CONNECTIONS: z.coerce.number().default(2),
+  DATABASE_MAX_CONNECTIONS: z.coerce.number().default(10),
 
   BETTER_AUTH_SECRET: z.string().min(32),
   JWT_SECRET: z.string().min(32),
@@ -42,27 +44,27 @@ export const envSchema = z.object({
   SMTP_FROM_EMAIL: z.string().email().optional(),
   SMTP_FROM_NAME: z.string().optional(),
 
-  FRONTEND_URL: z.string().url(),
-  RESET_PASSWORD_URL: z.string().url(),
+   APP_FRONTEND_URL: z.string().url(),
+   RESET_PASSWORD_URL: z.string().url(),
 
-  WS_HEARTBEAT_INTERVAL_SEC: z.coerce.number().default(60),
-  WS_BACKLOG_RETENTION_HOURS: z.coerce.number().default(1),
+   WS_HEARTBEAT_INTERVAL_SEC: z.coerce.number().default(60),
+   WS_BACKLOG_RETENTION_HOURS: z.coerce.number().default(1),
 
-  LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
-  LOG_FORMAT: z.enum(['json', 'pretty']).default('json'),
-  LOG_FILE_ENABLED: z.coerce.boolean().default(true),
-  LOG_FILE_PATH: z.string().default('logs/app.log'),
-  LOG_FILE_MAX_SIZE: z.string().default('10M'),
-  LOG_FILE_MAX_FILES: z.coerce.number().default(5),
-  AUDIT_LOG_ENABLED: z.coerce.boolean().default(true),
-  AUDIT_LOG_PATH: z.string().default('logs/audit.log'),
-  AUDIT_LOG_MAX_SIZE: z.string().default('10M'),
-  AUDIT_LOG_MAX_FILES: z.coerce.number().default(10),
+   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
+   LOG_FORMAT: z.enum(['json', 'pretty']).default('json'),
+   LOG_FILE_ENABLED: z.coerce.boolean().default(true),
+   LOG_FILE_PATH: z.string().default('logs/app.log'),
+   LOG_FILE_MAX_SIZE: z.string().default('10M'),
+   LOG_FILE_MAX_FILES: z.coerce.number().default(5),
+   AUDIT_LOG_ENABLED: z.coerce.boolean().default(true),
+   AUDIT_LOG_PATH: z.string().default('logs/audit.log'),
+   AUDIT_LOG_MAX_SIZE: z.string().default('10M'),
+   AUDIT_LOG_MAX_FILES: z.coerce.number().default(10),
 
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.coerce.number().default(3000),
+   APP_ENV: z.enum(['development', 'production', 'test']).default('development'),
+   APP_PORT: z.coerce.number().default(3000),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
 
-export const envConfig = envSchema.parse(process.env);
+export const appConfig = envSchema.parse(process.env);

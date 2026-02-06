@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, IsEnum, IsBoolean } from 'class-validator';
+import { IsOptional, IsString, IsInt, IsBoolean, Min } from 'class-validator';
 
 /**
  * Create Routing Rule Request

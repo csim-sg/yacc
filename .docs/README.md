@@ -129,6 +129,93 @@
 
 ---
 
+
+## 📋 Architecture Artifacts
+
+### 📁 architecture/ (Architect Reviews)
+
+Official architecture review documents and guidance.
+
+**Current Files:**
+- **INDEX-TS-RULE-CLARIFICATION.md** - Explains no barrel exports rule with exceptions
+- **ARCHITECT-REVIEW-BE006-PR177.md** - Review of BE-006 WebSocket infrastructure
+
+**When to use:** Understanding architecture patterns and decisions  
+**Audience:** Architects, developers making design decisions
+
+---
+
+### 📁 adr/ (Architecture Decision Records)
+
+Official ADRs numbered sequentially. Each ADR documents a significant architectural decision.
+
+**Current ADRs:**
+- **ADR-001**: Core table UUIDs
+- **ADR-002**: Non-core integer IDs
+- **ADR-003**: Phase 1 scope (Telegram + IRC)
+- **ADR-004**: Logging strategy
+- **ADR-005**: Infrastructure & config pattern
+- **ADR-006**: Auth client implementation
+- **ADR-007**: Jest to Vitest migration
+- **ADR-011**: File naming convention standardization
+
+**When to use:** Understanding architectural rationale  
+**Audience:** Architects, tech leads, developers making design decisions
+
+---
+
+### 📁 governance/ (Governance Logs)
+
+Official governance logs providing audit traceability for all decisions.
+
+**Current Logs:**
+- **GOV-001 through GOV-010**: Decision approvals and enforcement
+- **ARCHITECT-DECISION-*****: Final architectural decisions
+- **__README.md**: How governance works
+
+**When to use:** Audit trail, compliance verification, understanding decision history  
+**Audience:** Architects, auditors, compliance teams
+
+---
+
+### 📁 plans/ (Development Planning)
+
+Development planning documents, task tracking, and sprint planning.
+
+**Key Files:**
+- **00-INDEX.md**: Master planning index with task status
+- **BE-006-websocket-quick-start.md**: Quick start guide for WebSocket implementation
+
+**When to use:** Daily task tracking, sprint planning  
+**Audience:** Developers, tech leads, project managers
+
+---
+
+## 🚀 Development Workflow
+
+### Week 1 Kickoff
+1. Read `../README.md` - Quick start
+2. Read `../AGENTS.md` - Your role
+3. Read `03-implementation-guide.md` - System overview
+4. Read role-specific core document (see "By Role" section above)
+5. Check `plans/00-INDEX.md` for current week's tasks
+
+### During Development
+- Reference core documents by topic (API design, data model, testing strategy)
+- Check `adr/` for architectural decisions
+- Reference `plans/00-INDEX.md` for task status
+- Consult `governance/` for approval status
+
+### Before Release
+- Run regression suite from `04-qa-and-testing.md`
+- Verify all acceptance criteria met from `01-product-specification.md`
+- Check `adr/` and `governance/` are updated
+- Update `plans/00-INDEX.md` with completion status
+
+---
+
+## 📊 Documentation Stats
+
 ### 🔹 06-phase1-execution-guide.md
 **Phase 1 execution plan with complete scope and acceptance criteria**
 

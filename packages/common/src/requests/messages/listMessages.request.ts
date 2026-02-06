@@ -1,11 +1,11 @@
-import { IsOptional, IsString, IsEnum, IsUUID, IsInt, Min, Max, IsBoolean } from 'class-validator';
-import { ISearchableRequest } from '../../types/searchable.request';
+import { IsOptional, IsUUID, IsInt, Min, Max } from 'class-validator';
+import { SearchableRequest } from '../../types/searchableRequest.type';
 
 /**
  * List Messages Request
  * Query parameters for listing messages in a conversation
  */
-export class ListMessagesRequest extends ISearchableRequest {
+export class ListMessagesRequest extends SearchableRequest {
   @IsOptional()
   @IsUUID()
   conversationId?: string;

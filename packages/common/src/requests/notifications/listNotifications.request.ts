@@ -1,10 +1,11 @@
-import { ISearchableRequest } from '../../types/searchable.request';
+import { IsOptional, IsInt, Min, Max } from 'class-validator';
+import { SearchableRequest } from '../../types/searchableRequest.type';
 
 /**
  * List Notifications Request
  * Query parameters for listing user notifications
  */
-export class ListNotificationsRequest extends ISearchableRequest {
+export class ListNotificationsRequest extends SearchableRequest {
   @IsOptional()
   @IsInt()
   @Min(1)
