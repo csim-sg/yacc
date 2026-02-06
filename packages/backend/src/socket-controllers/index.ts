@@ -10,6 +10,7 @@
  * - TypingController: Typing indicators and timeouts
  * - PresenceController: User online/offline/status updates
  * - ReactionController: Message reactions (add, remove, list)
+ * - ConnectorController: External platform integration events (Telegram, IRC)
  */
 
 import { ConversationController } from './conversation.controller';
@@ -17,6 +18,7 @@ import { MessageController } from './message.controller';
 import { TypingController } from './typing.controller';
 import { PresenceController } from './presence.controller';
 import { ReactionController } from './reaction.controller';
+import { ConnectorController } from './connector.controller';
 
 export const socketControllers = [
   ConversationController,
@@ -24,4 +26,5 @@ export const socketControllers = [
   TypingController,
   PresenceController,
   ReactionController,
+  ConnectorController,
 ];
