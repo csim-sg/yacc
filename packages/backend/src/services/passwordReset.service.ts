@@ -5,8 +5,9 @@
 
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
-import { db } from '../config/db';
-import { passwordResetTokens, users } from '../config/db';
+import { dbClient } from '../infrastructure/db.client';
+import { passwordResetTokens } from '../schemas/passwordReset.schema';
+import { users } from '../schemas/user.schema';
 import { eq, isNull, and, lt } from 'drizzle-orm';
 import { validatePassword } from './passwordValidation.service';
 import { auditService } from './audit.service';
@@ -21,7 +22,7 @@ export async function generateResetToken(
   correlationId: string,
 ): Promise<string> {
   // Delete any existing valid tokens for this user
-  await db
+  await dbClient
     .delete(passwordResetTokens)
     .where(
       and(
@@ -41,7 +42,7 @@ export async function generateResetToken(
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
   // Store hashed token in database
-  await db.insert(passwordResetTokens).values({
+  await dbClient.insert(passwordResetTokens).values({
     userId,
     token: tokenHash,
     expiresAt,
@@ -73,7 +74,7 @@ export async function validateAndGetUserId(
   }
 
   // Get all non-used tokens
-  const records = await db
+  const records = await dbClient
     .select()
     .from(passwordResetTokens)
     .where(isNull(passwordResetTokens.usedAt));
@@ -138,13 +139,13 @@ export async function resetPassword(
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
   // Update user password
-  await db
+  await dbClient
     .update(users)
     .set({ passwordHash })
     .where(eq(users.id, userId));
 
   // Find and mark token as used
-  const record = await db
+  const record = await dbClient
     .select()
     .from(passwordResetTokens)
     .where(
@@ -156,7 +157,7 @@ export async function resetPassword(
     .limit(1);
 
   if (record.length > 0) {
-    await db
+    await dbClient
       .update(passwordResetTokens)
       .set({ usedAt: new Date() })
       .where(eq(passwordResetTokens.id, record[0].id));

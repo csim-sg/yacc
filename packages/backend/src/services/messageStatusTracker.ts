@@ -7,11 +7,12 @@
 
 import { eq } from 'drizzle-orm';
 import type { Platform } from '@yacc/common/types/platform.type';
-import { db } from '../infrastructure/db/client';
-import { messages } from '../infrastructure/db/schema';
-import { enqueueRetry } from '../infrastructure/queues/messageRetryQueue';
+import { dbClient } from '../infrastructure/db.client';
+import { messages } from '../schemas/message.schema';
+import { logger } from '../infrastructure/logger';
+// TODO: Import enqueueRetry when messageStatusTracker is fully integrated with message service
+// import { enqueueRetry } from '../infrastructure/queues.client';
 import { MessageEvents } from '../websockets/wsConstants';
-import logger from '../utils/logger';
 
 // ============================================
 // Message Status Enum
@@ -106,7 +107,7 @@ class MessageStatusTrackerService {
    */
   async trackReceivedMessage(update: MessageStatusUpdate): Promise<void> {
     try {
-      logger.debug('Tracking received message', {
+      logger.debug({ 
         messageId: update.messageId,
         platform: update.platform,
       });
@@ -130,7 +131,7 @@ class MessageStatusTrackerService {
         },
       });
     } catch (error) {
-      logger.error('Failed to track received message', {
+      logger.error({ 
         messageId: update.messageId,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -142,7 +143,7 @@ class MessageStatusTrackerService {
    */
   async trackSentMessage(update: MessageStatusUpdate): Promise<void> {
     try {
-      logger.debug('Tracking sent message', {
+      logger.debug({ 
         messageId: update.messageId,
         platform: update.platform,
       });
@@ -158,7 +159,7 @@ class MessageStatusTrackerService {
 
       // Validate status transition
       if (currentStatus && !canTransitionTo(currentStatus, 'sent')) {
-        logger.warn('Invalid status transition attempted', {
+        logger.warn({ 
           messageId: update.messageId,
           from: currentStatus,
           to: 'sent',
@@ -186,7 +187,7 @@ class MessageStatusTrackerService {
         },
       });
     } catch (error) {
-      logger.error('Failed to track sent message', {
+      logger.error({ 
         messageId: update.messageId,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -199,7 +200,7 @@ class MessageStatusTrackerService {
    */
   async trackFailedMessage(update: MessageStatusUpdate): Promise<void> {
     try {
-      logger.debug('Tracking failed message', {
+      logger.debug({ 
         messageId: update.messageId,
         platform: update.platform,
         error: update.error,
@@ -216,7 +217,7 @@ class MessageStatusTrackerService {
 
       // Validate status transition
       if (currentStatus && !canTransitionTo(currentStatus, 'failed')) {
-        logger.warn('Invalid status transition attempted', {
+        logger.warn({ 
           messageId: update.messageId,
           from: currentStatus,
           to: 'failed',
@@ -257,7 +258,7 @@ class MessageStatusTrackerService {
       // Enqueue for retry (only if retryable)
       await this.enqueueRetryIfNeeded(update, nextStatus);
     } catch (error) {
-      logger.error('Failed to track failed message', {
+      logger.error({ 
         messageId: update.messageId,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -274,33 +275,36 @@ class MessageStatusTrackerService {
     try {
       // Only retry if next status is pending
       if (nextStatus !== 'pending') {
-        logger.debug('Message not retryable', {
+        logger.debug({ 
           messageId: update.messageId,
           status: update.status,
         });
         return;
       }
 
-      // Enqueue for retry
-      await enqueueRetry({
-        messageId: update.messageId,
-        conversationId: update.conversationId,
-        platform: update.platform,
-        attemptNumber: 1, // Will be incremented by retry worker
-        attemptAt: new Date(),
-        lastError: update.error,
-      });
+      // TODO: Enqueue for retry - requires full message context (body, direction, recipientId)
+      // This needs to be implemented when messageStatusTracker is integrated with message service
+      // await enqueueRetry({
+      //   messageId: update.messageId,
+      //   conversationId: update.conversationId,
+      //   platformType: update.platform as 'telegram' | 'irc' | 'internal',
+      //   direction: 'outbound',
+      //   body: '', // Need to fetch from database
+      //   recipientId: '', // Need to get from conversation context
+      //   retryCount: 1,
+      //   lastError: update.error,
+      // });
 
-      logger.info('Message enqueued for retry', {
-        messageId: update.messageId,
-        conversationId: update.conversationId,
-        platform: update.platform,
-      });
+      // logger.info({ 
+      //   messageId: update.messageId,
+      //   conversationId: update.conversationId,
+      //   platform: update.platform,
+      // });
     } catch (error) {
-      logger.error('Failed to enqueue message for retry', {
+      logger.error({ 
         messageId: update.messageId,
         error: error instanceof Error ? error.message : String(error),
-      });
+      }, 'Failed to enqueue message for retry');
     }
   }
 
@@ -310,7 +314,7 @@ class MessageStatusTrackerService {
    * For now, we only log the event (WebSocket not yet initialized)
    */
   private emitMessageStatus(event: MessageStatusEvent): void {
-    logger.debug('Emitting message status event', {
+    logger.debug({ 
       event: event.event,
       messageId: event.data.messageId,
       status: event.data.status,

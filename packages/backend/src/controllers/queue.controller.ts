@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Param, Body, QueryParam } from 'routing-controllers';
-import { logger } from '../config/logging';
+import { logger } from '../infrastructure/logger';
 import { messageQueueService } from '../services/message-queue.service';
 import { messageQueueDLQService } from '../services/message-queue-dlq.service';
 import type { QueueStatistics } from '../types/message-queue.types';

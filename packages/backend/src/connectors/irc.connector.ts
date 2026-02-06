@@ -1,5 +1,5 @@
 import { BaseConnector } from './base/baseConnector';
-import { logger } from '../config/logging';
+import { logger } from '../infrastructure/logger';
 import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
 import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse.interface';
 import type { ValidationError } from '@yacc/common/types/validationError.interface';

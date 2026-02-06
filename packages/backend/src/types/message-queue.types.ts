@@ -19,15 +19,11 @@ export const SendMessageJobPayloadSchema = z.object({
   conversationId: z.string().uuid('Invalid conversation ID'),
   recipientId: z.string().uuid('Invalid recipient ID'),
   body: z.string().min(1, 'Message body required'),
-  direction: z.enum(['inbound', 'outbound'], {
-    errorMap: () => ({ message: 'Direction must be inbound or outbound' }),
-  }),
-  platformType: z.enum(['telegram', 'irc', 'internal'], {
-    errorMap: () => ({ message: 'Platform must be telegram, irc, or internal' }),
-  }),
+  direction: z.enum(['inbound', 'outbound']),
+  platformType: z.enum(['telegram', 'irc', 'internal']),
   retryCount: z.number().int().min(0).max(3, 'Retry count cannot exceed 3'),
   lastError: z.string().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.unknown()).optional(),
 });
 
 export type SendMessageJobPayload = z.infer<typeof SendMessageJobPayloadSchema>;
@@ -64,8 +60,7 @@ export const DLQEntrySchema = z.object({
   payload: SendMessageJobPayloadSchema,
   failedAt: z.string().datetime('Invalid timestamp'),
   failureReason: z.enum(
-    ['max_retries_exceeded', 'validation_error', 'platform_error', 'network_error', 'unknown'],
-    { errorMap: () => ({ message: 'Invalid failure reason' }) }
+    ['max_retries_exceeded', 'validation_error', 'platform_error', 'network_error', 'unknown']
   ),
   totalAttempts: z.number().int().min(1),
   lastError: z.string(),

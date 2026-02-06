@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { logger } from '../config/logging';
+import { logger } from '../infrastructure/logger';
 import { SendMessageJobPayload } from '../types/message-queue.types';
 import { queueDatabaseIntegration } from './queue-database-integration';
 import type { BaseConnector } from '../connectors/base/baseConnector';

@@ -4,17 +4,18 @@ import express from 'express';
 import { Server } from 'socket.io';
 import http from 'http';
 import { useExpressServer } from 'routing-controllers';
-import { checkDatabaseConnection } from './config/db';
+import { checkDatabaseConnection } from './infrastructure/db.client';
 import { authorizationChecker, currentUserChecker } from './middleware/routingControllersAuth';
 import { correlationIdMiddleware } from './middleware/correlationId.middleware';
 import { requestLoggingMiddleware } from './middleware/requestLogging.middleware';
+import { loginRateLimiter, passwordResetRateLimiter } from './middleware/rateLimit.middleware';
 import { AuthController } from './controllers/auth.controller';
 import { ConversationsController } from './controllers/conversations.controller';
 import { AuditController } from './controllers/audit.controller';
 import { HealthController } from './controllers/health.controller';
 import { QueueController } from './controllers/queue.controller';
 import { config } from './config/config';
-import { logger } from './config/logging';
+import { logger } from './infrastructure/logger';
 import { messageQueueService } from './services/message-queue.service';
 import { messageQueueProcessor } from './services/message-queue-processor';
 import { wsGateway } from './websockets/gateway';
@@ -25,6 +26,7 @@ import { IRCConnector } from './connectors/irc.connector';
 const app = express();
 
 // ===== SETUP ROUTING-CONTROLLERS =====
+// Register all middleware via routing-controllers to comply with architecture standards
 useExpressServer(app, {
   controllers: [AuthController, ConversationsController, AuditController, HealthController, QueueController],
   authorizationChecker: authorizationChecker,
@@ -36,11 +38,18 @@ useExpressServer(app, {
   },
   classTransformer: true,
   middlewares: [
-    // Middleware order is critical: registered in this order
-    correlationIdMiddleware,    // 1. Inject correlation ID
-    requestLoggingMiddleware,    // 2. Log HTTP requests
+    // Global middleware - run for all requests before controllers
+    correlationIdMiddleware,
+    requestLoggingMiddleware,
   ],
 });
+
+// ===== SETUP RATE LIMITING =====
+// Apply rate limiting to specific endpoints after routing-controllers setup
+// These use app.post() to pre-register routes before controllers process them
+app.post('/api/auth/sign-in/email', loginRateLimiter);
+app.post('/api/auth/forgot-password', passwordResetRateLimiter);
+app.post('/api/auth/reset-password', passwordResetRateLimiter);
 
 // ===== SETUP EXPRESS SERVER =====
 const server = http.createServer(app);

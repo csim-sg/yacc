@@ -1,4 +1,4 @@
-import { logger } from '../config/logging';
+import { logger } from '../infrastructure/logger';
 import { wsGateway } from '../websockets/gateway';
 import type { SendMessageJobPayload } from '../types/message-queue.types';
 
