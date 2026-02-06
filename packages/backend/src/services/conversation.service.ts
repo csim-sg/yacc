@@ -202,6 +202,14 @@ export class ConversationService {
           )
           .limit(10);
 
+        const participantList = participants
+          .filter((p): p is { senderName: string } => p.senderName !== null && p.senderName.trim().length > 0)
+          .map((p) => ({
+            id: p.senderName,
+            name: p.senderName,
+            type: 'contact' as const,
+          }));
+
         return {
           id: convo.id,
           channel: convo.channel,
@@ -211,11 +219,7 @@ export class ConversationService {
           assignedUserId: convo.assignedUserId,
           assignedUserName,
           tags: convoTags,
-          participants: participants.map((p: any) => ({
-            id: p.senderName,
-            name: p.senderName,
-            type: 'contact' as const,
-          })),
+          participants: participantList,
           unreadCount: unreadCount[0]?.count || 0,
           latestMessagePreview: latestMessage[0]?.body || null,
           latestMessageAt: latestMessage[0]?.createdAt || null,
@@ -264,34 +268,38 @@ export class ConversationService {
       .innerJoin(tags, eq(tags.id, conversationTags.tagId))
       .where(eq(conversationTags.conversationId, id));
 
-    // Get unique participants (senders of inbound messages)
-    const participants = await dbClient
-      .selectDistinct({ senderName: messages.senderName })
-      .from(messages)
-      .where(
-        and(
-          eq(messages.conversationId, id),
-          eq(messages.direction, 'inbound')
-        )
-      )
-      .limit(10);
+     // Get unique participants (senders of inbound messages)
+     const participants = await dbClient
+       .selectDistinct({ senderName: messages.senderName })
+       .from(messages)
+       .where(
+         and(
+           eq(messages.conversationId, id),
+           eq(messages.direction, 'inbound')
+         )
+       )
+       .limit(10);
 
-    return {
-      id: convo[0].id,
-      channel: convo[0].channel,
-      externalThreadId: convo[0].externalThreadId,
-      status: convo[0].status,
-      priority: convo[0].priority,
-      assignedUserId: convo[0].assignedUserId,
-      tags: convoTags,
-      participants: participants.map((p: any) => ({
-        id: p.senderName,
-        name: p.senderName,
-        type: 'contact' as const,
-      })),
-      createdAt: convo[0].createdAt,
-      updatedAt: convo[0].updatedAt,
-    };
+     const participantList = participants
+       .filter((p): p is { senderName: string } => p.senderName !== null && p.senderName.trim().length > 0)
+       .map((p) => ({
+         id: p.senderName,
+         name: p.senderName,
+         type: 'contact' as const,
+       }));
+
+     return {
+       id: convo[0].id,
+       channel: convo[0].channel,
+       externalThreadId: convo[0].externalThreadId,
+       status: convo[0].status,
+       priority: convo[0].priority,
+       assignedUserId: convo[0].assignedUserId,
+       tags: convoTags,
+       participants: participantList,
+       createdAt: convo[0].createdAt,
+       updatedAt: convo[0].updatedAt,
+     };
   }
 
   /**

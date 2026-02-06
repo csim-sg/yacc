@@ -70,9 +70,9 @@ export interface ConversationDetail {
 
 export interface ListConversationsResponse {
   data: ConversationListItem[];
-  totalCount: number;
+  total: number;
   page: number;
-  totalPage: number;
+  pageSize: number;
 }
 
 export interface ListConversationsParams {

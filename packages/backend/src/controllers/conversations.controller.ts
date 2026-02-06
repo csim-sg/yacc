@@ -16,6 +16,8 @@ import {
   Authorized,
   CurrentUser,
   HttpCode,
+  BadRequestError,
+  NotFoundError,
 } from 'routing-controllers';
 import { conversationService } from '../services/conversation.service.js';
 import { auditService } from '../services/audit.service.js';
@@ -26,11 +28,11 @@ import { AssignRequest } from '@yacc/common/requests/conversations/assign.reques
 import { TagRequest } from '@yacc/common/requests/conversations/tag.request';
 import type { AuthUser } from '../types/auth.types.js';
 
-@JsonController('/api/conversations')
+@JsonController('/conversations')
 @Authorized()
 export class ConversationsController {
   /**
-   * GET /api/conversations
+   * GET /conversations
    * List conversations with filters and pagination
    */
   @Get('/')
@@ -243,36 +245,44 @@ export class ConversationsController {
    * POST /api/conversations/:id/messages
    * Send a new message to a conversation
    */
-  @Post('/:id/messages')
-  @HttpCode(201)
-  async sendMessage(
-    @Param('id') conversationId: string,
-    @Body() body: { body: string },
-    @CurrentUser() user: AuthUser
-  ) {
-    if (!body.body || body.body.trim().length === 0) {
-      throw new Error('Message body cannot be empty');
-    }
+   @Post('/:id/messages')
+   @HttpCode(201)
+   async sendMessage(
+     @Param('id') conversationId: string,
+     @Body() body: { body: string },
+     @CurrentUser() user: AuthUser
+   ) {
+     // Validate message body
+     if (!body.body || body.body.trim().length === 0) {
+       throw new BadRequestError('Message body cannot be empty');
+     }
 
-    const result = await conversationService.createMessage({
-      conversationId,
-      senderName: user.email,
-      body: body.body,
-      direction: 'outbound',
-      status: 'pending',
-    });
+     // Verify conversation exists
+     try {
+       await conversationService.getConversation(conversationId);
+     } catch {
+       throw new NotFoundError('Conversation not found');
+     }
 
-    // Log audit
-    await auditService.logAction({
-      actorId: user.id,
-      action: 'message_sent',
-      entityType: 'conversation',
-      entityId: conversationId,
-      metadata: { messageId: result.message.id },
-    });
+     const result = await conversationService.createMessage({
+       conversationId,
+       senderName: user.email,
+       body: body.body,
+       direction: 'outbound',
+       status: 'pending',
+     });
 
-    return {
-      data: result.message,
-    };
-  }
+     // Log audit
+     await auditService.logAction({
+       actorId: user.id,
+       action: 'message_sent',
+       entityType: 'conversation',
+       entityId: conversationId,
+       metadata: { messageId: result.message.id },
+     });
+
+     return {
+       data: result.message,
+     };
+   }
 }
