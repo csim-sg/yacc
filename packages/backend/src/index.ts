@@ -47,9 +47,9 @@ useExpressServer(app, {
 // ===== SETUP RATE LIMITING =====
 // Apply rate limiting to specific endpoints after routing-controllers setup
 // These use app.post() to pre-register routes before controllers process them
-app.post('/api/auth/sign-in/email', loginRateLimiter);
-app.post('/api/auth/forgot-password', passwordResetRateLimiter);
-app.post('/api/auth/reset-password', passwordResetRateLimiter);
+app.post('/auth/sign-in/email', loginRateLimiter);
+app.post('/auth/forgot-password', passwordResetRateLimiter);
+app.post('/auth/reset-password', passwordResetRateLimiter);
 
 // ===== SETUP EXPRESS SERVER =====
 const server = http.createServer(app);

@@ -28,11 +28,11 @@ import { AssignRequest } from '@yacc/common/requests/conversations/assign.reques
 import { TagRequest } from '@yacc/common/requests/conversations/tag.request';
 import type { AuthUser } from '../types/auth.types.js';
 
-@JsonController('/conversations')
+@JsonController('/api/conversations')
 @Authorized()
 export class ConversationsController {
   /**
-   * GET /conversations
+   * GET /api/conversations
    * List conversations with filters and pagination
    */
   @Get('/')

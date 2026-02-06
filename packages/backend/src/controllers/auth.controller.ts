@@ -2,10 +2,10 @@
  * Auth Controller (Aligned with BetterAuth)
  * 
  * BetterAuth provides comprehensive auth endpoints via its handler:
- * - /api/auth/sign-in/email (login)
- * - /api/auth/sign-out (logout)
- * - /api/auth/get-session (session)
- * - /api/auth/sign-up/email (register)
+ * - /auth/sign-in/email (login)
+ * - /auth/sign-out (logout)
+ * - /auth/get-session (session)
+ * - /auth/sign-up/email (register)
  * 
  * This controller also handles custom password reset flow
  * for forgot-password and reset-password endpoints.
@@ -24,10 +24,10 @@ import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordRese
 // TODO: Implement EmailService in infrastructure layer
 // import { emailService } from '../infrastructure/email.client';
 
-@Controller('/api/auth')
+@Controller('/auth')
 export class AuthController {
   /**
-   * POST /api/auth/forgot-password
+   * POST /auth/forgot-password
    * Request password reset email (ALWAYS returns 200 to prevent email enumeration)
    *
    * Request: { "email": "user@example.com" }
@@ -78,7 +78,7 @@ export class AuthController {
   }
 
   /**
-   * POST /api/auth/reset-password
+   * POST /auth/reset-password
    * Reset password using token
    *
    * Request: { "token": "64-char-hex-token", "newPassword": "NewPassword123!" }

@@ -121,13 +121,13 @@ export const conversationsService = {
     });
 
     const queryString = query.toString();
-    const endpoint = queryString ? `/conversations?${queryString}` : '/conversations';
+    const endpoint = queryString ? `/api/conversations?${queryString}` : '/api/conversations';
 
     return api.get<ListConversationsResponse>(endpoint);
   },
 
   async getById(id: number): Promise<GetConversationResponse> {
-    return api.get<GetConversationResponse>(`/conversations/${id}`);
+    return api.get<GetConversationResponse>(`/api/conversations/${id}`);
   },
 
   async getMessages(
@@ -140,11 +140,11 @@ export const conversationsService = {
       limit: String(limit),
     });
 
-    return api.get<ListMessagesResponse>(`/conversations/${conversationId}/messages?${query}`);
+    return api.get<ListMessagesResponse>(`/api/conversations/${conversationId}/messages?${query}`);
   },
 
   async sendMessage(conversationId: number, body: string): Promise<SendMessageResponse> {
-    return api.post<SendMessageResponse>(`/conversations/${conversationId}/messages`, {
+    return api.post<SendMessageResponse>(`/api/conversations/${conversationId}/messages`, {
       body,
     });
   },
