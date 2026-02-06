@@ -214,4 +214,65 @@ export class ConversationsController {
       data: { success: true, message: 'Tag removed successfully' },
     };
   }
+
+  /**
+   * GET /api/conversations/:id/messages
+   * Get messages for a conversation with pagination
+   */
+  @Get('/:id/messages')
+  async getMessages(
+    @Param('id') conversationId: string,
+    @Req() req: Request
+  ) {
+    const query = req.query || {};
+    const page = query.page ? Number(query.page) : 1;
+    const limit = query.limit ? Number(query.limit) : 50;
+    const offset = (page - 1) * limit;
+
+    const result = await conversationService.listConversationMessages(conversationId, offset, limit);
+
+    return {
+      data: result.messages,
+      page,
+      pageSize: limit,
+      total: result.total,
+    };
+  }
+
+  /**
+   * POST /api/conversations/:id/messages
+   * Send a new message to a conversation
+   */
+  @Post('/:id/messages')
+  @HttpCode(201)
+  async sendMessage(
+    @Param('id') conversationId: string,
+    @Body() body: { body: string },
+    @CurrentUser() user: AuthUser
+  ) {
+    if (!body.body || body.body.trim().length === 0) {
+      throw new Error('Message body cannot be empty');
+    }
+
+    const result = await conversationService.createMessage({
+      conversationId,
+      senderName: user.email,
+      body: body.body,
+      direction: 'outbound',
+      status: 'pending',
+    });
+
+    // Log audit
+    await auditService.logAction({
+      actorId: user.id,
+      action: 'message_sent',
+      entityType: 'conversation',
+      entityId: conversationId,
+      metadata: { messageId: result.message.id },
+    });
+
+    return {
+      data: result.message,
+    };
+  }
 }

@@ -532,6 +532,43 @@ export class ConversationService {
   async removeTag(conversationId: string, tagId: number) {
     return await this.removeTagFromConversation(conversationId, tagId);
   }
+
+  /**
+   * List messages for a conversation with pagination
+   */
+  async listConversationMessages(conversationId: string, offset: number, limit: number) {
+    // Verify conversation exists
+    const convo = await dbClient
+      .select()
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+      .limit(1);
+
+    if (!convo.length) {
+      throw new Error('Conversation not found');
+    }
+
+    // Get total count
+    const countResult = await dbClient
+      .select({ count: sql<number>`count(*)` })
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId));
+    const total = countResult[0]?.count || 0;
+
+    // Get messages
+    const msgs = await dbClient
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(asc(messages.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      messages: msgs,
+      total,
+    };
+  }
 }
 
 export const conversationService = new ConversationService();
