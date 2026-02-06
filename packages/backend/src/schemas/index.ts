@@ -9,9 +9,10 @@ import { rawPayloads } from "./rawPayload.schema";
 import { routingRuleExecutions } from "./routingRule.schema";
 import { tags } from "./tag.schema";
 import { users } from "./user.schema";
+import { session, verification, account } from "./betterAuth.schema";
 
 export const schemas = {
-  // Add your schemas here as you create them
+  // YACC application tables
   attachments,
   auditLogs,
   conversations,
@@ -22,5 +23,9 @@ export const schemas = {
   rawPayloads,
   routingRuleExecutions,
   tags,
-  users
+  users,
+  // BetterAuth tables (for session/account management)
+  session,
+  verification,
+  account,
 };

@@ -102,7 +102,7 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
 | BE-001 | Set up PostgreSQL database with Drizzle ORM | **Done** | P0 | Backend | - | Database connection working, Drizzle schema migrations functional | PVTI_lAHOAB4wV84BNGcwzgj_5rE | 12 |
 | BE-002 | Define database schema (users, conversations, messages, tags, notes, audit logs, notifications, routing rules) | **Done** | P0 | Backend | BE-001 | All 11 tables defined with correct relationships, migrations generated | PVTI_lAHOAB4wV84BNGcwzgj_5rQ | 13 |
-| BE-003 | Implement BetterAuth for authentication (email/password, session/JWT) | Ready | P0 | Backend | BE-002 | Login endpoint working, JWT/session management functional | PVTI_lAHOAB4wV84BNGcwzgj_5rc | 18 |
+| BE-003 | Implement BetterAuth for authentication (email/password, session/JWT) | In Progress | P0 | Backend | BE-002 | Login endpoint working, JWT/session management functional | PVTI_lAHOAB4wV84BNGcwzgj_5rc | 18 |
 | BE-004 | Implement forgot password flow (reset token, email sending) | **Ready** | P1 | Backend | BE-003 | POST /auth/forgot-password and /reset-password working | PVTI_lAHOAB4wV84BNGcwzgj_5sM | 19 |
 | BE-005 | Implement RBAC middleware (4 roles: Super Admin, Admin, Manager, User) | **Ready** | P0 | Backend | BE-002, BE-003 | Permission checks working for all role-based endpoints | PVTI_lAHOAB4wV84BNGcwzgj_5rU | 20 |
 | BE-006 | Create user management endpoints (CRUD for users, roles) | Not Started | P1 | Backend | BE-005 | GET/POST/PUT/DELETE /users, /roles working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_5rk | 17 |

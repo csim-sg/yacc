@@ -1,5 +1,5 @@
 import type { Server as SocketIOServer } from 'socket.io';
-import { logger } from '../config/logging';
+import { logger } from '../infrastructure/logger';
 import type { WebSocketEventType } from './wsConstants';
 
 /**

@@ -1,5 +1,5 @@
 import type { AuthUser } from '../types/auth.types';
-import { db, conversations } from '../config/db';
+import { db, conversations } from '../infrastructure/db.client';
 import { eq } from 'drizzle-orm';
 
 /**

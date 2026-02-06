@@ -1,6 +1,6 @@
 import { Queue, Worker, Job } from 'bullmq';
-import { getRedisClient } from '../config/redis';
-import { logger } from '../config/logging';
+import { getRedisClient } from '../infrastructure/redis.client';
+import { logger } from '../infrastructure/logger';
 import { queueDatabaseIntegration } from './queue-database-integration';
 import {
   SendMessageJobPayload,

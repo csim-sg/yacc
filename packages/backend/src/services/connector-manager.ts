@@ -1,4 +1,4 @@
-import { logger } from '../config/logging';
+import { logger } from '../infrastructure/logger';
 import type { BaseConnector } from '../connectors/base/baseConnector';
 
 /**

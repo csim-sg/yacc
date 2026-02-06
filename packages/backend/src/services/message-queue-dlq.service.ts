@@ -1,4 +1,4 @@
-import { logger } from '../config/logging';
+import { logger } from '../infrastructure/logger';
 import { messageQueueService } from './message-queue.service';
 import type { DLQEntry } from '../types/message-queue.types';
 

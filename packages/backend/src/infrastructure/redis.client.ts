@@ -44,6 +44,13 @@ redis.on('reconnecting', (delay: number) => {
 export const redisClient = redis;
 
 /**
+ * Get Redis client (for compatibility with queue service)
+ */
+export function getRedisClient(): Redis {
+  return redis;
+}
+
+/**
  * Close Redis connection
  */
 export async function closeRedisClient(): Promise<void> {
