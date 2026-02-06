@@ -77,13 +77,17 @@ async function start() {
      wsGateway.initialize(io);
      logger.info('WebSocket gateway initialized successfully');
 
-     // Initialize socket-controllers for declarative WebSocket event handling
-      logger.info('Registering socket-controllers...');
-      new SocketControllers({
-        io,
-        controllers: socketControllers,
-      });
-      logger.info('Socket-controllers registered successfully');
+      // Initialize socket-controllers for declarative WebSocket event handling
+       logger.info('Registering socket-controllers...');
+       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       new SocketControllers({
+         io,
+         controllers: socketControllers,
+         container: {
+           get: (Class: any) => new Class(),
+         },
+       });
+       logger.info('Socket-controllers registered successfully');
 
      // Register platform connectors
     logger.info('Registering platform connectors...');
