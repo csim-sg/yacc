@@ -1,0 +1,173 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                   PHASE 1.4 MVP EXECUTION - APPROVED ✅                       ║
+║                                                                               ║
+║  Status: Ready to Execute                                                    ║
+║  Timeline: February 10-20, 2026 (2-week sprint)                              ║
+║  Target: Working inbox + messaging + real-time updates                       ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+📋 EXECUTION PLAN SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WEEK 1 (Feb 10-16): Core APIs
+  BACKEND (20-25 hours):
+    ✓ BE-007: Inbox API (filters, pagination, search) [Issue #183] → Feb 14
+    ✓ BE-008: Conversation Detail [Issue #184] → Feb 14
+
+  FRONTEND (16-20 hours):
+    ✓ FE-008: Inbox List Page (UI + mocks) [Issue #189] → Feb 12
+    ✓ FE-009: Conversation Detail (UI + mocks) [Issue #190] → Feb 14
+
+  SYNC POINTS:
+    • API contract finalized: Feb 10 (morning)
+    • Frontend UI ready with mocks: Feb 12 (EOD)
+    • Backend ready for FE integration: Feb 14 (EOD)
+
+WEEK 2 (Feb 17-23): Message Flow + Real-Time
+  BACKEND (30-35 hours):
+    ✓ BE-009/010: Message Retrieval & Send [Issue #185] → Feb 20
+    ✓ BE-017-019: WebSocket Events (received/sent/failed) [#186-188] → Feb 21
+
+  FRONTEND (25-30 hours):
+    ✓ FE-008/009: API Integration → Feb 20
+    ✓ FE-010: Reply Composer [Issue #191] → Feb 20
+    ✓ FE-013-015: WebSocket Listeners [#192-194] → Feb 21
+
+  QA (30-40 hours):
+    ✓ QA-001: Integration Tests (BE) [Issue #195]
+    ✓ QA-002: E2E Tests (FE) [Issue #196]
+    ✓ QA-003: Real-Time Tests [Issue #197]
+
+  MVP COMPLETE: Feb 20-21, 2026
+
+📊 DELIVERABLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Users can:
+   • View unified inbox with conversations from Telegram + IRC
+   • Filter by channel, status, assignee, tag, priority, search
+   • Read conversation messages with sender names + timestamps
+   • Send replies to conversations
+   • See real-time updates (new messages appear without refresh)
+   • See message status (pending/sent/failed)
+
+✅ System:
+   • Full RBAC enforcement (Super Admin/Admin/Manager/User)
+   • ≥85% test coverage (unit + integration + E2E)
+   • No architecture violations
+   • Clean code, proper error handling
+   • Production-ready
+
+🏛️ ARCHITECTURE CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Flat Folder Structure (controllers/, services/, middleware/)
+✅ One Definition Per File
+✅ No `any` Types (Strict TypeScript)
+✅ Drizzle ORM (no raw SQL)
+✅ Config vs Infrastructure Pattern
+✅ WebSocket Room-Based Delivery
+✅ RBAC Middleware Enforced
+✅ Proper Error Handling (status codes + correlation IDs)
+✅ 85%+ Test Coverage
+✅ Documentation Synced (.docs/plans/00-INDEX.md, GOV-012)
+
+🔗 GITHUB ISSUES CREATED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BACKEND:
+  #183: BE-007 - Inbox API
+  #184: BE-008 - Conversation Detail
+  #185: BE-009/010 - Message Retrieval & Send
+  #186: BE-017 - message.received Event
+  #187: BE-018 - message.sent Event
+  #188: BE-019 - message.failed Event
+
+FRONTEND:
+  #189: FE-008 - Inbox List Page
+  #190: FE-009 - Conversation Detail Page
+  #191: FE-010 - Reply Composer
+  #192: FE-013 - message.received Listener
+  #193: FE-014 - message.sent Listener
+  #194: FE-015 - message.failed Listener
+
+QA:
+  #195: QA-001 - Integration Tests (BE-007-010)
+  #196: QA-002 - E2E Tests (FE-008-011)
+  #197: QA-003 - Real-Time Tests
+
+📚 DOCUMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Governance: .docs/governance/GOV-012-phase1.4-mvp-execution-approval.md
+✅ Planning: .docs/plans/00-INDEX.md (updated with Week 1-2 schedule)
+✅ Task Briefs: All in GitHub issues (#183-197)
+✅ Deferred: Retry queue, audit logging, attachments, routing rules (Phase 1.5+)
+
+👥 TEAM RESPONSIBILITIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BACKEND DEV:
+  1. Review BE-007-019 task briefs (issues #183-188)
+  2. Ask clarifying questions on API contract
+  3. Create feature branch: feature/BE-007-inbox-api
+  4. Begin BE-007 implementation (DUE Feb 14)
+
+FRONTEND DEV:
+  1. Review FE-008-015 task briefs (issues #189-194)
+  2. Ask clarifying questions on UI specs
+  3. Create mock API responses for BE-007 data
+  4. Create feature branch: feature/FE-008-inbox-ui
+  5. Begin FE-008 UI scaffold (DUE Feb 12)
+
+QA/TESTER:
+  1. Review QA-001-003 task briefs (issues #195-197)
+  2. Prepare test case templates
+  3. Set up test environment (staging DB, test accounts)
+  4. Ready to write test cases once BE-007 API contract finalized
+
+ARCHITECT:
+  ✅ COMPLETE: Finalized API contracts
+  ✅ COMPLETE: Created all task briefs
+  ✅ COMPLETE: Updated planning documents
+  ✅ NEXT: Review PRs for architecture compliance
+  ✅ NEXT: Daily sync with team (10:00 AM UTC)
+
+🎯 SUCCESS CRITERIA (MVP DONE when...)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ ] BE-007-019 implemented + tested (≥85% coverage)
+[ ] FE-008-015 implemented + tested (≥85% coverage)
+[ ] QA-001-003 all tests passing
+[ ] No architecture violations (flat structure, RBAC, no `any`, etc.)
+[ ] Documentation updated (API contracts, WebSocket events)
+[ ] Security review passed (input validation, RBAC, error handling)
+[ ] Production-ready code (no todos, clean logs, proper error handling)
+
+⏰ DAILY SYNC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Time: 10:00 AM UTC (adjust as needed)
+Duration: 15 minutes
+Agenda:
+  1. What did you ship yesterday? (1-2 min)
+  2. What are you shipping today? (1-2 min)
+  3. Blockers or help needed? (3-5 min)
+  4. Integration issues? (3-5 min)
+
+Escalation: If blocker blocking >30 min, reach out to architect immediately
+
+📞 QUESTIONS?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+See .docs/05-quick-reference.md → "Quick Links" section
+Reference relevant issue brief for task details
+Reach out to architect for architecture questions
+
+═══════════════════════════════════════════════════════════════════════════════
+
+READY TO EXECUTE. Starting Week 1 (Feb 10-16).
+
+Version: 1.0
+Date: February 6, 2026
+Status: ✅ APPROVED

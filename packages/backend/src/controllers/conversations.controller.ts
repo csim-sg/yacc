@@ -3,6 +3,7 @@
  * Handles conversation CRUD and updates with routing-controllers
  */
 
+import type { Request } from 'express';
 import {
   JsonController,
   Get,
@@ -16,13 +17,14 @@ import {
   CurrentUser,
   HttpCode,
 } from 'routing-controllers';
-import { conversationService } from '../services/conversation.service';
-import { auditService } from '../services/audit.service';
+import { conversationService } from '../services/conversation.service.js';
+import { auditService } from '../services/audit.service.js';
 import { ListConversationsRequest } from '@yacc/common/requests/conversations/listConversations.request';
 import { UpdateStatusRequest } from '@yacc/common/requests/conversations/updateStatus.request';
 import { UpdatePriorityRequest } from '@yacc/common/requests/conversations/updatePriority.request';
 import { AssignRequest } from '@yacc/common/requests/conversations/assign.request';
 import { TagRequest } from '@yacc/common/requests/conversations/tag.request';
+import type { AuthUser } from '../types/auth.types.js';
 
 @JsonController('/api/conversations')
 @Authorized()
@@ -32,43 +34,40 @@ export class ConversationsController {
    * List conversations with filters and pagination
    */
   @Get('/')
-  async listConversations(@Req() req: any) {
-    const query = req?.query || {};
+  async listConversations(@Req() req: Request) {
+    const query = req.query || {};
     const normalizedQuery: ListConversationsRequest = {
       page: query.page ? Number(query.page) : undefined,
       limit: query.limit ? Number(query.limit) : undefined,
-      channel: query.channel,
-      status: query.status,
-      priority: query.priority,
-      assignedUserId: query.assignedUserId ? String(query.assignedUserId) : undefined,
-      search: query.search,
-      dateFrom: query.dateFrom,
-      dateTo: query.dateTo,
+      channel: typeof query.channel === 'string' ? query.channel : undefined,
+      status: typeof query.status === 'string' ? query.status : undefined,
+      priority: typeof query.priority === 'string' ? query.priority : undefined,
+      assignedUserId: typeof query.assignedUserId === 'string' ? query.assignedUserId : undefined,
+      search: typeof query.search === 'string' ? query.search : undefined,
+      dateFrom: typeof query.dateFrom === 'string' ? query.dateFrom : undefined,
+      dateTo: typeof query.dateTo === 'string' ? query.dateTo : undefined,
       unread: query.unread === 'true',
-      sortBy: query.sortBy,
-      sortOrder: query.sortOrder,
+      sortBy: typeof query.sortBy === 'string' ? (query.sortBy as 'lastActivity' | 'created' | 'priority') : undefined,
+      sortOrder: typeof query.sortOrder === 'string' ? (query.sortOrder as 'asc' | 'desc') : undefined,
     };
     const result = await conversationService.listConversations(normalizedQuery);
-    const totalCount = result.pagination.total;
-    const totalPage = result.pagination.pages;
 
     return {
-      data: result.conversations,
-      totalCount,
-      page: result.pagination.page,
-      totalPage,
+      data: result.data,
+      page: result.page,
+      pageSize: result.pageSize,
+      total: result.total,
     };
   }
 
   /**
    * GET /api/conversations/:id
-   * Get conversation by ID with messages
+   * Get conversation by ID
    */
   @Get('/:id')
   async getConversation(@Param('id') id: string) {
     const conversation = await conversationService.getConversation(id);
     return {
-      success: true,
       data: conversation,
     };
   }
@@ -83,7 +82,7 @@ export class ConversationsController {
   async updateStatus(
     @Param('id') id: string,
     @Body() body: UpdateStatusRequest,
-    @CurrentUser() user: any
+    @CurrentUser() user: AuthUser
   ) {
     const result = await conversationService.updateStatus(id, body.status);
 
@@ -97,7 +96,6 @@ export class ConversationsController {
     });
 
     return {
-      success: true,
       data: result.conversation,
     };
   }
@@ -112,7 +110,7 @@ export class ConversationsController {
   async updatePriority(
     @Param('id') id: string,
     @Body() body: UpdatePriorityRequest,
-    @CurrentUser() user: any
+    @CurrentUser() user: AuthUser
   ) {
     const result = await conversationService.updatePriority(id, body.priority);
 
@@ -126,7 +124,6 @@ export class ConversationsController {
     });
 
     return {
-      success: true,
       data: result.conversation,
     };
   }
@@ -141,7 +138,7 @@ export class ConversationsController {
   async assignConversation(
     @Param('id') id: string,
     @Body() body: AssignRequest,
-    @CurrentUser() user: any
+    @CurrentUser() user: AuthUser
   ) {
     const result = await conversationService.assignConversation(id, body.assignedUserId);
 
@@ -158,7 +155,6 @@ export class ConversationsController {
     });
 
     return {
-      success: true,
       data: result.conversation,
     };
   }
@@ -173,7 +169,7 @@ export class ConversationsController {
   async addTag(
     @Param('id') id: string,
     @Body() body: TagRequest,
-    @CurrentUser() user: any
+    @CurrentUser() user: AuthUser
   ) {
     await conversationService.addTag(id, body.tagId);
 
@@ -187,8 +183,7 @@ export class ConversationsController {
     });
 
     return {
-      success: true,
-      message: 'Tag added successfully',
+      data: { success: true, message: 'Tag added successfully' },
     };
   }
 
@@ -202,7 +197,7 @@ export class ConversationsController {
   async removeTag(
     @Param('id') id: string,
     @Param('tagId') tagId: number,
-    @CurrentUser() user: any
+    @CurrentUser() user: AuthUser
   ) {
     await conversationService.removeTag(id, tagId);
 
@@ -216,8 +211,7 @@ export class ConversationsController {
     });
 
     return {
-      success: true,
-      message: 'Tag removed successfully',
+      data: { success: true, message: 'Tag removed successfully' },
     };
   }
 }
