@@ -144,7 +144,7 @@ export const conversationsService = {
   },
 
   async sendMessage(conversationId: number, body: string): Promise<SendMessageResponse> {
-    return api.post<SendMessageResponse, SendMessageRequest>(`/conversations/${conversationId}/messages`, {
+    return api.post<SendMessageResponse>(`/conversations/${conversationId}/messages`, {
       body,
     });
   },
