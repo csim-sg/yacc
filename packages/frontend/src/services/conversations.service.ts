@@ -70,9 +70,9 @@ export interface ConversationDetail {
 
 export interface ListConversationsResponse {
   data: ConversationListItem[];
-  totalCount: number;
+  total: number;
   page: number;
-  totalPage: number;
+  pageSize: number;
 }
 
 export interface ListConversationsParams {
@@ -95,6 +95,21 @@ export interface GetConversationResponse {
   data: ConversationDetail;
 }
 
+export interface ListMessagesResponse {
+  data: ConversationMessage[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface SendMessageRequest {
+  body: string;
+}
+
+export interface SendMessageResponse {
+  data: ConversationMessage;
+}
+
 export const conversationsService = {
   async list(params: ListConversationsParams = {}): Promise<ListConversationsResponse> {
     const query = new URLSearchParams();
@@ -106,12 +121,31 @@ export const conversationsService = {
     });
 
     const queryString = query.toString();
-    const endpoint = queryString ? `/conversations?${queryString}` : '/conversations';
+    const endpoint = queryString ? `/api/conversations?${queryString}` : '/api/conversations';
 
     return api.get<ListConversationsResponse>(endpoint);
   },
 
   async getById(id: number): Promise<GetConversationResponse> {
-    return api.get<GetConversationResponse>(`/conversations/${id}`);
+    return api.get<GetConversationResponse>(`/api/conversations/${id}`);
+  },
+
+  async getMessages(
+    conversationId: number,
+    page: number = 1,
+    limit: number = 50
+  ): Promise<ListMessagesResponse> {
+    const query = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+
+    return api.get<ListMessagesResponse>(`/api/conversations/${conversationId}/messages?${query}`);
+  },
+
+  async sendMessage(conversationId: number, body: string): Promise<SendMessageResponse> {
+    return api.post<SendMessageResponse>(`/api/conversations/${conversationId}/messages`, {
+      body,
+    });
   },
 };

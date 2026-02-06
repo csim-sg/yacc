@@ -1,10 +1,11 @@
-import { db } from '../../infrastructure/db/client';
+import { dbClient } from '../infrastructure/db.client';
 import {
   conversations,
   messages,
   conversationTags,
   tags,
-} from '../../infrastructure/db/schema';
+  users,
+} from '../schemas';
 import { eq, and, desc, asc, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { auditService } from './audit.service';
@@ -120,42 +121,42 @@ export class ConversationService {
 
     // Get total count
     const countResult = whereClauses.length > 0
-      ? await db
+      ? await dbClient
           .select({ count: sql<number>`count(*)` })
           .from(conversations)
           .where(and(...whereClauses))
-      : await db
+      : await dbClient
           .select({ count: sql<number>`count(*)` })
           .from(conversations);
     const total = countResult[0]?.count || 0;
 
     // Get conversations
     const convos = whereClauses.length > 0
-      ? await db
+      ? await dbClient
           .select()
           .from(conversations)
           .where(and(...whereClauses))
           .orderBy(orderBy)
           .limit(limit)
           .offset(offset)
-      : await db
+      : await dbClient
           .select()
           .from(conversations)
           .orderBy(orderBy)
           .limit(limit)
           .offset(offset);
 
-    // For each conversation, get latest message, tags, and unread count
+    // For each conversation, get latest message, tags, assigned user info, and unread count
     const enrichedConvos = await Promise.all(
       convos.map(async (convo) => {
-        const latestMessage = await db
+        const latestMessage = await dbClient
           .select()
           .from(messages)
           .where(eq(messages.conversationId, convo.id))
           .orderBy(desc(messages.createdAt))
           .limit(1);
 
-        const convoTags = await db
+        const convoTags = await dbClient
           .select({
             id: tags.id,
             name: tags.name,
@@ -167,7 +168,7 @@ export class ConversationService {
 
         // Count unread messages (for Phase 1, we'll count all inbound messages as "unread")
         // In Phase 2, we'll add a proper read/unread tracking system
-        const unreadCount = await db
+        const unreadCount = await dbClient
           .select({ count: sql<number>`count(*)` })
           .from(messages)
           .where(
@@ -177,23 +178,62 @@ export class ConversationService {
             )
           );
 
+        // Fetch assigned user name if assigned
+        let assignedUserName: string | null = null;
+        if (convo.assignedUserId) {
+          const assignedUser = await dbClient
+            .select({ email: users.email })
+            .from(users)
+            .where(eq(users.id, convo.assignedUserId))
+            .limit(1);
+          assignedUserName = assignedUser[0]?.email || null;
+        }
+
+        // Get unique participants (senders of inbound messages)
+        // Phase 2: Add proper participant tracking
+        const participants = await dbClient
+          .selectDistinct({ senderName: messages.senderName })
+          .from(messages)
+          .where(
+            and(
+              eq(messages.conversationId, convo.id),
+              eq(messages.direction, 'inbound')
+            )
+          )
+          .limit(10);
+
+        const participantList = participants
+          .filter((p): p is { senderName: string } => p.senderName !== null && p.senderName.trim().length > 0)
+          .map((p) => ({
+            id: p.senderName,
+            name: p.senderName,
+            type: 'contact' as const,
+          }));
+
         return {
-          ...convo,
-          latestMessage: latestMessage[0] || null,
+          id: convo.id,
+          channel: convo.channel,
+          externalThreadId: convo.externalThreadId,
+          status: convo.status,
+          priority: convo.priority,
+          assignedUserId: convo.assignedUserId,
+          assignedUserName,
           tags: convoTags,
+          participants: participantList,
           unreadCount: unreadCount[0]?.count || 0,
+          latestMessagePreview: latestMessage[0]?.body || null,
+          latestMessageAt: latestMessage[0]?.createdAt || null,
+          createdAt: convo.createdAt,
+          updatedAt: convo.updatedAt,
         };
       })
     );
 
     return {
-      conversations: enrichedConvos,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
+      data: enrichedConvos,
+      page,
+      pageSize: limit,
+      total,
     };
   }
 
@@ -201,7 +241,7 @@ export class ConversationService {
    * Get a single conversation by ID
    */
   async getConversation(id: string) {
-    const convo = await db
+    const convo = await dbClient
       .select()
       .from(conversations)
       .where(eq(conversations.id, id));
@@ -211,14 +251,14 @@ export class ConversationService {
     }
 
     // Get all messages
-    const convMessages = await db
+    const convMessages = await dbClient
       .select()
       .from(messages)
       .where(eq(messages.conversationId, id))
       .orderBy(asc(messages.createdAt));
 
     // Get tags
-    const convoTags = await db
+    const convoTags = await dbClient
       .select({
         id: tags.id,
         name: tags.name,
@@ -228,11 +268,38 @@ export class ConversationService {
       .innerJoin(tags, eq(tags.id, conversationTags.tagId))
       .where(eq(conversationTags.conversationId, id));
 
-    return {
-      ...convo[0],
-      messages: convMessages,
-      tags: convoTags,
-    };
+     // Get unique participants (senders of inbound messages)
+     const participants = await dbClient
+       .selectDistinct({ senderName: messages.senderName })
+       .from(messages)
+       .where(
+         and(
+           eq(messages.conversationId, id),
+           eq(messages.direction, 'inbound')
+         )
+       )
+       .limit(10);
+
+     const participantList = participants
+       .filter((p): p is { senderName: string } => p.senderName !== null && p.senderName.trim().length > 0)
+       .map((p) => ({
+         id: p.senderName,
+         name: p.senderName,
+         type: 'contact' as const,
+       }));
+
+     return {
+       id: convo[0].id,
+       channel: convo[0].channel,
+       externalThreadId: convo[0].externalThreadId,
+       status: convo[0].status,
+       priority: convo[0].priority,
+       assignedUserId: convo[0].assignedUserId,
+       tags: convoTags,
+       participants: participantList,
+       createdAt: convo[0].createdAt,
+       updatedAt: convo[0].updatedAt,
+     };
   }
 
   /**
@@ -246,7 +313,7 @@ export class ConversationService {
     status?: 'pending' | 'sent' | 'failed';
   }) {
     const { conversationId, senderName, body, direction, status = 'sent' } = params;
-    const [conversation] = await db
+    const [conversation] = await dbClient
       .select()
       .from(conversations)
       .where(eq(conversations.id, conversationId))
@@ -260,7 +327,7 @@ export class ConversationService {
     let reopened = false;
 
     if (direction === 'inbound' && conversation.status === 'resolved') {
-      await db
+      await dbClient
         .update(conversations)
         .set({ status: 'open', updatedAt: now })
         .where(eq(conversations.id, conversationId));
@@ -279,7 +346,7 @@ export class ConversationService {
       reopened = true;
     }
 
-    const [message] = await db
+    const [message] = await dbClient
       .insert(messages)
       .values({
         conversationId,
@@ -292,7 +359,7 @@ export class ConversationService {
       })
       .returning();
 
-    await db
+    await dbClient
       .update(conversations)
       .set({ lastActivityAt: now, updatedAt: now, status: reopened ? 'open' : conversation.status })
       .where(eq(conversations.id, conversationId));
@@ -307,7 +374,7 @@ export class ConversationService {
     id: string,
     status: 'open' | 'pending' | 'resolved'
   ) {
-    const result = await db
+    const result = await dbClient
       .update(conversations)
       .set({
         status,
@@ -327,7 +394,7 @@ export class ConversationService {
    * Update status (alias for controller)
    */
   async updateStatus(id: string, status: 'open' | 'pending' | 'resolved') {
-    const oldConvo = await db
+    const oldConvo = await dbClient
       .select()
       .from(conversations)
       .where(eq(conversations.id, id));
@@ -347,7 +414,7 @@ export class ConversationService {
     id: string,
     priority: 'low' | 'medium' | 'high' | 'urgent'
   ) {
-    const result = await db
+    const result = await dbClient
       .update(conversations)
       .set({
         priority,
@@ -367,7 +434,7 @@ export class ConversationService {
    * Update priority (alias for controller)
    */
   async updatePriority(id: string, priority: 'low' | 'medium' | 'high' | 'urgent') {
-    const oldConvo = await db
+    const oldConvo = await dbClient
       .select()
       .from(conversations)
       .where(eq(conversations.id, id));
@@ -384,7 +451,7 @@ export class ConversationService {
    * Update conversation assignment
    */
   async updateConversationAssignment(id: string, assignedUserId: string | null) {
-    const result = await db
+    const result = await dbClient
       .update(conversations)
       .set({
         assignedUserId,
@@ -404,7 +471,7 @@ export class ConversationService {
    * Assign conversation (alias for controller)
    */
   async assignConversation(id: string, assignedUserId: string | null) {
-    const oldConvo = await db
+    const oldConvo = await dbClient
       .select()
       .from(conversations)
       .where(eq(conversations.id, id));
@@ -422,7 +489,7 @@ export class ConversationService {
    */
   async addTagToConversation(conversationId: string, tagId: number) {
     // Check if already tagged
-    const existing = await db
+    const existing = await dbClient
       .select()
       .from(conversationTags)
       .where(
@@ -436,7 +503,7 @@ export class ConversationService {
       return { success: true, message: 'Tag already applied' };
     }
 
-    await db.insert(conversationTags).values({
+    await dbClient.insert(conversationTags).values({
       conversationId,
       tagId,
     });
@@ -455,7 +522,7 @@ export class ConversationService {
    * Remove tag from conversation
    */
   async removeTagFromConversation(conversationId: string, tagId: number) {
-    await db
+    await dbClient
       .delete(conversationTags)
       .where(
         and(
@@ -472,6 +539,43 @@ export class ConversationService {
    */
   async removeTag(conversationId: string, tagId: number) {
     return await this.removeTagFromConversation(conversationId, tagId);
+  }
+
+  /**
+   * List messages for a conversation with pagination
+   */
+  async listConversationMessages(conversationId: string, offset: number, limit: number) {
+    // Verify conversation exists
+    const convo = await dbClient
+      .select()
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+      .limit(1);
+
+    if (!convo.length) {
+      throw new Error('Conversation not found');
+    }
+
+    // Get total count
+    const countResult = await dbClient
+      .select({ count: sql<number>`count(*)` })
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId));
+    const total = countResult[0]?.count || 0;
+
+    // Get messages
+    const msgs = await dbClient
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(asc(messages.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      messages: msgs,
+      total,
+    };
   }
 }
 

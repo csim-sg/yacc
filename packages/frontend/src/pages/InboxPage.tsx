@@ -194,10 +194,11 @@ export function InboxPage() {
     placeholderData: (previous: ListConversationsResponse | undefined) => previous ?? undefined,
   });
 
-  const conversations: ConversationListItem[] = conversationsData?.data ?? [];
-  const totalPages = conversationsData?.totalPage ?? 1;
-  const totalCount = conversationsData?.totalCount ?? 0;
-  const errorMessage = error?.error || error?.message || 'Failed to load conversations';
+   const conversations: ConversationListItem[] = conversationsData?.data ?? [];
+   const totalCount = conversationsData?.total ?? 0;
+   const responsivePageSize = conversationsData?.pageSize ?? 20;
+   const totalPages = Math.ceil(totalCount / responsivePageSize);
+   const errorMessage = error?.error || error?.message || 'Failed to load conversations';
 
   useEffect(() => {
     if (error && error.error === 'Authorization is required') {
