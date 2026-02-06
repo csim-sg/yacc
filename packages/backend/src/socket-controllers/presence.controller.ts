@@ -6,8 +6,9 @@
  */
 
 import { SocketController, OnMessage } from 'socket-controllers';
-import type { Socket } from 'socket.io';
+import type { Socket, Server } from 'socket.io';
 import { logger } from '../infrastructure/logger';
+import type { AuthenticatedSocket } from '../websockets/auth.middleware';
 import type { PresenceUpdatedPayload } from '../types/websocket.types';
 
 @SocketController()
@@ -181,15 +182,20 @@ export class PresenceController {
    */
   private async getOnlineUsers(socket: Socket): Promise<string[]> {
     try {
-      // Get all connected sockets using the io instance
-      const io = (socket as any).nsp.server;
+      // Get all connected sockets using the io instance from socket.nsp.server
+      // socket.nsp.server is the Socket.IO Server instance
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const io: Server = (socket.nsp as any).server;
       const sockets = await io.fetchSockets();
       const onlineUserIds = new Set<string>();
 
       // Extract unique user IDs from sockets
+      // Auth middleware attaches userId as a property on socket
       for (const connectedSocket of sockets) {
-        const userId = (connectedSocket as any).userId;
-        if (userId) {
+        // Type-safe extraction: check for userId property
+        const socketWithAuth = connectedSocket as unknown as AuthenticatedSocket;
+        const userId = socketWithAuth.userId;
+        if (userId && typeof userId === 'string') {
           onlineUserIds.add(userId);
         }
       }

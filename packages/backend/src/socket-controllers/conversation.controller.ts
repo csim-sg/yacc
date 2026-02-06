@@ -5,9 +5,10 @@
  * Uses socket-controllers for declarative event handling
  */
 
-import { SocketController, OnConnect, OnDisconnect, EmitOnSuccess, EmitOnFail } from 'socket-controllers';
+import { SocketController, OnConnect, OnDisconnect, OnMessage } from 'socket-controllers';
 import type { Socket } from 'socket.io';
 import { logger } from '../infrastructure/logger';
+import type { AuthenticatedSocket } from '../websockets/auth.middleware';
 import type { ConversationUpdatedPayload } from '../types/websocket.types';
 
 @SocketController()
@@ -15,11 +16,13 @@ export class ConversationController {
   /**
    * Lifecycle: When client connects
    * Join conversation-related rooms and broadcast presence
+   * Auth middleware ensures user is authenticated before this fires
    */
   @OnConnect()
   onConnect(socket: Socket): void {
-    const userId = (socket as any).userId;
-    const userRole = (socket as any).role;
+    const authSocket = socket as AuthenticatedSocket;
+    const userId = authSocket.userId;
+    const userRole = authSocket.role;
 
     logger.debug({
       socketId: socket.id,
@@ -45,7 +48,9 @@ export class ConversationController {
    */
   @OnDisconnect()
   onDisconnect(socket: Socket): void {
-    const userId = (socket as any).userId;
+    const authSocket = socket as AuthenticatedSocket;
+    const userId = authSocket.userId;
+    
     logger.debug({
       socketId: socket.id,
       userId,
@@ -62,13 +67,14 @@ export class ConversationController {
   }
 
   /**
-   * Emit conversation.updated event to all subscribers
-   * Called from conversation service when status/priority/assignment changes
+   * Handle conversation.updated event
+   * Called when conversation status/priority/assignment changes
+   * Broadcasts update to all subscribers in conversation room
    *
    * @param socket - Socket instance
    * @param payload - Updated conversation data
    */
-  @EmitOnSuccess('conversation.updated')
+  @OnMessage('conversation.updated')
   async onConversationUpdated(socket: Socket, payload: ConversationUpdatedPayload): Promise<void> {
     const room = `conversation:${payload.conversationId}`;
 
@@ -77,9 +83,9 @@ export class ConversationController {
         conversationId: payload.conversationId,
         room,
         changedBy: payload.changedBy,
-      }, 'Emitting conversation.updated event');
+      }, 'Broadcasting conversation.updated event');
 
-      // Emit to all subscribers in conversation room
+      // Emit to all subscribers in conversation room (except sender)
       socket.to(room).emit('conversation.updated', payload);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -98,6 +104,7 @@ export class ConversationController {
    * @param socket - Socket instance
    * @param conversationId - Conversation to subscribe to
    */
+  @OnMessage('subscribe.conversation')
   async onSubscribeToConversation(socket: Socket, conversationId: string): Promise<void> {
     const room = `conversation:${conversationId}`;
 
@@ -127,6 +134,7 @@ export class ConversationController {
    * @param socket - Socket instance
    * @param conversationId - Conversation to unsubscribe from
    */
+  @OnMessage('unsubscribe.conversation')
   async onUnsubscribeFromConversation(socket: Socket, conversationId: string): Promise<void> {
     const room = `conversation:${conversationId}`;
 
