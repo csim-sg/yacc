@@ -1,9 +1,9 @@
 # 06. Issues & User stories
 
-**Last Updated**: February 6, 2026  
-**Status**: Phase 1.4 Complete, Phase 1.5 Ready  
+**Last Updated**: February 7, 2026  
+**Status**: Phase 1.4 In Progress (Week 1 Feb 10–16), BE-206 Phase 4 Ready  
 **Total P0 Issues**: 22  
-**Completed in Phase 1.4**: BE-007-010 (Inbox API + Conversation Detail), BE-203-205 (Code Review), QA-001 (31 integration tests)  
+**Current focus (per 00-INDEX)**: BE-007, BE-008, FE-008, FE-009 (Week 1 due Feb 14); BE-206 Phase 4 (integration testing) ready for execution  
 **Governance**: ADR-003, GOV-006, GOV-007, GOV-012
 
 ---
@@ -104,8 +104,8 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | BE-001 | Set up PostgreSQL database with Drizzle ORM | **Done** | P0 | Backend | - | Database connection working, Drizzle schema migrations functional | PVTI_lAHOAB4wV84BNGcwzgj_5rE | 12 |
 | BE-002 | Define database schema (users, conversations, messages, tags, notes, audit logs, notifications, routing rules) | **Done** | P0 | Backend | BE-001 | All 11 tables defined with correct relationships, migrations generated | PVTI_lAHOAB4wV84BNGcwzgj_5rQ | 13 |
 | BE-003 | Implement BetterAuth for authentication (email/password, session/JWT) | **Done** | P0 | Backend | BE-002 | Login endpoint working, JWT/session management functional, rate limiting added, 194 tests passing | PVTI_lAHOAB4wV84BNGcwzgj_5rc | 18 |
-| BE-004 | Implement forgot password flow (reset token, email sending) | **Ready** | P1 | Backend | BE-003 | POST /auth/forgot-password and /reset-password working | PVTI_lAHOAB4wV84BNGcwzgj_5sM | 19 |
-| BE-005 | Implement RBAC middleware (4 roles: Super Admin, Admin, Manager, User) | **Ready** | P0 | Backend | BE-002, BE-003 | Permission checks working for all role-based endpoints | PVTI_lAHOAB4wV84BNGcwzgj_5rU | 20 |
+| BE-004 | Implement forgot password flow (reset token, email sending) | **Done** | P1 | Backend | BE-003 | POST /auth/forgot-password and /reset-password working | PVTI_lAHOAB4wV84BNGcwzgj_5sM | 19 |
+| BE-005 | Implement RBAC middleware (4 roles: Super Admin, Admin, Manager, User) | **Done** | P0 | Backend | BE-002, BE-003 | Permission checks working for all role-based endpoints | PVTI_lAHOAB4wV84BNGcwzgj_5rU | 20 |
 | BE-006 | Create user management endpoints (CRUD for users, roles) | Not Started | P1 | Backend | BE-005 | GET/POST/PUT/DELETE /users, /roles working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_5rk | 17 |
 | BE-007 | Implement inbox API (GET /conversations with filters: channel, assignee, tag, status, priority) | Not Started | P0 | Backend | BE-002, BE-005 | Filtering and pagination working | PVTI_lAHOAB4wV84BNGcwzgj_5sA | 14 |
 | BE-008 | Implement conversation detail endpoint (GET /conversations/:id) | Not Started | P0 | Backend | BE-007 | Returns conversation with messages and metadata | PVTI_lAHOAB4wV84BNGcwzgj_5rM | 15 |
@@ -140,15 +140,15 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| FE-001 | Set up TanStack Start project with React 18 | Not Started | P0 | Frontend | - | Project scaffold created, dev server running |  |  |
-| FE-002 | Configure Tailwind CSS with Williamstown SC brand colors | Not Started | P0 | Frontend | FE-001 | Tailwind working, brand colors defined |  |  |
-| FE-003 | Set up Zustand for client state management | Not Started | P0 | Frontend | FE-001 | Store configured, example state working |  |  |
-| FE-004 | Set up TanStack Query for API data fetching | Ready | P0 | Frontend | FE-001 | Query client configured, API requests working | PVTI_lAHOAB4wV84BNGcwzgj_6E0 | 38 |
-| FE-005 | Implement login page (email/password form) | Ready | P0 | Frontend | FE-002, BE-003 | Login functional, redirects on success, error handling working | PVTI_lAHOAB4wV84BNGcwzgj_6EI | 42 |
+| FE-001 | Set up TanStack Start project with React 18 | **Done** | P0 | Frontend | - | Project scaffold created, dev server running |  |  |
+| FE-002 | Configure Tailwind CSS with Williamstown SC brand colors | **Done** | P0 | Frontend | FE-001 | Tailwind working, brand colors defined |  |  |
+| FE-003 | Set up Zustand for client state management | **Done** | P0 | Frontend | FE-001 | Store configured, example state working |  |  |
+| FE-004 | Set up TanStack Query for API data fetching | **Done** | P0 | Frontend | FE-001 | Query client configured, API requests working | PVTI_lAHOAB4wV84BNGcwzgj_6E0 | 38 |
+| FE-005 | Implement login page (email/password form) | **Done** | P0 | Frontend | FE-002, BE-003 | Login functional, redirects on success, error handling working | PVTI_lAHOAB4wV84BNGcwzgj_6EI | 42 |
 | FE-006 | Implement forgot password page (email input form) | Not Started | P1 | Frontend | FE-002, BE-004 | Request reset working, confirmation message shown |  |  |
 | FE-007 | Implement password reset page (new password form) | Not Started | P1 | Frontend | FE-002, BE-004 | Password reset functional, login redirect on success |  |  |
 | FE-008 | Implement inbox list page (conversation cards with filters) | Not Started | P0 | Frontend | FE-004, BE-007 | Filters: channel, assignee, tag, status, priority, search, date range |  |  |
-| FE-009 | Implement conversation detail page (messages timeline, reply composer) | Ready | P0 | Frontend | FE-004, BE-008 | Shows conversation with messages, reply form functional | PVTI_lAHOAB4wV84BNGcwzgj_6D0 | 41 |
+| FE-009 | Implement conversation detail page (messages timeline, reply composer) | Not Started | P0 | Frontend | FE-004, BE-008 | Shows conversation with messages, reply form functional | PVTI_lAHOAB4wV84BNGcwzgj_6D0 | 41 |
 | FE-010 | Implement message reply composer (text input, attachment upload) | Not Started | P0 | Frontend | FE-009, BE-010 | Send message working, attachment upload to R2 |  |  |
 | FE-011 | Implement message status display (pending/sent/failed with retry button) | Not Started | P0 | Frontend | FE-009, BE-011 | Status icons visible, retry button for failed messages |  |  |
 | FE-012 | Set up Socket.io client for WebSocket | Not Started | P0 | Frontend | - | Socket.io client connected to server |  |  |

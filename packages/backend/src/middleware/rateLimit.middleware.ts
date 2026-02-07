@@ -24,10 +24,6 @@ export const loginRateLimiter = rateLimit({
     // Don't count OPTIONS requests
     return req.method === 'OPTIONS';
   },
-  keyGenerator: (req) => {
-    // Use IP address as key (falls back to connection remote address)
-    return req.ip || req.connection.remoteAddress || 'unknown';
-  },
   handler: (req, res) => {
     res.status(429).json({
       error: 'Too many login attempts. Please try again in 15 minutes.',
@@ -72,9 +68,6 @@ export const apiRateLimiter = rateLimit({
   legacyHeaders: false,
   skip: (req) => {
     return req.method === 'OPTIONS';
-  },
-  keyGenerator: (req) => {
-    return req.ip || req.connection.remoteAddress || 'unknown';
   },
   handler: (req, res) => {
     res.status(429).json({

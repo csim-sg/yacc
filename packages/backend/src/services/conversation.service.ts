@@ -17,6 +17,7 @@ export interface ListConversationsParams {
   status?: string;
   priority?: string;
   assignedUserId?: string;
+  tagId?: number;
   search?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -37,6 +38,7 @@ export class ConversationService {
       status,
       priority,
       assignedUserId,
+      tagId,
       search,
       dateFrom,
       dateTo,
@@ -67,6 +69,16 @@ export class ConversationService {
 
     if (assignedUserId) {
       whereClauses.push(eq(conversations.assignedUserId, assignedUserId));
+    }
+
+    if (tagId != null && tagId > 0) {
+      whereClauses.push(
+        sql`EXISTS (
+          SELECT 1 FROM ${conversationTags}
+          WHERE ${conversationTags.conversationId} = ${conversations.id}
+            AND ${conversationTags.tagId} = ${tagId}
+        )`
+      );
     }
 
     if (search) {

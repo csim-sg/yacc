@@ -9,10 +9,9 @@ import { checkDatabaseConnection } from './infrastructure/db.client';
 import { authorizationChecker, currentUserChecker } from './middleware/routingControllersAuth';
 import { correlationIdMiddleware } from './middleware/correlationId.middleware';
 import { requestLoggingMiddleware } from './middleware/requestLogging.middleware';
-import { loginRateLimiter, passwordResetRateLimiter } from './middleware/rateLimit.middleware';
 import { controllers } from './controllers';
 import { socketControllers } from './socket-controllers';
-import { config } from './config/config';
+import { appConfig } from './config/appConfig';
 import { logger } from './infrastructure/logger';
 import { messageQueueService } from './services/message-queue.service';
 import { messageQueueProcessor } from './services/message-queue-processor';
@@ -21,11 +20,9 @@ import { connectorManager } from './services/connector-manager';
 import { TelegramConnector } from './connectors/telegram.connector';
 import { IRCConnector } from './connectors/irc.connector';
 
+// ===== EXPRESS APP =====
 const app = express();
 
-// ===== SETUP ROUTING-CONTROLLERS =====
-// Register all middleware and configuration via routing-controllers to comply with architecture standards
-// Note: Rate limiting applied via @UseBefore decorator on auth controller methods, not here
 useExpressServer(app, {
   controllers: controllers,
   authorizationChecker: authorizationChecker,
@@ -37,26 +34,23 @@ useExpressServer(app, {
   },
   classTransformer: true,
   cors: {
-    origin: config.frontend.url,
+    origin: appConfig.APP_FRONTEND_URL,
     credentials: true,
     exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
   },
   middlewares: [
-    // Global middleware - run for all requests before controllers
     correlationIdMiddleware,
     requestLoggingMiddleware,
   ],
 });
 
-// ===== SETUP RATE LIMITING =====
-// Note: Rate limiting is now handled via @UseBefore decorators in AuthController
-// This section is kept for reference but rate limiting is applied at controller level
+export { app };
 
-// ===== SETUP EXPRESS SERVER =====
+// ===== HTTP & WEBSOCKET SERVER =====
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: config.frontend.url,
+    origin: appConfig.APP_FRONTEND_URL,
     credentials: true,
     exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
   },
@@ -66,9 +60,9 @@ const io = new Server(server, {
 async function start() {
   try {
     console.log('✓ Configuration validated successfully');
-    console.log(`  - Environment: ${config.app.env}`);
-    console.log(`  - Port: ${config.app.port}`);
-    console.log(`  - Log Level: ${config.logging.level}`);
+    console.log(`  - Environment: ${appConfig.APP_ENV}`);
+    console.log(`  - Port: ${appConfig.APP_PORT}`);
+    console.log(`  - Log Level: ${appConfig.LOG_LEVEL}`);
 
     // Check database connection
     const dbConnected = await checkDatabaseConnection();
@@ -120,11 +114,11 @@ async function start() {
     });
 
     // Start server
-    server.listen(config.app.port, () => {
-      console.log(`🚀 Server running on port ${config.app.port}`);
-      console.log(`📍 API: http://localhost:${config.app.port}/api`);
-      console.log(`🔗 WebSocket: ws://localhost:${config.app.port}`);
-      logger.info(`Server started on port ${config.app.port}`);
+    server.listen(appConfig.APP_PORT, () => {
+      console.log(`🚀 Server running on port ${appConfig.APP_PORT}`);
+      console.log(`📍 API: http://localhost:${appConfig.APP_PORT}/api`);
+      console.log(`🔗 WebSocket: ws://localhost:${appConfig.APP_PORT}`);
+      logger.info(`Server started on port ${appConfig.APP_PORT}`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
@@ -133,4 +127,7 @@ async function start() {
   }
 }
 
-start();
+// Do not start server when loaded by tests (e.g. BE-007 integration tests)
+if (process.env.NODE_ENV !== 'test') {
+  start();
+}

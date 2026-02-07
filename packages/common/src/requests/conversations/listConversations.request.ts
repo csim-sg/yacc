@@ -34,6 +34,11 @@ export class ListConversationsRequest extends SearchableRequest {
   assignedUserId?: string;
 
   @IsOptional()
+  @IsInt()
+  @Min(1)
+  tagId?: number;
+
+  @IsOptional()
   @IsString()
   search?: string;
 

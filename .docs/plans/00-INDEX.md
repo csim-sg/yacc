@@ -28,7 +28,7 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 ## ✅ Current Status
 
 ### Phase 1.4: MVP Core-First Execution (APPROVED)
-**Status**: 🚀 **IN PROGRESS - Week 1 (Feb 10-16)**  
+**Status**: 🚀 **IN PROGRESS - Week 2 (Feb 17-23)** — Week 1 complete (BE-007, BE-008, FE-008, FE-009)  
 **Approval Date**: 2026-02-06  
 **Target Completion**: 2026-02-20  
 **Timeline**: 2-week sprint
@@ -77,23 +77,23 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 
 ---
 
-## 🚀 Week 1 Execution (Feb 10-16)
+## 🚀 Week 1 Execution (Feb 10-16) ✅ COMPLETE
 
 **Backend**:
-- [ ] BE-007: Inbox API (GET /conversations with filters) - DUE Feb 14
-- [ ] BE-008: Conversation Detail (GET /conversations/:id) - DUE Feb 14
+- [x] BE-007: Inbox API (GET /conversations with filters) - DONE
+- [x] BE-008: Conversation Detail (GET /conversations/:id) - DONE
 
 **Frontend**:
-- [ ] FE-008: Inbox List Page (UI scaffold with mocks) - DUE Feb 14
-- [ ] FE-009: Conversation Detail Page (UI scaffold with mocks) - DUE Feb 14
+- [x] FE-008: Inbox List Page (UI scaffold with mocks) - DONE
+- [x] FE-009: Conversation Detail Page (UI scaffold with mocks) - DONE
 
 **QA**:
 - [ ] Test case preparation and test data setup
 
 **Sync Points**:
-- API contract finalized: Feb 10 (morning)
-- Frontend UI ready with mocks: Feb 12 (EOD)
-- Backend ready for FE integration: Feb 14 (EOD)
+- API contract finalized: Feb 10 (morning) ✅
+- Frontend UI ready with mocks: Feb 12 (EOD) ✅
+- Backend ready for FE integration: Feb 14 (EOD) ✅
 
 ---
 

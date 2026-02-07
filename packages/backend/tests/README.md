@@ -48,7 +48,16 @@ npm test -- password-reset.service.test
 
 # Password reset controller tests
 npm test -- auth.controller.password-reset.test
+
+# BE-007 Inbox API integration tests (requires Docker: PostgreSQL + Redis, and seeded user)
+pnpm test -- tests/BE-007-inbox-api.spec.ts
 ```
+
+### BE-007 Integration Tests
+- **File**: `tests/BE-007-inbox-api.spec.ts`
+- **Requires**: PostgreSQL and Redis (e.g. `docker-compose up -d`), and a seeded user (e.g. run `pnpm db:fixtures` or `scripts/seed-test-fixtures.ts` so `manager@yacc.local` / `admin123` exists).
+- **Helpers**: `tests/test-helpers.ts` provides `createTestApp()`, `createTestUser(app, opts)`, `seedTestConversations(userId, count)`.
+- If setup fails (no DB/Redis or login fails), the suite skips all tests via `itOrSkip`.
 
 ### Run with Coverage Report
 ```bash

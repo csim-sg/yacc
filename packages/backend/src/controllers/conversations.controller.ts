@@ -54,6 +54,7 @@ export class ConversationsController {
         status: (typeof query.status === 'string' ? query.status : undefined) as 'open' | 'pending' | 'resolved' | undefined,
         priority: (typeof query.priority === 'string' ? query.priority : undefined) as 'low' | 'medium' | 'high' | 'urgent' | undefined,
         assignedUserId: typeof query.assignedUserId === 'string' ? query.assignedUserId : undefined,
+        tagId: query.tagId ? Number(query.tagId) : undefined,
         search: typeof query.search === 'string' ? query.search : undefined,
         dateFrom: typeof query.dateFrom === 'string' ? query.dateFrom : undefined,
         dateTo: typeof query.dateTo === 'string' ? query.dateTo : undefined,
