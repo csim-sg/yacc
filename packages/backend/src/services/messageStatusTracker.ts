@@ -113,7 +113,7 @@ class MessageStatusTrackerService {
       });
 
       // Persist status to database
-      await db
+      await dbClient
         .update(messages)
         .set({ status: 'pending', updatedAt: new Date() })
         .where(eq(messages.id, update.messageId));
@@ -149,7 +149,7 @@ class MessageStatusTrackerService {
       });
 
       // Get current status from database
-      const currentMessage = await db
+      const currentMessage = await dbClient
         .select({ status: messages.status })
         .from(messages)
         .where(eq(messages.id, update.messageId))
@@ -168,7 +168,7 @@ class MessageStatusTrackerService {
       }
 
       // Persist status to database
-      await db
+      await dbClient
         .update(messages)
         .set({ status: 'sent', updatedAt: new Date() })
         .where(eq(messages.id, update.messageId));
@@ -207,7 +207,7 @@ class MessageStatusTrackerService {
       });
 
       // Get current status from database
-      const currentMessage = await db
+      const currentMessage = await dbClient
         .select({ status: messages.status })
         .from(messages)
         .where(eq(messages.id, update.messageId))
@@ -226,7 +226,7 @@ class MessageStatusTrackerService {
       }
 
       // Persist status to database
-      await db
+      await dbClient
         .update(messages)
         .set({
           status: 'failed',
@@ -342,4 +342,3 @@ export const MessageStatusTracker = {
   trackFailedMessage: (update: MessageStatusUpdate) =>
     tracker.trackFailedMessage(update),
 };
-

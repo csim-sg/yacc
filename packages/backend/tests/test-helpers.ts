@@ -7,6 +7,8 @@
  * Prerequisites for full run: test DB with migrations, and a user (e.g. run db:fixtures or seed).
  */
 
+import 'reflect-metadata';
+
 import type { Express } from 'express';
 import request from 'supertest';
 

@@ -62,18 +62,24 @@ export async function enqueueRetry(payload: SendMessageJobPayload): Promise<stri
       },
     });
 
-    logger.info('Message enqueued for retry', {
-      jobId: job.id,
-      messageId: payload.messageId,
-      conversationId: payload.conversationId,
-    });
+    logger.info(
+      {
+        jobId: job.id,
+        messageId: payload.messageId,
+        conversationId: payload.conversationId,
+      },
+      'Message enqueued for retry'
+    );
 
     return job.id || '';
   } catch (error) {
-    logger.error('Failed to enqueue message for retry', {
-      messageId: payload.messageId,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logger.error(
+      {
+        messageId: payload.messageId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Failed to enqueue message for retry'
+    );
     throw error;
   }
 }
@@ -86,9 +92,12 @@ export async function closeRetryQueue(): Promise<void> {
     await messageRetryQueue.close();
     logger.info('Message retry queue closed');
   } catch (error) {
-    logger.error('Failed to close message retry queue', {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logger.error(
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Failed to close message retry queue'
+    );
     throw error;
   }
 }

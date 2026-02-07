@@ -23,7 +23,7 @@ export const SendMessageJobPayloadSchema = z.object({
   platformType: z.enum(['telegram', 'irc', 'internal']),
   retryCount: z.number().int().min(0).max(3, 'Retry count cannot exceed 3'),
   lastError: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type SendMessageJobPayload = z.infer<typeof SendMessageJobPayloadSchema>;

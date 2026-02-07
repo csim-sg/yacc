@@ -14,12 +14,7 @@ import { controllers } from './controllers';
 import { socketControllers } from './socket-controllers';
 import { appConfig } from './config/appConfig';
 import { logger } from './infrastructure/logger';
-import { messageQueueService } from './services/message-queue.service';
-import { messageQueueProcessor } from './services/message-queue-processor';
 import { wsGateway } from './websockets/gateway';
-import { connectorManager } from './services/connector-manager';
-import { TelegramConnector } from './connectors/telegram.connector';
-import { IRCConnector } from './connectors/irc.connector';
 
 // ===== EXPRESS APP =====
 const app = express();
@@ -88,29 +83,14 @@ async function start() {
     });
     logger.info('Socket-controllers registered successfully');
 
-    // Register platform connectors
-    logger.info('Registering platform connectors...');
-    const telegramConnector = new TelegramConnector();
-    const ircConnector = new IRCConnector();
-    connectorManager.registerConnector('telegram', telegramConnector);
-    connectorManager.registerConnector('irc', ircConnector);
-    logger.info('Platform connectors registered successfully');
-
-    // Initialize message queue service with processor
-    logger.info('Initializing message queue service...');
-    await messageQueueService.initialize(messageQueueProcessor);
-    logger.info('Message queue service initialized successfully');
-
     // Setup graceful shutdown
     process.on('SIGTERM', async () => {
       logger.info('SIGTERM received - shutting down gracefully');
-      await messageQueueService.close();
       process.exit(0);
     });
 
     process.on('SIGINT', async () => {
       logger.info('SIGINT received - shutting down gracefully');
-      await messageQueueService.close();
       process.exit(0);
     });
 

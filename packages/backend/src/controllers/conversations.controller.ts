@@ -19,15 +19,15 @@ import {
   BadRequestError,
   NotFoundError,
 } from 'routing-controllers';
-import { conversationService } from '../services/conversation.service.js';
-import { auditService } from '../services/audit.service.js';
-import { logger } from '../infrastructure/logger.js';
+import { conversationService } from '../services/conversation.service';
+import { auditService } from '../services/audit.service';
+import { logger } from '../infrastructure/logger';
 import { ListConversationsRequest } from '@yacc/common/requests/conversations/listConversations.request';
 import { UpdateStatusRequest } from '@yacc/common/requests/conversations/updateStatus.request';
 import { UpdatePriorityRequest } from '@yacc/common/requests/conversations/updatePriority.request';
 import { AssignRequest } from '@yacc/common/requests/conversations/assign.request';
 import { TagRequest } from '@yacc/common/requests/conversations/tag.request';
-import type { AuthUser } from '../types/auth.types.js';
+import type { AuthUser } from '../types/auth.types';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;

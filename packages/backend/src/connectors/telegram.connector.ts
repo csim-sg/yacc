@@ -3,6 +3,7 @@ import { logger } from '../infrastructure/logger';
 import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
 import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse.interface';
 import type { ValidationError } from '@yacc/common/types/validationError.interface';
+import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
 
 /**
  * Telegram Connector
@@ -15,10 +16,16 @@ import type { ValidationError } from '@yacc/common/types/validationError.interfa
  * - Connection validation
  */
 
-interface TelegramConfig {
+type TelegramConfig = ConnectorConfig<'telegram'> & {
   botToken: string;
   botName?: string;
-}
+};
+
+type TelegramApiResponse = {
+  ok: boolean;
+  result?: unknown;
+  description?: string;
+};
 
 export class TelegramConnector extends BaseConnector<'telegram', TelegramConfig> {
   private baseUrl: string = 'https://api.telegram.org';
@@ -129,7 +136,7 @@ export class TelegramConnector extends BaseConnector<'telegram', TelegramConfig>
         throw error;
       }
 
-      const messageId = response.result?.message_id?.toString() || 'unknown';
+      const messageId = this.extractMessageId(response.result);
 
       logger.info(
         {
@@ -144,7 +151,7 @@ export class TelegramConnector extends BaseConnector<'telegram', TelegramConfig>
       return {
         success: true,
         platformMessageId: messageId,
-        timestamp: new Date().toISOString(),
+        sentAt: new Date().toISOString(),
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -161,7 +168,7 @@ export class TelegramConnector extends BaseConnector<'telegram', TelegramConfig>
       return {
         success: false,
         error: errorMessage,
-        timestamp: new Date().toISOString(),
+        sentAt: new Date().toISOString(),
       };
     }
   }
@@ -211,17 +218,26 @@ export class TelegramConnector extends BaseConnector<'telegram', TelegramConfig>
     return null;
   }
 
+  private extractMessageId(result: unknown): string {
+    if (!result || typeof result !== 'object') {
+      return 'unknown';
+    }
+
+    if (!('message_id' in result)) {
+      return 'unknown';
+    }
+
+    const raw = (result as { message_id: unknown }).message_id;
+    return raw === null || raw === undefined ? 'unknown' : String(raw);
+  }
+
   /**
    * Call Telegram API
    */
   private async callTelegramApi(
     method: string,
-    params: Record<string, any>
-  ): Promise<{
-    ok: boolean;
-    result?: any;
-    description?: string;
-  }> {
+    params: Record<string, unknown>
+  ): Promise<TelegramApiResponse> {
     if (!this.config) {
       throw new Error('Configuration not set');
     }
@@ -253,7 +269,7 @@ export class TelegramConnector extends BaseConnector<'telegram', TelegramConfig>
         };
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as TelegramApiResponse;
       return data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Network error';

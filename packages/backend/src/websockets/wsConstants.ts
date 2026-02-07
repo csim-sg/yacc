@@ -44,13 +44,22 @@ export const PresenceEvents = {
 } as const;
 
 /**
+ * Queue / delivery pipeline events
+ */
+export const QueueEvents = {
+  MESSAGE_RETRY_SCHEDULED: 'message.retry.scheduled',
+  MESSAGE_DLQ: 'queue.message.dlq',
+} as const;
+
+/**
  * All WebSocket event types
  */
 export type WebSocketEventType =
    | typeof MessageEvents[keyof typeof MessageEvents]
    | typeof ConversationEvents[keyof typeof ConversationEvents]
    | typeof NotificationEvents[keyof typeof NotificationEvents]
-   | typeof PresenceEvents[keyof typeof PresenceEvents];
+   | typeof PresenceEvents[keyof typeof PresenceEvents]
+   | typeof QueueEvents[keyof typeof QueueEvents];
 
 // ============================================
 // WebSocket Configuration

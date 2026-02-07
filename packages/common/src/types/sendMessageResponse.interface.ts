@@ -1,14 +1,18 @@
 /**
- * Send Message Response Interface
+ * Send Message Response
  *
- * Response from sending a message via a connector
+ * Result from sending a message via a connector.
+ * This is connector-facing (platform delivery), not API-facing.
  */
 
-export interface SendMessageResponse {
-  messageId: string;
-  externalMessageId: string;
-  status: 'sent' | 'failed';
-  success: boolean;
-  error?: string;
-  sentAt: Date;
-}
+export type SendMessageResponse =
+  | {
+      success: true;
+      platformMessageId: string;
+      sentAt: string; // ISO timestamp
+    }
+  | {
+      success: false;
+      error: string;
+      sentAt: string; // ISO timestamp
+    };

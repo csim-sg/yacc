@@ -3,6 +3,7 @@ import { logger } from '../infrastructure/logger';
 import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
 import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse.interface';
 import type { ValidationError } from '@yacc/common/types/validationError.interface';
+import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
 
 /**
  * IRC Connector
@@ -16,16 +17,16 @@ import type { ValidationError } from '@yacc/common/types/validationError.interfa
  * - Server configuration validation
  */
 
-interface IRCConfig {
+type IRCConfig = ConnectorConfig<'irc'> & {
   server: string;
   port: number;
   nick: string;
   password?: string;
   channels: string[];
-}
+};
 
 export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
-  private socket: any = null;
+  private socket: unknown = null;
   private messageQueue: Array<{ channel: string; message: string }> = [];
   private isConnecting: boolean = false;
 
@@ -221,7 +222,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         return {
           success: false,
           error: 'IRC not connected, message queued for later delivery',
-          timestamp: new Date().toISOString(),
+          sentAt: new Date().toISOString(),
         };
       }
 
@@ -243,7 +244,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       return {
         success: true,
         platformMessageId: messageId,
-        timestamp: new Date().toISOString(),
+        sentAt: new Date().toISOString(),
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -260,9 +261,13 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       return {
         success: false,
         error: errorMessage,
-        timestamp: new Date().toISOString(),
+        sentAt: new Date().toISOString(),
       };
     }
+  }
+
+  private isConnected(): boolean {
+    return this.connectionStatus === 'connected';
   }
 
   /**

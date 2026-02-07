@@ -7,6 +7,6 @@
 export type ConnectorEventMap = {
   connected: [];
   disconnected: [];
-  message: [any];
+  message: [unknown];
   error: [Error];
 };

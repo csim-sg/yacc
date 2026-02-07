@@ -1,5 +1,5 @@
-import { db } from '../infrastructure/db.client';
-import { auditLogs } from '../infrastructure/db.client';
+import { dbClient } from '../infrastructure/db.client';
+import { auditLogs } from '../schemas/auditLog.schema';
 import { desc, eq, and } from 'drizzle-orm';
 
 /**
@@ -42,7 +42,7 @@ export class AuditService {
     }
 
     try {
-      await db.insert(auditLogs).values({
+      await dbClient.insert(auditLogs).values({
         actorId: actorId || null,
         action,
         entityType: 'conversation',
@@ -76,14 +76,14 @@ export class AuditService {
       );
 
       // Get total count for this conversation
-      const countResult = await db
+      const countResult = await dbClient
         .select()
         .from(auditLogs)
         .where(whereClause);
       const total = countResult.length;
 
       // Get logs for this conversation
-      const logs = await db
+      const logs = await dbClient
         .select()
         .from(auditLogs)
         .where(whereClause)
