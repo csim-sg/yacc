@@ -55,9 +55,32 @@ pnpm test -- tests/BE-007-inbox-api.spec.ts
 
 ### BE-007 Integration Tests
 - **File**: `tests/BE-007-inbox-api.spec.ts`
-- **Requires**: PostgreSQL and Redis (e.g. `docker-compose up -d`), and a seeded user (e.g. run `pnpm db:fixtures` or `scripts/seed-test-fixtures.ts` so `manager@yacc.local` / `admin123` exists).
+- **Prerequisites**:
+  1. PostgreSQL running (via `docker-compose up -d`)
+  2. Redis running (via `docker-compose up -d`)
+  3. Database migrations applied (via `pnpm db:migrate`)
+  4. Test user seeded (via `pnpm db:fixtures` or manually via `scripts/seed-test-fixtures.ts`)
+     - Test user email: `manager@yacc.local`
+     - Test user password: `admin123`
 - **Helpers**: `tests/test-helpers.ts` provides `createTestApp()`, `createTestUser(app, opts)`, `seedTestConversations(userId, count)`.
-- **Fail fast**: If setup fails (no DB/Redis or login fails), `beforeAll` throws and the suite fails with a clear error. No test skipping. For CI, add a bootstrap step to seed fixtures before running this suite.
+- **Fail fast**: If setup fails (no DB/Redis, missing migrations, or login fails), `beforeAll` throws and the suite fails with a clear error. No test skipping. For CI, add a bootstrap step to ensure all prerequisites before running this suite.
+
+#### Running BE-007 Tests Locally
+
+```bash
+# 1. Start Docker services (PostgreSQL + Redis)
+docker-compose up -d
+
+# 2. Run migrations
+cd packages/backend
+pnpm db:migrate
+
+# 3. Seed test fixtures (creates test user manager@yacc.local)
+pnpm db:fixtures
+
+# 4. Run BE-007 tests
+pnpm test -- --run tests/BE-007-inbox-api.spec.ts
+```
 
 ### Run with Coverage Report
 ```bash
@@ -237,6 +260,14 @@ psql -U postgres -h localhost -d yacc_dev -c "SELECT 1"
 ```bash
 npm run type-check
 ```
+
+### BE-007 Test Prerequisites Not Met
+If Redis or PostgreSQL is not running when you run BE-007 tests:
+- The `beforeAll` setup will throw an error
+- All tests in the suite will be skipped with a clear failure message
+- Error will indicate exactly which service is missing (e.g., "Redis connection refused", "Database migration missing")
+
+**To fix**: Follow the setup steps in the "Running BE-007 Tests Locally" section above.
 
 ### Slow Tests
 Tests timeout after 10 seconds. For long-running tests, increase timeout:
