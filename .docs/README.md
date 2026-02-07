@@ -28,18 +28,12 @@
 **QA/Testers:**
 - `04-qa-and-testing.md` - Test cases & regression suite
 - `01-product-specification.md` - User stories & acceptance criteria
-<<<<<<< HEAD
-=======
 - `06-phase1-execution-guide.md` - Phase 1 execution plan
->>>>>>> feature/BE-006-phase4-platform-integration
 
 **Product Owners & Designers:**
 - `01-product-specification.md` - Complete product scope
 - `05-quick-reference.md` - Features checklist
-<<<<<<< HEAD
-=======
 - `06-phase1-execution-guide.md` - Phase 1 deliverables
->>>>>>> feature/BE-006-phase4-platform-integration
 
 **Tech Leads & Architects:**
 - `03-implementation-guide.md` - Complete system architecture
@@ -135,8 +129,24 @@
 
 ---
 
-<<<<<<< HEAD
+### 🔹 06-phase1-execution-guide.md
+**Phase 1 execution plan with complete scope and acceptance criteria**
 
+- Phase 1 scope (Telegram + IRC integration)
+- 22 P0 Backend issues with dependencies
+- Complete dependency graph (Mermaid diagram)
+- 3-week execution timeline
+- Week-by-week breakdown with daily tasks
+- Technical clarifications for all issues
+- Risk mitigation strategies
+- Environment variables reference
+- Testing strategy (unit, integration, E2E)
+- Handoff checklist
+
+**When to use:** Starting Phase 1, sprint planning, tracking progress  
+**Audience:** Backend developers, tech leads, architects
+
+---
 
 ## 📋 Architecture Artifacts
 
@@ -223,104 +233,6 @@ Development planning documents, task tracking, and sprint planning.
 ---
 
 ## 📊 Documentation Stats
-
-=======
-### 🔹 06-phase1-execution-guide.md
-**Phase 1 execution plan with complete scope and acceptance criteria**
-
-- Phase 1 scope (Telegram + IRC integration)
-- 22 P0 Backend issues with dependencies
-- Complete dependency graph (Mermaid diagram)
-- 3-week execution timeline
-- Week-by-week breakdown with daily tasks
-- Technical clarifications for all issues
-- Risk mitigation strategies
-- Environment variables reference
-- Testing strategy (unit, integration, E2E)
-- Handoff checklist
-
-**When to use:** Starting Phase 1, sprint planning, tracking progress  
-**Audience:** Backend developers, tech leads, architects
-
----
-
-## 📋 Architecture Artifacts
-
-### 📁 adr/ (Architecture Decision Records)
-
-Official ADRs numbered sequentially. Each ADR documents a significant architectural decision.
-
-**Current ADRs:**
-- **ADR-001**: Core table UUIDs
-- **ADR-002**: Non-core integer IDs
-- **ADR-003**: Phase 1 scope (Telegram + IRC)
-- **ADR-004**: Logging strategy
-- **ADR-005**: Infrastructure & config pattern
-- **ADR-006**: Auth client implementation
-- **ADR-007**: Jest to Vitest migration
-- **ADR-011**: File naming convention standardization
-
-**When to use:** Understanding architectural rationale  
-**Audience:** Architects, tech leads, developers making design decisions
-
----
-
-### 📁 governance/ (Governance Logs)
-
-Official governance logs providing audit traceability for all decisions.
-
-**Current Logs:**
-- **GOV-001 through GOV-010**: Decision approvals and enforcement
-- **ARCHITECT-DECISION-*****: Final architectural decisions
-- **__README.md**: How governance works
-
-**When to use:** Audit trail, compliance verification, understanding decision history  
-**Audience:** Architects, auditors, compliance teams
-
----
-
-### 📁 plans/ (Development Planning)
-
-Development planning documents, task tracking, and sprint planning.
-
-**Key Files:**
-- **00-INDEX.md**: Master planning index with task status
-- **BE-004-***: Backend task 4 planning docs
-- **BE-006-***: Backend task 6 planning docs
-- **FE-005-006-***: Frontend tasks 5-6 planning docs
-- **week1-***, **week2-***: Weekly planning documents
-
-**When to use:** Daily task tracking, sprint planning  
-**Audience:** Developers, tech leads, project managers
-
----
-
-## 🚀 Development Workflow
-
-### Week 1 Kickoff
-1. Read `../README.md` - Quick start
-2. Read `../AGENTS.md` - Your role
-3. Read `03-implementation-guide.md` - System overview
-4. Read role-specific core document (see "By Role" section above)
-5. Check `plans/00-INDEX.md` for current week's tasks
-
-### During Development
-- Reference core documents by topic (API design, data model, testing strategy)
-- Check `adr/` for architectural decisions
-- Reference `plans/00-INDEX.md` for task status
-- Consult `governance/` for approval status
-
-### Before Release
-- Run regression suite from `04-qa-and-testing.md`
-- Verify all acceptance criteria met from `01-product-specification.md`
-- Check `adr/` and `governance/` are updated
-- Update `plans/00-INDEX.md` with completion status
-
----
-
-## 📊 Documentation Stats
-
->>>>>>> feature/BE-006-phase4-platform-integration
 - ✅ **6 core product documents** (01-06)
 - ✅ **8 active ADRs** (architecture decisions)
 - ✅ **10 governance logs** (approval audit trail)
@@ -353,21 +265,13 @@ Development planning documents, task tracking, and sprint planning.
 
 ---
 
-<<<<<<< HEAD
-## ✅ Updated: 2026-02-05
-
-**Status:** ✅ Clean structure, ready for development  
-**Total Files:** 46 (cleaned up redundant docs)  
-**Organization:** Core docs + Architecture + ADR + Governance + Plans  
-**Latest:** BE-006 WebSocket infrastructure architecture review complete
-=======
-## ✅ Updated: 2026-01-28
+## ✅ Updated: 2026-02-07
 
 **Status:** ✅ Clean structure, ready for development  
 **Total Files:** 53 (down from 93)  
 **Total Size:** 1.1MB (down from 1.7MB)  
-**Organization:** Core docs + ADR + Governance + Plans
->>>>>>> feature/BE-006-phase4-platform-integration
+**Organization:** Core docs + ADR + Governance + Plans  
+**Latest:** BE-206 Socket-Controllers migration complete, BE-007-010 Phase 1.4 MVP ready
 
 ---
 
@@ -382,12 +286,7 @@ Development planning documents, task tracking, and sprint planning.
 | System architecture | `03-implementation-guide.md` | 30 min |
 | Test cases | `04-qa-and-testing.md` | 20 min |
 | Quick reference | `05-quick-reference.md` | 5 min |
-<<<<<<< HEAD
-| Architecture review | `architecture/ARCHITECT-REVIEW-BE006-PR177.md` | 20 min |
-| Architecture patterns | `architecture/INDEX-TS-RULE-CLARIFICATION.md` | 10 min |
-=======
 | Phase 1 plan | `06-phase1-execution-guide.md` | 20 min |
->>>>>>> feature/BE-006-phase4-platform-integration
 | Architecture decisions | `adr/` | varies |
 | Decision approvals | `governance/` | varies |
 | Task tracking | `plans/00-INDEX.md` | varies |
