@@ -28,18 +28,12 @@
 **QA/Testers:**
 - `04-qa-and-testing.md` - Test cases & regression suite
 - `01-product-specification.md` - User stories & acceptance criteria
-<<<<<<< HEAD
-=======
 - `06-phase1-execution-guide.md` - Phase 1 execution plan
->>>>>>> feature/BE-006-phase4-platform-integration
 
 **Product Owners & Designers:**
 - `01-product-specification.md` - Complete product scope
 - `05-quick-reference.md` - Features checklist
-<<<<<<< HEAD
-=======
 - `06-phase1-execution-guide.md` - Phase 1 deliverables
->>>>>>> feature/BE-006-phase4-platform-integration
 
 **Tech Leads & Architects:**
 - `03-implementation-guide.md` - Complete system architecture
@@ -135,8 +129,6 @@
 
 ---
 
-<<<<<<< HEAD
-
 
 ## 📋 Architecture Artifacts
 
@@ -224,7 +216,6 @@ Development planning documents, task tracking, and sprint planning.
 
 ## 📊 Documentation Stats
 
-=======
 ### 🔹 06-phase1-execution-guide.md
 **Phase 1 execution plan with complete scope and acceptance criteria**
 
@@ -320,7 +311,6 @@ Development planning documents, task tracking, and sprint planning.
 
 ## 📊 Documentation Stats
 
->>>>>>> feature/BE-006-phase4-platform-integration
 - ✅ **6 core product documents** (01-06)
 - ✅ **8 active ADRs** (architecture decisions)
 - ✅ **10 governance logs** (approval audit trail)
@@ -353,21 +343,12 @@ Development planning documents, task tracking, and sprint planning.
 
 ---
 
-<<<<<<< HEAD
-## ✅ Updated: 2026-02-05
-
-**Status:** ✅ Clean structure, ready for development  
-**Total Files:** 46 (cleaned up redundant docs)  
-**Organization:** Core docs + Architecture + ADR + Governance + Plans  
-**Latest:** BE-006 WebSocket infrastructure architecture review complete
-=======
 ## ✅ Updated: 2026-01-28
 
 **Status:** ✅ Clean structure, ready for development  
 **Total Files:** 53 (down from 93)  
 **Total Size:** 1.1MB (down from 1.7MB)  
 **Organization:** Core docs + ADR + Governance + Plans
->>>>>>> feature/BE-006-phase4-platform-integration
 
 ---
 
@@ -382,12 +363,7 @@ Development planning documents, task tracking, and sprint planning.
 | System architecture | `03-implementation-guide.md` | 30 min |
 | Test cases | `04-qa-and-testing.md` | 20 min |
 | Quick reference | `05-quick-reference.md` | 5 min |
-<<<<<<< HEAD
-| Architecture review | `architecture/ARCHITECT-REVIEW-BE006-PR177.md` | 20 min |
-| Architecture patterns | `architecture/INDEX-TS-RULE-CLARIFICATION.md` | 10 min |
-=======
 | Phase 1 plan | `06-phase1-execution-guide.md` | 20 min |
->>>>>>> feature/BE-006-phase4-platform-integration
 | Architecture decisions | `adr/` | varies |
 | Decision approvals | `governance/` | varies |
 | Task tracking | `plans/00-INDEX.md` | varies |
