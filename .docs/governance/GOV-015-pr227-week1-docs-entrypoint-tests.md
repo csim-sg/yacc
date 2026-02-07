@@ -30,6 +30,33 @@ Changes:
 
 ---
 
+## Addendum (v1.4) – Backend Build Bundling (2026-02-07)
+
+To stabilize backend runtime and keep TypeScript source imports extensionless (no `.js` specifiers), the backend build is updated to bundle a single runtime entry with sourcemaps.
+
+Decision:
+1. Compile with `tsc` to preserve decorator metadata.
+2. Bundle with `esbuild` into `dist/index.js` with sourcemap.
+3. Keep runtime dependencies external in `node_modules/`.
+
+ADR:
+- `ADR-013-backend-build-bundling-esbuild.md`
+
+---
+
+## Addendum (v1.5) – External Boundary Typing Pragmatism (2026-02-07)
+
+Decision:
+1. For external runtime boundaries (e.g. BetterAuth `response.json()`), we allow minimal shape checks + TypeScript type assertions.
+2. We do not require full runtime schema validation (Zod/guards) for these responses in MVP.
+3. We keep strict typing for internal code paths and continue to avoid introducing `any`.
+
+Rationale:
+- Avoid over-engineering and excessive boilerplate for MVP velocity.
+- Rely on integration tests and BetterAuth stability for response shape.
+
+---
+
 ## Addendum (v1.2) – Re-Review Findings (2026-02-07)
 
 Since v1.1, PR #227 expanded materially beyond Week-1 docs + BE-007 filter/tests, including schema refactors and app bootstrap changes. A re-review identified new non-compliance items and a regression. This governance log is updated to preserve auditability of the expanded scope and the resulting remediation requirements.
