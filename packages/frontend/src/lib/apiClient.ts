@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 /**
  * API Client with Interceptors for YACC Backend
  * 
@@ -17,7 +19,16 @@
  * - POST /api/auth/reset-password (reset password)
  */
 
-const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:3000';
+/**
+ * Get API base URL from environment variable (Vite)
+ * VITE_API_BASE_URL is defined in .env file
+ */
+function getApiBaseUrl(): string {
+  // Vite provides import.meta.env at build time
+  return (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:3000';
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface ApiError {
   error: string;
