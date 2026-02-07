@@ -196,7 +196,7 @@ describe('ConversationService', () => {
 describe('GET /conversations', () => {
   it('should return 200 with conversations', async () => {
     const res = await request(app)
-      .get('/conversations')
+      .get('/api/conversations')
       .set('Authorization', `Bearer ${token}`);
     
     expect(res.status).toBe(200);
@@ -227,7 +227,7 @@ describe('Inbox List Page', () => {
 ## API Contracts (Reference)
 
 ### GET /conversations
-**Endpoint**: `GET /conversations?channel=telegram&status=open&page=1&limit=20`
+**Endpoint**: `GET /api/conversations?channel=telegram&status=open&page=1&limit=20`
 
 **Request**:
 ```typescript
@@ -267,10 +267,10 @@ Query: {
       "createdAt": "2026-02-06T09:00:00Z",
       "updatedAt": "2026-02-06T10:05:00Z"
     }
-   ],
-   "page": 1,
-   "pageSize": 20,
-   "total": 150
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "total": 150
 }
 ```
 

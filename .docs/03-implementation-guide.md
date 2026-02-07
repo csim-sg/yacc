@@ -446,42 +446,103 @@ export async function downloadAndRehost(
 
 ---
 
-### 3.5 WebSocket Real-Time Updates
+### 3.5 WebSocket Real-Time Updates (socket-controllers)
 
 **When to use**: Notify UI of inbox changes, message delivery, presence, notifications
+
+**Architecture Decision**: Adopted **socket-controllers** for declarative, type-safe WebSocket event handling (ADR-012)
 
 **Configuration**:
 ```
 Heartbeat: 60 seconds (ping/pong)
 Backlog: 1 hour of missed events (stored in DB)
 Reconnect: Exponential backoff (1s → 60s max, 5 attempts)
+Auth: BetterAuth JWT validation via webSocketAuthMiddleware
 ```
 
-**Key Code**:
+**Controller Pattern** (socket-controllers):
 ```typescript
-// Server: authenticate & setup
-const wsServer = new Server(httpServer);
-wsServer.use(async (socket, next) => {
-  const user = await verifyAuth(socket.handshake.auth.token);
-  socket.userId = user.id;
-  next();
+import { SocketController, OnConnect, OnDisconnect, OnMessage } from 'socket-controllers';
+import type { Socket } from 'socket.io';
+import type { AuthenticatedSocket } from '../websockets/auth.middleware';
+
+@SocketController()
+export class ConversationController {
+  @OnConnect()
+  onConnect(socket: Socket): void {
+    const authSocket = socket as AuthenticatedSocket;
+    const userId = authSocket.userId;
+    // Join user's personal room
+    if (userId) {
+      socket.join(`user:${userId}`);
+    }
+  }
+
+  @OnMessage('subscribe.conversation')
+  async onSubscribeToConversation(socket: Socket, conversationId: string): Promise<void> {
+    socket.join(`conversation:${conversationId}`);
+    socket.emit('conversation.subscribed', { conversationId });
+  }
+
+  @OnMessage('conversation.updated')
+  async onConversationUpdated(socket: Socket, payload: ConversationUpdatedPayload): Promise<void> {
+    const room = `conversation:${payload.conversationId}`;
+    // Broadcast to all subscribers
+    socket.to(room).emit('conversation.updated', payload);
+  }
+
+  @OnDisconnect()
+  onDisconnect(socket: Socket): void {
+    const authSocket = socket as AuthenticatedSocket;
+    // Broadcast offline status
+    if (authSocket.userId) {
+      socket.broadcast.emit('presence.updated', {
+        userId: authSocket.userId,
+        status: 'offline',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+}
+```
+
+**Benefits Over Manual Listeners**:
+- ✅ **Type Safety**: Full TypeScript with `AuthenticatedSocket` interface
+- ✅ **Consistency**: Same decorator pattern as REST API (routing-controllers)
+- ✅ **Auto-Discovery**: Controllers registered via `socket-controllers/index.ts`
+- ✅ **Testability**: Controllers are unit-testable classes
+- ✅ **Middleware Integration**: Auth middleware applies uniformly
+
+**Implementation Details**:
+- **Controllers**: `src/socket-controllers/` (6 controllers: conversation, message, typing, presence, reaction, connector)
+- **Types**: `AuthenticatedSocket` interface from `websockets/auth.middleware.ts`
+- **Auth**: `webSocketAuthMiddleware` validates JWT before `@OnConnect`
+- **Events**: Named via `@OnMessage('event.name')` matching API contract in `.docs/02-api-and-data-model.md`
+
+**For Detailed Patterns**: See `GOV-014: Socket-Controllers Implementation Guide` for:
+- 5 common event handler patterns
+- Type safety guidelines
+- Error handling & logging standards
+- Testing patterns
+- Common gotchas & solutions
+
+**Client Integration**:
+```typescript
+// TanStack Start frontend
+const socket = io(WS_URL, { auth: { token: jwt } });
+
+// Subscribe to conversation
+socket.emit('subscribe.conversation', 'conv-123');
+
+// Listen for updates
+socket.on('conversation.updated', (payload) => {
+  // Update store
+  updateInboxStore(payload.conversation);
 });
 
-// Emit event to user
-export async function publishEvent(userId: string, event: any) {
-  wsServer.to(`user:${userId}`).emit('event', event);
-  // Store for backlog
-  await db.webSocketEvent.create({
-    data: { user_id: userId, event_type: event.type, payload: JSON.stringify(event.payload) },
-  });
-}
-
-// Client: subscribe to updates
-const socket = io(WS_URL, { auth: { token: jwt } });
-socket.on('event', (event) => {
-  if (event.type === 'conversation.updated') {
-    updateInboxStore(event.payload.conversation);
-  }
+socket.on('presence.updated', (payload) => {
+  // Update presence indicator
+  updatePresenceStore(payload);
 });
 ```
 

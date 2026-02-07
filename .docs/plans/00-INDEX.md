@@ -1,7 +1,8 @@
 # Active Execution Plans Index
 
-**Last Updated**: 2026-02-06  
-**Status**: Updated to reflect BE-003 completion and current task status  
+**Last Updated**: 2026-02-07  
+**Status**: BE-206 Phase 4 (Integration Testing) ready to start
+**Current Focus**: WebSocket integration & E2E testing  
 
 ---
 
@@ -9,7 +10,8 @@
 
 ### Active Plans
 
-- **[00-consolidated-active-plans.md](./00-consolidated-active-plans.md)** - Current authoritative execution plan for in-flight and pending tasks (BE-003 complete)
+- **[BE-206-phase4-integration-plan.md](./BE-206-phase4-integration-plan.md)** - Phase 4 Integration Testing Plan (⏳ READY FOR EXECUTION - 10-12 hours)
+- **[00-consolidated-active-plans.md](./00-consolidated-active-plans.md)** - Historical execution plan for Week 1-2 (BE-003 complete)
 - **[BE-003-COMPLETION-SUMMARY.md](./BE-003-COMPLETION-SUMMARY.md)** - BE-003 BetterAuth completion with test results (194 passing tests)
 
 ### Archive (Historical Reference)
@@ -50,6 +52,23 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 - FE-008 (#189), FE-009 (#190), FE-010 (#191)
 - FE-013 (#192), FE-014 (#193), FE-015 (#194)
 - QA-001 (#195), QA-002 (#196), QA-003 (#197)
+
+### BE-206: Socket-Controllers Migration (Phases 1-3)
+**Status**: ✅ **COMPLETE**  
+**PR**: #208 (feature/BE-206-socket-controllers-migration)  
+**Code Coverage**: 6 controllers, 0 TypeScript errors, 0 `any` types  
+**Unit Tests**: 46/46 passing (100%)  
+**Merged**: dev branch (commit ec2c0e9)  
+
+### BE-206: Socket-Controllers Migration Phase 4
+**Status**: ⏳ **READY FOR EXECUTION**  
+**Plan**: BE-206-phase4-integration-plan.md  
+**Duration**: 10-12 hours  
+**Tasks**:
+- Task 1: Integration Tests (4-5 hours) - 20+ tests
+- Task 2: E2E Tests (3-4 hours) - 15+ tests
+- Task 3: Performance Verification (2 hours) - SLO compliance
+- Task 4: Regression Testing (1 hour) - Zero breakage
 
 ### BE-003: BetterAuth Authentication
 **Status**: ✅ **COMPLETE**  

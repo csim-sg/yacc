@@ -5,19 +5,19 @@
 
 import type { Request } from 'express';
 import {
-   JsonController,
-   Get,
-   Post,
-   Patch,
-   Delete,
-   Param,
-   Body,
-   Req,
-   Authorized,
-   CurrentUser,
-   HttpCode,
-   BadRequestError,
-   NotFoundError,
+  JsonController,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Req,
+  Authorized,
+  CurrentUser,
+  HttpCode,
+  BadRequestError,
+  NotFoundError,
 } from 'routing-controllers';
 import { conversationService } from '../services/conversation.service.js';
 import { auditService } from '../services/audit.service.js';
@@ -47,12 +47,12 @@ export class ConversationsController {
 
     try {
       const query = req.query || {};
-       const normalizedQuery: ListConversationsRequest = {
-         page: query.page ? Number(query.page) : undefined,
-         limit: query.limit ? Number(query.limit) : undefined,
-         channel: typeof query.channel === 'string' ? query.channel : undefined,
-         status: (typeof query.status === 'string' ? query.status : undefined) as 'open' | 'pending' | 'resolved' | undefined,
-         priority: (typeof query.priority === 'string' ? query.priority : undefined) as 'low' | 'medium' | 'high' | 'urgent' | undefined,
+      const normalizedQuery: ListConversationsRequest = {
+        page: query.page ? Number(query.page) : undefined,
+        limit: query.limit ? Number(query.limit) : undefined,
+        channel: typeof query.channel === 'string' ? query.channel : undefined,
+        status: (typeof query.status === 'string' ? query.status : undefined) as 'open' | 'pending' | 'resolved' | undefined,
+        priority: (typeof query.priority === 'string' ? query.priority : undefined) as 'low' | 'medium' | 'high' | 'urgent' | undefined,
         assignedUserId: typeof query.assignedUserId === 'string' ? query.assignedUserId : undefined,
         search: typeof query.search === 'string' ? query.search : undefined,
         dateFrom: typeof query.dateFrom === 'string' ? query.dateFrom : undefined,
@@ -100,9 +100,16 @@ export class ConversationsController {
    * Get conversation by ID
    */
   @Get('/:id')
+<<<<<<< HEAD
   async getConversation(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     const startTime = performance.now();
     const correlationId = req.correlationId || 'unknown';
+=======
+  async getConversation(@Param('id') id: string, @Req() req: Request) {
+    const startTime = performance.now();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const correlationId = (req as any).correlationId || 'unknown';
+>>>>>>> origin/dev
 
     try {
       const conversation = await conversationService.getConversation(id);
@@ -285,10 +292,18 @@ export class ConversationsController {
   @Get('/:id/messages')
   async getMessages(
     @Param('id') conversationId: string,
+<<<<<<< HEAD
     @Req() req: AuthenticatedRequest
   ) {
     const startTime = performance.now();
     const correlationId = req.correlationId || 'unknown';
+=======
+    @Req() req: Request
+  ) {
+    const startTime = performance.now();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const correlationId = (req as any).correlationId || 'unknown';
+>>>>>>> origin/dev
 
     try {
       const query = req.query || {};
@@ -343,10 +358,18 @@ export class ConversationsController {
       @Param('id') conversationId: string,
       @Body() body: { body: string },
       @CurrentUser() user: AuthUser,
+<<<<<<< HEAD
       @Req() req: AuthenticatedRequest
     ) {
       const startTime = performance.now();
       const correlationId = req.correlationId || 'unknown';
+=======
+      @Req() req: Request
+    ) {
+      const startTime = performance.now();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const correlationId = (req as any).correlationId || 'unknown';
+>>>>>>> origin/dev
 
       try {
         // Validate message body

@@ -11,7 +11,7 @@
  * for forgot-password and reset-password endpoints.
  */
 
-import { All, Controller, Post, Req, Res, Body, BadRequestError } from 'routing-controllers';
+import { All, Controller, Post, Req, Res, Body, BadRequestError, UseBefore } from 'routing-controllers';
 import type { Request, Response } from 'express';
 import { betterAuthClient } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
@@ -20,6 +20,7 @@ import { eq } from 'drizzle-orm';
 import { generateResetToken, resetPassword } from '../services/passwordReset.service';
 import { logger } from '../infrastructure/logger';
 import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
+import { loginRateLimiter, passwordResetRateLimiter } from '../middleware/rateLimit.middleware';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;
@@ -45,11 +46,13 @@ export class AuthController {
   /**
    * POST /auth/forgot-password
    * Request password reset email (ALWAYS returns 200 to prevent email enumeration)
+   * Rate limited to prevent abuse
    *
    * Request: { "email": "user@example.com" }
    * Response: { "message": "If an email exists, a password reset link has been sent" }
    */
   @Post('/forgot-password')
+  @UseBefore(passwordResetRateLimiter)
   async forgotPassword(@Body() body: unknown, @Req() req: AuthenticatedRequest): Promise<{ message: string }> {
     const correlationId = req.correlationId || 'unknown';
 
@@ -95,12 +98,14 @@ export class AuthController {
   /**
    * POST /auth/reset-password
    * Reset password using token
+   * Rate limited to prevent abuse
    *
    * Request: { "token": "64-char-hex-token", "newPassword": "NewPassword123!" }
    * Response: { "success": true, "message": "Password reset successfully" }
    * Error: 400 { "error": "Invalid or expired token" }
    */
   @Post('/reset-password')
+  @UseBefore(passwordResetRateLimiter)
   async resetPasswordHandler(
     @Body() body: unknown,
     @Req() req: AuthenticatedRequest,
@@ -129,13 +134,25 @@ export class AuthController {
   }
 
   /**
-   * Handle all BetterAuth routes
-   * Routes: /sign-in/email, /sign-up/email, /sign-out, /get-session, etc.
+   * POST /auth/sign-in/email
+   * BetterAuth sign-in endpoint
+   * Rate limited to prevent brute force attacks
+   *
+   * Delegates to BetterAuth handler with rate limiting
+   */
+  @Post('/sign-in/email')
+  @UseBefore(loginRateLimiter)
+  async handleSignInEmail(@Req() req: BetterAuthRequest, @Res() res: Response): Promise<void> {
+    return this.delegateToAuth(req, res);
+  }
+
+  /**
+   * Handle all other BetterAuth routes
+   * Routes: /sign-up/email, /sign-out, /get-session, etc.
    *
    * This wildcard route MUST be last so custom routes above take precedence
    * 
    * BetterAuth provides:
-   * - /sign-in/email (login)
    * - /sign-out (logout)
    * - /get-session (session retrieval)
    * - /sign-up/email (registration)
@@ -143,6 +160,14 @@ export class AuthController {
    */
   @All('/*')
   async handleAuth(@Req() req: BetterAuthRequest, @Res() res: Response): Promise<void> {
+    return this.delegateToAuth(req, res);
+  }
+
+  /**
+   * Helper method to delegate requests to BetterAuth handler
+   * @private
+   */
+  private async delegateToAuth(req: BetterAuthRequest, res: Response): Promise<void> {
     const correlationId = req.correlationId || 'unknown';
 
     try {

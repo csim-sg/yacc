@@ -813,17 +813,37 @@ export async function getUser(id: string) {
 }
 ```
 
-### 4. Barrel Exports (index.ts Re-exports)
+### 4. Index Files Must Export Const Arrays/Objects (NOT Individual Named Exports)
 ```typescript
-// ❌ DON'T DO THIS
+// ❌ DON'T DO THIS (named exports of individual items)
 // controllers/index.ts
 export { ConversationController } from './conversation.controller';
 export { MessageController } from './message.controller';
 
-// ✅ DO THIS
-// Import directly
-import { ConversationController } from '../controllers/conversation.controller';
+// ✅ DO THIS (const array/object for centralized registration)
+// controllers/index.ts
+import { ConversationController } from './conversation.controller';
+import { MessageController } from './message.controller';
+
+export const controllers = [
+  ConversationController,
+  MessageController,
+];
+
+// Use in src/index.ts:
+import { controllers } from './controllers';
+useExpressServer(app, {
+  controllers: controllers,  // ✅ Pass const directly
+  // ...
+});
 ```
+
+**Pattern applies to:**
+- `controllers/index.ts` → `export const controllers = [...]`
+- `socket-controllers/index.ts` → `export const socketControllers = [...]`
+- `schemas/index.ts` → `export const schemas = {...}`
+
+**Why**: Centralizes all registrations in one place, easier to maintain, reduces import noise, follows the convention of `src/schemas/index.ts`.
 
 ### 5. Hardcoded Values
 ```typescript

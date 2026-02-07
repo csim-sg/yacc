@@ -128,7 +128,11 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
+<<<<<<< HEAD
       res.body.data.forEach((conv: ConversationSummary) => {
+=======
+      res.body.data.forEach((conv: any) => {
+>>>>>>> origin/dev
         expect(conv.channel).toBe('telegram');
       });
     });
@@ -139,7 +143,11 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
+<<<<<<< HEAD
       res.body.data.forEach((conv: ConversationSummary) => {
+=======
+      res.body.data.forEach((conv: any) => {
+>>>>>>> origin/dev
         expect(conv.status).toBe('open');
       });
     });
@@ -150,7 +158,11 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
+<<<<<<< HEAD
       res.body.data.forEach((conv: ConversationSummary) => {
+=======
+      res.body.data.forEach((conv: any) => {
+>>>>>>> origin/dev
         expect(conv.priority).toBe('high');
       });
     });
@@ -161,7 +173,11 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
+<<<<<<< HEAD
       res.body.data.forEach((conv: ConversationSummary) => {
+=======
+      res.body.data.forEach((conv: any) => {
+>>>>>>> origin/dev
         expect(conv.assignedUserId).toBe(testUserId);
       });
     });
@@ -172,7 +188,11 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
+<<<<<<< HEAD
       res.body.data.forEach((conv: ConversationSummary) => {
+=======
+      res.body.data.forEach((conv: any) => {
+>>>>>>> origin/dev
         expect(conv.channel).toBe('telegram');
         expect(conv.status).toBe('open');
         expect(conv.priority).toBe('high');
