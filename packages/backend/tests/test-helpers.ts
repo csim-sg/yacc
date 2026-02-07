@@ -38,10 +38,6 @@ export async function createTestApp(): Promise<Express> {
   const { appConfig } = await import('../src/config/appConfig');
 
   const testApp = express.default();
-  
-  // Add body parsing middleware
-  testApp.use(express.default.json());
-  testApp.use(express.default.urlencoded({ extended: true }));
 
   useExpressServer(testApp, {
     controllers: controllers,

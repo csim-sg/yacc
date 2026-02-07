@@ -23,10 +23,6 @@ import { IRCConnector } from './connectors/irc.connector';
 // ===== EXPRESS APP =====
 const app = express();
 
-// ===== BODY PARSING MIDDLEWARE =====
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
 useExpressServer(app, {
   controllers: controllers,
   authorizationChecker: authorizationChecker,
