@@ -22,49 +22,12 @@ export interface TestUser {
 }
 
 /**
- * Returns the Express app instance used by the server (no listen).
- * Note: The app is created at module load time in src/index.ts,
- * but start() only runs when NODE_ENV !== 'test', so this is safe for testing.
- * We access the app through a module that imports and initializes it.
+ * Returns a fully configured Express app for testing.
+ * Uses the same factory function as src/index.ts to ensure consistency.
  */
 export async function createTestApp(): Promise<Express> {
-  // Create a fresh Express app with the same setup as src/index.ts
-  const express = await import('express');
-  const { useExpressServer } = await import('routing-controllers');
-  const { authorizationChecker, currentUserChecker } = await import('../src/middleware/routingControllersAuth');
-  const { correlationIdMiddleware } = await import('../src/middleware/correlationId.middleware');
-  const { requestLoggingMiddleware } = await import('../src/middleware/requestLogging.middleware');
-  const { controllers } = await import('../src/controllers');
-  const { appConfig } = await import('../src/config/appConfig');
-
-  const testApp = express.default();
-
-  // Body parsing middleware required for POST/PUT endpoints
-  testApp.use(express.json());
-  testApp.use(express.urlencoded({ extended: true }));
-
-  useExpressServer(testApp, {
-    controllers: controllers,
-    authorizationChecker: authorizationChecker,
-    currentUserChecker: currentUserChecker,
-    defaultErrorHandler: true,
-    validation: {
-      whitelist: true,
-      forbidNonWhitelisted: true,
-    },
-    classTransformer: true,
-    cors: {
-      origin: appConfig.APP_FRONTEND_URL,
-      credentials: true,
-      exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
-    },
-    middlewares: [
-      correlationIdMiddleware,
-      requestLoggingMiddleware,
-    ],
-  });
-
-  return testApp as Express;
+  const { createApp } = await import('../src/app');
+  return createApp();
 }
 
 /**
