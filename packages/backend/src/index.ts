@@ -45,8 +45,10 @@ useExpressServer(app, {
 });
 
 // ===== SETUP RATE LIMITING =====
-// Apply rate limiting to specific endpoints after routing-controllers setup
-// These use app.post() to pre-register routes before controllers process them
+// Apply rate limiting to specific endpoints before routing-controllers
+// Rate limiters must be registered at Express level for specific routes
+// This pattern ensures rate limiting is checked before routing-controllers processes the request
+// Global middlewares are registered via useExpressServer.middlewares; route-specific ones via app.post/put/etc
 app.post('/auth/sign-in/email', loginRateLimiter);
 app.post('/auth/forgot-password', passwordResetRateLimiter);
 app.post('/auth/reset-password', passwordResetRateLimiter);
