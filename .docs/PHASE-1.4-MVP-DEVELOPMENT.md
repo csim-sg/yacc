@@ -267,10 +267,10 @@ Query: {
       "createdAt": "2026-02-06T09:00:00Z",
       "updatedAt": "2026-02-06T10:05:00Z"
     }
-  ],
-  "page": 1,
-  "totalCount": 150,
-  "totalPage": 8
+   ],
+   "page": 1,
+   "pageSize": 20,
+   "total": 150
 }
 ```
 
