@@ -1,11 +1,9 @@
 import { dbClient } from '../infrastructure/db.client';
-import {
-  conversations,
-  messages,
-  conversationTags,
-  tags,
-  users,
-} from '../schemas';
+import { conversations } from '../schemas/conversation.schema';
+import { messages } from '../schemas/message.schema';
+import { conversationTags } from '../schemas/conversationTag.schema';
+import { tags } from '../schemas/tag.schema';
+import { users } from '../schemas/user.schema';
 import { eq, and, desc, asc, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { auditService } from './audit.service';

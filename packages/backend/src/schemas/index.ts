@@ -15,27 +15,10 @@ import { session } from "./session.schema";
 import { verification } from "./verification.schema";
 import { account } from "./account.schema";
 
-// Re-export all schemas as named exports for convenience
-export {
-  attachments,
-  auditLogs,
-  conversations,
-  conversationTags,
-  messages,
-  notes,
-  notifications,
-  passwordResetTokens,
-  rawPayloads,
-  routingRules,
-  routingRuleExecutions,
-  tags,
-  users,
-  session,
-  verification,
-  account,
-};
-
-// Also export as const object for library wiring (e.g., Drizzle adapter)
+/**
+ * Schema registry - data-only constant for library wiring (Drizzle adapter)
+ * Direct file imports required; no barrel exports allowed
+ */
 export const schemas = {
   // YACC application tables
   attachments,
