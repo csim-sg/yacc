@@ -26,39 +26,41 @@ export interface TestUser {
  * Sets up routing-controllers with same configuration as src/index.ts.
  */
 export async function createTestApp(): Promise<Express> {
-  const express = await import('express');
-  const { useExpressServer } = await import('routing-controllers');
-  const { authorizationChecker, currentUserChecker } = await import('../src/middleware/routingControllersAuth');
-  const { correlationIdMiddleware } = await import('../src/middleware/correlationId.middleware');
-  const { requestLoggingMiddleware } = await import('../src/middleware/requestLogging.middleware');
-  const { controllers } = await import('../src/controllers');
-  const { appConfig } = await import('../src/config/appConfig');
+   const express = await import('express');
+   const { useExpressServer } = await import('routing-controllers');
+   const { authorizationChecker, currentUserChecker } = await import('../src/middleware/routingControllersAuth');
+   const { correlationIdMiddleware } = await import('../src/middleware/correlationId.middleware');
+   const { requestLoggingMiddleware } = await import('../src/middleware/requestLogging.middleware');
+   const { bodyParserMiddleware } = await import('../src/middleware/bodyParser.middleware');
+   const { controllers } = await import('../src/controllers');
+   const { appConfig } = await import('../src/config/appConfig');
 
-  const testApp = express.default();
+   const testApp = express.default();
 
-  useExpressServer(testApp, {
-    controllers: controllers,
-    authorizationChecker: authorizationChecker,
-    currentUserChecker: currentUserChecker,
-    defaultErrorHandler: true,
-    validation: {
-      whitelist: true,
-      forbidNonWhitelisted: true,
-    },
-    classTransformer: true,
-    cors: {
-      origin: appConfig.APP_FRONTEND_URL,
-      credentials: true,
-      exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
-    },
-    middlewares: [
-      correlationIdMiddleware,
-      requestLoggingMiddleware,
-    ],
-  });
+   useExpressServer(testApp, {
+     controllers: controllers,
+     authorizationChecker: authorizationChecker,
+     currentUserChecker: currentUserChecker,
+     defaultErrorHandler: true,
+     validation: {
+       whitelist: true,
+       forbidNonWhitelisted: true,
+     },
+     classTransformer: true,
+     cors: {
+       origin: appConfig.APP_FRONTEND_URL,
+       credentials: true,
+       exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
+     },
+     middlewares: [
+       correlationIdMiddleware,
+       requestLoggingMiddleware,
+       bodyParserMiddleware,
+     ],
+   });
 
-  return testApp as Express;
-}
+   return testApp as Express;
+ }
 
 /**
  * Logs in via POST /auth/sign-in/email and returns user id and token.

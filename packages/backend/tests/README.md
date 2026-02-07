@@ -56,9 +56,9 @@ pnpm test -- tests/BE-007-inbox-api.spec.ts
 ### BE-007 Integration Tests
 - **File**: `tests/BE-007-inbox-api.spec.ts`
 - **Prerequisites**:
-  1. PostgreSQL running (via `docker-compose up -d`)
-  2. Redis running (via `docker-compose up -d`)
-  3. Database migrations applied (via `pnpm db:migrate`)
+   1. PostgreSQL running (via `docker compose up -d`)
+   2. Redis running (via `docker compose up -d`)
+   3. Database migrations applied (via `pnpm db:migrate`)
   4. Test user seeded (via `pnpm db:fixtures` or manually via `scripts/seed-test-fixtures.ts`)
      - Test user email: `manager@yacc.local`
      - Test user password: `admin123`
@@ -69,7 +69,7 @@ pnpm test -- tests/BE-007-inbox-api.spec.ts
 
 ```bash
 # 1. Start Docker services (PostgreSQL + Redis)
-docker-compose up -d
+docker compose up -d
 
 # 2. Run migrations
 cd packages/backend
@@ -252,6 +252,9 @@ npm install --save-dev @types/bcryptjs
 ### Database Connection Errors
 Ensure PostgreSQL is running and test database is accessible:
 ```bash
+# Start Docker services if not already running
+docker compose up -d
+
 # Check database connection
 psql -U postgres -h localhost -d yacc_dev -c "SELECT 1"
 ```

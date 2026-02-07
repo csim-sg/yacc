@@ -9,8 +9,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import { conversations } from './conversation.schema';
 import { users } from './user.schema';
-import { messageStatusEnum } from './enums/messageStatus.enum';
-import { messageDirectionEnum } from './enums/messageDirection.enum';
+import { messageStatusEnum } from '../enums/messageStatus.enum';
+import { messageDirectionEnum } from '../enums/messageDirection.enum';
 
 /**
  * Messages table - stores individual messages

@@ -1,6 +1,6 @@
 import { boolean, pgTable, text, timestamp, uuid, varchar, index } from 'drizzle-orm/pg-core';
-import { userRoleEnum } from './enums/userRole.enum';
-import { userStatusEnum } from './enums/userStatus.enum';
+import { userRoleEnum } from '../enums/userRole.enum';
+import { userStatusEnum } from '../enums/userStatus.enum';
 
 /**
  * Users table - stores user accounts and authentication

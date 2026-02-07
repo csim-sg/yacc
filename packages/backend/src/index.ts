@@ -9,6 +9,7 @@ import { checkDatabaseConnection } from './infrastructure/db.client';
 import { authorizationChecker, currentUserChecker } from './middleware/routingControllersAuth';
 import { correlationIdMiddleware } from './middleware/correlationId.middleware';
 import { requestLoggingMiddleware } from './middleware/requestLogging.middleware';
+import { bodyParserMiddleware } from './middleware/bodyParser.middleware';
 import { controllers } from './controllers';
 import { socketControllers } from './socket-controllers';
 import { appConfig } from './config/appConfig';
@@ -41,6 +42,7 @@ useExpressServer(app, {
   middlewares: [
     correlationIdMiddleware,
     requestLoggingMiddleware,
+    bodyParserMiddleware,
   ],
 });
 

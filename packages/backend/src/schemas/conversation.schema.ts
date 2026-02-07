@@ -8,9 +8,9 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { users } from './user.schema';
-import { conversationStatusEnum } from './enums/conversationStatus.enum';
-import { conversationPriorityEnum } from './enums/conversationPriority.enum';
-import { channelTypeEnum } from './enums/channelType.enum';
+import { conversationStatusEnum } from '../enums/conversationStatus.enum';
+import { conversationPriorityEnum } from '../enums/conversationPriority.enum';
+import { channelTypeEnum } from '../enums/channelType.enum';
 
 /**
  * Conversations table - represents a conversation thread (one per group/channel)
