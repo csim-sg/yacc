@@ -11,6 +11,7 @@
 ### Active Plans
 
 - **[BE-206-phase4-integration-plan.md](./BE-206-phase4-integration-plan.md)** - Phase 4 Integration Testing Plan (⏳ READY FOR EXECUTION - 10-12 hours)
+- **[week1-qa-test-cases-and-data.md](./week1-qa-test-cases-and-data.md)** - Week 1 QA: test cases + test data setup (✅ ready)
 - **[00-consolidated-active-plans.md](./00-consolidated-active-plans.md)** - Historical execution plan for Week 1-2 (BE-003 complete)
 - **[BE-003-COMPLETION-SUMMARY.md](./BE-003-COMPLETION-SUMMARY.md)** - BE-003 BetterAuth completion with test results (194 passing tests)
 
@@ -28,7 +29,7 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 ## ✅ Current Status
 
 ### Phase 1.4: MVP Core-First Execution (APPROVED)
-**Status**: 🚀 **IN PROGRESS - Week 2 (Feb 17-23)** — Week 1 complete (BE-007, BE-008, FE-008, FE-009)  
+**Status**: 🚀 **IN PROGRESS - Week 2 (Feb 17-23)** — Week 1 complete 2026-02-07 (BE-007, BE-008, FE-008, FE-009)  
 **Approval Date**: 2026-02-06  
 **Target Completion**: 2026-02-20  
 **Timeline**: 2-week sprint
@@ -77,7 +78,7 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 
 ---
 
-## 🚀 Week 1 Execution (Feb 10-16) ✅ COMPLETE
+## 🚀 Week 1 Execution ✅ COMPLETE (2026-02-07)
 
 **Backend**:
 - [x] BE-007: Inbox API (GET /conversations with filters) - DONE
@@ -88,12 +89,12 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 - [x] FE-009: Conversation Detail Page (UI scaffold with mocks) - DONE
 
 **QA**:
-- [ ] Test case preparation and test data setup
+- [x] Test case preparation and test data setup (see [week1-qa-test-cases-and-data.md](./week1-qa-test-cases-and-data.md))
 
-**Sync Points**:
-- API contract finalized: Feb 10 (morning) ✅
-- Frontend UI ready with mocks: Feb 12 (EOD) ✅
-- Backend ready for FE integration: Feb 14 (EOD) ✅
+**Sync Points** (completed with Week 1):
+- API contract finalized ✅
+- Frontend UI ready with mocks ✅
+- Backend ready for FE integration ✅
 
 ---
 

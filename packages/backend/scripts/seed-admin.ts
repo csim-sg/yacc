@@ -4,8 +4,8 @@
  * Usage: tsx scripts/seed-admin.ts
  */
 import 'dotenv/config';
-import { db } from '../src/infrastructure/db/client';
-import { hashPassword } from '../src/infrastructure/auth/password';
+import { dbClient } from '../src/infrastructure/db.client.js';
+import { hashPassword } from 'better-auth/crypto';
 import { sql } from 'drizzle-orm';
 
 async function seedAdmin() {
@@ -13,15 +13,16 @@ async function seedAdmin() {
     console.log('🌱 Seeding admin user...');
 
     // Check if admin already exists
-    const result = await db.execute(
-      sql`SELECT COUNT(*) FROM users WHERE email = 'admin@yacc.local'`
+    const result = await dbClient.execute(
+      sql`SELECT COUNT(*)::text as count FROM users WHERE email = 'admin@yacc.local'`
     );
+    const count = (result.rows[0] as { count: string })?.count ?? '0';
 
-    if (result.rows[0].count === '0') {
-      // Create super admin user
-      const hashedPassword = hashPassword('admin123');
+    if (count === '0') {
+      // Create super admin user (Better Auth compatible hash)
+      const hashedPassword = await hashPassword('admin123');
 
-      await db.execute(sql`
+      await dbClient.execute(sql`
         INSERT INTO users (email, name, password_hash, role, status, email_verified)
         VALUES ('admin@yacc.local', 'System Administrator', ${hashedPassword}, 'super_admin', 'active', true)
       `);

@@ -57,7 +57,7 @@ pnpm test -- tests/BE-007-inbox-api.spec.ts
 - **File**: `tests/BE-007-inbox-api.spec.ts`
 - **Requires**: PostgreSQL and Redis (e.g. `docker-compose up -d`), and a seeded user (e.g. run `pnpm db:fixtures` or `scripts/seed-test-fixtures.ts` so `manager@yacc.local` / `admin123` exists).
 - **Helpers**: `tests/test-helpers.ts` provides `createTestApp()`, `createTestUser(app, opts)`, `seedTestConversations(userId, count)`.
-- If setup fails (no DB/Redis or login fails), the suite skips all tests via `itOrSkip`.
+- **Fail fast**: If setup fails (no DB/Redis or login fails), `beforeAll` throws and the suite fails with a clear error. No test skipping. For CI, add a bootstrap step to seed fixtures before running this suite.
 
 ### Run with Coverage Report
 ```bash

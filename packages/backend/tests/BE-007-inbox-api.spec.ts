@@ -21,38 +21,28 @@ interface ConversationSummary {
 }
 
 describe('BE-007: Inbox API (GET /conversations with filters)', () => {
-  let app: Express | undefined;
+  let app: Express;
   let authToken: string;
   let testUserId: string;
-  let skipSuite = false;
 
   beforeAll(async () => {
-    try {
-      app = await createTestApp();
-      const user = await createTestUser(app, {
-        email: 'manager@yacc.local',
-        password: 'admin123',
-        role: 'manager',
-      });
-      testUserId = user.id;
-      authToken = user.token;
-      await seedTestConversations(testUserId, 35);
-    } catch (err) {
-      skipSuite = true;
-      console.warn('BE-007 integration setup skipped (DB/Redis or seed required):', (err as Error).message);
-    }
+    app = await createTestApp();
+    const user = await createTestUser(app, {
+      email: 'manager@yacc.local',
+      password: 'admin123',
+      role: 'manager',
+    });
+    testUserId = user.id;
+    authToken = user.token;
+    await seedTestConversations(testUserId, 35);
   });
 
   afterAll(async () => {
     // Cleanup would happen here
   });
 
-  const itOrSkip = (name: string, fn: () => Promise<void>) =>
-    skipSuite ? it.skip(name, fn) : it(name, fn);
-
   describe('Basic Listing', () => {
-    itOrSkip('should return 200 with paginated conversations', async () => {
-      if (skipSuite || !app) return;
+    it('should return 200 with paginated conversations', async () => {
       const res = await request(app)
         .get('/api/conversations')
         .set('Authorization', `Bearer ${authToken}`);
@@ -65,8 +55,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       expect(Array.isArray(res.body.data)).toBe(true);
     });
 
-    itOrSkip('should return default pagination (page=1, pageSize=20)', async () => {
-      if (skipSuite || !app) return;
+    it('should return default pagination (page=1, pageSize=20)', async () => {
       const res = await request(app)
         .get('/api/conversations')
         .set('Authorization', `Bearer ${authToken}`);
@@ -76,8 +65,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       expect(res.body.page).toBe(1);
     });
 
-    itOrSkip('should return 401 without authorization token', async () => {
-      if (skipSuite || !app) return;
+    it('should return 401 without authorization token', async () => {
       const res = await request(app).get('/api/conversations');
 
       expect(res.status).toBe(401);
@@ -85,8 +73,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
   });
 
   describe('Pagination', () => {
-    itOrSkip('should support custom page size', async () => {
-      if (skipSuite || !app) return;
+    it('should support custom page size', async () => {
       const res = await request(app)
         .get('/api/conversations?limit=10')
         .set('Authorization', `Bearer ${authToken}`);
@@ -95,8 +82,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       expect(res.body.data.length).toBeLessThanOrEqual(10);
     });
 
-    itOrSkip('should support page offset', async () => {
-      if (skipSuite || !app) return;
+    it('should support page offset', async () => {
       const res1 = await request(app)
         .get('/api/conversations?limit=5&page=1')
         .set('Authorization', `Bearer ${authToken}`);
@@ -113,8 +99,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       }
     });
 
-    itOrSkip('should include total count in response', async () => {
-      if (skipSuite || !app) return;
+    it('should include total count in response', async () => {
       const res = await request(app)
         .get('/api/conversations')
         .set('Authorization', `Bearer ${authToken}`);
@@ -124,8 +109,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       expect(typeof res.body.total).toBe('number');
     });
 
-    itOrSkip('should calculate total pages correctly', async () => {
-      if (skipSuite || !app) return;
+    it('should calculate total pages correctly', async () => {
       const res = await request(app)
         .get('/api/conversations?limit=10')
         .set('Authorization', `Bearer ${authToken}`);
@@ -138,8 +122,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
   });
 
   describe('Filtering', () => {
-    itOrSkip('should filter by channel', async () => {
-      if (skipSuite || !app) return;
+    it('should filter by channel', async () => {
       const res = await request(app)
         .get('/api/conversations?channel=telegram')
         .set('Authorization', `Bearer ${authToken}`);
@@ -150,8 +133,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       });
     });
 
-    itOrSkip('should filter by status', async () => {
-      if (skipSuite || !app) return;
+    it('should filter by status', async () => {
       const res = await request(app)
         .get('/api/conversations?status=open')
         .set('Authorization', `Bearer ${authToken}`);
@@ -162,8 +144,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       });
     });
 
-    itOrSkip('should filter by priority', async () => {
-      if (skipSuite || !app) return;
+    it('should filter by priority', async () => {
       const res = await request(app)
         .get('/api/conversations?priority=high')
         .set('Authorization', `Bearer ${authToken}`);
@@ -174,8 +155,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       });
     });
 
-    itOrSkip('should filter by assignedUserId', async () => {
-      if (skipSuite || !app) return;
+    it('should filter by assignedUserId', async () => {
       const res = await request(app)
         .get(`/api/conversations?assignedUserId=${testUserId}`)
         .set('Authorization', `Bearer ${authToken}`);
@@ -186,8 +166,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       });
     });
 
-    itOrSkip('should combine multiple filters', async () => {
-      if (skipSuite || !app) return;
+    it('should combine multiple filters', async () => {
       const res = await request(app)
         .get(`/api/conversations?channel=telegram&status=open&priority=high`)
         .set('Authorization', `Bearer ${authToken}`);
@@ -202,7 +181,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
   });
 
   describe('Search', () => {
-    itOrSkip('should search by title/externalThreadId', async () => {
+    it('should search by title/externalThreadId', async () => {
       // Assumes test data has a conversation with specific title
       const res = await request(app)
         .get('/api/conversations?search=test')
@@ -214,7 +193,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
   });
 
   describe('Date Range Filtering', () => {
-    itOrSkip('should filter by dateFrom', async () => {
+    it('should filter by dateFrom', async () => {
       const dateFrom = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const res = await request(app)
         .get(`/api/conversations?dateFrom=${dateFrom}`)
@@ -223,7 +202,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       expect(res.status).toBe(200);
     });
 
-    itOrSkip('should filter by dateTo', async () => {
+    it('should filter by dateTo', async () => {
       const dateTo = new Date().toISOString();
       const res = await request(app)
         .get(`/api/conversations?dateTo=${dateTo}`)
@@ -232,7 +211,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       expect(res.status).toBe(200);
     });
 
-    itOrSkip('should filter by date range', async () => {
+    it('should filter by date range', async () => {
       const dateFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const dateTo = new Date().toISOString();
       const res = await request(app)
@@ -244,7 +223,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
   });
 
   describe('Response Format', () => {
-    itOrSkip('should return conversation summary objects with required fields', async () => {
+    it('should return conversation summary objects with required fields', async () => {
       const res = await request(app)
         .get('/api/conversations')
         .set('Authorization', `Bearer ${authToken}`);
@@ -268,7 +247,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       }
     });
 
-    itOrSkip('should return array for tags', async () => {
+    it('should return array for tags', async () => {
       const res = await request(app)
         .get('/api/conversations')
         .set('Authorization', `Bearer ${authToken}`);
@@ -279,7 +258,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       }
     });
 
-    itOrSkip('should return array for participants', async () => {
+    it('should return array for participants', async () => {
       const res = await request(app)
         .get('/api/conversations')
         .set('Authorization', `Bearer ${authToken}`);
@@ -292,7 +271,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
   });
 
   describe('RBAC', () => {
-    itOrSkip('should enforce role-based visibility', async () => {
+    it('should enforce role-based visibility', async () => {
       // Manager should see assigned conversations
       const res = await request(app)
         .get('/api/conversations')
@@ -304,7 +283,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
   });
 
   describe('Sorting', () => {
-    itOrSkip('should sort by lastActivity by default (desc)', async () => {
+    it('should sort by lastActivity by default (desc)', async () => {
       const res = await request(app)
         .get('/api/conversations')
         .set('Authorization', `Bearer ${authToken}`);
@@ -319,7 +298,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
   });
 
   describe('Error Handling', () => {
-    itOrSkip('should return 400 for invalid page number', async () => {
+    it('should return 400 for invalid page number', async () => {
       const res = await request(app)
         .get('/api/conversations?page=abc')
         .set('Authorization', `Bearer ${authToken}`);
@@ -327,7 +306,23 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       expect(res.status).toBe(400);
     });
 
-    itOrSkip('should return 400 for invalid channel value', async () => {
+    it('should return 400 for invalid limit (non-integer)', async () => {
+      const res = await request(app)
+        .get('/api/conversations?limit=abc')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+    });
+
+    it('should return 400 for invalid limit (exceeds 100)', async () => {
+      const res = await request(app)
+        .get('/api/conversations?limit=999')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+    });
+
+    it('should return 400 for invalid channel value', async () => {
       const res = await request(app)
         .get('/api/conversations?channel=invalid')
         .set('Authorization', `Bearer ${authToken}`);
@@ -335,12 +330,30 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       expect(res.status).toBe(400);
     });
 
-    itOrSkip('should return 400 for invalid status value', async () => {
+    it('should return 400 for invalid status value', async () => {
       const res = await request(app)
         .get('/api/conversations?status=invalid')
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
+    });
+
+    it('should return 400 for invalid tagId (non-integer)', async () => {
+      const res = await request(app)
+        .get('/api/conversations?tagId=abc')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+    });
+
+    it('should return 200 when tagId is a valid positive integer', async () => {
+      const res = await request(app)
+        .get('/api/conversations?tagId=1')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('data');
+      expect(Array.isArray(res.body.data)).toBe(true);
     });
   });
 });

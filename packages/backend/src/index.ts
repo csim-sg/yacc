@@ -23,6 +23,10 @@ import { IRCConnector } from './connectors/irc.connector';
 // ===== EXPRESS APP =====
 const app = express();
 
+// ===== BODY PARSING MIDDLEWARE =====
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 useExpressServer(app, {
   controllers: controllers,
   authorizationChecker: authorizationChecker,
@@ -77,12 +81,13 @@ async function start() {
 
       // Initialize socket-controllers for declarative WebSocket event handling
        logger.info('Registering socket-controllers...');
-       // eslint-disable-next-line @typescript-eslint/no-explicit-any
        new SocketControllers({
          io,
          controllers: socketControllers,
          container: {
-           get: (Class: any) => new Class(),
+           get<T>(Class: new (...args: unknown[]) => T): T {
+             return new Class();
+           },
          },
        });
        logger.info('Socket-controllers registered successfully');

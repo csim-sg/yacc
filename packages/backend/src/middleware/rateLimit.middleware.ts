@@ -45,9 +45,6 @@ export const passwordResetRateLimiter = rateLimit({
   skip: (req) => {
     return req.method === 'OPTIONS';
   },
-  keyGenerator: (req) => {
-    return req.ip || req.connection.remoteAddress || 'unknown';
-  },
   handler: (req, res) => {
     res.status(429).json({
       error: 'Too many password reset attempts. Please try again in 1 hour.',
