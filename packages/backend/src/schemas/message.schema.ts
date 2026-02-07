@@ -5,15 +5,11 @@ import {
   text,
   timestamp,
   jsonb,
-  pgEnum,
   index,
 } from 'drizzle-orm/pg-core';
 import { conversations } from './conversation.schema';
 import { users } from './user.schema';
-
-export const messageStatusEnum = pgEnum('message_status', ['pending', 'sent', 'failed']);
-
-export const messageDirectionEnum = pgEnum('message_direction', ['inbound', 'outbound']);
+import { messageStatusEnum, messageDirectionEnum } from './enums/index';
 
 /**
  * Messages table - stores individual messages
@@ -35,13 +31,13 @@ export const messages = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  (table) => ({
-    conversationIdIdx: index('messages_conversation_id_idx').on(table.conversationId),
-    senderIdIdx: index('messages_sender_id_idx').on(table.senderId),
-    statusIdx: index('messages_status_idx').on(table.status),
-    directionIdx: index('messages_direction_idx').on(table.direction),
-    createdAtIdx: index('messages_created_at_idx').on(table.createdAt),
-  })
+  (table) => [
+    index('messages_conversation_id_idx').on(table.conversationId),
+    index('messages_sender_id_idx').on(table.senderId),
+    index('messages_status_idx').on(table.status),
+    index('messages_direction_idx').on(table.direction),
+    index('messages_created_at_idx').on(table.createdAt),
+  ]
 );
 
 export type Message = typeof messages.$inferSelect;

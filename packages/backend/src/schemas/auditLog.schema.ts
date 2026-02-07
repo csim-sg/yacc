@@ -16,12 +16,12 @@ export const auditLogs = pgTable(
     ipAddress: varchar('ip_address', { length: 45 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  (table) => ({
-    actorIdIdx: index('audit_logs_actor_id_idx').on(table.actorId),
-    actionIdx: index('audit_logs_action_idx').on(table.action),
-    entityTypeIdx: index('audit_logs_entity_type_idx').on(table.entityType),
-    createdAtIdx: index('audit_logs_created_at_idx').on(table.createdAt),
-  })
+  (table) => [
+    index('audit_logs_actor_id_idx').on(table.actorId),
+    index('audit_logs_action_idx').on(table.action),
+    index('audit_logs_entity_type_idx').on(table.entityType),
+    index('audit_logs_created_at_idx').on(table.createdAt),
+  ]
 );
 
 export type AuditLog = typeof auditLogs.$inferSelect;

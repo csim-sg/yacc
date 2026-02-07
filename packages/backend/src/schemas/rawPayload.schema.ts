@@ -20,10 +20,10 @@ export const rawPayloads = pgTable(
       .default(sql`NOW() + INTERVAL '7 days'`),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  (table) => ({
-    messageIdIdx: index('raw_payloads_message_id_idx').on(table.messageId),
-    expiresAtIdx: index('raw_payloads_expires_at_idx').on(table.expiresAt),
-  })
+  (table) => [
+    index('raw_payloads_message_id_idx').on(table.messageId),
+    index('raw_payloads_expires_at_idx').on(table.expiresAt),
+  ]
 );
 
 export type RawPayload = typeof rawPayloads.$inferSelect;

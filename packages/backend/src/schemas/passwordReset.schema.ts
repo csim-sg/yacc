@@ -16,11 +16,11 @@ export const passwordResetTokens = pgTable(
     usedAt: timestamp('used_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  (table) => ({
-    userIdIdx: index('password_reset_tokens_user_id_idx').on(table.userId),
-    tokenIdx: index('password_reset_tokens_token_idx').on(table.token),
-    expiresAtIdx: index('password_reset_tokens_expires_at_idx').on(table.expiresAt),
-  })
+  (table) => [
+    index('password_reset_tokens_user_id_idx').on(table.userId),
+    index('password_reset_tokens_token_idx').on(table.token),
+    index('password_reset_tokens_expires_at_idx').on(table.expiresAt),
+  ]
 );
 
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;

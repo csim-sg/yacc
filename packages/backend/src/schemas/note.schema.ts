@@ -20,10 +20,10 @@ export const notes = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  (table) => ({
-    conversationIdIdx: index('notes_conversation_id_idx').on(table.conversationId),
-    authorIdIdx: index('notes_author_id_idx').on(table.authorId),
-  })
+  (table) => [
+    index('notes_conversation_id_idx').on(table.conversationId),
+    index('notes_author_id_idx').on(table.authorId),
+  ]
 );
 
 export type Note = typeof notes.$inferSelect;

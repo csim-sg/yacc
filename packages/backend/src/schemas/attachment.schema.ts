@@ -18,9 +18,9 @@ export const attachments = pgTable(
     url: text('url').notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  (table) => ({
-    messageIdIdx: index('attachments_message_id_idx').on(table.messageId),
-  })
+  (table) => [
+    index('attachments_message_id_idx').on(table.messageId),
+  ]
 );
 
 export type Attachment = typeof attachments.$inferSelect;
