@@ -30,7 +30,7 @@ Implement the complete forgot password flow for YACC, allowing users to reset th
 ## 🎯 Acceptance Criteria (7 Core Requirements)
 
 ### AC 1: Forgot Password Endpoint (POST /auth/forgot-password)
-- **Endpoint**: `POST /api/auth/forgot-password`
+- **Endpoint**: `POST /auth/forgot-password`
 - **Request**: `{ "email": "user@example.com" }`
 - **Response**: Always `200 OK` (even if email doesn't exist)
 - **Response Body**: `{ "message": "If the email exists, a password reset link has been sent" }`
@@ -50,7 +50,7 @@ Implement the complete forgot password flow for YACC, allowing users to reset th
 - **Duplicate Prevention**: Delete any existing valid token for user before creating new one
 
 ### AC 3: Reset Password Endpoint (POST /auth/reset-password)
-- **Endpoint**: `POST /api/auth/reset-password`
+- **Endpoint**: `POST /auth/reset-password`
 - **Request**: 
   ```json
   {
@@ -740,31 +740,31 @@ describe('PasswordResetController', () => {
     // Register controller...
   });
 
-  describe('POST /auth/forgot-password', () => {
-    it('should return 200 for valid email', async () => {
-      const response = await request(app)
-        .post('/api/auth/forgot-password')
-        .send({ email: 'user@example.com' });
+   describe('POST /auth/forgot-password', () => {
+     it('should return 200 for valid email', async () => {
+       const response = await request(app)
+         .post('/auth/forgot-password')
+         .send({ email: 'user@example.com' });
 
       expect(response.status).toBe(200);
       expect(response.body.message).toContain('If the email exists');
     });
 
-    it('should return 200 for non-existent email (prevent enumeration)', async () => {
-      const response = await request(app)
-        .post('/api/auth/forgot-password')
-        .send({ email: 'nonexistent@example.com' });
+     it('should return 200 for non-existent email (prevent enumeration)', async () => {
+       const response = await request(app)
+         .post('/auth/forgot-password')
+         .send({ email: 'nonexistent@example.com' });
 
       expect(response.status).toBe(200);
       expect(response.body.message).toContain('If the email exists');
     });
 
-    it('should send email with reset link', async () => {
-      const emailSpy = jest.spyOn(emailService, 'sendPasswordResetEmail');
+     it('should send email with reset link', async () => {
+       const emailSpy = jest.spyOn(emailService, 'sendPasswordResetEmail');
 
-      await request(app)
-        .post('/api/auth/forgot-password')
-        .send({ email: 'user@example.com' });
+       await request(app)
+         .post('/auth/forgot-password')
+         .send({ email: 'user@example.com' });
 
       expect(emailSpy).toHaveBeenCalledWith(
         'user@example.com',
@@ -772,10 +772,10 @@ describe('PasswordResetController', () => {
       );
     });
 
-    it('should reject invalid email format', async () => {
-      const response = await request(app)
-        .post('/api/auth/forgot-password')
-        .send({ email: 'invalid-email' });
+     it('should reject invalid email format', async () => {
+       const response = await request(app)
+         .post('/auth/forgot-password')
+         .send({ email: 'invalid-email' });
 
       expect(response.status).toBe(400);
     });
@@ -786,20 +786,20 @@ describe('PasswordResetController', () => {
       // Generate valid token
       const token = await passwordResetService.generateResetToken('user-id', 'corr-id');
 
-      const response = await request(app)
-        .post('/api/auth/reset-password')
-        .send({
-          token,
-          newPassword: 'NewPassword123!',
-        });
+       const response = await request(app)
+         .post('/auth/reset-password')
+         .send({
+           token,
+           newPassword: 'NewPassword123!',
+         });
 
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-    });
+       expect(response.status).toBe(200);
+       expect(response.body.success).toBe(true);
+     });
 
-    it('should reject invalid token', async () => {
-      const response = await request(app)
-        .post('/api/auth/reset-password')
+     it('should reject invalid token', async () => {
+       const response = await request(app)
+         .post('/auth/reset-password')
         .send({
           token: 'invalid-token-123',
           newPassword: 'NewPassword123!',
@@ -812,12 +812,12 @@ describe('PasswordResetController', () => {
     it('should reject weak password', async () => {
       const token = await passwordResetService.generateResetToken('user-id', 'corr-id');
 
-      const response = await request(app)
-        .post('/api/auth/reset-password')
-        .send({
-          token,
-          newPassword: 'weak', // Too short, no uppercase, no number
-        });
+       const response = await request(app)
+         .post('/auth/reset-password')
+         .send({
+           token,
+           newPassword: 'weak', // Too short, no uppercase, no number
+         });
 
       expect(response.status).toBe(400);
     });
@@ -831,34 +831,34 @@ describe('PasswordResetController', () => {
         .set({ expires_at: new Date(Date.now() - 1000) })
         .where(eq(passwordResetTokens.user_id, 'user-id'));
 
-      const response = await request(app)
-        .post('/api/auth/reset-password')
+       const response = await request(app)
+         .post('/auth/reset-password')
+         .send({
+           token,
+           newPassword: 'NewPassword123!',
+         });
+
+       expect(response.status).toBe(400);
+       expect(response.body.error).toContain('Invalid or expired token');
+     });
+
+     it('should mark token as used after reset', async () => {
+       const token = await passwordResetService.generateResetToken('user-id', 'corr-id');
+
+       await request(app)
+         .post('/auth/reset-password')
         .send({
           token,
           newPassword: 'NewPassword123!',
         });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toContain('Invalid or expired token');
-    });
-
-    it('should mark token as used after reset', async () => {
-      const token = await passwordResetService.generateResetToken('user-id', 'corr-id');
-
-      await request(app)
-        .post('/api/auth/reset-password')
-        .send({
-          token,
-          newPassword: 'NewPassword123!',
-        });
-
-      // Try to reuse token - should fail
-      const response2 = await request(app)
-        .post('/api/auth/reset-password')
-        .send({
-          token,
-          newPassword: 'AnotherPassword123!',
-        });
+       // Try to reuse token - should fail
+       const response2 = await request(app)
+         .post('/auth/reset-password')
+         .send({
+           token,
+           newPassword: 'AnotherPassword123!',
+         });
 
       expect(response2.status).toBe(400);
       expect(response2.body.error).toContain('Invalid or expired token');
@@ -873,7 +873,7 @@ describe('PasswordResetController', () => {
 
 ### Test 1: Forgot Password - Valid Email
 ```
-POST http://localhost:3000/api/auth/forgot-password
+POST http://localhost:3000/auth/forgot-password
 Content-Type: application/json
 
 {
@@ -893,7 +893,7 @@ Expected Action:
 
 ### Test 2: Forgot Password - Non-Existent Email
 ```
-POST http://localhost:3000/api/auth/forgot-password
+POST http://localhost:3000/auth/forgot-password
 Content-Type: application/json
 
 {
@@ -913,7 +913,7 @@ Expected Action:
 
 ### Test 3: Reset Password - Valid Token
 ```
-POST http://localhost:3000/api/auth/reset-password
+POST http://localhost:3000/auth/reset-password
 Content-Type: application/json
 
 {
@@ -936,7 +936,7 @@ Expected Actions:
 
 ### Test 4: Reset Password - Expired Token
 ```
-POST http://localhost:3000/api/auth/reset-password
+POST http://localhost:3000/auth/reset-password
 Content-Type: application/json
 
 {
@@ -956,7 +956,7 @@ Expected Action:
 
 ### Test 5: Reset Password - Already Used Token
 ```
-POST http://localhost:3000/api/auth/reset-password
+POST http://localhost:3000/auth/reset-password
 Content-Type: application/json
 
 {
