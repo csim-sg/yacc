@@ -1,10 +1,15 @@
 import 'reflect-metadata';
 import 'dotenv/config';
+import express from 'express';
 import { Server } from 'socket.io';
 import http from 'http';
+import { useExpressServer } from 'routing-controllers';
 import { SocketControllers } from 'socket-controllers';
-import { createApp } from './app';
 import { checkDatabaseConnection } from './infrastructure/db.client';
+import { authorizationChecker, currentUserChecker } from './middleware/routingControllersAuth';
+import { correlationIdMiddleware } from './middleware/correlationId.middleware';
+import { requestLoggingMiddleware } from './middleware/requestLogging.middleware';
+import { controllers } from './controllers';
 import { socketControllers } from './socket-controllers';
 import { appConfig } from './config/appConfig';
 import { logger } from './infrastructure/logger';
@@ -16,7 +21,28 @@ import { TelegramConnector } from './connectors/telegram.connector';
 import { IRCConnector } from './connectors/irc.connector';
 
 // ===== EXPRESS APP =====
-const app = createApp();
+const app = express();
+
+useExpressServer(app, {
+  controllers: controllers,
+  authorizationChecker: authorizationChecker,
+  currentUserChecker: currentUserChecker,
+  defaultErrorHandler: true,
+  validation: {
+    whitelist: true,
+    forbidNonWhitelisted: true,
+  },
+  classTransformer: true,
+  cors: {
+    origin: appConfig.APP_FRONTEND_URL,
+    credentials: true,
+    exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
+  },
+  middlewares: [
+    correlationIdMiddleware,
+    requestLoggingMiddleware,
+  ],
+});
 
 // ===== HTTP & WEBSOCKET SERVER =====
 const server = http.createServer(app);
