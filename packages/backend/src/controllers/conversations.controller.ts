@@ -100,16 +100,9 @@ export class ConversationsController {
    * Get conversation by ID
    */
   @Get('/:id')
-<<<<<<< HEAD
   async getConversation(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     const startTime = performance.now();
     const correlationId = req.correlationId || 'unknown';
-=======
-  async getConversation(@Param('id') id: string, @Req() req: Request) {
-    const startTime = performance.now();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const correlationId = (req as any).correlationId || 'unknown';
->>>>>>> origin/dev
 
     try {
       const conversation = await conversationService.getConversation(id);
@@ -292,18 +285,10 @@ export class ConversationsController {
   @Get('/:id/messages')
   async getMessages(
     @Param('id') conversationId: string,
-<<<<<<< HEAD
     @Req() req: AuthenticatedRequest
   ) {
     const startTime = performance.now();
     const correlationId = req.correlationId || 'unknown';
-=======
-    @Req() req: Request
-  ) {
-    const startTime = performance.now();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const correlationId = (req as any).correlationId || 'unknown';
->>>>>>> origin/dev
 
     try {
       const query = req.query || {};
@@ -358,18 +343,10 @@ export class ConversationsController {
       @Param('id') conversationId: string,
       @Body() body: { body: string },
       @CurrentUser() user: AuthUser,
-<<<<<<< HEAD
       @Req() req: AuthenticatedRequest
     ) {
       const startTime = performance.now();
       const correlationId = req.correlationId || 'unknown';
-=======
-      @Req() req: Request
-    ) {
-      const startTime = performance.now();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const correlationId = (req as any).correlationId || 'unknown';
->>>>>>> origin/dev
 
       try {
         // Validate message body
