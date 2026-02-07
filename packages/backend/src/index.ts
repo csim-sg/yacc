@@ -48,8 +48,6 @@ useExpressServer(app, {
   ],
 });
 
-export { app };
-
 // ===== HTTP & WEBSOCKET SERVER =====
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -74,25 +72,25 @@ async function start() {
       throw new Error('Failed to connect to database');
     }
 
-     // Initialize WebSocket gateway
-     logger.info('Initializing WebSocket gateway...');
-     wsGateway.initialize(io);
-     logger.info('WebSocket gateway initialized successfully');
+    // Initialize WebSocket gateway
+    logger.info('Initializing WebSocket gateway...');
+    wsGateway.initialize(io);
+    logger.info('WebSocket gateway initialized successfully');
 
-      // Initialize socket-controllers for declarative WebSocket event handling
-       logger.info('Registering socket-controllers...');
-       new SocketControllers({
-         io,
-         controllers: socketControllers,
-         container: {
-           get<T>(Class: new (...args: unknown[]) => T): T {
-             return new Class();
-           },
-         },
-       });
-       logger.info('Socket-controllers registered successfully');
+    // Initialize socket-controllers for declarative WebSocket event handling
+    logger.info('Registering socket-controllers...');
+    new SocketControllers({
+      io,
+      controllers: socketControllers,
+      container: {
+        get<T>(Class: new (...args: unknown[]) => T): T {
+          return new Class();
+        },
+      },
+    });
+    logger.info('Socket-controllers registered successfully');
 
-     // Register platform connectors
+    // Register platform connectors
     logger.info('Registering platform connectors...');
     const telegramConnector = new TelegramConnector();
     const ircConnector = new IRCConnector();
@@ -132,7 +130,7 @@ async function start() {
   }
 }
 
-// Do not start server when loaded by tests (e.g. BE-007 integration tests)
+// Start server in production/development (not in tests)
 if (process.env.NODE_ENV !== 'test') {
   start();
 }
