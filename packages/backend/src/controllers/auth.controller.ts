@@ -11,7 +11,7 @@
  * for forgot-password and reset-password endpoints.
  */
 
-import { All, Controller, Post, Req, Res, Body, BadRequestError, UseBefore } from 'routing-controllers';
+import { All, JsonController, Post, Req, Res, Body, BadRequestError, UseBefore } from 'routing-controllers';
 import type { Request, Response } from 'express';
 import { betterAuthClient } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
@@ -41,7 +41,7 @@ interface BetterAuthRequest {
 // TODO: Implement EmailService in infrastructure layer
 // import { emailService } from '../infrastructure/email.client';
 
-@Controller('/auth')
+@JsonController('/auth')
 export class AuthController {
   /**
    * POST /auth/forgot-password
