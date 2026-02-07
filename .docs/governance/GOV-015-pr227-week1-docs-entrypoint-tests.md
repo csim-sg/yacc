@@ -11,11 +11,22 @@
 
 ## Summary
 
-PR #227 marks Week 1 (BE-007, BE-008, FE-008, FE-009) complete and implements three critical backend improvements:
+PR #227 updates Week 1 planning artifacts and implements three critical backend improvements (pending merge):
 
 1. **Entrypoint Refactoring**: Express app initialization and `useExpressServer` setup moved into `src/index.ts` for test exportability; `app` exported for supertest integration tests.
 2. **Query Parameter Validation**: Added explicit validation for `tagId`, `page`, `limit` and other query params with proper error handling (BadRequestError on invalid values).
 3. **BE-007 Integration Tests**: Tests now create their own test user (via BetterAuth sign-in) and seed test conversations programmatically; deterministic without depending on pre-seeded fixtures.
+
+---
+
+## Addendum (v1.3) – Planning Status Accuracy (2026-02-07)
+
+The governed planning docs were updated to remove premature "DONE" claims for Week 1 items while PR #227 is still in review.
+
+Changes:
+1. `.docs/plans/00-INDEX.md` Week 1 section moved back to planned/in-review status (no completion claims until merged).
+2. `.docs/06-tasks.md` BE-007/BE-008 statuses set to "In Review (PR #227)" to reflect current state.
+3. `.docs/plans/week1-qa-test-cases-and-data.md` sign-off updated to mark completion only after execution.
 
 ---
 

@@ -154,7 +154,7 @@ pnpm test -- inbox-filters.spec.ts
 - [ ] BE-007: Inbox API test suite run (or skipped with reason).
 - [ ] BE-008: Conversation detail covered by integration/E2E.
 - [ ] FE-008 / FE-009: Inbox and conversation detail E2E/smoke run.
-- [ ] 00-INDEX.md Week 1 QA task marked complete.
+- [ ] Update `.docs/plans/00-INDEX.md` after execution (mark Week 1 QA task complete when run).
 
 **Version**: 1.0  
 **Governance**: GOV-008, ADR-005 apply

@@ -29,7 +29,7 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 ## ✅ Current Status
 
 ### Phase 1.4: MVP Core-First Execution (APPROVED)
-**Status**: 🚀 **IN PROGRESS - Week 2 (Feb 17-23)** — Week 1 complete 2026-02-07 (BE-007, BE-008, FE-008, FE-009)  
+**Status**: 🚀 **IN PROGRESS - Week 1 (Feb 10-16)** (PR #227 in review; do not mark complete until merged)  
 **Approval Date**: 2026-02-06  
 **Target Completion**: 2026-02-20  
 **Timeline**: 2-week sprint
@@ -39,13 +39,13 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 - Frontend: FE-008 (Inbox List), FE-009 (Conversation Detail), FE-010 (Reply Composer), FE-013-015 (WebSocket Listeners)
 - QA: QA-001-003 (Integration + E2E + Real-Time tests)
 
-**Success Criteria**:
-- ✅ Users can view unified inbox with filters
-- ✅ Users can read conversation messages
-- ✅ Users can send replies
-- ✅ Real-time updates work (message received/sent/failed)
-- ✅ Full RBAC enforcement (4 roles)
-- ✅ ≥85% test coverage
+**Target Success Criteria (when Phase 1.4 completes)**:
+- Users can view unified inbox with filters
+- Users can read conversation messages
+- Users can send replies
+- Real-time updates work (message received/sent/failed)
+- Full RBAC enforcement (4 roles)
+- ≥85% test coverage
 
 **GitHub Issues Created**:
 - BE-007 (#183), BE-008 (#184), BE-009/010 (#185)
@@ -78,23 +78,25 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 
 ---
 
-## 🚀 Week 1 Execution ✅ COMPLETE (2026-02-07)
+## 🚀 Week 1 Execution (Feb 10-16)
+
+**Status**: In review (PR #227)
 
 **Backend**:
-- [x] BE-007: Inbox API (GET /conversations with filters) - DONE
-- [x] BE-008: Conversation Detail (GET /conversations/:id) - DONE
+- [ ] BE-007: Inbox API (GET /conversations with filters) (in review: PR #227)
+- [ ] BE-008: Conversation Detail (GET /conversations/:id) (in review: PR #227)
 
 **Frontend**:
-- [x] FE-008: Inbox List Page (UI scaffold with mocks) - DONE
-- [x] FE-009: Conversation Detail Page (UI scaffold with mocks) - DONE
+- [ ] FE-008: Inbox List Page (UI scaffold with mocks)
+- [ ] FE-009: Conversation Detail Page (UI scaffold with mocks)
 
 **QA**:
-- [x] Test case preparation and test data setup (see [week1-qa-test-cases-and-data.md](./week1-qa-test-cases-and-data.md))
+- [ ] Test case preparation and test data setup (see [week1-qa-test-cases-and-data.md](./week1-qa-test-cases-and-data.md))
 
-**Sync Points** (completed with Week 1):
-- API contract finalized ✅
-- Frontend UI ready with mocks ✅
-- Backend ready for FE integration ✅
+**Sync Points**:
+- API contract finalized: Feb 10 (morning)
+- Frontend UI ready with mocks: Feb 12 (EOD)
+- Backend ready for FE integration: Feb 14 (EOD)
 
 ---
 
