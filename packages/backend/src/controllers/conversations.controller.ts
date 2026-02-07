@@ -5,19 +5,19 @@
 
 import type { Request } from 'express';
 import {
-  JsonController,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Param,
-  Body,
-  Req,
-  Authorized,
-  CurrentUser,
-  HttpCode,
-  BadRequestError,
-  NotFoundError,
+   JsonController,
+   Get,
+   Post,
+   Patch,
+   Delete,
+   Param,
+   Body,
+   Req,
+   Authorized,
+   CurrentUser,
+   HttpCode,
+   BadRequestError,
+   NotFoundError,
 } from 'routing-controllers';
 import { conversationService } from '../services/conversation.service.js';
 import { auditService } from '../services/audit.service.js';
@@ -29,6 +29,10 @@ import { AssignRequest } from '@yacc/common/requests/conversations/assign.reques
 import { TagRequest } from '@yacc/common/requests/conversations/tag.request';
 import type { AuthUser } from '../types/auth.types.js';
 
+interface AuthenticatedRequest extends Request {
+  correlationId?: string;
+}
+
 @JsonController('/api/conversations')
 @Authorized()
 export class ConversationsController {
@@ -37,19 +41,18 @@ export class ConversationsController {
    * List conversations with filters and pagination
    */
   @Get('/')
-  async listConversations(@Req() req: Request) {
+  async listConversations(@Req() req: AuthenticatedRequest) {
     const startTime = performance.now();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const correlationId = (req as any).correlationId || 'unknown';
+    const correlationId = req.correlationId || 'unknown';
 
     try {
       const query = req.query || {};
-      const normalizedQuery: ListConversationsRequest = {
-        page: query.page ? Number(query.page) : undefined,
-        limit: query.limit ? Number(query.limit) : undefined,
-        channel: typeof query.channel === 'string' ? query.channel : undefined,
-        status: typeof query.status === 'string' ? query.status : undefined,
-        priority: typeof query.priority === 'string' ? query.priority : undefined,
+       const normalizedQuery: ListConversationsRequest = {
+         page: query.page ? Number(query.page) : undefined,
+         limit: query.limit ? Number(query.limit) : undefined,
+         channel: typeof query.channel === 'string' ? query.channel : undefined,
+         status: (typeof query.status === 'string' ? query.status : undefined) as 'open' | 'pending' | 'resolved' | undefined,
+         priority: (typeof query.priority === 'string' ? query.priority : undefined) as 'low' | 'medium' | 'high' | 'urgent' | undefined,
         assignedUserId: typeof query.assignedUserId === 'string' ? query.assignedUserId : undefined,
         search: typeof query.search === 'string' ? query.search : undefined,
         dateFrom: typeof query.dateFrom === 'string' ? query.dateFrom : undefined,
@@ -97,10 +100,9 @@ export class ConversationsController {
    * Get conversation by ID
    */
   @Get('/:id')
-  async getConversation(@Param('id') id: string, @Req() req: Request) {
+  async getConversation(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     const startTime = performance.now();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const correlationId = (req as any).correlationId || 'unknown';
+    const correlationId = req.correlationId || 'unknown';
 
     try {
       const conversation = await conversationService.getConversation(id);
@@ -283,11 +285,10 @@ export class ConversationsController {
   @Get('/:id/messages')
   async getMessages(
     @Param('id') conversationId: string,
-    @Req() req: Request
+    @Req() req: AuthenticatedRequest
   ) {
     const startTime = performance.now();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const correlationId = (req as any).correlationId || 'unknown';
+    const correlationId = req.correlationId || 'unknown';
 
     try {
       const query = req.query || {};
@@ -342,11 +343,10 @@ export class ConversationsController {
       @Param('id') conversationId: string,
       @Body() body: { body: string },
       @CurrentUser() user: AuthUser,
-      @Req() req: Request
+      @Req() req: AuthenticatedRequest
     ) {
       const startTime = performance.now();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const correlationId = (req as any).correlationId || 'unknown';
+      const correlationId = req.correlationId || 'unknown';
 
       try {
         // Validate message body

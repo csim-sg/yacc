@@ -11,8 +11,8 @@
  * for forgot-password and reset-password endpoints.
  */
 
-import { All, Controller, Post, Req, Res, Body } from 'routing-controllers';
-import type { Response } from 'express';
+import { All, Controller, Post, Req, Res, Body, BadRequestError } from 'routing-controllers';
+import type { Request, Response } from 'express';
 import { betterAuthClient } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
 import { users } from '../schemas/user.schema';
@@ -20,6 +20,22 @@ import { eq } from 'drizzle-orm';
 import { generateResetToken, resetPassword } from '../services/passwordReset.service';
 import { logger } from '../infrastructure/logger';
 import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
+
+interface AuthenticatedRequest extends Request {
+  correlationId?: string;
+}
+
+interface BetterAuthRequest {
+  correlationId?: string;
+  protocol: string;
+  host: string;
+  originalUrl: string;
+  url: string;
+  method: string;
+  headers: Record<string, string | string[] | undefined>;
+  body?: unknown;
+  get(header: string): string | undefined;
+}
 
 // TODO: Implement EmailService in infrastructure layer
 // import { emailService } from '../infrastructure/email.client';
@@ -34,9 +50,8 @@ export class AuthController {
    * Response: { "message": "If an email exists, a password reset link has been sent" }
    */
   @Post('/forgot-password')
-  async forgotPassword(@Body() body: unknown, @Req() req: Request): Promise<{ message: string }> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const correlationId = (req as any).correlationId || 'unknown';
+  async forgotPassword(@Body() body: unknown, @Req() req: AuthenticatedRequest): Promise<{ message: string }> {
+    const correlationId = req.correlationId || 'unknown';
 
     try {
       // Validate input using Zod schema
@@ -88,10 +103,9 @@ export class AuthController {
   @Post('/reset-password')
   async resetPasswordHandler(
     @Body() body: unknown,
-    @Req() req: Request,
+    @Req() req: AuthenticatedRequest,
   ): Promise<{ success: boolean; message: string }> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const correlationId = (req as any).correlationId || 'unknown';
+    const correlationId = req.correlationId || 'unknown';
 
     try {
       // Validate input using Zod schema
@@ -110,7 +124,7 @@ export class AuthController {
       logger.error('Reset password error - correlationId: %s, error: %s', correlationId, error instanceof Error ? error.message : String(error));
 
       // Return generic error to prevent token enumeration
-      throw new Error('Invalid or expired token');
+      throw new BadRequestError('Invalid or expired token');
     }
   }
 
@@ -128,8 +142,7 @@ export class AuthController {
    * - /refresh-token (token refresh with Bearer plugin)
    */
   @All('/*')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async handleAuth(@Req() req: any, @Res() res: Response): Promise<void> {
+  async handleAuth(@Req() req: BetterAuthRequest, @Res() res: Response): Promise<void> {
     const correlationId = req.correlationId || 'unknown';
 
     try {
@@ -139,19 +152,26 @@ export class AuthController {
       const host = req.get('host') || 'localhost:3000';
       const fullUrl = `${protocol}://${host}${req.originalUrl || req.url}`;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const request = new (globalThis as any).Request(fullUrl, {
+      // Convert Express headers to fetch Request compatible format
+      const headersRecord: Record<string, string> = {};
+      Object.entries(req.headers).forEach(([key, value]) => {
+        if (typeof value === 'string') {
+          headersRecord[key] = value;
+        } else if (Array.isArray(value)) {
+          headersRecord[key] = value.join(';');
+        }
+      });
+
+      const request = new Request(fullUrl, {
         method: req.method,
-        headers: req.headers,
+        headers: headersRecord,
         body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
       });
 
       const response = await betterAuthClient.handler(request);
 
       // Set headers from response
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const headers = response.headers as any;
-      headers.forEach((value: string, key: string) => {
+      response.headers.forEach((value: string, key: string) => {
         res.setHeader(key, value);
       });
 

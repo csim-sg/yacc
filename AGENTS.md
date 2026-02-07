@@ -462,10 +462,11 @@ Complete specifications in `.docs/`:
      - Handles initialization, connection pooling, singleton pattern
    - Reason: "I don't want clean architecture. I want to keep it simple and clean."
 
-6. **No Global `/api` Prefix** (Add to controllers individually)
-   - ❌ NO: Global `@Controller('/api/users')`
-   - ✅ YES: Individual routes like `@Controller('/users')` with `@Post('/login')` → `/users/login`
-   - Add `/api` prefix only when needed for routing clarity
+6. **No Global `/api` Prefix** (routing-controllers routePrefix)
+   - ❌ NO: `useExpressServer({ routePrefix: '/api' })`
+   - ✅ YES: Add `/api` at the controller level when needed (e.g., `@Controller('/api/users')`)
+   - ✅ YES: Direct resource paths when `/api` is not needed (e.g., `@Controller('/users')` → `/users/login`)
+   - The restriction is only on global prefix configuration, not controller paths
 
 ### Testing & Quality Standards
 
