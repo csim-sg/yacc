@@ -453,7 +453,13 @@ Complete specifications in `.docs/`:
    - One service per file
    - Clear, single responsibility principle
 
-5. **Config vs Infrastructure Pattern** (ADR-005 approved)
+5. **Index Aggregators (Limited Allowance)**
+   - ✅ Allowed: `index.ts` that exports **lists** for libraries (e.g., controller arrays for routing-controllers, schema registries for ORM)
+   - ✅ Allowed: data-only aggregations (no business logic)
+   - ❌ Not allowed: barrel exports for general imports (avoid `import { X } from '../services'`)
+   - Rationale: enable library wiring while keeping code discoverable
+
+6. **Config vs Infrastructure Pattern** (ADR-005 approved)
    - **Config folder**: Simple `const` objects with env var references
      - Example: `{ port: process.env.PORT, dbUrl: process.env.DATABASE_URL }`
      - NO class definitions, NO initialization logic
@@ -462,7 +468,7 @@ Complete specifications in `.docs/`:
      - Handles initialization, connection pooling, singleton pattern
    - Reason: "I don't want clean architecture. I want to keep it simple and clean."
 
-6. **No Global `/api` Prefix** (routing-controllers routePrefix)
+7. **No Global `/api` Prefix** (routing-controllers routePrefix)
    - ❌ NO: `useExpressServer({ routePrefix: '/api' })`
    - ✅ YES: Add `/api` at the controller level when needed (e.g., `@Controller('/api/users')`)
    - ✅ YES: Direct resource paths when `/api` is not needed (e.g., `@Controller('/users')` → `/users/login`)

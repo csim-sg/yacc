@@ -176,6 +176,7 @@ Official ADRs numbered sequentially. Each ADR documents a significant architectu
 - **ADR-006**: Auth client implementation
 - **ADR-007**: Jest to Vitest migration
 - **ADR-011**: File naming convention standardization
+- **ADR-012**: Index aggregator allowance (controllers/schemas lists)
 
 **When to use:** Understanding architectural rationale  
 **Audience:** Architects, tech leads, developers making design decisions
