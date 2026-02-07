@@ -269,8 +269,8 @@ Query: {
     }
   ],
   "page": 1,
-  "totalCount": 150,
-  "totalPage": 8
+  "pageSize": 20,
+  "total": 150
 }
 ```
 

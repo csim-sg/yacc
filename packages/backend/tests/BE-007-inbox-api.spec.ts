@@ -3,6 +3,23 @@ import request from 'supertest';
 import { Express } from 'express';
 import { createTestApp, createTestUser, seedTestConversations } from './test-helpers';
 
+interface ConversationSummary {
+  id: string;
+  channel: 'telegram' | 'irc';
+  status: 'open' | 'pending' | 'resolved';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  assignedUserId?: string;
+  assignedUserName?: string;
+  externalThreadId: string;
+  tags: Array<{ id: string; name: string; color: string }>;
+  participants: Array<{ id: string; name: string; type: string }>;
+  unreadCount: number;
+  latestMessagePreview?: string;
+  latestMessageAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 describe('BE-007: Inbox API (GET /conversations with filters)', () => {
   let app: Express;
   let authToken: string;
@@ -111,7 +128,11 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
+<<<<<<< HEAD
+      res.body.data.forEach((conv: ConversationSummary) => {
+=======
       res.body.data.forEach((conv: any) => {
+>>>>>>> origin/dev
         expect(conv.channel).toBe('telegram');
       });
     });
@@ -122,7 +143,11 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
+<<<<<<< HEAD
+      res.body.data.forEach((conv: ConversationSummary) => {
+=======
       res.body.data.forEach((conv: any) => {
+>>>>>>> origin/dev
         expect(conv.status).toBe('open');
       });
     });
@@ -133,7 +158,11 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
+<<<<<<< HEAD
+      res.body.data.forEach((conv: ConversationSummary) => {
+=======
       res.body.data.forEach((conv: any) => {
+>>>>>>> origin/dev
         expect(conv.priority).toBe('high');
       });
     });
@@ -144,7 +173,11 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
+<<<<<<< HEAD
+      res.body.data.forEach((conv: ConversationSummary) => {
+=======
       res.body.data.forEach((conv: any) => {
+>>>>>>> origin/dev
         expect(conv.assignedUserId).toBe(testUserId);
       });
     });
@@ -155,7 +188,11 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
+<<<<<<< HEAD
+      res.body.data.forEach((conv: ConversationSummary) => {
+=======
       res.body.data.forEach((conv: any) => {
+>>>>>>> origin/dev
         expect(conv.channel).toBe('telegram');
         expect(conv.status).toBe('open');
         expect(conv.priority).toBe('high');

@@ -131,7 +131,7 @@ I've created a detailed architectural review document: `.docs/ARCHITECT-REVIEW-2
 - ✅ Routing-controllers best practices followed
 - ✅ One definition per file (standardized naming)
 - ✅ Config/Infrastructure pattern enforced (ADR-005)
-- ✅ No global /api prefix (individual routes)
+- ✅ No global /api routePrefix (controller-level /api allowed)
 - ✅ Coverage ≥85% (enforced in all PRs)
 - ✅ Documentation standards (ADR/GOV framework)
 

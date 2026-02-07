@@ -11,8 +11,8 @@
  * for forgot-password and reset-password endpoints.
  */
 
-import { All, Controller, Post, Req, Res, Body, UseBefore } from 'routing-controllers';
-import type { Response } from 'express';
+import { All, Controller, Post, Req, Res, Body, BadRequestError, UseBefore } from 'routing-controllers';
+import type { Request, Response } from 'express';
 import { betterAuthClient } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
 import { users } from '../schemas/user.schema';
@@ -22,24 +22,39 @@ import { logger } from '../infrastructure/logger';
 import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
 import { loginRateLimiter, passwordResetRateLimiter } from '../middleware/rateLimit.middleware';
 
+interface AuthenticatedRequest extends Request {
+  correlationId?: string;
+}
+
+interface BetterAuthRequest {
+  correlationId?: string;
+  protocol: string;
+  host: string;
+  originalUrl: string;
+  url: string;
+  method: string;
+  headers: Record<string, string | string[] | undefined>;
+  body?: unknown;
+  get(header: string): string | undefined;
+}
+
 // TODO: Implement EmailService in infrastructure layer
 // import { emailService } from '../infrastructure/email.client';
 
 @Controller('/auth')
 export class AuthController {
-   /**
-    * POST /auth/forgot-password
-    * Request password reset email (ALWAYS returns 200 to prevent email enumeration)
-    * Rate limited to prevent abuse
-    *
-    * Request: { "email": "user@example.com" }
-    * Response: { "message": "If an email exists, a password reset link has been sent" }
-    */
-   @Post('/forgot-password')
-   @UseBefore(passwordResetRateLimiter)
-  async forgotPassword(@Body() body: unknown, @Req() req: Request): Promise<{ message: string }> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const correlationId = (req as any).correlationId || 'unknown';
+  /**
+   * POST /auth/forgot-password
+   * Request password reset email (ALWAYS returns 200 to prevent email enumeration)
+   * Rate limited to prevent abuse
+   *
+   * Request: { "email": "user@example.com" }
+   * Response: { "message": "If an email exists, a password reset link has been sent" }
+   */
+  @Post('/forgot-password')
+  @UseBefore(passwordResetRateLimiter)
+  async forgotPassword(@Body() body: unknown, @Req() req: AuthenticatedRequest): Promise<{ message: string }> {
+    const correlationId = req.correlationId || 'unknown';
 
     try {
       // Validate input using Zod schema
@@ -80,23 +95,22 @@ export class AuthController {
     }
   }
 
-   /**
-    * POST /auth/reset-password
-    * Reset password using token
-    * Rate limited to prevent abuse
-    *
-    * Request: { "token": "64-char-hex-token", "newPassword": "NewPassword123!" }
-    * Response: { "success": true, "message": "Password reset successfully" }
-    * Error: 400 { "error": "Invalid or expired token" }
-    */
-   @Post('/reset-password')
-   @UseBefore(passwordResetRateLimiter)
+  /**
+   * POST /auth/reset-password
+   * Reset password using token
+   * Rate limited to prevent abuse
+   *
+   * Request: { "token": "64-char-hex-token", "newPassword": "NewPassword123!" }
+   * Response: { "success": true, "message": "Password reset successfully" }
+   * Error: 400 { "error": "Invalid or expired token" }
+   */
+  @Post('/reset-password')
+  @UseBefore(passwordResetRateLimiter)
   async resetPasswordHandler(
     @Body() body: unknown,
-    @Req() req: Request,
+    @Req() req: AuthenticatedRequest,
   ): Promise<{ success: boolean; message: string }> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const correlationId = (req as any).correlationId || 'unknown';
+    const correlationId = req.correlationId || 'unknown';
 
     try {
       // Validate input using Zod schema
@@ -115,48 +129,45 @@ export class AuthController {
       logger.error('Reset password error - correlationId: %s, error: %s', correlationId, error instanceof Error ? error.message : String(error));
 
       // Return generic error to prevent token enumeration
-      throw new Error('Invalid or expired token');
+      throw new BadRequestError('Invalid or expired token');
     }
   }
 
-   /**
-    * POST /auth/sign-in/email
-    * BetterAuth sign-in endpoint
-    * Rate limited to prevent brute force attacks
-    *
-    * Delegates to BetterAuth handler with rate limiting
-    */
-   @Post('/sign-in/email')
-   @UseBefore(loginRateLimiter)
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-   async handleSignInEmail(@Req() req: any, @Res() res: Response): Promise<void> {
-     return this.delegateToAuth(req, res);
-   }
+  /**
+   * POST /auth/sign-in/email
+   * BetterAuth sign-in endpoint
+   * Rate limited to prevent brute force attacks
+   *
+   * Delegates to BetterAuth handler with rate limiting
+   */
+  @Post('/sign-in/email')
+  @UseBefore(loginRateLimiter)
+  async handleSignInEmail(@Req() req: BetterAuthRequest, @Res() res: Response): Promise<void> {
+    return this.delegateToAuth(req, res);
+  }
 
-   /**
-    * Handle all other BetterAuth routes
-    * Routes: /sign-up/email, /sign-out, /get-session, etc.
-    *
-    * This wildcard route MUST be last so custom routes above take precedence
-    * 
-    * BetterAuth provides:
-    * - /sign-out (logout)
-    * - /get-session (session retrieval)
-    * - /sign-up/email (registration)
-    * - /refresh-token (token refresh with Bearer plugin)
-    */
-   @All('/*')
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-   async handleAuth(@Req() req: any, @Res() res: Response): Promise<void> {
-     return this.delegateToAuth(req, res);
-   }
+  /**
+   * Handle all other BetterAuth routes
+   * Routes: /sign-up/email, /sign-out, /get-session, etc.
+   *
+   * This wildcard route MUST be last so custom routes above take precedence
+   * 
+   * BetterAuth provides:
+   * - /sign-out (logout)
+   * - /get-session (session retrieval)
+   * - /sign-up/email (registration)
+   * - /refresh-token (token refresh with Bearer plugin)
+   */
+  @All('/*')
+  async handleAuth(@Req() req: BetterAuthRequest, @Res() res: Response): Promise<void> {
+    return this.delegateToAuth(req, res);
+  }
 
-   /**
-    * Helper method to delegate requests to BetterAuth handler
-    * @private
-    */
-   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-   private async delegateToAuth(req: any, res: Response): Promise<void> {
+  /**
+   * Helper method to delegate requests to BetterAuth handler
+   * @private
+   */
+  private async delegateToAuth(req: BetterAuthRequest, res: Response): Promise<void> {
     const correlationId = req.correlationId || 'unknown';
 
     try {
@@ -166,19 +177,26 @@ export class AuthController {
       const host = req.get('host') || 'localhost:3000';
       const fullUrl = `${protocol}://${host}${req.originalUrl || req.url}`;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const request = new (globalThis as any).Request(fullUrl, {
+      // Convert Express headers to fetch Request compatible format
+      const headersRecord: Record<string, string> = {};
+      Object.entries(req.headers).forEach(([key, value]) => {
+        if (typeof value === 'string') {
+          headersRecord[key] = value;
+        } else if (Array.isArray(value)) {
+          headersRecord[key] = value.join(';');
+        }
+      });
+
+      const request = new Request(fullUrl, {
         method: req.method,
-        headers: req.headers,
+        headers: headersRecord,
         body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
       });
 
       const response = await betterAuthClient.handler(request);
 
       // Set headers from response
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const headers = response.headers as any;
-      headers.forEach((value: string, key: string) => {
+      response.headers.forEach((value: string, key: string) => {
         res.setHeader(key, value);
       });
 

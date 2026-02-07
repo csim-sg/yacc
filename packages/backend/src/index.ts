@@ -48,6 +48,10 @@ useExpressServer(app, {
   ],
 });
 
+// ===== SETUP RATE LIMITING =====
+// Note: Rate limiting is now handled via @UseBefore decorators in AuthController
+// This section is kept for reference but rate limiting is applied at controller level
+
 // ===== SETUP EXPRESS SERVER =====
 const server = http.createServer(app);
 const io = new Server(server, {

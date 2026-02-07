@@ -473,9 +473,9 @@ Line 3: `**Session:** Week 1 Complete + Week 2 Planning Complete` → Should upd
 ### Constraint 6: No Global /api Prefix ✅ ENFORCED
 
 **Evidence:**
-- Controllers use individual routes (e.g., `/auth/login` not `/api/auth/login`)
-- API prefix added contextually when needed
-- Matches implementation
+- No global `routePrefix` set in `useExpressServer`
+- `/api` allowed at controller level when needed for grouping
+- Direct resource paths used where `/api` is not needed
 
 **Status:** ✅ VALID AND ENFORCED
 

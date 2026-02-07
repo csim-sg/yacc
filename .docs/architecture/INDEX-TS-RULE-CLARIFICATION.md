@@ -160,7 +160,7 @@ packages/backend/src/
 
 ## Existing Exceptions (Allowed for Data Only)
 
-There are two existing `index.ts` files that ARE allowed because they consolidate **pure data** (schemas, request types):
+There are limited `index.ts` files that ARE allowed because they consolidate **pure data** or **library wiring lists** (no business logic):
 
 ### ✅ Allowed: `packages/backend/src/schemas/index.ts`
 
@@ -181,6 +181,22 @@ export const schemas = {
 - Acts like a namespace for database definitions
 - Drizzle ORM uses this pattern
 - Used only by infrastructure layer (not throughout app)
+
+### ✅ Allowed: `packages/backend/src/controllers/index.ts`
+
+```typescript
+// ✅ ALLOWED - Library wiring list only
+import { AuthController } from './auth.controller';
+import { ConversationsController } from './conversations.controller';
+
+export const controllers = [AuthController, ConversationsController];
+```
+
+**Why This Is Allowed:**
+- Exports **a list for library wiring only** (routing-controllers)
+- No business logic or re-export convenience
+- Keeps direct imports elsewhere
+- Improves clarity in app bootstrap without hiding implementations
 
 ### ✅ Allowed: `packages/backend/src/requests/index.ts`
 
@@ -208,6 +224,7 @@ export { LoginRequest } from './login.request';
 | **Barrel export in middleware/** | ❌ NO | Would hide middleware logic |
 | **Barrel export in infrastructure/** | ❌ NO | Would hide which client is which |
 | **Data-only schemas index.ts** | ✅ YES | Pure data, no logic |
+| **Controller list index.ts** | ✅ YES | Library wiring list only |
 | **Data-only requests index.ts** | ✅ YES | Pure request types, no logic |
 | **Nested folder structure** | ❌ NO | Violates flat structure rule |
 
@@ -236,10 +253,10 @@ import { SomeService } from '../services/some.service';
 Before committing code with `index.ts`:
 
 - [ ] Is this the root `packages/backend/src/index.ts`? (OK if yes)
-- [ ] Is this ONLY for app initialization? (OK if yes)
+- [ ] Is this ONLY for app initialization or library wiring list? (OK if yes)
 - [ ] Does it contain business logic? (NOT OK - move to service file)
-- [ ] Is this a barrel export of feature files? (NOT OK - use direct imports)
-- [ ] Is this pure data (schemas/requests only)? (OK if yes)
+- [ ] Is this a barrel export of feature files for convenience? (NOT OK - use direct imports)
+- [ ] Is this pure data (schemas/requests) or a library list (controllers)? (OK if yes)
 - [ ] Can I find the actual code by following the import path? (Must be YES)
 
 ---
@@ -247,10 +264,10 @@ Before committing code with `index.ts`:
 ## Questions to Ask Yourself
 
 1. **Am I creating an index.ts in a feature folder (controllers/services/etc)?**
-   - Answer: **NO** - Never do this. Use direct imports instead.
+   - Answer: **Only if it's a library wiring list** (controllers) or pure data (schemas/requests). Otherwise **NO**.
 
 2. **Am I consolidating business logic/classes with index.ts?**
-   - Answer: **NO** - Always import directly from the file.
+   - Answer: **NO** - Only lists/registries allowed, no business logic exports.
 
 3. **Is my code discoverable by path?** (e.g., `import X from 'path/to/x.ts'`)
    - Answer: **YES** - The import path should match the file location exactly.
@@ -273,7 +290,6 @@ This principle ensures:
 
 ---
 
-**Last Updated**: February 5, 2026  
+**Last Updated**: February 7, 2026  
 **Status**: Active Guidance  
 **Next Review**: When new folder patterns added
-
