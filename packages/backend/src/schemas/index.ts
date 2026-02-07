@@ -9,7 +9,9 @@ import { rawPayloads } from "./rawPayload.schema";
 import { routingRuleExecutions } from "./routingRule.schema";
 import { tags } from "./tag.schema";
 import { users } from "./user.schema";
-import { session, verification, account } from "./betterAuth.schema";
+import { session } from "./session.schema";
+import { verification } from "./verification.schema";
+import { account } from "./account.schema";
 
 export const schemas = {
   // YACC application tables

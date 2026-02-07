@@ -11,7 +11,9 @@ import { authConfig } from '../config/auth.config';
 import { dbClient } from './db.client';
 import { emailService } from './email.client';
 import { logger } from './logger';
-import { session, verification, account } from '../schemas/betterAuth.schema';
+import { session } from '../schemas/session.schema';
+import { verification } from '../schemas/verification.schema';
+import { account } from '../schemas/account.schema';
 import { users } from '../schemas/user.schema';
 
 /**
