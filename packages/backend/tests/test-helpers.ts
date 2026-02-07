@@ -39,6 +39,10 @@ export async function createTestApp(): Promise<Express> {
 
   const testApp = express.default();
 
+  // Body parsing middleware required for POST/PUT endpoints
+  testApp.use(express.json());
+  testApp.use(express.urlencoded({ extended: true }));
+
   useExpressServer(testApp, {
     controllers: controllers,
     authorizationChecker: authorizationChecker,

@@ -23,6 +23,10 @@ import { IRCConnector } from './connectors/irc.connector';
 // ===== EXPRESS APP =====
 const app = express();
 
+// Body parsing middleware required for POST/PUT endpoints
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 useExpressServer(app, {
   controllers: controllers,
   authorizationChecker: authorizationChecker,
