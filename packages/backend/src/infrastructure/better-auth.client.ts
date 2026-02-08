@@ -11,8 +11,18 @@ import { authConfig } from '../config/auth.config';
 import { dbClient } from './db.client';
 import { emailService } from './email.client';
 import { logger } from './logger';
-import { session, verification, account } from '../schemas/betterAuth.schema';
+import { session } from '../schemas/session.schema';
+import { verification } from '../schemas/verification.schema';
+import { account } from '../schemas/account.schema';
 import { users } from '../schemas/user.schema';
+
+/**
+ * User object shape for password reset email callback
+ * Contains at minimum the email field used by sendEmail
+ */
+type BetterAuthUser = {
+  email: string;
+};
 
 /**
  * Initialize BetterAuth client with proper database and email integration
@@ -20,8 +30,8 @@ import { users } from '../schemas/user.schema';
 function initializeBetterAuth() {
   try {
     // Wire the database client into the config using drizzle adapter
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const wiredConfig: any = {
+    // Type is inferred from betterAuth function parameter; wiredConfig satisfies BetterAuthOptions
+    const wiredConfig = {
       ...authConfig,
       database: drizzleAdapter(dbClient, {
         provider: 'pg',
@@ -34,7 +44,7 @@ function initializeBetterAuth() {
       }),
       emailAndPassword: {
         enabled: true,
-        sendResetEmail: async (user: any, url: string) => {
+        sendResetEmail: async (user: BetterAuthUser, url: string) => {
           await emailService.sendEmail({
             to: user.email,
             subject: 'Reset your password',

@@ -10,8 +10,8 @@
 
 ### Prerequisites
 - Node.js 18+
-- PostgreSQL running (docker-compose up)
-- Redis running (docker-compose up)
+- PostgreSQL running (docker compose up)
+- Redis running (docker compose up)
 - BetterAuth configured (completed in BE-003)
 
 ### Setup
@@ -22,7 +22,7 @@ cd yacc
 pnpm install
 
 # Start Docker services
-docker-compose up -d
+docker compose up -d
 
 # Create feature branch
 git checkout -b feature/BE-007-inbox-api
@@ -316,8 +316,8 @@ const { data, isLoading, error } = useQuery({
 ### Tests Failing
 ```bash
 # Check database setup
-docker-compose ps
-docker-compose logs postgres
+docker compose ps
+docker compose logs postgres
 
 # Verify migrations
 pnpm --filter @yacc/backend db:migrate

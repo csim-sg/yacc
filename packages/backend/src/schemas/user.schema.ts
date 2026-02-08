@@ -1,19 +1,17 @@
-import {boolean, pgTable, text, timestamp, uuid, varchar, index, pgEnum} from "drizzle-orm/pg-core";
+import { boolean, pgTable, text, timestamp, uuid, varchar, index } from 'drizzle-orm/pg-core';
+import { userRoleEnum } from '../enums/userRole.enum';
+import { userStatusEnum } from '../enums/userStatus.enum';
 
-export const userRoleEnum = pgEnum('user_role', [
-  'super_admin',
-  'admin',
-  'manager',
-  'user',
-]);
-
-export const userStatusEnum = pgEnum('user_status', ['active', 'inactive', 'suspended']);
-
-
+/**
+ * Users table - stores user accounts and authentication
+ * 
+ * Note: ID is TEXT (not UUID) because BetterAuth generates text-based user IDs.
+ * BetterAuth Drizzle adapter expects this format.
+ */
 export const users = pgTable(
   'users',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: text('id').primaryKey(),
     email: varchar('email', { length: 255 }).notNull().unique(),
     name: varchar('name', { length: 255 }).notNull(),
     passwordHash: text('password_hash').notNull(),
@@ -25,11 +23,11 @@ export const users = pgTable(
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
     lastLoginAt: timestamp('last_login_at'),
   },
-  (table) => ({
-    emailIdx: index('users_email_idx').on(table.email),
-    roleIdx: index('users_role_idx').on(table.role),
-    statusIdx: index('users_status_idx').on(table.status),
-  })
+  (table) => [
+    index('users_email_idx').on(table.email),
+    index('users_role_idx').on(table.role),
+    index('users_status_idx').on(table.status),
+  ]
 );
 
 export type User = typeof users.$inferSelect;

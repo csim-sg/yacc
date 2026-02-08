@@ -11,6 +11,7 @@
 ### Active Plans
 
 - **[BE-206-phase4-integration-plan.md](./BE-206-phase4-integration-plan.md)** - Phase 4 Integration Testing Plan (⏳ READY FOR EXECUTION - 10-12 hours)
+- **[week1-qa-test-cases-and-data.md](./week1-qa-test-cases-and-data.md)** - Week 1 QA: test cases + test data setup (✅ ready)
 - **[00-consolidated-active-plans.md](./00-consolidated-active-plans.md)** - Historical execution plan for Week 1-2 (BE-003 complete)
 - **[BE-003-COMPLETION-SUMMARY.md](./BE-003-COMPLETION-SUMMARY.md)** - BE-003 BetterAuth completion with test results (194 passing tests)
 
@@ -28,7 +29,7 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 ## ✅ Current Status
 
 ### Phase 1.4: MVP Core-First Execution (APPROVED)
-**Status**: 🚀 **IN PROGRESS - Week 1 (Feb 10-16)**  
+**Status**: 🚀 **IN PROGRESS - Week 1 (Feb 10-16)** (PR #227 in review; do not mark complete until merged)  
 **Approval Date**: 2026-02-06  
 **Target Completion**: 2026-02-20  
 **Timeline**: 2-week sprint
@@ -38,13 +39,13 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 - Frontend: FE-008 (Inbox List), FE-009 (Conversation Detail), FE-010 (Reply Composer), FE-013-015 (WebSocket Listeners)
 - QA: QA-001-003 (Integration + E2E + Real-Time tests)
 
-**Success Criteria**:
-- ✅ Users can view unified inbox with filters
-- ✅ Users can read conversation messages
-- ✅ Users can send replies
-- ✅ Real-time updates work (message received/sent/failed)
-- ✅ Full RBAC enforcement (4 roles)
-- ✅ ≥85% test coverage
+**Target Success Criteria (when Phase 1.4 completes)**:
+- Users can view unified inbox with filters
+- Users can read conversation messages
+- Users can send replies
+- Real-time updates work (message received/sent/failed)
+- Full RBAC enforcement (4 roles)
+- ≥85% test coverage
 
 **GitHub Issues Created**:
 - BE-007 (#183), BE-008 (#184), BE-009/010 (#185)
@@ -79,16 +80,18 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 
 ## 🚀 Week 1 Execution (Feb 10-16)
 
+**Status**: In review (PR #227)
+
 **Backend**:
-- [ ] BE-007: Inbox API (GET /conversations with filters) - DUE Feb 14
-- [ ] BE-008: Conversation Detail (GET /conversations/:id) - DUE Feb 14
+- [ ] BE-007: Inbox API (GET /conversations with filters) (in review: PR #227)
+- [ ] BE-008: Conversation Detail (GET /conversations/:id) (in review: PR #227)
 
 **Frontend**:
-- [ ] FE-008: Inbox List Page (UI scaffold with mocks) - DUE Feb 14
-- [ ] FE-009: Conversation Detail Page (UI scaffold with mocks) - DUE Feb 14
+- [ ] FE-008: Inbox List Page (UI scaffold with mocks)
+- [ ] FE-009: Conversation Detail Page (UI scaffold with mocks)
 
 **QA**:
-- [ ] Test case preparation and test data setup
+- [ ] Test case preparation and test data setup (see [week1-qa-test-cases-and-data.md](./week1-qa-test-cases-and-data.md))
 
 **Sync Points**:
 - API contract finalized: Feb 10 (morning)

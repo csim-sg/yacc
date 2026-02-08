@@ -1,5 +1,6 @@
 import { logger } from '../infrastructure/logger';
 import { wsGateway } from '../websockets/gateway';
+import { QueueEvents } from '../websockets/wsConstants';
 import type { SendMessageJobPayload } from '../types/message-queue.types';
 
 /**
@@ -186,7 +187,7 @@ class QueueDatabaseIntegration {
       //   .where(eq(messages.id, payload.messageId));
 
       // Emit WebSocket event
-      wsGateway.emitGlobally('message.retry_scheduled', {
+      wsGateway.emitGlobally(QueueEvents.MESSAGE_RETRY_SCHEDULED, {
         messageId: payload.messageId,
         conversationId: payload.conversationId,
         attempt,
@@ -245,15 +246,15 @@ class QueueDatabaseIntegration {
       //   .where(eq(messages.id, payload.messageId));
 
        // Emit WebSocket event to admins
-       wsGateway.emitGlobally('queue.message_dlq', {
-         messageId: payload.messageId,
-         conversationId: payload.conversationId,
-         failureReason,
-         totalAttempts,
-         lastError,
-         requiresReview: true,
-         timestamp: new Date().toISOString(),
-       });
+        wsGateway.emitGlobally(QueueEvents.MESSAGE_DLQ, {
+          messageId: payload.messageId,
+          conversationId: payload.conversationId,
+          failureReason,
+          totalAttempts,
+          lastError,
+          requiresReview: true,
+          timestamp: new Date().toISOString(),
+        });
 
       // TODO: Log audit event
       // await auditService.log({

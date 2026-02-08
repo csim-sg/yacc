@@ -1,5 +1,6 @@
 import type { AuthUser } from '../types/auth.types';
-import { db, conversations } from '../infrastructure/db.client';
+import { dbClient } from '../infrastructure/db.client';
+import { conversations } from '../schemas/conversation.schema';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -43,7 +44,7 @@ export class AuthorizationService {
     // User role: Must be assigned to the conversation
     if (user.role === 'user') {
       try {
-        const conversation = await db.query.conversations.findFirst({
+        const conversation = await dbClient.query.conversations.findFirst({
           where: eq(conversations.id, conversationId),
           columns: { assignedUserId: true },
         });

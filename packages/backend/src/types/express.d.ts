@@ -4,7 +4,7 @@
  */
 
 import type { Logger } from 'pino';
-import type { AuthUser } from './auth.types.js';
+import type { AuthUser } from './auth.types';
 
 declare module 'express' {
   interface Request {

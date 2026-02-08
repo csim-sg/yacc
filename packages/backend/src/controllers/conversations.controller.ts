@@ -19,18 +19,93 @@ import {
   BadRequestError,
   NotFoundError,
 } from 'routing-controllers';
-import { conversationService } from '../services/conversation.service.js';
-import { auditService } from '../services/audit.service.js';
-import { logger } from '../infrastructure/logger.js';
+import { conversationService } from '../services/conversation.service';
+import { auditService } from '../services/audit.service';
+import { logger } from '../infrastructure/logger';
 import { ListConversationsRequest } from '@yacc/common/requests/conversations/listConversations.request';
 import { UpdateStatusRequest } from '@yacc/common/requests/conversations/updateStatus.request';
 import { UpdatePriorityRequest } from '@yacc/common/requests/conversations/updatePriority.request';
 import { AssignRequest } from '@yacc/common/requests/conversations/assign.request';
 import { TagRequest } from '@yacc/common/requests/conversations/tag.request';
-import type { AuthUser } from '../types/auth.types.js';
+import type { AuthUser } from '../types/auth.types';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;
+}
+
+const VALID_CHANNELS = ['telegram', 'irc'] as const;
+const VALID_STATUSES = ['open', 'pending', 'resolved'] as const;
+const VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const;
+const VALID_SORT_BY = ['lastActivity', 'created', 'priority'] as const;
+const VALID_SORT_ORDER = ['asc', 'desc'] as const;
+
+function parsePositiveInt(value: unknown, name: string): number | undefined {
+  if (value === undefined || value === '') return undefined;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1) return undefined;
+  return n;
+}
+
+function validateListConversationsQuery(query: Record<string, unknown>): ListConversationsRequest {
+  if (query.page !== undefined && query.page !== '') {
+    const page = parsePositiveInt(query.page, 'page');
+    if (page === undefined) {
+      throw new BadRequestError('Invalid query: page must be a positive integer');
+    }
+  }
+  if (query.limit !== undefined && query.limit !== '') {
+    const limit = parsePositiveInt(query.limit, 'limit');
+    if (limit === undefined || limit > 100) {
+      throw new BadRequestError('Invalid query: limit must be an integer between 1 and 100');
+    }
+  }
+  if (query.tagId !== undefined && query.tagId !== '') {
+    const tagId = parsePositiveInt(query.tagId, 'tagId');
+    if (tagId === undefined) {
+      throw new BadRequestError('Invalid query: tagId must be a positive integer');
+    }
+  }
+  const channel = typeof query.channel === 'string' ? query.channel : undefined;
+  if (channel !== undefined && !VALID_CHANNELS.includes(channel as (typeof VALID_CHANNELS)[number])) {
+    throw new BadRequestError(`Invalid query: channel must be one of ${VALID_CHANNELS.join(', ')}`);
+  }
+  const status = typeof query.status === 'string' ? query.status : undefined;
+  if (status !== undefined && !VALID_STATUSES.includes(status as (typeof VALID_STATUSES)[number])) {
+    throw new BadRequestError(`Invalid query: status must be one of ${VALID_STATUSES.join(', ')}`);
+  }
+  const priority = typeof query.priority === 'string' ? query.priority : undefined;
+  if (priority !== undefined && !VALID_PRIORITIES.includes(priority as (typeof VALID_PRIORITIES)[number])) {
+    throw new BadRequestError(`Invalid query: priority must be one of ${VALID_PRIORITIES.join(', ')}`);
+  }
+  const sortBy = typeof query.sortBy === 'string' ? query.sortBy : undefined;
+  if (sortBy !== undefined && !VALID_SORT_BY.includes(sortBy as (typeof VALID_SORT_BY)[number])) {
+    throw new BadRequestError(`Invalid query: sortBy must be one of ${VALID_SORT_BY.join(', ')}`);
+  }
+  const sortOrder = typeof query.sortOrder === 'string' ? query.sortOrder : undefined;
+  if (sortOrder !== undefined && !VALID_SORT_ORDER.includes(sortOrder as (typeof VALID_SORT_ORDER)[number])) {
+    throw new BadRequestError(`Invalid query: sortOrder must be one of ${VALID_SORT_ORDER.join(', ')}`);
+  }
+
+  const page = parsePositiveInt(query.page, 'page');
+  const limitRaw = parsePositiveInt(query.limit, 'limit');
+  const limit = limitRaw !== undefined && limitRaw <= 100 ? limitRaw : undefined;
+  const tagId = parsePositiveInt(query.tagId, 'tagId');
+
+  return {
+    page,
+    limit,
+    channel,
+    status: status as 'open' | 'pending' | 'resolved' | undefined,
+    priority: priority as 'low' | 'medium' | 'high' | 'urgent' | undefined,
+    assignedUserId: typeof query.assignedUserId === 'string' ? query.assignedUserId : undefined,
+    tagId,
+    search: typeof query.search === 'string' ? query.search : undefined,
+    dateFrom: typeof query.dateFrom === 'string' ? query.dateFrom : undefined,
+    dateTo: typeof query.dateTo === 'string' ? query.dateTo : undefined,
+    unread: query.unread === 'true',
+    sortBy: sortBy as 'lastActivity' | 'created' | 'priority' | undefined,
+    sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+  };
 }
 
 @JsonController('/api/conversations')
@@ -46,21 +121,8 @@ export class ConversationsController {
     const correlationId = req.correlationId || 'unknown';
 
     try {
-      const query = req.query || {};
-      const normalizedQuery: ListConversationsRequest = {
-        page: query.page ? Number(query.page) : undefined,
-        limit: query.limit ? Number(query.limit) : undefined,
-        channel: typeof query.channel === 'string' ? query.channel : undefined,
-        status: (typeof query.status === 'string' ? query.status : undefined) as 'open' | 'pending' | 'resolved' | undefined,
-        priority: (typeof query.priority === 'string' ? query.priority : undefined) as 'low' | 'medium' | 'high' | 'urgent' | undefined,
-        assignedUserId: typeof query.assignedUserId === 'string' ? query.assignedUserId : undefined,
-        search: typeof query.search === 'string' ? query.search : undefined,
-        dateFrom: typeof query.dateFrom === 'string' ? query.dateFrom : undefined,
-        dateTo: typeof query.dateTo === 'string' ? query.dateTo : undefined,
-        unread: query.unread === 'true',
-        sortBy: typeof query.sortBy === 'string' ? (query.sortBy as 'lastActivity' | 'created' | 'priority') : undefined,
-        sortOrder: typeof query.sortOrder === 'string' ? (query.sortOrder as 'asc' | 'desc') : undefined,
-      };
+      const query = (req.query || {}) as Record<string, unknown>;
+      const normalizedQuery = validateListConversationsQuery(query);
       const result = await conversationService.listConversations(normalizedQuery);
 
       const duration = performance.now() - startTime;

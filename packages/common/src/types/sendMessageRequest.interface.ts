@@ -7,6 +7,8 @@
 export interface SendMessageRequest {
   conversationId: string;
   messageId: string;
+  recipientId: string;
   body: string;
   externalThreadId?: string;
+  metadata?: Record<string, unknown>;
 }

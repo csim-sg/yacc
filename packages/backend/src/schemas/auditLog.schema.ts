@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, varchar, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
 import { users } from './user.schema';
 
 /**
@@ -8,7 +8,7 @@ export const auditLogs = pgTable(
   'audit_logs',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
+    actorId: text('actor_id').references(() => users.id, { onDelete: 'set null' }),
     action: varchar('action', { length: 255 }).notNull(), // e.g., 'assignment', 'tag', 'note', 'status_change'
     entityType: varchar('entity_type', { length: 50 }).notNull(), // e.g., 'conversation', 'message', 'user'
     entityId: uuid('entity_id').notNull(),
@@ -16,12 +16,12 @@ export const auditLogs = pgTable(
     ipAddress: varchar('ip_address', { length: 45 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  (table) => ({
-    actorIdIdx: index('audit_logs_actor_id_idx').on(table.actorId),
-    actionIdx: index('audit_logs_action_idx').on(table.action),
-    entityTypeIdx: index('audit_logs_entity_type_idx').on(table.entityType),
-    createdAtIdx: index('audit_logs_created_at_idx').on(table.createdAt),
-  })
+  (table) => [
+    index('audit_logs_actor_id_idx').on(table.actorId),
+    index('audit_logs_action_idx').on(table.action),
+    index('audit_logs_entity_type_idx').on(table.entityType),
+    index('audit_logs_created_at_idx').on(table.createdAt),
+  ]
 );
 
 export type AuditLog = typeof auditLogs.$inferSelect;

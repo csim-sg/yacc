@@ -78,9 +78,13 @@ export async function login(
     }
 
     // Parse response
-    const data = await response.json();
+    const data = (await response.json()) as unknown as {
+      user?: LoginResponse['user'];
+      accessToken?: string;
+      refreshToken?: string;
+    };
 
-    // Validate response structure
+    // Basic shape check (avoid over-typing external boundary)
     if (!data.user || !data.accessToken || !data.refreshToken) {
       logger.error(
         { correlationId },
@@ -112,16 +116,7 @@ export async function login(
     );
 
     return {
-      user: {
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.name,
-        role: data.user.role,
-        status: data.user.status,
-        emailVerified: data.user.emailVerified,
-        createdAt: data.user.createdAt,
-        lastLoginAt: data.user.lastLoginAt,
-      },
+      user: data.user,
       accessToken: data.accessToken,
       refreshToken: data.refreshToken,
     };
@@ -232,7 +227,10 @@ export async function getSession(
     }
 
     // Parse response
-    const data = await response.json();
+    const data = (await response.json()) as unknown as {
+      user?: LoginResponse['user'];
+      session?: { id: string; expiresAt: string };
+    };
 
     if (!data.user || !data.session) {
       logger.error(
@@ -248,16 +246,7 @@ export async function getSession(
     );
 
     return {
-      user: {
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.name,
-        role: data.user.role,
-        status: data.user.status,
-        emailVerified: data.user.emailVerified,
-        createdAt: data.user.createdAt,
-        lastLoginAt: data.user.lastLoginAt,
-      },
+      user: data.user,
       session: {
         id: data.session.id,
         expiresAt: data.session.expiresAt,

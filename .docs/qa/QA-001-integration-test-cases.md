@@ -641,7 +641,7 @@ Pass Criteria: Parameter validation works
 ### Setup
 ```bash
 # 1. Start local database
-docker-compose up -d
+docker compose up -d
 
 # 2. Run test fixtures to seed data
 pnpm --filter @yacc/backend run db:fixtures

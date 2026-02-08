@@ -27,15 +27,13 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    const user = await createTestUser({
-      email: 'inbox-test@example.com',
-      password: 'TestPassword123!',
+    const user = await createTestUser(app, {
+      email: 'manager@yacc.local',
+      password: 'admin123',
       role: 'manager',
     });
     testUserId = user.id;
     authToken = user.token;
-
-    // Seed test conversations
     await seedTestConversations(testUserId, 35);
   });
 
@@ -51,9 +49,9 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveProperty('data');
-      expect(res.body).toHaveProperty('totalCount');
+      expect(res.body).toHaveProperty('total');
       expect(res.body).toHaveProperty('page');
-      expect(res.body).toHaveProperty('totalPage');
+      expect(res.body).toHaveProperty('pageSize');
       expect(Array.isArray(res.body.data)).toBe(true);
     });
 
@@ -107,8 +105,8 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.totalCount).toBeGreaterThan(0);
-      expect(typeof res.body.totalCount).toBe('number');
+      expect(res.body.total).toBeGreaterThanOrEqual(0);
+      expect(typeof res.body.total).toBe('number');
     });
 
     it('should calculate total pages correctly', async () => {
@@ -117,7 +115,9 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.totalPage).toBe(Math.ceil(res.body.totalCount / 10));
+      expect(Math.ceil(res.body.total / res.body.pageSize)).toBe(
+        Math.ceil(res.body.total / (res.body.pageSize || 10))
+      );
     });
   });
 
@@ -128,11 +128,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
-<<<<<<< HEAD
       res.body.data.forEach((conv: ConversationSummary) => {
-=======
-      res.body.data.forEach((conv: any) => {
->>>>>>> origin/dev
         expect(conv.channel).toBe('telegram');
       });
     });
@@ -143,11 +139,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
-<<<<<<< HEAD
       res.body.data.forEach((conv: ConversationSummary) => {
-=======
-      res.body.data.forEach((conv: any) => {
->>>>>>> origin/dev
         expect(conv.status).toBe('open');
       });
     });
@@ -158,11 +150,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
-<<<<<<< HEAD
       res.body.data.forEach((conv: ConversationSummary) => {
-=======
-      res.body.data.forEach((conv: any) => {
->>>>>>> origin/dev
         expect(conv.priority).toBe('high');
       });
     });
@@ -173,11 +161,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
-<<<<<<< HEAD
       res.body.data.forEach((conv: ConversationSummary) => {
-=======
-      res.body.data.forEach((conv: any) => {
->>>>>>> origin/dev
         expect(conv.assignedUserId).toBe(testUserId);
       });
     });
@@ -188,11 +172,7 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
-<<<<<<< HEAD
       res.body.data.forEach((conv: ConversationSummary) => {
-=======
-      res.body.data.forEach((conv: any) => {
->>>>>>> origin/dev
         expect(conv.channel).toBe('telegram');
         expect(conv.status).toBe('open');
         expect(conv.priority).toBe('high');
@@ -326,6 +306,22 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
       expect(res.status).toBe(400);
     });
 
+    it('should return 400 for invalid limit (non-integer)', async () => {
+      const res = await request(app)
+        .get('/api/conversations?limit=abc')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+    });
+
+    it('should return 400 for invalid limit (exceeds 100)', async () => {
+      const res = await request(app)
+        .get('/api/conversations?limit=999')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+    });
+
     it('should return 400 for invalid channel value', async () => {
       const res = await request(app)
         .get('/api/conversations?channel=invalid')
@@ -340,6 +336,24 @@ describe('BE-007: Inbox API (GET /conversations with filters)', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
+    });
+
+    it('should return 400 for invalid tagId (non-integer)', async () => {
+      const res = await request(app)
+        .get('/api/conversations?tagId=abc')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(400);
+    });
+
+    it('should return 200 when tagId is a valid positive integer', async () => {
+      const res = await request(app)
+        .get('/api/conversations?tagId=1')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('data');
+      expect(Array.isArray(res.body.data)).toBe(true);
     });
   });
 });

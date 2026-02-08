@@ -1,11 +1,9 @@
 import { dbClient } from '../infrastructure/db.client';
-import {
-  conversations,
-  messages,
-  conversationTags,
-  tags,
-  users,
-} from '../schemas';
+import { conversations } from '../schemas/conversation.schema';
+import { messages } from '../schemas/message.schema';
+import { conversationTags } from '../schemas/conversationTag.schema';
+import { tags } from '../schemas/tag.schema';
+import { users } from '../schemas/user.schema';
 import { eq, and, desc, asc, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { auditService } from './audit.service';
@@ -17,6 +15,7 @@ export interface ListConversationsParams {
   status?: string;
   priority?: string;
   assignedUserId?: string;
+  tagId?: number;
   search?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -37,6 +36,7 @@ export class ConversationService {
       status,
       priority,
       assignedUserId,
+      tagId,
       search,
       dateFrom,
       dateTo,
@@ -67,6 +67,16 @@ export class ConversationService {
 
     if (assignedUserId) {
       whereClauses.push(eq(conversations.assignedUserId, assignedUserId));
+    }
+
+    if (tagId != null && tagId > 0) {
+      whereClauses.push(
+        sql`EXISTS (
+          SELECT 1 FROM ${conversationTags}
+          WHERE ${conversationTags.conversationId} = ${conversations.id}
+            AND ${conversationTags.tagId} = ${tagId}
+        )`
+      );
     }
 
     if (search) {
@@ -128,7 +138,7 @@ export class ConversationService {
       : await dbClient
           .select({ count: sql<number>`count(*)` })
           .from(conversations);
-    const total = countResult[0]?.count || 0;
+    const total = countResult[0]?.count ? Number(countResult[0].count) : 0;
 
     // Get conversations
     const convos = whereClauses.length > 0
@@ -210,22 +220,22 @@ export class ConversationService {
             type: 'contact' as const,
           }));
 
-        return {
-          id: convo.id,
-          channel: convo.channel,
-          externalThreadId: convo.externalThreadId,
-          status: convo.status,
-          priority: convo.priority,
-          assignedUserId: convo.assignedUserId,
-          assignedUserName,
-          tags: convoTags,
-          participants: participantList,
-          unreadCount: unreadCount[0]?.count || 0,
-          latestMessagePreview: latestMessage[0]?.body || null,
-          latestMessageAt: latestMessage[0]?.createdAt || null,
-          createdAt: convo.createdAt,
-          updatedAt: convo.updatedAt,
-        };
+         return {
+           id: convo.id,
+           channel: convo.channel,
+           externalThreadId: convo.externalThreadId,
+           status: convo.status,
+           priority: convo.priority,
+           assignedUserId: convo.assignedUserId,
+           assignedUserName,
+           tags: convoTags,
+           participants: participantList,
+           unreadCount: unreadCount[0]?.count ? Number(unreadCount[0].count) : 0,
+           latestMessagePreview: latestMessage[0]?.body || null,
+           latestMessageAt: latestMessage[0]?.createdAt || null,
+           createdAt: convo.createdAt,
+           updatedAt: convo.updatedAt,
+         };
       })
     );
 

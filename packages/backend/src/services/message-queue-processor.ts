@@ -3,29 +3,8 @@ import { logger } from '../infrastructure/logger';
 import { SendMessageJobPayload } from '../types/message-queue.types';
 import { queueDatabaseIntegration } from './queue-database-integration';
 import type { BaseConnector } from '../connectors/base/baseConnector';
-
-/**
- * Send message request interface
- * Used for communication with platform connectors
- */
-interface SendMessageRequest {
-  messageId: string;
-  conversationId: string;
-  recipientId: string;
-  body: string;
-  platformType: 'telegram' | 'irc' | 'internal';
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * Send message response interface
- * Returned from platform connectors
- */
-interface SendMessageResponse {
-  platformMessageId: string;
-  sentAt: string;
-  status: 'sent' | 'pending';
-}
+import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
+import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse.interface';
 
 /**
  * Message Queue Processor
@@ -105,12 +84,15 @@ export async function messageQueueProcessor(job: Job<SendMessageJobPayload>): Pr
       conversationId,
       recipientId,
       body,
-      platformType: platformType as 'telegram' | 'irc' | 'internal',
       metadata: job.data.metadata,
     };
 
     // Send message via platform
     const response: SendMessageResponse = await connector.sendMessage(sendRequest);
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
 
     // Log success
     logger.info(
