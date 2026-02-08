@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 
-const repoRoot = path.resolve(dirname, '..');
+const repoRoot = path.resolve(dirname);
 const distTmpEntry = path.join(repoRoot, 'dist-tmp', 'index.js');
 const distDir = path.join(repoRoot, 'dist');
 const outFile = path.join(distDir, 'index.js');
