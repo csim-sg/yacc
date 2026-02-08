@@ -1,10 +1,10 @@
 # 06. Issues & User stories
 
-**Last Updated**: February 7, 2026  
-**Status**: Phase 1.4 In Progress (Week 1 Feb 10–16), BE-206 Phase 4 Ready  
+**Last Updated**: February 8, 2026 (14:30 UTC)  
+**Status**: ✅ Phase 1.4 COMPLETE (Week 1 Feb 3–8, PR #227 merged), Phase 2 Ready (Kickoff Feb 9 9am)  
 **Total P0 Issues**: 22  
-**Current focus (per 00-INDEX)**: BE-007, BE-008, FE-008, FE-009 (Week 1 due Feb 14); BE-206 Phase 4 (integration testing) ready for execution  
-**Governance**: ADR-003, GOV-006, GOV-007, GOV-012
+**Current focus (per 00-INDEX)**: Week 2 Phase 2 Execution (BE-009/010/011/012/014 messaging + BE-017/018/019 WebSocket events + FE-008/009/010/013/014/015)  
+**Governance**: ADR-003, GOV-006, GOV-007, GOV-012, ADR-014 (approved v1.5), GOV-015 v1.7 (approved)
 
 ---
 
@@ -107,8 +107,8 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | BE-004 | Implement forgot password flow (reset token, email sending) | **Done** | P1 | Backend | BE-003 | POST /auth/forgot-password and /reset-password working | PVTI_lAHOAB4wV84BNGcwzgj_5sM | 19 |
 | BE-005 | Implement RBAC middleware (4 roles: Super Admin, Admin, Manager, User) | **Done** | P0 | Backend | BE-002, BE-003 | Permission checks working for all role-based endpoints | PVTI_lAHOAB4wV84BNGcwzgj_5rU | 20 |
 | BE-006 | Create user management endpoints (CRUD for users, roles) | Not Started | P1 | Backend | BE-005 | GET/POST/PUT/DELETE /users, /roles working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_5rk | 17 |
-| BE-007 | Implement inbox API (GET /conversations with filters: channel, assignee, tag, status, priority) | In Review (PR #227) | P0 | Backend | BE-002, BE-005 | Filtering and pagination working | PVTI_lAHOAB4wV84BNGcwzgj_5sA | 14 |
-| BE-008 | Implement conversation detail endpoint (GET /conversations/:id) | In Review (PR #227) | P0 | Backend | BE-007 | Returns conversation with messages and metadata | PVTI_lAHOAB4wV84BNGcwzgj_5rM | 15 |
+| BE-007 | Implement inbox API (GET /conversations with filters: channel, assignee, tag, status, priority) | **Done** (PR #227 merged) | P0 | Backend | BE-002, BE-005 | Filtering and pagination working ✅ | PVTI_lAHOAB4wV84BNGcwzgj_5sA | 14 |
+| BE-008 | Implement conversation detail endpoint (GET /conversations/:id) | **Done** (PR #227 merged) | P0 | Backend | BE-007 | Returns conversation with messages and metadata ✅ | PVTI_lAHOAB4wV84BNGcwzgj_5rM | 15 |
 | BE-009 | Implement message retrieval endpoint (GET /conversations/:id/messages) | Not Started | P0 | Backend | BE-002, BE-008 | Returns paginated messages with direction (inbound/outbound) | PVTI_lAHOAB4wV84BNGcwzgj_5r4 | 10 |
 | BE-010 | Implement send message endpoint (POST /conversations/:id/messages) | Not Started | P0 | Backend | BE-008 | Queues message for delivery, returns pending status | PVTI_lAHOAB4wV84BNGcwzgj_5ro | 11 |
 | BE-011 | Implement message status tracking (pending → sent/failed) | Not Started | P0 | Backend | BE-010 | Status updates working, database reflects delivery state | PVTI_lAHOAB4wV84BNGcwzgj_54c | 30 |
