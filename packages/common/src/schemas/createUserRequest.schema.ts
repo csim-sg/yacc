@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RoleEnum } from '../constants/roles.constant';
+import { RoleEnum } from '../constants/roles.constant.js';
 
 export const CreateUserRequestSchema = z.object({
   email: z.string().email(),

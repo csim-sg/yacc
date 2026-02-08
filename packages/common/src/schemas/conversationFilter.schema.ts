@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ChannelEnum, ConversationStatusEnum, PriorityEnum } from '../constants/statuses.constant';
+import { ChannelEnum, ConversationStatusEnum, PriorityEnum } from '../constants/statuses.constant.js';
 
 export const ConversationFilterSchema = z.object({
   channel: ChannelEnum.optional(),

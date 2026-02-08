@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { NotificationTypeEnum } from '../constants/statuses.constant';
+import { NotificationTypeEnum } from '../constants/statuses.constant.js';
 
 export const NotificationSchema = z.object({
   id: z.string().uuid(),

@@ -1,5 +1,5 @@
 import { IsOptional, IsInt, IsBoolean, Min, Max } from 'class-validator';
-import { SearchableRequest } from '../../types/searchableRequest.type';
+import { SearchableRequest } from '../../types/searchableRequest.type.js';
 
 /**
  * List Routing Rules Request

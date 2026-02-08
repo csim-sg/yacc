@@ -15,6 +15,4 @@ build/
 .pnpm-debug.log*
 coverage/
 .nyc_output/
-.cursor/worktrees.json
-.cursor/agents/
-.cursor/skills/
+.cursor/

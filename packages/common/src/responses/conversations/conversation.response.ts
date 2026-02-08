@@ -1,4 +1,4 @@
-import { IListResponse } from '../../types/listResponse.type';
+import { IListResponse } from '../../types/listResponse.type.js';
 
 /**
  * Conversation Response

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ChannelEnum, ConversationStatusEnum } from '../constants/statuses.constant';
+import { ChannelEnum, ConversationStatusEnum } from '../constants/statuses.constant.js';
 
 export const SearchConversationsQuerySchema = z.object({
   q: z.string().min(1),

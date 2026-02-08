@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ConversationStatusEnum, PriorityEnum } from '../constants/statuses.constant';
+import { ConversationStatusEnum, PriorityEnum } from '../constants/statuses.constant.js';
 
 export const BulkActionRequestSchema = z.object({
   conversationIds: z.array(z.string().uuid()).min(1).max(100),

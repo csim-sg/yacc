@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RoutingRuleStatusEnum } from '../constants/statuses.constant';
+import { RoutingRuleStatusEnum } from '../constants/statuses.constant.js';
 import { RuleConditionSchema } from './RuleCondition.schema';
 import { RuleActionSchema } from './RuleAction.schema';
 

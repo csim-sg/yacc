@@ -1,5 +1,5 @@
 import { IsOptional, IsInt, IsString, IsUUID, IsEnum, Min, Max } from 'class-validator';
-import { SearchableRequest } from '../../types/searchableRequest.type';
+import { SearchableRequest } from '../../types/searchableRequest.type.js';
 
 /**
  * List Conversations Request

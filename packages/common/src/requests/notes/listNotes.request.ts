@@ -1,5 +1,5 @@
 import { IsOptional, IsUUID } from 'class-validator';
-import { SearchableRequest } from '../../types/searchableRequest.type';
+import { SearchableRequest } from '../../types/searchableRequest.type.js';
 
 /**
  * List Notes Request

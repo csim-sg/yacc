@@ -1,6 +1,6 @@
 import { IsOptional, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
-import { SearchableRequest } from '../../types/searchableRequest.type';
+import { SearchableRequest } from '../../types/searchableRequest.type.js';
 
 /**
  * Get Conversation Audit Logs Request
