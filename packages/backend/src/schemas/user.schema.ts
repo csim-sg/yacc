@@ -4,11 +4,14 @@ import { userStatusEnum } from '../enums/userStatus.enum';
 
 /**
  * Users table - stores user accounts and authentication
+ * 
+ * Note: ID is TEXT (not UUID) because BetterAuth generates text-based user IDs.
+ * BetterAuth Drizzle adapter expects this format.
  */
 export const users = pgTable(
   'users',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: text('id').primaryKey(),
     email: varchar('email', { length: 255 }).notNull().unique(),
     name: varchar('name', { length: 255 }).notNull(),
     passwordHash: text('password_hash').notNull(),

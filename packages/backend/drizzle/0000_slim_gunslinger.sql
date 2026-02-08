@@ -7,7 +7,7 @@ CREATE TYPE "public"."user_role" AS ENUM('super_admin', 'admin', 'manager', 'use
 CREATE TYPE "public"."user_status" AS ENUM('active', 'inactive', 'suspended');--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"account_id" text NOT NULL,
 	"provider_id" text NOT NULL,
 	"access_token" text,
@@ -30,7 +30,7 @@ CREATE TABLE "attachments" (
 --> statement-breakpoint
 CREATE TABLE "audit_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"actor_id" uuid,
+	"actor_id" text,
 	"action" varchar(255) NOT NULL,
 	"entity_type" varchar(50) NOT NULL,
 	"entity_id" uuid NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE "conversations" (
 	"title" varchar(500),
 	"status" "conversation_status" DEFAULT 'open' NOT NULL,
 	"priority" "conversation_priority" DEFAULT 'medium' NOT NULL,
-	"assigned_user_id" uuid,
+	"assigned_user_id" text,
 	"metadata" jsonb,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
@@ -61,7 +61,7 @@ CREATE TABLE "conversation_tags" (
 CREATE TABLE "messages" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"conversation_id" uuid NOT NULL,
-	"sender_id" uuid,
+	"sender_id" text,
 	"sender_name" varchar(255) NOT NULL,
 	"body" text NOT NULL,
 	"status" "message_status" DEFAULT 'pending' NOT NULL,
@@ -75,7 +75,7 @@ CREATE TABLE "messages" (
 CREATE TABLE "notes" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"conversation_id" uuid NOT NULL,
-	"author_id" uuid NOT NULL,
+	"author_id" text NOT NULL,
 	"body" text NOT NULL,
 	"mentions" jsonb,
 	"created_at" timestamp DEFAULT now() NOT NULL,
@@ -84,10 +84,10 @@ CREATE TABLE "notes" (
 --> statement-breakpoint
 CREATE TABLE "notifications" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"type" varchar(50) NOT NULL,
 	"conversation_id" uuid,
-	"actor_id" uuid,
+	"actor_id" text,
 	"message" text NOT NULL,
 	"is_read" boolean DEFAULT false NOT NULL,
 	"metadata" jsonb,
@@ -96,7 +96,7 @@ CREATE TABLE "notifications" (
 --> statement-breakpoint
 CREATE TABLE "password_reset_tokens" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"token" varchar(255) NOT NULL,
 	"expires_at" timestamp NOT NULL,
 	"used_at" timestamp,
@@ -122,7 +122,7 @@ CREATE TABLE "routing_rules" (
 	"priority" integer DEFAULT 999 NOT NULL,
 	"conditions" jsonb NOT NULL,
 	"actions" jsonb NOT NULL,
-	"created_by_id" uuid NOT NULL,
+	"created_by_id" text NOT NULL,
 	"last_run_at" timestamp,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
@@ -139,7 +139,7 @@ CREATE TABLE "routing_rule_executions" (
 --> statement-breakpoint
 CREATE TABLE "session" (
 	"id" text PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"expires_at" timestamp NOT NULL,
 	"token" text NOT NULL,
 	"ip_address" varchar(45),
@@ -153,12 +153,12 @@ CREATE TABLE "tags" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" varchar(255) NOT NULL,
 	"color" varchar(7) DEFAULT '#808080' NOT NULL,
-	"created_by_id" uuid NOT NULL,
+	"created_by_id" text NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "users" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" text PRIMARY KEY NOT NULL,
 	"email" varchar(255) NOT NULL,
 	"name" varchar(255) NOT NULL,
 	"password_hash" text NOT NULL,

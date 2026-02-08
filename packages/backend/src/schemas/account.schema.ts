@@ -8,7 +8,7 @@ export const account = pgTable(
   'account',
   {
     id: text('id').primaryKey(),
-    userId: uuid('user_id')
+    userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     accountId: text('account_id').notNull(),

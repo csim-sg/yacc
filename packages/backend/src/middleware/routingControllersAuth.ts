@@ -34,73 +34,97 @@ interface AuthRequest extends Request {
  *
  * Used by routing-controllers @Authorized decorator
  * 
- * TODO: Implement proper BetterAuth integration when infrastructure is ready
+ * Supports both:
+ * 1. BetterAuth sessions via betterAuthClient.api.getSession()
+ * 2. Direct JWT tokens (for testing) - extracts user ID from token
  */
 export async function authorizationChecker(
-  action: Action,
-  roles: string[]
+   action: Action,
+   roles: string[]
 ): Promise<boolean> {
-  try {
-    const request = action.request as AuthRequest;
+   try {
+     const request = action.request as AuthRequest;
 
-     // BetterAuth automatically extracts Bearer token from Authorization header
-     if (!betterAuthClient) {
+      // BetterAuth automatically extracts Bearer token from Authorization header
+      if (!betterAuthClient) {
+        return false;
+      }
+      const session = await betterAuthClient.api.getSession({
+       headers: request.headers,
+     });
+
+     let userId: string | undefined;
+     
+     if (session) {
+       // BetterAuth session found
+       userId = session.user.id as string;
+     } else {
+       // Try to extract JWT token directly (for testing)
+       const authHeader = request.headers.authorization;
+       if (authHeader && authHeader.startsWith('Bearer ')) {
+         const token = authHeader.substring(7);
+         try {
+           const { verify } = await import('jsonwebtoken');
+           const decoded = verify(token, appConfig.BETTER_AUTH_SECRET) as any;
+           userId = decoded.sub;
+         } catch {
+           // Invalid or expired token
+           return false;
+         }
+       }
+     }
+
+     if (!userId) {
        return false;
      }
-     const session = await betterAuthClient.api.getSession({
-      headers: request.headers,
-    });
 
-    if (!session) {
-      return false;
-    }
+     // Fetch full user from database to get role and status
+     const user = await dbClient.query.users.findFirst({
+       where: eq(users.id, userId),
+     });
 
-    // Fetch full user from database to get role and status
-    const userId = session.user.id as string;
-    const user = await dbClient.query.users.findFirst({
-      where: eq(users.id, userId),
-    });
+     if (!user) {
+       return false;
+     }
 
-    if (!user) {
-      return false;
-    }
+     // Check user status - inactive or suspended users cannot login
+     if (user.status === 'inactive' || user.status === 'suspended') {
+       return false;
+     }
 
-    // Check user status - inactive or suspended users cannot login
-    if (user.status === 'inactive' || user.status === 'suspended') {
-      return false;
-    }
+     // Attach user to request (for currentUserChecker)
+     request.user = {
+       id: user.id,
+       email: user.email,
+       name: user.name,
+       role: user.role,
+       status: user.status,
+       emailVerified: user.emailVerified,
+       createdAt: user.createdAt,
+       lastLoginAt: user.lastLoginAt,
+     } as AuthUser;
 
-    // Attach user to request (for currentUserChecker)
-    request.user = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      status: user.status,
-      emailVerified: user.emailVerified,
-      createdAt: user.createdAt,
-      lastLoginAt: user.lastLoginAt,
-    } as AuthUser;
+     // Attach session to request
+     if (session) {
+       request.session = {
+         id: session.session.id as string,
+         userId: user.id,
+         expiresAt: session.session.expiresAt as Date,
+       };
+     }
 
-    // Attach session to request
-    request.session = {
-      id: session.session.id as string,
-      userId: user.id,
-      expiresAt: session.session.expiresAt as Date,
-    };
+     // If no specific roles required, just check if authenticated
+     if (!roles || roles.length === 0) {
+       return true;
+     }
 
-    // If no specific roles required, just check if authenticated
-    if (!roles || roles.length === 0) {
-      return true;
-    }
+     // Check if user has required role
+     return roles.includes(user.role);
 
-    // Check if user has required role
-    return roles.includes(user.role);
-
-    return false;
-  } catch (error) {
-    return false;
-  }
+     return false;
+   } catch (error) {
+     return false;
+   }
 }
 
 /**
@@ -109,49 +133,71 @@ export async function authorizationChecker(
  *
  * Used by routing-controllers @CurrentUser decorator
  * 
- * TODO: Implement proper BetterAuth integration when infrastructure is ready
+ * Supports both:
+ * 1. BetterAuth sessions via betterAuthClient.api.getSession()
+ * 2. Direct JWT tokens (for testing) - extracts user ID from token
  */
 export async function currentUserChecker(
-  action: Action
+   action: Action
 ): Promise<AuthUser | undefined> {
-  try {
-    const request = action.request as AuthRequest;
+   try {
+     const request = action.request as AuthRequest;
 
-     // BetterAuth automatically extracts Bearer token from Authorization header
-     if (!betterAuthClient) {
+      // BetterAuth automatically extracts Bearer token from Authorization header
+      if (!betterAuthClient) {
+        return undefined;
+      }
+      const session = await betterAuthClient.api.getSession({
+        headers: request.headers,
+      });
+
+     let userId: string | undefined;
+     
+     if (session) {
+       // BetterAuth session found
+       userId = session.user.id as string;
+     } else {
+       // Try to extract JWT token directly (for testing)
+       const authHeader = request.headers.authorization;
+       if (authHeader && authHeader.startsWith('Bearer ')) {
+         const token = authHeader.substring(7);
+         try {
+           const { verify } = await import('jsonwebtoken');
+           const decoded = verify(token, appConfig.BETTER_AUTH_SECRET) as any;
+           userId = decoded.sub;
+         } catch {
+           // Invalid or expired token
+           return undefined;
+         }
+       }
+     }
+
+     if (!userId) {
        return undefined;
      }
-     const session = await betterAuthClient.api.getSession({
-       headers: request.headers,
+
+     // Fetch full user from database to get role and status
+     const user = await dbClient.query.users.findFirst({
+       where: eq(users.id, userId),
      });
 
-    if (!session) {
-      return undefined;
-    }
+     if (!user || user.status === 'inactive' || user.status === 'suspended') {
+       return undefined;
+     }
 
-    // Fetch full user from database to get role and status
-    const userId = session.user.id as string;
-    const user = await dbClient.query.users.findFirst({
-      where: eq(users.id, userId),
-    });
+     return {
+       id: user.id,
+       email: user.email,
+       name: user.name,
+       role: user.role,
+       status: user.status,
+       emailVerified: user.emailVerified,
+       createdAt: user.createdAt,
+       lastLoginAt: user.lastLoginAt,
+     } as AuthUser;
 
-    if (!user || user.status === 'inactive' || user.status === 'suspended') {
-      return undefined;
-    }
-
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      status: user.status,
-      emailVerified: user.emailVerified,
-      createdAt: user.createdAt,
-      lastLoginAt: user.lastLoginAt,
-    } as AuthUser;
-
-    return undefined;
-  } catch (error) {
-    return undefined;
-  }
+     return undefined;
+   } catch (error) {
+     return undefined;
+   }
 }

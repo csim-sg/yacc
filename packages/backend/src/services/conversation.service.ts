@@ -138,7 +138,7 @@ export class ConversationService {
       : await dbClient
           .select({ count: sql<number>`count(*)` })
           .from(conversations);
-    const total = countResult[0]?.count || 0;
+    const total = countResult[0]?.count ? Number(countResult[0].count) : 0;
 
     // Get conversations
     const convos = whereClauses.length > 0
@@ -220,22 +220,22 @@ export class ConversationService {
             type: 'contact' as const,
           }));
 
-        return {
-          id: convo.id,
-          channel: convo.channel,
-          externalThreadId: convo.externalThreadId,
-          status: convo.status,
-          priority: convo.priority,
-          assignedUserId: convo.assignedUserId,
-          assignedUserName,
-          tags: convoTags,
-          participants: participantList,
-          unreadCount: unreadCount[0]?.count || 0,
-          latestMessagePreview: latestMessage[0]?.body || null,
-          latestMessageAt: latestMessage[0]?.createdAt || null,
-          createdAt: convo.createdAt,
-          updatedAt: convo.updatedAt,
-        };
+         return {
+           id: convo.id,
+           channel: convo.channel,
+           externalThreadId: convo.externalThreadId,
+           status: convo.status,
+           priority: convo.priority,
+           assignedUserId: convo.assignedUserId,
+           assignedUserName,
+           tags: convoTags,
+           participants: participantList,
+           unreadCount: unreadCount[0]?.count ? Number(unreadCount[0].count) : 0,
+           latestMessagePreview: latestMessage[0]?.body || null,
+           latestMessageAt: latestMessage[0]?.createdAt || null,
+           createdAt: convo.createdAt,
+           updatedAt: convo.updatedAt,
+         };
       })
     );
 

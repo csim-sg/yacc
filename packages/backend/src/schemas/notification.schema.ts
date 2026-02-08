@@ -9,14 +9,14 @@ export const notifications = pgTable(
   'notifications',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+       .notNull()
+       .references(() => users.id, { onDelete: 'cascade' }),
     type: varchar('type', { length: 50 }).notNull(), // 'assignment', 'mention', etc.
     conversationId: uuid('conversation_id').references(() => conversations.id, {
-      onDelete: 'set null',
-    }),
-    actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
+       onDelete: 'set null',
+     }),
+    actorId: text('actor_id').references(() => users.id, { onDelete: 'set null' }),
     message: text('message').notNull(),
     isRead: boolean('is_read').notNull().default(false),
     metadata: jsonb('metadata'),

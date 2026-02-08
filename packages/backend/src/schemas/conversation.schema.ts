@@ -1,6 +1,7 @@
 import {
   pgTable,
   uuid,
+  text,
   varchar,
   timestamp,
   jsonb,
@@ -24,7 +25,7 @@ export const conversations = pgTable(
     title: varchar('title', { length: 500 }),
     status: conversationStatusEnum('status').notNull().default('open'),
     priority: conversationPriorityEnum('priority').notNull().default('medium'),
-    assignedUserId: uuid('assigned_user_id').references(() => users.id, {
+    assignedUserId: text('assigned_user_id').references(() => users.id, {
       onDelete: 'set null',
     }),
     metadata: jsonb('metadata'),

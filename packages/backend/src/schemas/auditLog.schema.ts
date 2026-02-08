@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, varchar, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
 import { users } from './user.schema';
 
 /**
@@ -8,7 +8,7 @@ export const auditLogs = pgTable(
   'audit_logs',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
+    actorId: text('actor_id').references(() => users.id, { onDelete: 'set null' }),
     action: varchar('action', { length: 255 }).notNull(), // e.g., 'assignment', 'tag', 'note', 'status_change'
     entityType: varchar('entity_type', { length: 50 }).notNull(), // e.g., 'conversation', 'message', 'user'
     entityId: uuid('entity_id').notNull(),

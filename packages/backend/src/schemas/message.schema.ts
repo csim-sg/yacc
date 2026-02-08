@@ -22,7 +22,7 @@ export const messages = pgTable(
     conversationId: uuid('conversation_id')
       .notNull()
       .references(() => conversations.id, { onDelete: 'cascade' }),
-    senderId: uuid('sender_id').references(() => users.id, { onDelete: 'set null' }),
+    senderId: text('sender_id').references(() => users.id, { onDelete: 'set null' }),
     senderName: varchar('sender_name', { length: 255 }).notNull(),
     body: text('body').notNull(),
     status: messageStatusEnum('status').notNull().default('pending'),

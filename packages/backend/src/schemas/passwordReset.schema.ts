@@ -1,4 +1,4 @@
-import { pgTable, serial, timestamp, varchar, index, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, serial, timestamp, varchar, index, text } from 'drizzle-orm/pg-core';
 import { users } from './user.schema';
 
 /**
@@ -8,7 +8,7 @@ export const passwordResetTokens = pgTable(
   'password_reset_tokens',
   {
     id: serial('id').primaryKey(),
-    userId: uuid('user_id')
+    userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     token: varchar('token', { length: 255 }).notNull().unique(),

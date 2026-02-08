@@ -14,9 +14,9 @@ export const routingRules = pgTable(
     priority: integer('priority').notNull().default(999), // Lower number = higher priority
     conditions: jsonb('conditions').notNull(), // JSON array of conditions
     actions: jsonb('actions').notNull(), // JSON array of actions
-    createdById: uuid('created_by_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'set null' }),
+    createdById: text('created_by_id')
+       .notNull()
+       .references(() => users.id, { onDelete: 'set null' }),
     lastRunAt: timestamp('last_run_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),

@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, timestamp, uuid, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, timestamp, text, uniqueIndex } from 'drizzle-orm/pg-core';
 import { users } from './user.schema';
 
 /**
@@ -10,7 +10,7 @@ export const tags = pgTable(
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
     color: varchar('color', { length: 7 }).notNull().default('#808080'),
-    createdById: uuid('created_by_id')
+    createdById: text('created_by_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
