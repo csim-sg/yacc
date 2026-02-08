@@ -676,7 +676,7 @@ yacc-client/
  │   └── frontend-deploy.yml
  │
  ├── .docs/
- ├── docker-compose.yml
+ ├── docker compose.yml
  ├── turbo.json
  ├── pnpm-workspace.yaml
  └── package.json

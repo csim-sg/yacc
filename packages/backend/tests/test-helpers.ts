@@ -1,10 +1,15 @@
 /**
  * Test helpers for integration tests (BE-007, etc.)
  * - createTestApp: returns Express app from src/app (no server listen)
- * - createTestUser: logs in via POST /auth/sign-in/email, returns { id, token }
+ * - createTestUser: creates user via /auth/sign-up/email, then logs in, returns { id, token }
  * - seedTestConversations: inserts test conversations (requires DB)
  *
- * Prerequisites for full run: test DB with migrations, and a user (e.g. run db:fixtures or seed).
+ * Test flow:
+ * 1. createTestApp() - initialize Express with routing-controllers
+ * 2. createTestUser() - sign up new user, then login to get token (deterministic, no pre-seeding)
+ * 3. seedTestConversations() - insert test data into DB
+ *
+ * All operations are self-contained; tests are deterministic and don't require db:fixtures.
  */
 
 import 'reflect-metadata';
@@ -16,6 +21,7 @@ export interface TestUserOptions {
   email: string;
   password: string;
   role?: string;
+  name?: string;
 }
 
 export interface TestUser {
@@ -39,6 +45,10 @@ export async function createTestApp(): Promise<Express> {
 
    const testApp = express.default();
 
+   // Register body parser middleware BEFORE routing-controllers
+   // This ensures request.body is available in all route handlers
+   testApp.use(bodyParserMiddleware);
+
    useExpressServer(testApp, {
      controllers: controllers,
      authorizationChecker: authorizationChecker,
@@ -57,7 +67,6 @@ export async function createTestApp(): Promise<Express> {
      middlewares: [
        correlationIdMiddleware,
        requestLoggingMiddleware,
-       bodyParserMiddleware,
      ],
    });
 
@@ -65,23 +74,59 @@ export async function createTestApp(): Promise<Express> {
  }
 
 /**
- * Logs in via POST /auth/sign-in/email and returns user id and token.
- * The user must exist in the database (e.g. seed-test-fixtures or db:fixtures).
+ * Creates a new test user via /auth/sign-up/email, then logs in to get access token.
+ * Optionally sets the role via direct DB update (BetterAuth signup doesn't support role field).
+ * This makes tests deterministic: no pre-seeded users required.
+ *
+ * Flow:
+ * 1. Try POST /auth/sign-up/email with email, password, name
+ *    - If user already exists (422), skip to login
+ *    - If signup fails with other error, throw
+ * 2. POST /auth/sign-in/email with email, password
+ * 3. (Optional) UPDATE user role in DB via Drizzle
+ * 4. Return { id, token }
+ *
+ * @param app - Express app instance
+ * @param options - User options (email, password, optional role, name)
+ * @returns { id, token } for authenticated user
+ * @throws Error if signup or login fails
  */
 export async function createTestUser(app: Express, options: TestUserOptions): Promise<TestUser> {
-  const res = await request(app)
+  const name = options.name || options.email.split('@')[0] || 'Test User';
+
+  // Step 1: Sign up (skip if user already exists)
+  const signupRes = await request(app)
+    .post('/auth/sign-up/email')
+    .set('Content-Type', 'application/json')
+    .send({
+      email: options.email,
+      password: options.password,
+      name: name,
+    });
+
+  // 422 means user already exists (unique email constraint), which is fine for tests
+  // We can just login instead
+  if (signupRes.status !== 200 && signupRes.status !== 422) {
+    throw new Error(
+      `Signup failed: ${signupRes.status} - ${JSON.stringify(signupRes.body)}`
+    );
+  }
+
+  // Step 2: Log in (sign-up may not return token, so we login to get it)
+  const loginRes = await request(app)
     .post('/auth/sign-in/email')
     .set('Content-Type', 'application/json')
     .send({ email: options.email, password: options.password });
 
-  if (res.status !== 200) {
+  if (loginRes.status !== 200) {
     throw new Error(
-      `Login failed: ${res.status} - ${JSON.stringify(res.body)}`
+      `Login failed: ${loginRes.status} - ${JSON.stringify(loginRes.body)}`
     );
   }
 
+  // Extract user id and token from login response
   // BetterAuth sign-in/email returns { user, accessToken, refreshToken } at top level
-  const body = res.body as {
+  const body = loginRes.body as {
     user?: { id: string };
     accessToken?: string;
     refreshToken?: string;
@@ -94,15 +139,25 @@ export async function createTestUser(app: Express, options: TestUserOptions): Pr
     body.session?.accessToken ??
     body.session?.token ??
     body.token ??
-    (res.headers['set-auth-token'] as string) ??
-    (Array.isArray(res.headers['set-cookie'])
-      ? res.headers['set-cookie'][0]?.split(';')[0]?.replace(/^[^=]+=/, '')
+    (loginRes.headers['set-auth-token'] as string) ??
+    (Array.isArray(loginRes.headers['set-cookie'])
+      ? loginRes.headers['set-cookie'][0]?.split(';')[0]?.replace(/^[^=]+=/, '')
       : undefined);
 
   if (!id || !token) {
     throw new Error(
       `Login response missing id or token: ${JSON.stringify(body)}`
     );
+  }
+
+  // Step 3: (Optional) Update user role if specified
+  // BetterAuth signup doesn't support role, so we update it directly
+  if (options.role) {
+    const { dbClient } = await import('../src/infrastructure/db.client.js');
+    const { users } = await import('../src/schemas/user.schema.js');
+    const { eq } = await import('drizzle-orm');
+
+    await dbClient.update(users).set({ role: options.role as any }).where(eq(users.id, id)).execute();
   }
 
   return { id, token };

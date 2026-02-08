@@ -13,7 +13,8 @@ import { beforeAll } from 'vitest';
 // Setup environment variables for tests
 beforeAll(() => {
   // Mock required environment variables
-  process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/yacc_test';
+  // Use the same credentials as docker-compose for test database
+  process.env.DATABASE_URL = 'postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox';
   process.env.BETTER_AUTH_SECRET = 'test-secret-key-for-better-auth-12345';
   process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-12345';
   process.env.CLOUDFLARE_R2_ENDPOINT = 'https://test.r2.cloudflarestorage.com';

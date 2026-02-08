@@ -146,71 +146,102 @@ export class AuthController {
     return this.delegateToAuth(req, res);
   }
 
-  /**
-   * Handle all other BetterAuth routes
-   * Routes: /sign-up/email, /sign-out, /get-session, etc.
-   *
-   * This wildcard route MUST be last so custom routes above take precedence
-   * 
-   * BetterAuth provides:
-   * - /sign-out (logout)
-   * - /get-session (session retrieval)
-   * - /sign-up/email (registration)
-   * - /refresh-token (token refresh with Bearer plugin)
-   */
-  @All('/*')
-  async handleAuth(@Req() req: BetterAuthRequest, @Res() res: Response): Promise<void> {
-    return this.delegateToAuth(req, res);
-  }
+   /**
+    * Handle all other BetterAuth routes
+    * Routes: /sign-up/email, /sign-out, /get-session, etc.
+    *
+    * This wildcard route MUST be last so custom routes above take precedence
+    * 
+    * BetterAuth provides:
+    * - /sign-out (logout)
+    * - /get-session (session retrieval)
+    * - /sign-up/email (registration)
+    * - /refresh-token (token refresh with Bearer plugin)
+    */
+   @All('/*')
+   async handleAuth(@Req() req: any, @Res() res: Response): Promise<void> {
+     return this.delegateToAuth(req, res);
+   }
 
-  /**
-   * Helper method to delegate requests to BetterAuth handler
-   * @private
-   */
-  private async delegateToAuth(req: BetterAuthRequest, res: Response): Promise<void> {
-    const correlationId = req.correlationId || 'unknown';
+   /**
+    * Helper method to delegate requests to BetterAuth handler
+    * Reads body from request and converts to BetterAuth format
+    * @private
+    */
+   private async delegateToAuth(req: any, res: Response): Promise<void> {
+     const correlationId = req.correlationId || 'unknown';
 
-    try {
-      // Convert Express request to BetterAuth format
-      // Need full URL for Request constructor
-      const protocol = req.protocol || 'http';
-      const host = req.get('host') || 'localhost:3000';
-      const fullUrl = `${protocol}://${host}${req.originalUrl || req.url}`;
+     try {
+       // Convert Express request to BetterAuth format
+       // Need full URL for Request constructor
+       const protocol = req.protocol || 'http';
+       const host = req.get('host') || 'localhost:3000';
+       const fullUrl = `${protocol}://${host}${req.originalUrl || req.url}`;
 
-      // Convert Express headers to fetch Request compatible format
-      const headersRecord: Record<string, string> = {};
-      Object.entries(req.headers).forEach(([key, value]) => {
-        if (typeof value === 'string') {
-          headersRecord[key] = value;
-        } else if (Array.isArray(value)) {
-          headersRecord[key] = value.join(';');
-        }
-      });
+       // Convert Express headers to fetch Request compatible format
+       const headersRecord: Record<string, string> = {};
+       Object.entries(req.headers).forEach(([key, value]) => {
+         if (typeof value === 'string') {
+           headersRecord[key] = value;
+         } else if (Array.isArray(value)) {
+           headersRecord[key] = value.join(';');
+         }
+       });
 
-      const request = new Request(fullUrl, {
-        method: req.method,
-        headers: headersRecord,
-        body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
-      });
+       // Prepare body: req.body is parsed by bodyParserMiddleware
+       let body: string | undefined;
+       if (req.method !== 'GET' && req.method !== 'HEAD') {
+         // routing-controllers may pass body as object or string
+         // BetterAuth expects it as a string
+         if (typeof req.body === 'string') {
+           body = req.body;
+         } else if (req.body) {
+           body = JSON.stringify(req.body);
+         }
+       }
 
-      const response = await betterAuthClient.handler(request);
+       const request = new Request(fullUrl, {
+         method: req.method,
+         headers: headersRecord,
+         body: body,
+       });
 
-      // Set headers from response
-      response.headers.forEach((value: string, key: string) => {
-        res.setHeader(key, value);
-      });
+       const response = await betterAuthClient.handler(request);
 
-      // Set status
-      res.status(response.status);
+       // Log BetterAuth response for debugging
+       const responseBody = await response.text();
+       if (response.status >= 400) {
+         logger.warn(
+           { correlationId, status: response.status, body: responseBody },
+           'BetterAuth returned error response'
+         );
+       }
 
-      // Send body
-      const body = await response.text();
-      res.send(body);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
-      logger.error('BetterAuth handler error - correlationId: %s, error: %s', correlationId, errorMessage);
+       // Set headers from response
+       response.headers.forEach((value: string, key: string) => {
+         // Skip content-length header as express will set it
+         if (key.toLowerCase() !== 'content-length') {
+           res.setHeader(key, value);
+         }
+       });
 
-      res.status(500).json({ error: errorMessage });
-    }
-  }
+       // Set status
+       res.status(response.status);
+       
+       // Set content-type if not already set
+       if (!res.getHeader('content-type') && responseBody) {
+         res.setHeader('content-type', 'application/json');
+       }
+       
+       res.send(responseBody);
+     } catch (error: unknown) {
+       const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
+       logger.error('BetterAuth handler error - correlationId: %s, error: %s', correlationId, errorMessage);
+
+       // Only send error response if headers haven't been sent
+       if (!res.headersSent) {
+         res.status(500).json({ error: errorMessage });
+       }
+     }
+   }
 }

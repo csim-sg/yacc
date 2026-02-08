@@ -19,6 +19,10 @@ import { wsGateway } from './websockets/gateway';
 // ===== EXPRESS APP =====
 const app = express();
 
+// Register body parser middleware BEFORE routing-controllers
+// This ensures request.body is available in all route handlers
+app.use(bodyParserMiddleware);
+
 useExpressServer(app, {
   controllers: controllers,
   authorizationChecker: authorizationChecker,
@@ -37,7 +41,6 @@ useExpressServer(app, {
   middlewares: [
     correlationIdMiddleware,
     requestLoggingMiddleware,
-    bodyParserMiddleware,
   ],
 });
 

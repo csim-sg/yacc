@@ -229,7 +229,7 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| HD-001 | Create Docker Compose configuration (PostgreSQL, Redis, R2 local/minio) | Not Started | P0 | Backend | BE-001, BE-013, BE-020 | All services running via docker-compose up |  |  |
+| HD-001 | Create Docker Compose configuration (PostgreSQL, Redis, R2 local/minio) | Not Started | P0 | Backend | BE-001, BE-013, BE-020 | All services running via docker compose up |  |  |
 | HD-002 | Create production Docker image for backend (multi-stage build) | Not Started | P0 | Backend | BE-025 | Docker image builds and runs correctly |  |  |
 | HD-003 | Create production Docker image for frontend (static build for S3) | Not Started | P0 | Frontend | FE-021 | Docker image generates static build |  |  |
 | HD-004 | Create database migration scripts (Drizzle migrations) | Not Started | P0 | Backend | BE-002 | Migrations tested, reversible |  |  |

@@ -16,7 +16,7 @@ This document defines the **test cases** and **test data setup** for Week 1 deli
 
 ### 2.1 Prerequisites
 
-- **PostgreSQL** and **Redis** running (e.g. `docker-compose up -d`).
+- **PostgreSQL** and **Redis** running (e.g. `docker compose up -d`).
 - **Database migrated** (Drizzle migrations applied).
 - **Backend** `.env` configured (`DATABASE_URL`, `BETTER_AUTH_SECRET`, etc.).
 
@@ -126,7 +126,7 @@ pnpm test -- inbox-filters.spec.ts
 
 ## 4. Execution Order (Week 1)
 
-1. **Start services**: `docker-compose up -d` (PostgreSQL, Redis).
+1. **Start services**: `docker compose up -d` (PostgreSQL, Redis).
 2. **Backend env**: Ensure `packages/backend/.env` has `DATABASE_URL`, `BETTER_AUTH_SECRET`, etc.
 3. **Migrations**: `pnpm --filter @yacc/backend db:migrate` (or equivalent).
 4. **Seed**: `pnpm --filter @yacc/backend db:seed` then `pnpm --filter @yacc/backend db:fixtures`.

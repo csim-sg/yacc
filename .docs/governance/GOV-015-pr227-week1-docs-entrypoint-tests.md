@@ -81,8 +81,8 @@ Since v1.1, PR #227 expanded materially beyond Week-1 docs + BE-007 filter/tests
    - Constraint: do not reintroduce `app.use(...)` for middleware registration.
    - Required remediation: enable routing-controllers body parsing via configuration in `useExpressServer` (and mirror in test app).
 
-3. **Docs mismatch: docker-compose vs docker compose**
-   - Finding: `docker-compose` command not available in the current environment.
+3. **Docs mismatch: docker compose vs docker compose**
+   - Finding: `docker compose` command not available in the current environment.
    - Required remediation: update docs to prefer `docker compose up -d`.
 
 4. **Governance completeness**
@@ -96,7 +96,7 @@ Since v1.1, PR #227 expanded materially beyond Week-1 docs + BE-007 filter/tests
    - Result: fails during setup due to Redis connection refused and login body parsing regression.
 
 2. **Local services**
-   - `docker-compose` is unavailable; use `docker compose`.
+   - `docker compose` is unavailable; use `docker compose`.
 
 ### 4. Updated Architecture Decisions
 
@@ -208,7 +208,7 @@ sequenceDiagram
 |------|------------|--------|-----------|
 | **Entrypoint app export enables test-only code paths** | Low | Medium | `NODE_ENV !== 'test'` gate ensures start() only runs in production/development; code is clean (no hacks). |
 | **Query validation incomplete** | Low | Low | Validation covers all known query params; new params must include validation before merging. |
-| **Test setup flakes if DB/Redis unavailable** | Medium | Medium | Tests fail fast with actionable error (not silently skipped); CI must run docker-compose before test suite. |
+| **Test setup flakes if DB/Redis unavailable** | Medium | Medium | Tests fail fast with actionable error (not silently skipped); CI must run docker compose before test suite. |
 
 ---
 
@@ -228,7 +228,7 @@ sequenceDiagram
 
 1. **Schemas flatness:** Remove `packages/backend/src/schemas/enums/` by moving enums into flat `schemas/` directory; update imports.
 2. **Body parsing config:** Enable body parsing via routing-controllers configuration (no `app.use`) and ensure BetterAuth login receives parsed body.
-3. **Docs:** Update test prerequisites to use `docker compose up -d` (not `docker-compose`).
+3. **Docs:** Update test prerequisites to use `docker compose up -d` (not `docker compose`).
 4. **CI/CD:** Ensure CI boots Postgres + Redis and seeds fixtures before BE-007 suite.
 5. **Governance:** Keep GOV-015 updated if further scope expands; avoid “Approved” state until all verification steps pass.
 
