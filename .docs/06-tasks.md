@@ -358,8 +358,8 @@ This document provides the complete execution plan for all 22 P0 Backend issues 
 | **BE-005** | Implement RBAC middleware | **Ready** | BE-002, BE-003 | 1 |
 | **BE-016** | Set up Socket.io WebSocket server | **Ready** | BE-003, BE-026 | 1 |
 | **BE-013** | Set up Redis + BullMQ for message retry queue | **Done** | None | 2 |
-| **BE-007** | Implement inbox API | Ready | BE-002, BE-005 | 2 |
-| **BE-008** | Implement conversation detail endpoint | Ready | BE-007 | 2 |
+| **BE-007** | Implement inbox API | **Done** (PR #227 merged) | BE-002, BE-005 | 2 |
+| **BE-008** | Implement conversation detail endpoint | **Done** (PR #227 merged) | BE-007 | 2 |
 | **BE-009** | Implement message retrieval endpoint | **Done** (PR #240 merged) | BE-002, BE-003, BE-008 | 2 |
 | **BE-010** | Implement send message endpoint | **Done** (PR #240 merged) | BE-008, BE-013, BE-020 | 2 |
 | **BE-014** | Implement exponential backoff for retries | **Done** (PR #242 merged) | BE-013 | 3 |

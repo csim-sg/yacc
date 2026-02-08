@@ -931,8 +931,9 @@ REACT_APP_WS_URL=https://api.example.com
 
 3. **Routing-Controllers Best Practices**
    - Use `middlewares` option in `useExpressServer()` to register middleware
-   - ❌ NO: Use `app.use()` for middleware registration
+   - ❌ NO: Use `app.use()` for general middleware registration
    - ✅ YES: Pass middlewares via routing-controllers config
+   - ✅ Exception: request body parsing may use `app.use()` at the entrypoint boundary for BetterAuth compatibility (see ADR-014)
 
 4. **One Definition Per File**
    - One class per file
