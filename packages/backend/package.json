@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch index.ts",
     "clean": "rm -rf dist dist-tmp",
     "build:tsc": "tsc --outDir dist-tmp",
-    "build:bundle": "tsx scripts/bundle-backend.ts",
+    "build:bundle": "tsx bundle-backend.ts",
     "build": "pnpm run clean && pnpm run build:tsc && pnpm run build:bundle",
     "start": "node --enable-source-maps dist/index.js",
     "test": "vitest",

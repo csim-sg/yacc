@@ -52,7 +52,7 @@ const io = new Server(server, {
 });
 
 // ===== DATABASE AND STARTUP =====
-async function start() {
+export async function start(): Promise<void> {
   try {
     console.log('✓ Configuration validated successfully');
     console.log(`  - Environment: ${appConfig.APP_ENV}`);
@@ -108,7 +108,4 @@ async function start() {
   }
 }
 
-// Start server in production/development (not in tests)
-if (process.env.NODE_ENV !== 'test') {
-  start();
-}
+// Do not auto-start on import; packages/backend/index.ts is the entrypoint.
