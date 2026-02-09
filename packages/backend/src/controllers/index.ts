@@ -13,6 +13,7 @@
 
 import { AuthController } from './auth.controller.js';
 import { ConversationsController } from './conversations.controller.js';
+import { DLQController } from './dlq.controller.js';
 import { MessageController } from './message.controller.js';
 import { AuditController } from './audit.controller.js';
 import { HealthController } from './health.controller.js';
@@ -21,6 +22,7 @@ import { QueueController } from './queue.controller.js';
 export const controllers = [
   AuthController,
   ConversationsController,
+  DLQController,
   MessageController,
   AuditController,
   HealthController,
