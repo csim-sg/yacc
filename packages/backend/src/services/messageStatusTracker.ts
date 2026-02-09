@@ -6,6 +6,7 @@
  */
 
 import { eq } from 'drizzle-orm';
+import type { Platform } from '@yacc/common/types/platform.type';
 import { dbClient } from '../infrastructure/db.client.js';
 import { enqueueRetry } from '../infrastructure/queues.client.js';
 import { logger } from '../infrastructure/logger.js';
@@ -15,11 +16,10 @@ import type { SendMessageJobPayload } from '../types/message-queue.types.js';
 import { MessageEvents } from '../websockets/wsConstants.js';
 
 // ============================================
-// Message Status & Platform Types
+// Message Status Type
 // ============================================
 
 export type MessageStatus = 'pending' | 'sent' | 'failed';
-export type Platform = 'telegram' | 'irc' | 'internal';
 
 // ============================================
 // Message Status Events
