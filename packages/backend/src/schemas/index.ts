@@ -1,6 +1,7 @@
 import { attachments } from "./attachment.schema";
 import { auditLogs } from "./auditLog.schema";
 import { conversations } from "./conversation.schema";
+import { deadLetterQueue } from "./deadLetterQueue.schema";
 import { messages } from "./message.schema";
 import { notes } from "./note.schema";
 import { notifications } from "./notification.schema";
@@ -25,6 +26,7 @@ export const schemas = {
   auditLogs,
   conversations,
   conversationTags,
+  deadLetterQueue,
   messages,
   notes,
   notifications,

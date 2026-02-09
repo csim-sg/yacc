@@ -1,8 +1,8 @@
 # Active Execution Plans Index
 
 **Last Updated**: 2026-02-09  
-**Status**: ✅ Week 1 Backend COMPLETE, ✅ BE-009/010 COMPLETE (PR #240), ✅ BE-011 COMPLETE (PR #241), Phase 2 In Progress
-**Current Focus**: BE-011 in architect review, prepare BE-012/014/017/018/019 (Feb 9, 14:30)  
+**Status**: ✅ Week 1 COMPLETE, ✅ BE-009/010 COMPLETE (PR #240), ✅ BE-011 COMPLETE (PR #241), ✅ BE-014 Phases 1-3 COMPLETE
+**Current Focus**: BE-014 Phase 4 ready, BE-011 architect review (Feb 9, 16:30 UTC)  
 
 ---
 
@@ -110,8 +110,9 @@ Governance references:
 **Backend** (Priority Order):
 - [x] BE-009/010: Message Retrieval & Send - COMPLETE (PR #240 merged)
 - [x] BE-011: Message Status Tracking - COMPLETE (PR #241 in review)
-- [ ] BE-014: Exponential Backoff Retry - START Feb 11
-- [ ] BE-012: Message Retry Endpoint - START Feb 12
+- [x] BE-014: Exponential Backoff Retry - PHASES 1-3 COMPLETE (Phase 4 ready)
+- [ ] BE-014 Phase 4: Service integration & worker registration - START Feb 11
+- [ ] BE-012: Message Retry Endpoint - START Feb 12 (unblocked by BE-014)
 - [ ] BE-017/018/019: WebSocket Events - START Feb 13
 
 **Frontend** (Parallel):
