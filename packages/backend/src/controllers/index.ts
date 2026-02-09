@@ -11,15 +11,17 @@
  * - QueueController: Message queue status endpoints
  */
 
-import { AuthController } from './auth.controller';
-import { ConversationsController } from './conversations.controller';
-import { AuditController } from './audit.controller';
-import { HealthController } from './health.controller';
-import { QueueController } from './queue.controller';
+import { AuthController } from './auth.controller.js';
+import { ConversationsController } from './conversations.controller.js';
+import { MessageController } from './message.controller.js';
+import { AuditController } from './audit.controller.js';
+import { HealthController } from './health.controller.js';
+import { QueueController } from './queue.controller.js';
 
 export const controllers = [
   AuthController,
   ConversationsController,
+  MessageController,
   AuditController,
   HealthController,
   QueueController,
