@@ -8,23 +8,18 @@
 // Import reflect-metadata for decorators (socket-controllers needs this)
 import 'reflect-metadata';
 
-import { beforeAll } from 'vitest';
-
-// Setup environment variables for tests
-beforeAll(() => {
-  // Mock required environment variables
-  // Use the same credentials as docker-compose for test database
-  process.env.DATABASE_URL = 'postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox';
-  process.env.BETTER_AUTH_SECRET = 'test-secret-key-for-better-auth-12345';
-  process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-12345';
-  process.env.CLOUDFLARE_R2_ENDPOINT = 'https://test.r2.cloudflarestorage.com';
-  process.env.CLOUDFLARE_R2_ACCESS_KEY = 'test-access-key';
-  process.env.CLOUDFLARE_R2_SECRET_KEY = 'test-secret-key';
-  process.env.CLOUDFLARE_R2_BUCKET = 'yacc-test';
-  process.env.APP_FRONTEND_URL = 'http://localhost:3000';
-  process.env.RESET_PASSWORD_URL = 'http://localhost:3000/reset-password';
-  process.env.NODE_ENV = 'test';
-});
+// Setup environment variables IMMEDIATELY (before modules are imported)
+// This is needed because config modules load at import time, not at test time
+process.env.DATABASE_URL = 'postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox';
+process.env.BETTER_AUTH_SECRET = 'test-secret-key-for-better-auth-12345';
+process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-12345';
+process.env.CLOUDFLARE_R2_ENDPOINT = 'https://test.r2.cloudflarestorage.com';
+process.env.CLOUDFLARE_R2_ACCESS_KEY = 'test-access-key';
+process.env.CLOUDFLARE_R2_SECRET_KEY = 'test-secret-key';
+process.env.CLOUDFLARE_R2_BUCKET = 'yacc-test';
+process.env.APP_FRONTEND_URL = 'http://localhost:3000';
+process.env.RESET_PASSWORD_URL = 'http://localhost:3000/reset-password';
+process.env.NODE_ENV = 'test';
 
 // Suppress console logs during tests (can override with --verbose flag)
 if (process.env.DEBUG !== 'true') {

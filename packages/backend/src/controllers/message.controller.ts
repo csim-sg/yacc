@@ -259,7 +259,97 @@ export class MessageController {
         'Failed to send message'
       );
 
-      res.status(500).json({ error: 'Failed to send message' });
-    }
-  }
+       res.status(500).json({ error: 'Failed to send message' });
+     }
+   }
+
+   /**
+    * GET /conversations/:conversationId/messages/:messageId/status
+    * Get the status of a specific message
+    */
+   @Get('/:messageId/status')
+   async getMessageStatus(
+     @Param('conversationId') conversationId: string,
+     @Param('messageId') messageId: string,
+     @Req() req: AuthenticatedRequest,
+     @Res() res: Response
+   ): Promise<void> {
+     const correlationId = req.correlationId || 'unknown';
+
+     try {
+       // Verify conversation exists
+       const conversationExists = await messageService.conversationExists(conversationId);
+       if (!conversationExists) {
+         logger.warn(
+           {
+             conversationId,
+             messageId,
+             correlationId,
+           },
+           'Conversation not found'
+         );
+         res.status(404).json({ error: 'Conversation not found' });
+         return;
+       }
+
+       // Get message
+       const message = await messageService.getMessage(messageId);
+       if (!message) {
+         logger.warn(
+           {
+             conversationId,
+             messageId,
+             correlationId,
+           },
+           'Message not found'
+         );
+         res.status(404).json({ error: 'Message not found' });
+         return;
+       }
+
+       // Verify message belongs to conversation
+       if (message.conversationId !== conversationId) {
+         logger.warn(
+           {
+             conversationId,
+             messageId,
+             actualConversationId: message.conversationId,
+             correlationId,
+           },
+           'Message does not belong to conversation'
+         );
+         res.status(404).json({ error: 'Message not found' });
+         return;
+       }
+
+       logger.debug(
+         {
+           conversationId,
+           messageId,
+           status: message.status,
+           correlationId,
+         },
+         'Message status retrieved'
+       );
+
+       res.status(200).json({
+         messageId: message.id,
+         status: message.status,
+         createdAt: message.createdAt,
+         updatedAt: message.updatedAt,
+       });
+     } catch (error) {
+       logger.error(
+         {
+           conversationId,
+           messageId,
+           correlationId,
+           error: error instanceof Error ? error.message : 'Unknown error',
+         },
+         'Failed to get message status'
+       );
+
+       res.status(500).json({ error: 'Failed to get message status' });
+     }
+   }
 }

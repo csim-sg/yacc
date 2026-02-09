@@ -7,6 +7,7 @@ import type { Message } from '../schemas/message.schema.js';
 import type { GetMessagesQuery, SendMessageRequestBody } from '../types/message.types.js';
 import { logger } from '../infrastructure/logger.js';
 import { connectorManager } from './connector-manager.js';
+import { MessageStatusTracker } from './messageStatusTracker.js';
 
 /**
  * Message Service - handles message retrieval and sending
@@ -135,113 +136,100 @@ export class MessageService {
     }
   }
 
-  /**
-   * Dispatch message to connector and update status
-   * This is async and non-blocking; errors are logged but don't fail the original request
-   */
-  private async dispatchToConnector(
-    conversationId: string,
-    message: Message,
-    userId: string
-  ): Promise<void> {
-    try {
-      // Get conversation details
-      const conversation = await dbClient.query.conversations.findFirst({
-        where: eq(conversations.id, conversationId),
-      });
+   /**
+    * Dispatch message to connector and update status
+    * This is async and non-blocking; errors are logged but don't fail the original request
+    */
+   private async dispatchToConnector(
+     conversationId: string,
+     message: Message,
+     userId: string
+   ): Promise<void> {
+     let platform: 'telegram' | 'irc' | 'internal' = 'internal';
 
-      if (!conversation) {
-      logger.warn(
-        {
-          conversationId,
-          messageId: message.id,
-        },
-        'Conversation not found for dispatch'
-      );
-      return;
-    }
+     try {
+       // Get conversation details
+       const conversation = await dbClient.query.conversations.findFirst({
+         where: eq(conversations.id, conversationId),
+       });
 
-    logger.debug(
-      {
-        messageId: message.id,
-        conversationId,
-        channel: conversation.channel,
-      },
-      'Dispatching message to connector'
-    );
+       if (!conversation) {
+         logger.warn(
+           {
+             conversationId,
+             messageId: message.id,
+           },
+           'Conversation not found for dispatch'
+         );
+         return;
+       }
 
-      // For Phase 2A MVP: Use stub connector
-      // Stub immediately marks message as sent (simulates successful delivery)
-      // In Phase 2B/3, will be replaced with real Telegram/IRC connectors
+       platform = conversation.channel as 'telegram' | 'irc' | 'internal';
 
-      // Simulate connector sending (stub behavior for MVP)
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay to simulate I/O
+       logger.debug(
+         {
+           messageId: message.id,
+           conversationId,
+           channel: conversation.channel,
+         },
+         'Dispatching message to connector'
+       );
 
-      // Mark as sent (stub connector always succeeds)
-      await dbClient
-        .update(messages)
-        .set({
-          status: 'sent',
-          updatedAt: new Date(),
-        })
-        .where(eq(messages.id, message.id));
+       // For Phase 2A MVP: Use stub connector
+       // Stub immediately marks message as sent (simulates successful delivery)
+       // In Phase 2B/3, will be replaced with real Telegram/IRC connectors
 
-      logger.info(
-        {
-          messageId: message.id,
-          conversationId,
-          status: 'sent',
-        },
-        'Message dispatched successfully (stub)'
-      );
+       // Simulate connector sending (stub behavior for MVP)
+       await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay to simulate I/O
 
-      // TODO: In Phase 2B, emit WebSocket event here
-      // socketEmitter.emit('message.sent', { conversationId, message })
-    } catch (error) {
-      logger.error(
-        {
-          messageId: message.id,
-          conversationId,
-          error: error instanceof Error ? error.message : 'Unknown',
-        },
-        'Error dispatching message to connector'
-      );
+       // Track sent status via MessageStatusTracker
+       await MessageStatusTracker.trackSentMessage({
+         messageId: message.id,
+         conversationId,
+         status: 'sent',
+         platform,
+         timestamp: new Date(),
+       });
 
-      // Mark as failed
-      try {
-        await dbClient
-          .update(messages)
-          .set({
-            status: 'failed',
-            metadata: {
-              errorDetails: {
-                code: 'CONNECTOR_DISPATCH_ERROR',
-                message: error instanceof Error ? error.message : 'Unknown error',
-                timestamp: new Date().toISOString(),
-              },
-            },
-            updatedAt: new Date(),
-          })
-          .where(eq(messages.id, message.id));
+       logger.info(
+         {
+           messageId: message.id,
+           conversationId,
+           status: 'sent',
+         },
+         'Message dispatched successfully (stub)'
+       );
+     } catch (error) {
+       logger.error(
+         {
+           messageId: message.id,
+           conversationId,
+           error: error instanceof Error ? error.message : 'Unknown',
+         },
+         'Error dispatching message to connector'
+       );
 
-        logger.warn(
-          {
-            messageId: message.id,
-            conversationId,
-          },
-          'Message marked as failed'
-        );
-      } catch (updateError) {
-        logger.error(
-          {
-            messageId: message.id,
-            error: updateError instanceof Error ? updateError.message : 'Unknown',
-          },
-          'Failed to update message status to failed'
-        );
-      }
-    }
-  }
+       // Track failed status via MessageStatusTracker
+       try {
+         await MessageStatusTracker.trackFailedMessage({
+           messageId: message.id,
+           conversationId,
+           status: 'failed',
+           platform,
+           error: error instanceof Error ? error.message : 'Unknown error',
+           timestamp: new Date(),
+         });
+       } catch (trackerError) {
+         logger.error(
+           {
+             messageId: message.id,
+             error: trackerError instanceof Error ? trackerError.message : 'Unknown',
+           },
+           'Failed to track message status'
+         );
+       }
+     }
+   }
 
   /**
    * Get a single message by ID
@@ -285,34 +273,58 @@ export class MessageService {
     }
   }
 
-  /**
-   * Get user display name
-   */
-  async getUserName(userId: string): Promise<string> {
-    try {
-      const user = await dbClient.query.users.findFirst({
-        where: eq(users.id, userId),
-        columns: { id: true, email: true },
-      });
+   /**
+    * Get user display name
+    */
+   async getUserName(userId: string): Promise<string> {
+     try {
+       const user = await dbClient.query.users.findFirst({
+         where: eq(users.id, userId),
+         columns: { id: true, email: true },
+       });
 
-      if (!user) {
-        return 'Unknown User';
-      }
+       if (!user) {
+         return 'Unknown User';
+       }
 
-      // Extract name from email (before @)
-      const name = user.email?.split('@')[0] || 'User';
-      return name.charAt(0).toUpperCase() + name.slice(1);
-    } catch (error) {
-      logger.error(
-        {
-          userId,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        },
-        'Failed to fetch user name'
-      );
-      return 'Unknown User';
-    }
-  }
+       // Extract name from email (before @)
+       const name = user.email?.split('@')[0] || 'User';
+       return name.charAt(0).toUpperCase() + name.slice(1);
+     } catch (error) {
+       logger.error(
+         {
+           userId,
+           error: error instanceof Error ? error.message : 'Unknown error',
+         },
+         'Failed to fetch user name'
+       );
+       return 'Unknown User';
+     }
+   }
+
+   /**
+    * Get message status (for querying message status after sending)
+    */
+   async getMessageStatus(messageId: string): Promise<'pending' | 'sent' | 'failed' | null> {
+     try {
+       const result = await dbClient
+         .select({ status: messages.status })
+         .from(messages)
+         .where(eq(messages.id, messageId))
+         .limit(1);
+
+       return result[0]?.status || null;
+     } catch (error) {
+       logger.error(
+         {
+           messageId,
+           error: error instanceof Error ? error.message : 'Unknown error',
+         },
+         'Failed to fetch message status'
+       );
+       throw error;
+     }
+   }
 }
 
 export const messageService = new MessageService();
