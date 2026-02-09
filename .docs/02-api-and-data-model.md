@@ -207,6 +207,41 @@ bulk_action_applied
 }
 ```
 
+### Dead Letter Queue (DLQ) Entry
+```json
+{
+  "id": "uuid",
+  "messageId": "uuid",
+  "conversationId": "uuid",
+  "payload": {
+    "messageId": "uuid",
+    "conversationId": "uuid",
+    "recipientId": "uuid",
+    "body": "Message content",
+    "direction": "outbound",
+    "platformType": "telegram",
+    "retryCount": 3,
+    "lastError": "Platform error"
+  },
+  "failureReason": "max_retries_exceeded" | "validation_error" | "platform_error" | "network_error" | "unknown",
+  "totalAttempts": 3,
+  "lastError": "Error details",
+  "movedAt": "2026-01-16T10:00:00Z",
+  "expiresAt": "2026-01-23T10:00:00Z",
+  "retryAttempt": false,
+  "retriedAt": "2026-01-16T11:00:00Z",
+  "retriedBy": "uuid",
+  "createdAt": "2026-01-16T10:00:00Z",
+  "updatedAt": "2026-01-16T10:00:00Z"
+}
+```
+
+**Purpose**: Stores messages that failed after 3 retry attempts for ops investigation and manual retry
+
+**Retention**: 7 days (auto-cleanup via scheduled job)
+
+**Access**: Manager+ roles only
+
 ### Message
 ```json
 {
@@ -551,11 +586,55 @@ CREATE TABLE raw_payloads (
   content_type VARCHAR(100),
   created_at TIMESTAMP DEFAULT NOW(),
   expires_at TIMESTAMP,
-  
+
   INDEX(message_id),
   INDEX(created_at)
 );
 ```
+
+### Dead Letter Queue (DLQ)
+```sql
+CREATE TABLE dead_letter_queue (
+  id UUID PRIMARY KEY,
+  message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+
+  -- Original message payload for re-sending
+  payload JSONB NOT NULL,
+
+  -- Failure tracking
+  failure_reason VARCHAR(255) NOT NULL,  -- max_retries_exceeded, validation_error, platform_error, network_error, unknown
+  total_attempts INTEGER NOT NULL DEFAULT 3,
+  last_error TEXT NOT NULL,
+
+  -- Timestamps
+  moved_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMP NOT NULL,  -- Set to NOW() + 7 days
+
+  -- Re-queue tracking (if manually retried from DLQ)
+  retry_attempt BOOLEAN DEFAULT FALSE,
+  retried_at TIMESTAMP,
+  retried_by UUID,  -- User who retried
+
+  -- Metadata
+  metadata JSONB,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+  INDEX(message_id),
+  INDEX(conversation_id),
+  INDEX(moved_at),
+  INDEX(expires_at),  -- For cleanup queries
+  INDEX(failure_reason),
+  INDEX(retry_attempt)
+);
+```
+
+**Purpose**: Stores messages that failed after 3 retry attempts for ops investigation and manual retry
+
+**Retention**: 7 days (auto-cleanup via scheduled job)
+
+**Access**: Manager+ roles only
 
 ### Audit Logs
 Conversation-scoped audit events only (entity_type is always `conversation`).
@@ -871,6 +950,24 @@ Resets user password using a valid reset token.
 
 ---
 
+#### `GET /conversations/:id/messages/:messageId/status`
+**Response:**
+```json
+{
+  "messageId": "uuid",
+  "status": "pending" | "sent" | "failed",
+  "createdAt": "ISO-8601 timestamp",
+  "updatedAt": "ISO-8601 timestamp"
+}
+```
+
+**Auth**: User can access their own messages, managers+ can access any message
+
+**Error Codes:**
+- `404`: Conversation or message not found, or message doesn't belong to conversation
+
+---
+
 #### `GET /messages/:id/raw-payload`
 **Response:**
 ```json
@@ -883,6 +980,75 @@ Resets user password using a valid reset token.
 ```
 
 **Auth**: Manager+ only, audit-logged
+
+---
+
+### Dead Letter Queue (DLQ)
+
+#### `GET /dlq`
+**Query**: `page`, `limit`, `failureReason`
+
+**Auth**: Manager+ only
+
+**Response:**
+```json
+{
+  "entries": [/* DLQ Entry models */],
+  "page": 1,
+  "limit": 25,
+  "total": 150
+}
+```
+
+---
+
+#### `GET /dlq/stats`
+**Auth**: Manager+ only
+
+**Response:**
+```json
+{
+  "total": 150,
+  "byFailureReason": {
+    "max_retries_exceeded": 80,
+    "validation_error": 20,
+    "platform_error": 30,
+    "network_error": 15,
+    "unknown": 5
+  }
+}
+```
+
+---
+
+#### `POST /dlq/:id/re-queue`
+**Auth**: Manager+ only
+
+**Response:**
+```json
+{
+  "message": "Entry marked for manual retry",
+  "entry": {/* DLQ Entry model (updated) */}
+}
+```
+
+---
+
+#### `DELETE /dlq/:id`
+**Auth**: super_admin only (strict access control)
+
+**Response:**
+```json
+{
+  "message": "DLQ entry deleted successfully",
+  "deletedEntry": {
+    "id": "uuid",
+    "messageId": "uuid",
+    "conversationId": "uuid",
+    "failureReason": "max_retries_exceeded"
+  }
+}
+```
 
 ---
 

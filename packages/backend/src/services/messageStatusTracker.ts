@@ -287,7 +287,7 @@ class MessageStatusTrackerService {
       // await enqueueRetry({
       //   messageId: update.messageId,
       //   conversationId: update.conversationId,
-      //   platformType: update.platform as 'telegram' | 'irc' | 'internal',
+      //   platformType: update.platform as Platform,
       //   direction: 'outbound',
       //   body: '', // Need to fetch from database
       //   recipientId: '', // Need to get from conversation context
