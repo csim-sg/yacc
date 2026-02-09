@@ -3,7 +3,7 @@ import request from 'supertest';
 import { Express } from 'express';
 import { createTestApp, createTestUser, seedTestConversations } from './test-helpers.js';
 import { dbClient } from '../src/infrastructure/db.client.js';
-import { messages } from '../src/schemas/message.schema.js';
+import { messages, type Message } from '../src/schemas/message.schema.js';
 import { eq } from 'drizzle-orm';
 
 describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conversations/:id/messages)', () => {
@@ -174,16 +174,16 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(inboundRes.status).toBe(200);
-      const inboundMessages = inboundRes.body.messages;
-      expect(inboundMessages.every((m: any) => m.direction === 'inbound')).toBe(true);
+      const inboundMessages = inboundRes.body.messages as Message[];
+      expect(inboundMessages.every((m: Message) => m.direction === 'inbound')).toBe(true);
 
       const outboundRes = await request(app)
         .get(`/conversations/${conversationId}/messages?direction=outbound`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(outboundRes.status).toBe(200);
-      const outboundMessages = outboundRes.body.messages;
-      expect(outboundMessages.every((m: any) => m.direction === 'outbound')).toBe(true);
+      const outboundMessages = outboundRes.body.messages as Message[];
+      expect(outboundMessages.every((m: Message) => m.direction === 'outbound')).toBe(true);
     });
 
     it('should return messages ordered chronologically (oldest first)', async () => {

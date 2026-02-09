@@ -3,7 +3,7 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { createTestApp, createTestUser, seedTestConversations } from './test-helpers.js';
 import { dbClient } from '../src/infrastructure/db.client.js';
-import { messages } from '../src/schemas/message.schema.js';
+import { messages, type Message } from '../src/schemas/message.schema.js';
 import { eq } from 'drizzle-orm';
 
 describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', () => {
@@ -211,7 +211,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
       expect(listResponse.body.messages).toBeInstanceOf(Array);
 
       // Find the message we just sent
-      const message = listResponse.body.messages.find((m: any) => m.id === messageId);
+      const message = listResponse.body.messages.find((m: Message) => m.id === messageId);
       expect(message).toBeDefined();
       expect(message.status).toBe('sent');
     });
@@ -339,7 +339,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(messageResponse.status).toBe(200);
-      const message = messageResponse.body.messages.find((m: any) => m.id === messageId);
+      const message = messageResponse.body.messages.find((m: Message) => m.id === messageId);
 
       expect(message).toBeDefined();
       expect(message).toMatchObject({
