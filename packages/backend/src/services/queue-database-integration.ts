@@ -299,7 +299,7 @@ class QueueDatabaseIntegration {
       //   recipientId: message.recipient_id,
       //   body: message.body,
       //   direction: message.direction as 'inbound' | 'outbound',
-      //   platformType: message.platform_type as 'telegram' | 'irc' | 'internal',
+      //   platformType: message.platform_type as 'telegram' | 'irc' | 'whatsapp' | 'weChat' | 'meta' | 'twitter',
       //   retryCount: 0,
       //   metadata: message.metadata,
       // } : null;
