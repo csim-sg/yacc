@@ -20,7 +20,7 @@ export const SendMessageJobPayloadSchema = z.object({
   recipientId: z.string().uuid('Invalid recipient ID'),
   body: z.string().min(1, 'Message body required'),
   direction: z.enum(['inbound', 'outbound']),
-  platformType: z.enum(['telegram', 'irc', 'internal']),
+  platformType: z.enum(['telegram', 'irc', 'whatsapp', 'weChat', 'meta', 'twitter']),
   retryCount: z.number().int().min(0).max(3, 'Retry count cannot exceed 3'),
   lastError: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
