@@ -35,7 +35,7 @@
   },
   "agent": {
     "fullstack-developer": {
-      "description": "Fullstack developer, develop both frontend and backend codes, POC for any development related, specialized in Java, DotNet, NodeJS Typescript, React, Tenstack. ",
+      "description": "Fullstack developer specialist for YACC project. Implements features across backend (Node.js/Express) and frontend (React/TanStack Start) following project standards. Performs impact analysis before starting, delegates to QA after completion, follows detailed PR workflow. Use proactively for feature implementation, bug fixes, and refactoring tasks.",
       "mode": "primary",
       "prompt": "{file:./.opencode/prompts/fullstack-developer.md}",
       "tools": {
@@ -104,8 +104,8 @@
         }
       }
     },
-    "architect": {      
-      "description": "Solution Archtect, maintaining the requirement and features from users can be implemented without changing the planned archtecture. As much as possible, maintaining low cost for production deployment without compromising stability and maintainibility of the project. ",
+    "ea-architecture-validator": {      
+      "description": "Enterprise Architecture solution validator and Product Owner. Validates architectural decisions against ADRs, project constraints, EA principles, and governance standards. Ensures 95%+ requirement coverage before development. Use proactively when making architectural changes, introducing new patterns, before major refactoring, during PR reviews, or when capturing user requirements and ensuring documentation completeness.",
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/architect.md}",
       "model": "openai/gpt-5.2",
@@ -146,10 +146,10 @@
         }
       }
     },
-    "qa-tester": {
-      "description": "QA and Auto Test developer, suggest possible edge cases and test cases for the developed features. Create automated test scripts to run regression tests for any new features developed. ",
+    "code-reviewer": {
+      "description": "Expert code review specialist. Proactively reviews code for quality, security, maintainability, and strict adherence to YACC project constraints. Use immediately after writing or modifying code, before creating PRs.",
       "mode": "all",
-      "prompt": "{file:./.opencode/prompts/qa-tester.md}",
+      "prompt": "{file:./.opencode/prompts/code-reviewer.md}",
       "tools": {
         "write": true,
         "edit": true,
