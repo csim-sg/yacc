@@ -6,19 +6,20 @@
  */
 
 import { eq } from 'drizzle-orm';
-import type { Platform } from '@yacc/common/types/platform.type';
-import { dbClient } from '../infrastructure/db.client';
-import { messages } from '../schemas/message.schema';
-import { logger } from '../infrastructure/logger';
-// TODO: Import enqueueRetry when messageStatusTracker is fully integrated with message service
-// import { enqueueRetry } from '../infrastructure/queues.client';
-import { MessageEvents } from '../websockets/wsConstants';
+import { dbClient } from '../infrastructure/db.client.js';
+import { enqueueRetry } from '../infrastructure/queues.client.js';
+import { logger } from '../infrastructure/logger.js';
+import { messages } from '../schemas/message.schema.js';
+import { dlqService } from './dlq.service.js';
+import type { SendMessageJobPayload } from '../types/message-queue.types.js';
+import { MessageEvents } from '../websockets/wsConstants.js';
 
 // ============================================
-// Message Status Enum
+// Message Status & Platform Types
 // ============================================
 
 export type MessageStatus = 'pending' | 'sent' | 'failed';
+export type Platform = 'telegram' | 'irc' | 'internal';
 
 // ============================================
 // Message Status Events
@@ -35,6 +36,7 @@ export interface MessageStatusUpdate {
   previousStatus?: MessageStatus;
   error?: string;
   timestamp: Date;
+  retryCount?: number; // Current retry attempt (0-3)
 }
 
 /**
@@ -265,48 +267,138 @@ class MessageStatusTrackerService {
     }
   }
 
-  /**
-   * Enqueue message for retry if it's retryable
-   */
-  private async enqueueRetryIfNeeded(
-    update: MessageStatusUpdate,
-    nextStatus: MessageStatus
-  ): Promise<void> {
-    try {
-      // Only retry if next status is pending
-      if (nextStatus !== 'pending') {
-        logger.debug({ 
-          messageId: update.messageId,
-          status: update.status,
-        });
-        return;
-      }
+   /**
+    * Enqueue message for retry if it's retryable, or move to DLQ if max attempts reached
+    */
+   private async enqueueRetryIfNeeded(
+     update: MessageStatusUpdate,
+     nextStatus: MessageStatus
+   ): Promise<void> {
+     try {
+       const retryCount = update.retryCount || 0;
+       const MAX_ATTEMPTS = 3;
 
-      // TODO: Enqueue for retry - requires full message context (body, direction, recipientId)
-      // This needs to be implemented when messageStatusTracker is integrated with message service
-      // await enqueueRetry({
-      //   messageId: update.messageId,
-      //   conversationId: update.conversationId,
-      //   platformType: update.platform as 'telegram' | 'irc' | 'internal',
-      //   direction: 'outbound',
-      //   body: '', // Need to fetch from database
-      //   recipientId: '', // Need to get from conversation context
-      //   retryCount: 1,
-      //   lastError: update.error,
-      // });
+       // If next status is not pending, no retry needed
+       if (nextStatus !== 'pending') {
+         logger.debug(
+           {
+             messageId: update.messageId,
+             status: update.status,
+             nextStatus,
+           },
+           'No retry needed (terminal status)'
+         );
+         return;
+       }
 
-      // logger.info({ 
-      //   messageId: update.messageId,
-      //   conversationId: update.conversationId,
-      //   platform: update.platform,
-      // });
-    } catch (error) {
-      logger.error({ 
-        messageId: update.messageId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Failed to enqueue message for retry');
-    }
-  }
+       // Check if we've exceeded max attempts
+       if (retryCount >= MAX_ATTEMPTS) {
+         logger.warn(
+           {
+             messageId: update.messageId,
+             conversationId: update.conversationId,
+             retryCount,
+             maxAttempts: MAX_ATTEMPTS,
+           },
+           'Max retry attempts reached, moving to DLQ'
+         );
+
+         // Fetch message from database for payload
+         const message = await dbClient.query.messages.findFirst({
+           where: eq(messages.id, update.messageId),
+         });
+
+         if (!message) {
+           logger.warn(
+             {
+               messageId: update.messageId,
+             },
+             'Message not found for DLQ move'
+           );
+           return;
+         }
+
+         // Create payload for DLQ
+         const dlqPayload: SendMessageJobPayload = {
+           messageId: update.messageId,
+           conversationId: update.conversationId,
+           recipientId: update.conversationId, // Fallback to conversationId
+           body: message.body,
+           direction: message.direction as 'inbound' | 'outbound',
+           platformType: update.platform,
+           retryCount: MAX_ATTEMPTS,
+           lastError: update.error,
+         };
+
+         // Move to DLQ
+         await dlqService.moveToDLQ(
+           update.messageId,
+           update.conversationId,
+           dlqPayload,
+           'max_retries_exceeded',
+           update.error || 'Unknown error after max attempts'
+         );
+
+         logger.info(
+           {
+             messageId: update.messageId,
+             conversationId: update.conversationId,
+           },
+           'Message moved to Dead Letter Queue'
+         );
+
+         return;
+       }
+
+       // Enqueue for retry (if under max attempts)
+       const message = await dbClient.query.messages.findFirst({
+         where: eq(messages.id, update.messageId),
+       });
+
+       if (!message) {
+         logger.warn(
+           {
+             messageId: update.messageId,
+           },
+           'Message not found for retry'
+         );
+         return;
+       }
+
+       // Create retry job payload
+       const retryPayload: SendMessageJobPayload = {
+         messageId: update.messageId,
+         conversationId: update.conversationId,
+         recipientId: update.conversationId, // Fallback to conversationId
+         body: message.body,
+         direction: message.direction as 'inbound' | 'outbound',
+         platformType: update.platform,
+         retryCount: retryCount + 1,
+         lastError: update.error,
+       };
+
+       // Enqueue to retry queue
+       const jobId = await enqueueRetry(retryPayload);
+
+       logger.info(
+         {
+           messageId: update.messageId,
+           conversationId: update.conversationId,
+           retryCount: retryCount + 1,
+           jobId,
+         },
+         'Message enqueued for retry'
+       );
+     } catch (error) {
+       logger.error(
+         {
+           messageId: update.messageId,
+           error: error instanceof Error ? error.message : String(error),
+         },
+         'Failed to enqueue message for retry'
+       );
+     }
+   }
 
   /**
    * Emit message status event via WebSocket
