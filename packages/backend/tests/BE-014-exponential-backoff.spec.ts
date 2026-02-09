@@ -51,7 +51,7 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
         recipientId: testUserId,
         body: 'Test message',
         direction: 'outbound' as const,
-        platformType: 'internal' as const,
+        platformType: 'telegram' as const,
         retryCount: 3,
       };
 
@@ -78,7 +78,7 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
         recipientId: testUserId,
         body: 'Test message',
         direction: 'outbound' as const,
-        platformType: 'internal' as const,
+        platformType: 'telegram' as const,
         retryCount: 3,
       };
 
@@ -123,7 +123,7 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
         recipientId: testUserId,
         body: 'Test retry message',
         direction: 'outbound' as const,
-        platformType: 'internal' as const,
+        platformType: 'telegram' as const,
         retryCount: 3,
       };
 
@@ -200,7 +200,7 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
         recipientId: testUserId,
         body: 'Message to retry',
         direction: 'outbound' as const,
-        platformType: 'internal' as const,
+        platformType: 'telegram' as const,
         retryCount: 3,
       };
 
@@ -242,7 +242,7 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
         recipientId: testUserId,
         body: 'Message to delete',
         direction: 'outbound' as const,
-        platformType: 'internal' as const,
+        platformType: 'telegram' as const,
         retryCount: 3,
       };
 
@@ -322,7 +322,7 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
         recipientId: testUserId,
         body: 'Network error test',
         direction: 'outbound' as const,
-        platformType: 'internal' as const,
+        platformType: 'telegram' as const,
         retryCount: 3,
       };
 
@@ -386,7 +386,7 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
           recipientId: testUserId,
           body: `Concurrent message ${i}`,
           direction: 'outbound' as const,
-          platformType: 'internal' as const,
+          platformType: 'telegram' as const,
           retryCount: 3,
         };
 
