@@ -10,7 +10,7 @@ import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse
  * Message Queue Processor
  *
  * Handles processing of individual message jobs from the retry queue.
- * Implements platform-specific delivery logic (Telegram, IRC, internal).
+ * Implements platform-specific delivery logic (Telegram, IRC).
  *
  * For each job:
  * 1. Validate payload
@@ -27,7 +27,7 @@ const connectorRegistry: Map<string, BaseConnector> = new Map();
 /**
  * Register a connector for a platform
  *
- * @param platform - Platform name (telegram, irc, internal)
+ * @param platform - Platform name (telegram, irc)
  * @param connector - Connector instance
  */
 export function registerConnector(platform: string, connector: BaseConnector): void {
