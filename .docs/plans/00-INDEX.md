@@ -1,7 +1,7 @@
 # Active Execution Plans Index
 
-**Last Updated**: 2026-02-08 (Updated 14:30)  
-**Status**: ✅ Week 1 Backend COMPLETE (PR #227 merged, commit a956002), ✅ All 6 Critical Blockers RESOLVED, ✅ All Governance Sync COMPLETE, Phase 2 Ready
+**Last Updated**: 2026-02-09  
+**Status**: ✅ Week 1 Backend COMPLETE (PR #227 merged, commit a956002), ✅ Governance artifacts in GOV, Phase 2 Ready
 **Current Focus**: Phase 2 execution kickoff (Feb 9, 9am)  
 
 ---
@@ -10,19 +10,20 @@
 
 ### Active Plans
 
-- **[BE-206-phase4-integration-plan.md](./BE-206-phase4-integration-plan.md)** - Phase 4 Integration Testing Plan (⏳ READY FOR EXECUTION - 10-12 hours)
-- **[week1-qa-test-cases-and-data.md](./week1-qa-test-cases-and-data.md)** - Week 1 QA: test cases + test data setup (✅ ready)
-- **[00-consolidated-active-plans.md](./00-consolidated-active-plans.md)** - Historical execution plan for Week 1-2 (BE-003 complete)
-- **[BE-003-COMPLETION-SUMMARY.md](./BE-003-COMPLETION-SUMMARY.md)** - BE-003 BetterAuth completion with test results (194 passing tests)
+- **[BE-206-phase4-integration-plan.md](./BE-206-phase4-integration-plan.md)** - BE-206 Phase 4 Integration Testing Plan (⏳ READY FOR EXECUTION - 10-12 hours)
+- **[BE-206-PHASE-4-EXECUTION-LOG.md](./BE-206-PHASE-4-EXECUTION-LOG.md)** - BE-206 Phase 4 execution log (⏳ IN PROGRESS)
+- **[BE-206-PHASE-4-STATUS.md](./BE-206-PHASE-4-STATUS.md)** - BE-206 Phase 4 status snapshot (⏳ READY)
 
-### Archive (Historical Reference)
+### Completed Work (Reference)
 
-Historical planning documents from Week 1-2 have been consolidated into `.docs/plans/00-consolidated-active-plans.md`. For reference on completed tasks:
-- **BE-027**: Structured Logging (Week 1 - Complete) - See git history: commit 2f56987
-- **BE-003**: BetterAuth (Week 1-2 - Complete) - See `BE-003-COMPLETION-SUMMARY.md`
-- **BE-004**: Forgot Password (Week 1 - Complete) - See git history: commit 7089841
-- **BE-005**: RBAC (Week 1 - Complete) - See git history: commit 254f74c  
-- **FE-001 to FE-006**: Frontend Features (Week 2 - Complete) - See git history: commits 95ea616, b5eb3ad, 2376a22
+Completed artifacts have been removed from `.docs/plans/` to keep this directory actionable.
+
+Governance references:
+- BE-003 completion: `.docs/governance/GOV-011-BE-003-completion-review.md`
+- PR #227 governance trail: `.docs/governance/GOV-015-pr227-week1-docs-entrypoint-tests.md`
+- BE-206 session summary: `.docs/governance/GOV-016-be-206-phase4-session-summary.md`
+- Plans cleanup decision: `.docs/governance/GOV-017-plans-directory-cleanup-phase2.md`
+
 
 ---
 
@@ -133,8 +134,9 @@ Historical planning documents from Week 1-2 have been consolidated into `.docs/p
 |-------|-----------|
 | BE-003 requirements | `.docs/01-product-specification.md` |
 | BE-003 API contract | `.docs/02-api-and-data-model.md` |
-| BE-003 implementation | `BE-003-COMPLETION-SUMMARY.md` |
-| Current active plans | `00-consolidated-active-plans.md` |
+| BE-003 completion (governed) | `.docs/governance/GOV-011-BE-003-completion-review.md` |
+| PR #227 governance trail | `.docs/governance/GOV-015-pr227-week1-docs-entrypoint-tests.md` |
+| Plans cleanup decision | `.docs/governance/GOV-017-plans-directory-cleanup-phase2.md` |
 
 ---
 
