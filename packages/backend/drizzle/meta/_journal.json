@@ -8,6 +8,13 @@
       "when": 1770549357098,
       "tag": "0000_slim_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770622403202,
+      "tag": "0001_clumsy_hiroim",
+      "breakpoints": true
     }
   ]
 }
