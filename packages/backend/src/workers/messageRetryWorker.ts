@@ -7,6 +7,7 @@
 
 import { Worker, type Job } from 'bullmq';
 import { eq } from 'drizzle-orm';
+import type { Platform } from '@yacc/common/types/platform.type';
 import { dbClient } from '../infrastructure/db.client.js';
 import { logger } from '../infrastructure/logger.js';
 import { redisClient } from '../infrastructure/redis.client.js';
@@ -153,7 +154,7 @@ async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<void> {
       messageId,
       conversationId,
       status: 'sent',
-      platform: platformType as 'telegram' | 'irc' | 'internal',
+      platform: platformType as unknown as Platform,
       timestamp: new Date(),
     });
 
@@ -178,16 +179,16 @@ async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<void> {
       'Retry job failed'
     );
 
-    // Track as failed
-    try {
-      await MessageStatusTracker.trackFailedMessage({
-        messageId,
-        conversationId,
-        status: 'failed',
-        platform: platformType as 'telegram' | 'irc' | 'internal',
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date(),
-      });
+     // Track as failed
+     try {
+       await MessageStatusTracker.trackFailedMessage({
+         messageId,
+         conversationId,
+         status: 'failed',
+         platform: platformType as unknown as Platform,
+         error: error instanceof Error ? error.message : 'Unknown error',
+         timestamp: new Date(),
+       });
     } catch (trackerError) {
       logger.error(
         {

@@ -5,6 +5,7 @@ import { users } from '../schemas/user.schema.js';
 import { eq, desc, asc, and, sql } from 'drizzle-orm';
 import type { Message } from '../schemas/message.schema.js';
 import type { GetMessagesQuery, SendMessageRequestBody } from '../types/message.types.js';
+import type { Platform } from '@yacc/common/types/platform.type';
 import { logger } from '../infrastructure/logger.js';
 import { connectorManager } from './connector-manager.js';
 import { MessageStatusTracker } from './messageStatusTracker.js';
@@ -136,60 +137,60 @@ export class MessageService {
     }
   }
 
-   /**
-    * Dispatch message to connector and update status
-    * This is async and non-blocking; errors are logged but don't fail the original request
-    */
-   private async dispatchToConnector(
-     conversationId: string,
-     message: Message,
-     userId: string
-   ): Promise<void> {
-     let platform: 'telegram' | 'irc' | 'internal' = 'internal';
+    /**
+     * Dispatch message to connector and update status
+     * This is async and non-blocking; errors are logged but don't fail the original request
+     */
+    private async dispatchToConnector(
+      conversationId: string,
+      message: Message,
+      userId: string
+    ): Promise<void> {
+      let platform: Platform | undefined;
 
-     try {
-       // Get conversation details
-       const conversation = await dbClient.query.conversations.findFirst({
-         where: eq(conversations.id, conversationId),
-       });
+      try {
+        // Get conversation details
+        const conversation = await dbClient.query.conversations.findFirst({
+          where: eq(conversations.id, conversationId),
+        });
 
-       if (!conversation) {
-         logger.warn(
-           {
-             conversationId,
-             messageId: message.id,
-           },
-           'Conversation not found for dispatch'
-         );
-         return;
-       }
+        if (!conversation) {
+          logger.warn(
+            {
+              conversationId,
+              messageId: message.id,
+            },
+            'Conversation not found for dispatch'
+          );
+          return;
+        }
 
-       platform = conversation.channel as 'telegram' | 'irc' | 'internal';
+        platform = conversation.channel as unknown as Platform;
 
-       logger.debug(
-         {
-           messageId: message.id,
-           conversationId,
-           channel: conversation.channel,
-         },
-         'Dispatching message to connector'
-       );
+        logger.debug(
+          {
+            messageId: message.id,
+            conversationId,
+            channel: conversation.channel,
+          },
+          'Dispatching message to connector'
+        );
 
-       // For Phase 2A MVP: Use stub connector
-       // Stub immediately marks message as sent (simulates successful delivery)
-       // In Phase 2B/3, will be replaced with real Telegram/IRC connectors
+        // For Phase 2A MVP: Use stub connector
+        // Stub immediately marks message as sent (simulates successful delivery)
+        // In Phase 2B/3, will be replaced with real Telegram/IRC connectors
 
-       // Simulate connector sending (stub behavior for MVP)
-       await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay to simulate I/O
+        // Simulate connector sending (stub behavior for MVP)
+        await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay to simulate I/O
 
-       // Track sent status via MessageStatusTracker
-       await MessageStatusTracker.trackSentMessage({
-         messageId: message.id,
-         conversationId,
-         status: 'sent',
-         platform,
-         timestamp: new Date(),
-       });
+        // Track sent status via MessageStatusTracker
+        await MessageStatusTracker.trackSentMessage({
+          messageId: message.id,
+          conversationId,
+          status: 'sent',
+          platform,
+          timestamp: new Date(),
+        });
 
        logger.info(
          {
@@ -209,25 +210,27 @@ export class MessageService {
          'Error dispatching message to connector'
        );
 
-       // Track failed status via MessageStatusTracker
-       try {
-         await MessageStatusTracker.trackFailedMessage({
-           messageId: message.id,
-           conversationId,
-           status: 'failed',
-           platform,
-           error: error instanceof Error ? error.message : 'Unknown error',
-           timestamp: new Date(),
-         });
-       } catch (trackerError) {
-         logger.error(
-           {
-             messageId: message.id,
-             error: trackerError instanceof Error ? trackerError.message : 'Unknown',
-           },
-           'Failed to track message status'
-         );
-       }
+        // Track failed status via MessageStatusTracker (if platform was determined)
+        if (platform) {
+          try {
+            await MessageStatusTracker.trackFailedMessage({
+              messageId: message.id,
+              conversationId,
+              status: 'failed',
+              platform,
+              error: error instanceof Error ? error.message : 'Unknown error',
+              timestamp: new Date(),
+            });
+          } catch (trackerError) {
+            logger.error(
+              {
+                messageId: message.id,
+                error: trackerError instanceof Error ? trackerError.message : 'Unknown',
+              },
+              'Failed to track message status'
+            );
+          }
+        }
      }
    }
 
