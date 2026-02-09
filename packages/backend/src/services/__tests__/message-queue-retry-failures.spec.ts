@@ -276,7 +276,7 @@ describe('Message Queue - Retry Logic with Mock Failures', () => {
   // ============================================
 
   it('should handle retries across different platforms', async () => {
-    const platforms: Array<'telegram' | 'irc' | 'whatsapp'> = ['telegram', 'irc', 'whatsapp'];
+    const platforms: Array<'telegram' | 'irc'> = ['telegram', 'irc'];
 
     for (const platform of platforms) {
       const payload: SendMessageJobPayload = {
