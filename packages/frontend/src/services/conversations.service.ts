@@ -12,38 +12,39 @@ export const PHASE1_CHANNELS = ['telegram', 'irc'] as const;
 export type Phase1ChannelType = (typeof PHASE1_CHANNELS)[number];
 
 export interface ConversationTag {
-  id: number;
+  id: string;
   name: string;
   color: string;
 }
 
-export interface LatestMessage {
-  id: number;
-  body: string;
-  senderName: string;
-  createdAt: string;
+export interface Participant {
+  id: string;
+  name: string;
+  type: 'contact' | 'agent';
 }
 
 export interface ConversationListItem {
-  id: number;
+  id: string;
   channel: ChannelType;
   externalThreadId: string;
   title?: string | null;
   status: ConversationStatus;
   priority: ConversationPriority;
-  assignedUserId?: number | null;
-  latestMessage?: LatestMessage | null;
+  assignedUserId?: string | null;
+  assignedUserName?: string | null;
   tags?: ConversationTag[];
+  participants?: Participant[];
   unreadCount?: number;
+  latestMessagePreview?: string | null;
+  latestMessageAt?: string | null;
   createdAt: string;
   updatedAt: string;
-  lastActivityAt: string;
 }
 
 export interface ConversationMessage {
-  id: number;
-  conversationId: number;
-  senderId?: number | null;
+  id: string;
+  conversationId: string;
+  senderId?: string | null;
   senderName: string;
   body: string;
   status: 'pending' | 'sent' | 'failed';
@@ -54,13 +55,13 @@ export interface ConversationMessage {
 }
 
 export interface ConversationDetail {
-  id: number;
+  id: string;
   channel: ChannelType;
   externalThreadId: string;
   title?: string | null;
   status: ConversationStatus;
   priority: ConversationPriority;
-  assignedUserId?: number | null;
+  assignedUserId?: string | null;
   createdAt: string;
   updatedAt: string;
   lastActivityAt: string;
@@ -81,7 +82,8 @@ export interface ListConversationsParams {
   channel?: ChannelType;
   status?: ConversationStatus;
   priority?: ConversationPriority;
-  assignedUserId?: number;
+  assignedUserId?: string;
+  tagId?: number;
   search?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -126,26 +128,26 @@ export const conversationsService = {
     return api.get<ListConversationsResponse>(endpoint);
   },
 
-  async getById(id: number): Promise<GetConversationResponse> {
-    return api.get<GetConversationResponse>(`/api/conversations/${id}`);
-  },
+   async getById(id: string): Promise<GetConversationResponse> {
+     return api.get<GetConversationResponse>(`/api/conversations/${id}`);
+   },
 
-  async getMessages(
-    conversationId: number,
-    page: number = 1,
-    limit: number = 50
-  ): Promise<ListMessagesResponse> {
-    const query = new URLSearchParams({
-      page: String(page),
-      limit: String(limit),
-    });
+   async getMessages(
+     conversationId: string,
+     page: number = 1,
+     limit: number = 50
+   ): Promise<ListMessagesResponse> {
+     const query = new URLSearchParams({
+       page: String(page),
+       limit: String(limit),
+     });
 
-    return api.get<ListMessagesResponse>(`/api/conversations/${conversationId}/messages?${query}`);
-  },
+     return api.get<ListMessagesResponse>(`/api/conversations/${conversationId}/messages?${query}`);
+   },
 
-  async sendMessage(conversationId: number, body: string): Promise<SendMessageResponse> {
-    return api.post<SendMessageResponse>(`/api/conversations/${conversationId}/messages`, {
-      body,
-    });
-  },
+   async sendMessage(conversationId: string, body: string): Promise<SendMessageResponse> {
+     return api.post<SendMessageResponse>(`/api/conversations/${conversationId}/messages`, {
+       body,
+     });
+   },
 };

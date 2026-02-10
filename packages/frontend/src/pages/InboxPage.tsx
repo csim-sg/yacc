@@ -56,8 +56,8 @@ export function InboxPage() {
    * Handle conversation click - mark as read and navigate
    */
   const handleConversationClick = useCallback(
-    (conversationId: number) => {
-      if (conversationId > 0) {
+    (conversationId: string) => {
+      if (conversationId) {
         markAsRead(conversationId);
       }
       navigate(`/conversations/${conversationId}`);
@@ -740,14 +740,14 @@ export function InboxPage() {
                                 {conversation.title || `Thread ${conversation.externalThreadId}`}
                               </h3>
                               <p className="text-sm text-base-content/60 line-clamp-2">
-                                {conversation.latestMessage?.body || 'No messages yet'}
+                                {conversation.latestMessagePreview || 'No messages yet'}
                               </p>
                             </div>
                             <div className="flex flex-col items-start lg:items-end gap-1 text-sm text-base-content/60">
-                              <span>{formatTimestamp(conversation.lastActivityAt)}</span>
+                              <span>{conversation.latestMessageAt ? formatTimestamp(conversation.latestMessageAt) : 'Never'}</span>
                               <span>
-                                {conversation.assignedUserId
-                                  ? `Assigned to #${conversation.assignedUserId}`
+                                {conversation.assignedUserName
+                                  ? `Assigned to ${conversation.assignedUserName}`
                                   : 'Unassigned'}
                               </span>
                             </div>

@@ -48,8 +48,8 @@ export function ConversationPage() {
   const { id } = useParams();
 
   const conversationId = useMemo(() => {
-    const parsed = Number(id);
-    return Number.isNaN(parsed) ? null : parsed;
+    // URL parameter 'id' is already a string (UUID)
+    return id || null;
   }, [id]);
 
   useEffect(() => {
@@ -69,11 +69,11 @@ export function ConversationPage() {
     isFetching,
     error,
     refetch,
-  } = useQuery<GetConversationResponse, { error?: string; message?: string }>({
-    queryKey: ['conversation', conversationId],
-    queryFn: () => conversationsService.getById(conversationId as number),
-    enabled: Number.isFinite(conversationId),
-  });
+   } = useQuery<GetConversationResponse, { error?: string; message?: string }>({
+     queryKey: ['conversation', conversationId],
+     queryFn: () => conversationsService.getById(conversationId!),
+     enabled: !!conversationId,
+   });
 
   const conversation: ConversationDetail | null = data?.data ?? null;
   const errorMessage = error?.error || error?.message || 'Failed to load conversation';

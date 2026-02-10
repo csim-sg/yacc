@@ -45,9 +45,8 @@ export function useUnreadBadges() {
    * Clears unread count
    */
   const markAsRead = useCallback(
-    (conversationId: number | string) => {
-      const id = typeof conversationId === 'string' ? parseInt(conversationId, 10) : conversationId;
-      logger.debug('[UnreadBadges] Marking conversation as read', { conversationId: id });
+    (conversationId: string) => {
+      logger.debug('[UnreadBadges] Marking conversation as read', { conversationId });
 
       // Update conversation cache
       const cacheKey = ['conversations'];
@@ -57,7 +56,7 @@ export function useUnreadBadges() {
         return {
           ...oldData,
           data: oldData.data.map((conv: ConversationListItem) =>
-            conv.id === id ? { ...conv, unreadCount: 0 } : conv
+            conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv
           ),
         };
       });
@@ -79,10 +78,9 @@ export function useUnreadBadges() {
    * Called when new message arrives via WebSocket
    */
   const updateUnreadCount = useCallback(
-    (conversationId: number | string, newCount: number) => {
-      const id = typeof conversationId === 'string' ? parseInt(conversationId, 10) : conversationId;
+    (conversationId: string, newCount: number) => {
       logger.debug('[UnreadBadges] Updating unread count', {
-        conversationId: id,
+        conversationId,
         newCount,
       });
 
@@ -93,7 +91,7 @@ export function useUnreadBadges() {
         return {
           ...oldData,
           data: oldData.data.map((conv: ConversationListItem) =>
-            conv.id === id
+            conv.id === conversationId
               ? { ...conv, unreadCount: newCount }
               : conv
           ),
@@ -108,8 +106,7 @@ export function useUnreadBadges() {
    * Called when new inbound message arrives
    */
   const incrementUnreadCount = useCallback(
-    (conversationId: number | string) => {
-      const id = typeof conversationId === 'string' ? parseInt(conversationId, 10) : conversationId;
+    (conversationId: string) => {
       const cacheKey = ['conversations'];
       queryClient.setQueryData(cacheKey, (oldData: any) => {
         if (!oldData || !oldData.data) return oldData;
@@ -117,7 +114,7 @@ export function useUnreadBadges() {
         return {
           ...oldData,
           data: oldData.data.map((conv: ConversationListItem) =>
-            conv.id === id
+            conv.id === conversationId
               ? { ...conv, unreadCount: (conv.unreadCount || 0) + 1 }
               : conv
           ),
