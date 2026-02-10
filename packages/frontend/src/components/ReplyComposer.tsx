@@ -116,9 +116,9 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
 
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
-      {/* Error alert */}
-      {error && showError && (
-        <div className="alert alert-error shadow-lg" role="alert">
+       {/* Error alert */}
+       {error && showError && (
+         <div className="alert alert-error shadow-lg" role="alert" data-testid="error-message">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="stroke-current shrink-0 h-6 w-6"
@@ -136,16 +136,17 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
             <h3 className="font-bold">Failed to send message</h3>
             <div className="text-sm">{error}</div>
           </div>
-          {onErrorDismiss && (
-            <button
-              className="btn btn-sm btn-ghost"
-              onClick={onErrorDismiss}
-              aria-label="Dismiss error message"
-              type="button"
-            >
-              Dismiss
-            </button>
-          )}
+           {onErrorDismiss && (
+             <button
+               className="btn btn-sm btn-ghost"
+               onClick={onErrorDismiss}
+               aria-label="Dismiss error message"
+               type="button"
+               data-testid="error-dismiss-button"
+             >
+               Dismiss
+             </button>
+           )}
         </div>
       )}
 
@@ -170,18 +171,19 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
 
           {/* Footer with character counter and send button */}
           <div className="flex items-center justify-between px-4 py-3 bg-base-200 border-t border-base-300 gap-3">
-            {/* Character counter */}
-            <div
-              id={isAtLimit ? 'char-limit-warning' : 'char-counter'}
-              className={`text-xs font-medium whitespace-nowrap ${
-                isAtLimit ? 'text-error font-bold' : 'text-base-content/60'
-              }`}
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              {charCount.toLocaleString()} / {maxLength.toLocaleString()}
-              {isAtLimit && <span className="ml-1">(limit reached)</span>}
-            </div>
+             {/* Character counter */}
+             <div
+               id={isAtLimit ? 'char-limit-warning' : 'char-counter'}
+               className={`text-xs font-medium whitespace-nowrap ${
+                 isAtLimit ? 'text-error font-bold' : 'text-base-content/60'
+               }`}
+               aria-live="polite"
+               aria-atomic="true"
+               data-testid="character-counter"
+             >
+               {charCount.toLocaleString()} / {maxLength.toLocaleString()}
+               {isAtLimit && <span className="ml-1">(limit reached)</span>}
+             </div>
 
             {/* Send button */}
             <button

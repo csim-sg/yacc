@@ -556,20 +556,21 @@ export function InboxPage() {
                     </button>
                   </div>
 
-                  <div className="flex flex-col lg:flex-row gap-3">
-                    <label className="input input-bordered flex items-center gap-2 flex-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-base-content/60">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-4.35-4.35m0 0A7.5 7.5 0 1 0 4.5 4.5a7.5 7.5 0 0 0 12.15 12.15Z" />
-                      </svg>
-                      <input
-                        type="text"
-                        className="grow"
-                        placeholder="Search conversations"
-                        value={searchInput}
-                        onChange={(event) => setSearchInput(event.target.value)}
-                        onKeyDown={handleSearchKeyDown}
-                      />
-                    </label>
+                   <div className="flex flex-col lg:flex-row gap-3">
+                     <label className="input input-bordered flex items-center gap-2 flex-1">
+                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-base-content/60">
+                         <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-4.35-4.35m0 0A7.5 7.5 0 1 0 4.5 4.5a7.5 7.5 0 0 0 12.15 12.15Z" />
+                       </svg>
+                       <input
+                         type="text"
+                         className="grow"
+                         placeholder="Search conversations"
+                         value={searchInput}
+                         onChange={(event) => setSearchInput(event.target.value)}
+                         onKeyDown={handleSearchKeyDown}
+                         data-testid="search-input"
+                       />
+                     </label>
                     <div className="flex gap-2">
                       <button className="btn btn-primary btn-sm" onClick={handleSearchSubmit}>
                         Search
@@ -580,17 +581,29 @@ export function InboxPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-3">
-                    <select
-                      className="select select-bordered select-sm"
-                      value={status}
-                      onChange={(event) => setStatus(event.target.value as ConversationStatus | 'all')}
-                    >
-                      <option value="all">All Statuses</option>
-                      <option value="open">Open</option>
-                      <option value="pending">Pending</option>
-                      <option value="resolved">Resolved</option>
-                    </select>
+                   <div className="flex flex-wrap gap-3">
+                     <select
+                       className="select select-bordered select-sm"
+                       value={channel}
+                       onChange={(event) => setChannel(event.target.value as Phase1ChannelType | 'all')}
+                       data-testid="channel-filter"
+                     >
+                       <option value="all">All Channels</option>
+                       <option value="telegram">Telegram</option>
+                       <option value="irc">IRC</option>
+                     </select>
+
+                     <select
+                        className="select select-bordered select-sm"
+                        value={status}
+                        onChange={(event) => setStatus(event.target.value as ConversationStatus | 'all')}
+                        data-testid="status-filter"
+                      >
+                        <option value="all">All Statuses</option>
+                       <option value="open">Open</option>
+                       <option value="pending">Pending</option>
+                       <option value="resolved">Resolved</option>
+                     </select>
 
                     <select
                       className="select select-bordered select-sm"
@@ -662,7 +675,7 @@ export function InboxPage() {
                 <div className="divider"></div>
 
                 {(isLoading || isFetching) && (
-                  <div className="space-y-4">
+                  <div className="space-y-4" data-testid="conversation-skeleton">
                     {[...Array(3)].map((_, index) => (
                       <div key={`loading-${index}`} className="flex flex-col gap-2">
                         <div className="skeleton h-4 w-1/3"></div>
@@ -675,22 +688,22 @@ export function InboxPage() {
                 )}
 
                 {!isLoading && error && (
-                  <div className="alert alert-error">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div className="flex-1">
-                      <h3 className="font-semibold">Failed to load conversations</h3>
-                      <div className="text-sm opacity-80">{errorMessage}</div>
-                    </div>
-                    <button className="btn btn-sm" onClick={() => refetch()}>
-                      Retry
-                    </button>
-                  </div>
-                )}
+                   <div className="alert alert-error" data-testid="error-message">
+                     <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                     </svg>
+                     <div className="flex-1">
+                       <h3 className="font-semibold">Failed to load conversations</h3>
+                       <div className="text-sm opacity-80">{errorMessage}</div>
+                     </div>
+                     <button className="btn btn-sm" onClick={() => refetch()} data-testid="retry-button">
+                       Retry
+                     </button>
+                   </div>
+                 )}
 
                 {!isLoading && !error && conversations.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                   <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="empty-state">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
@@ -719,30 +732,32 @@ export function InboxPage() {
                         key={conversation.id}
                         onClick={() => handleConversationClick(conversation.id)}
                         className="block w-full text-left p-4 rounded-lg border border-base-200 hover:border-primary/40 transition-colors"
+                        data-testid="conversation-card"
+                        data-conversation-id={conversation.id}
                       >
                         <div className="flex flex-col gap-3">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="badge badge-outline badge-sm">
-                              {CHANNEL_LABELS[conversation.channel as Phase1ChannelType] || conversation.channel}
-                            </span>
-                            <span className={`badge badge-sm ${STATUS_BADGE[conversation.status]}`}>
-                              {conversation.status}
-                            </span>
-                            <span className={`badge badge-sm ${PRIORITY_BADGE[conversation.priority]}`}>
-                              {conversation.priority}
-                            </span>
-                            <UnreadBadge count={conversation.unreadCount || 0} />
-                          </div>
+                             <span className="badge badge-outline badge-sm" data-testid="conversation-channel">
+                               {CHANNEL_LABELS[conversation.channel as Phase1ChannelType] || conversation.channel}
+                             </span>
+                             <span className={`badge badge-sm ${STATUS_BADGE[conversation.status]}`} data-testid="conversation-status-badge">
+                               {conversation.status}
+                             </span>
+                             <span className={`badge badge-sm ${PRIORITY_BADGE[conversation.priority]}`}>
+                               {conversation.priority}
+                             </span>
+                             <UnreadBadge count={conversation.unreadCount || 0} />
+                           </div>
 
                           <div className="flex flex-col lg:flex-row lg:items-center gap-3">
                             <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-base truncate">
-                                {conversation.title || `Thread ${conversation.externalThreadId}`}
-                              </h3>
-                              <p className="text-sm text-base-content/60 line-clamp-2">
-                                {conversation.latestMessagePreview || 'No messages yet'}
-                              </p>
-                            </div>
+                               <h3 className="font-semibold text-base truncate">
+                                 {conversation.title || `Thread ${conversation.externalThreadId}`}
+                               </h3>
+                               <p className="text-sm text-base-content/60 line-clamp-2" data-testid="conversation-message-preview">
+                                 {conversation.latestMessagePreview || 'No messages yet'}
+                               </p>
+                             </div>
                             <div className="flex flex-col items-start lg:items-end gap-1 text-sm text-base-content/60">
                               <span>{conversation.latestMessageAt ? formatTimestamp(conversation.latestMessageAt) : 'Never'}</span>
                               <span>
@@ -770,11 +785,11 @@ export function InboxPage() {
                       </button>
                     ))}
 
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                      <div className="text-sm text-base-content/60">
-                        Page {page} of {totalPages} · {totalCount} total
-                      </div>
-                      <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2" data-testid="pagination-controls">
+                       <div className="text-sm text-base-content/60" data-testid="page-info">
+                         Page {page} of {totalPages} · {totalCount} total
+                       </div>
+                       <div className="flex gap-2">
                         <button
                           className="btn btn-sm"
                           onClick={() => setPage((prev) => Math.max(1, prev - 1))}

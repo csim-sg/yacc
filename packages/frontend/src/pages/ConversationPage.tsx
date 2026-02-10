@@ -4,9 +4,10 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth.store';
+import { ReplyComposer } from '../components/ReplyComposer';
 import {
   conversationsService,
   type ConversationDetail,
@@ -76,19 +77,42 @@ export function ConversationPage() {
     enabled: !!conversationId,
   });
 
-  // Fetch messages separately
-  const {
-    data: messagesData,
-    isLoading: messagesLoading,
-  } = useQuery({
-    queryKey: ['conversationMessages', conversationId],
-    queryFn: () => conversationsService.getMessages(conversationId as string),
-    enabled: !!conversationId,
-  });
+   // Fetch messages separately
+   const {
+     data: messagesData,
+     isLoading: messagesLoading,
+   } = useQuery({
+     queryKey: ['conversationMessages', conversationId],
+     queryFn: () => conversationsService.getMessages(conversationId as string),
+     enabled: !!conversationId,
+   });
 
-  const conversation: ConversationDetail | null = data?.data ?? null;
-  const messages = messagesData?.data ?? [];
-  const errorMessage = error?.error || error?.message || 'Failed to load conversation';
+   // Send message mutation
+   const queryClient = useQueryClient();
+   const sendMessageMutation = useMutation({
+     mutationFn: (body: string) =>
+       conversationsService.sendMessage(conversationId as string, body),
+     onSuccess: (newMessage) => {
+       // Add message to the messages list cache
+       queryClient.setQueryData(
+         ['conversationMessages', conversationId],
+         (oldData: unknown) => {
+           if (!oldData || typeof oldData !== 'object' || !('data' in oldData)) {
+             return { data: [newMessage] };
+           }
+           const typedData = oldData as { data: ConversationMessage[] };
+           return {
+             ...typedData,
+             data: [...typedData.data, newMessage],
+           };
+         }
+       );
+     },
+   });
+
+   const conversation: ConversationDetail | null = data?.data ?? null;
+   const messages = messagesData?.data ?? [];
+   const errorMessage = error?.error || error?.message || 'Failed to load conversation';
 
   const handleLogout = async () => {
     await logout();
@@ -116,32 +140,32 @@ export function ConversationPage() {
     });
   };
 
-  const renderMessageBubble = (message: ConversationMessage) => {
-    const isInbound = message.direction === 'inbound';
+   const renderMessageBubble = (message: ConversationMessage) => {
+     const isInbound = message.direction === 'inbound';
 
-    return (
-      <div
-        key={message.id}
-        className={`flex ${isInbound ? 'justify-start' : 'justify-end'}`}
-      >
-        <div
-          className={`max-w-[80%] rounded-lg px-4 py-3 shadow-sm ${
-            isInbound ? 'bg-base-100 border border-base-200' : 'bg-primary text-primary-content'
-          }`}
-        >
-          <div className="flex items-center gap-2 text-xs opacity-70 mb-1">
-            <span>{message.senderName || (isInbound ? 'Inbound' : 'Agent')}</span>
-            <span>•</span>
-            <span>{formatTimestamp(message.createdAt)}</span>
-            <span className="badge badge-xs badge-outline">
-              {message.status}
-            </span>
-          </div>
-          <p className="text-sm whitespace-pre-wrap">{message.body}</p>
-        </div>
-      </div>
-    );
-  };
+     return (
+       <div
+         key={message.id}
+         className={`flex ${isInbound ? 'justify-start' : 'justify-end'}`}
+       >
+         <div
+           className={`max-w-[80%] rounded-lg px-4 py-3 shadow-sm ${
+             isInbound ? 'bg-base-100 border border-base-200' : 'bg-primary text-primary-content'
+           }`}
+         >
+           <div className="flex items-center gap-2 text-xs opacity-70 mb-1">
+             <span data-testid="message-sender">{message.senderName || (isInbound ? 'Inbound' : 'Agent')}</span>
+             <span>•</span>
+             <span>{formatTimestamp(message.createdAt)}</span>
+             <span className="badge badge-xs badge-outline">
+               {message.status}
+             </span>
+           </div>
+           <p className="text-sm whitespace-pre-wrap" data-testid="message-body">{message.body}</p>
+         </div>
+       </div>
+     );
+   };
 
   return (
     <div className="h-screen flex flex-col bg-base-200">
@@ -345,15 +369,15 @@ export function ConversationPage() {
             <div className="card bg-base-100 shadow-xl mb-6">
               <div className="card-body">
                 <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-3">
-                    <Link to="/" className="btn btn-ghost btn-sm">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                      </svg>
-                      Back
-                    </Link>
-                    <div className="flex items-center gap-2">
-                      <h2 className="card-title text-2xl">Conversation</h2>
+                   <div className="flex items-center gap-3" data-testid="conversation-header">
+                     <Link to="/" className="btn btn-ghost btn-sm" data-testid="back-button">
+                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                       </svg>
+                       Back
+                     </Link>
+                     <div className="flex items-center gap-2">
+                       <h2 className="card-title text-2xl">Conversation</h2>
                       {isFetching && !isLoading && (
                         <span className="loading loading-spinner loading-sm text-primary"></span>
                       )}
@@ -368,37 +392,37 @@ export function ConversationPage() {
                     </div>
                   )}
 
-                  {!isLoading && error && (
-                    <div className="alert alert-error">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <div className="flex-1">
-                        <h3 className="font-semibold">Failed to load conversation</h3>
-                        <div className="text-sm opacity-80">{errorMessage}</div>
-                      </div>
-                      <button className="btn btn-sm" onClick={() => refetch()}>
-                        Retry
-                      </button>
-                    </div>
-                  )}
+                   {!isLoading && error && (
+                     <div className="alert alert-error" data-testid="error-message">
+                       <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                       </svg>
+                       <div className="flex-1">
+                         <h3 className="font-semibold">Failed to load conversation</h3>
+                         <div className="text-sm opacity-80">{errorMessage}</div>
+                       </div>
+                       <button className="btn btn-sm" onClick={() => refetch()} data-testid="retry-button">
+                         Retry
+                       </button>
+                     </div>
+                   )}
 
-                  {!isLoading && !error && !conversation && (
-                    <div className="text-center text-base-content/70">Conversation not found.</div>
-                  )}
+                   {!isLoading && !error && !conversation && (
+                     <div className="text-center text-base-content/70" data-testid="conversation-detail">Conversation not found.</div>
+                   )}
 
-                  {!isLoading && !error && conversation && (
-                    <div className="flex flex-col gap-6">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="badge badge-outline badge-sm">
-                          {CHANNEL_LABELS[conversation.channel] || conversation.channel}
-                        </span>
-                        <span className={`badge badge-sm ${STATUS_BADGE[conversation.status]}`}>
-                          {conversation.status}
-                        </span>
-                        <span className={`badge badge-sm ${PRIORITY_BADGE[conversation.priority]}`}>
-                          {conversation.priority}
-                        </span>
+                   {!isLoading && !error && conversation && (
+                     <div className="flex flex-col gap-6" data-testid="conversation-detail">
+                       <div className="flex flex-wrap items-center gap-2">
+                         <span className="badge badge-outline badge-sm" data-testid="conversation-channel">
+                           {CHANNEL_LABELS[conversation.channel] || conversation.channel}
+                         </span>
+                         <span className={`badge badge-sm ${STATUS_BADGE[conversation.status]}`} data-testid="conversation-status">
+                           {conversation.status}
+                         </span>
+                         <span className={`badge badge-sm ${PRIORITY_BADGE[conversation.priority]}`} data-testid="conversation-priority">
+                           {conversation.priority}
+                         </span>
                         {conversation.assignedUserId && (
                           <span className="badge badge-sm badge-ghost">
                             Assigned to #{conversation.assignedUserId}
@@ -433,27 +457,53 @@ export function ConversationPage() {
 
                       <div className="divider"></div>
 
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Messages</h3>
-                        {messagesLoading && (
-                          <div className="loading loading-spinner loading-md"></div>
-                        )}
-                        {!messagesLoading && messages.length === 0 && (
-                          <div className="text-base-content/60">No messages yet.</div>
-                        )}
-                        {!messagesLoading && messages.length > 0 && (
-                          <div className="flex flex-col gap-3">
-                            {messages.map(renderMessageBubble)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+                       <div className="space-y-4" data-testid="conversation-messages">
+                         <h3 className="text-lg font-semibold">Messages</h3>
+                         {messagesLoading && (
+                           <div className="loading loading-spinner loading-md"></div>
+                         )}
+                         {!messagesLoading && messages.length === 0 && (
+                           <div className="text-base-content/60">No messages yet.</div>
+                         )}
+                         {!messagesLoading && messages.length > 0 && (
+                           <div className="flex flex-col gap-3">
+                             {messages.map((msg) => (
+                               <div key={msg.id} data-testid="message-item">
+                                 {renderMessageBubble(msg)}
+                               </div>
+                             ))}
+                           </div>
+                         )}
+                       </div>
 
-            <div className="card bg-base-100 shadow-xl">
+                       <div className="divider"></div>
+
+                       {/* Reply Composer */}
+                       <div>
+                         <h3 className="text-lg font-semibold mb-4">Reply</h3>
+                         <ReplyComposer
+                           onSend={async (body) => {
+                             await sendMessageMutation.mutateAsync(body);
+                           }}
+                           isSending={sendMessageMutation.isPending}
+                           error={
+                             sendMessageMutation.error instanceof Error
+                               ? sendMessageMutation.error.message
+                               : sendMessageMutation.error
+                                 ? String(sendMessageMutation.error)
+                                 : undefined
+                           }
+                           showError={true}
+                           onErrorDismiss={() => sendMessageMutation.reset()}
+                         />
+                       </div>
+                     </div>
+                   )}
+                 </div>
+               </div>
+             </div>
+
+             <div className="card bg-base-100 shadow-xl">
               <div className="card-body">
                 <h3 className="card-title text-xl mb-4">Account Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
