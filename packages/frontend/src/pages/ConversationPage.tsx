@@ -3,10 +3,11 @@
  * Read-only conversation view
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth.store';
+import { ReplyComposer } from '../components/ReplyComposer';
 import {
   conversationsService,
   type ConversationDetail,
@@ -77,6 +78,43 @@ export function ConversationPage() {
 
   const conversation: ConversationDetail | null = data?.data ?? null;
   const errorMessage = error?.error || error?.message || 'Failed to load conversation';
+
+  // Send message mutation
+  const queryClient = useQueryClient();
+  const [sendError, setSendError] = useState<string | null>(null);
+
+  const {
+    mutateAsync: sendMessage,
+    isPending: isSendingMessage,
+  } = useMutation({
+    mutationFn: async (body: string) => {
+      if (!conversationId) {
+        throw new Error('Conversation ID is required');
+      }
+      return conversationsService.sendMessage(conversationId, body);
+    },
+    onSuccess: () => {
+      // Invalidate conversation query to refetch messages
+      queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
+      setSendError(null);
+    },
+    onError: (error: unknown) => {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to send message';
+      setSendError(errorMsg);
+    },
+  });
+
+  const handleSendMessage = useCallback(
+    async (body: string) => {
+      try {
+        await sendMessage(body);
+      } catch (err) {
+        console.error('[ConversationPage] Failed to send message:', err);
+        // Error is already handled by mutation callbacks
+      }
+    },
+    [sendMessage]
+  );
 
   const handleLogout = async () => {
     await logout();
@@ -426,19 +464,32 @@ export function ConversationPage() {
                       <div className="divider"></div>
 
                       <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Messages</h3>
-                        {conversation.messages.length === 0 && (
-                          <div className="text-base-content/60">No messages yet.</div>
-                        )}
-                        <div className="flex flex-col gap-3">
-                          {conversation.messages.map(renderMessageBubble)}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+                         <h3 className="text-lg font-semibold">Messages</h3>
+                         {conversation.messages.length === 0 && (
+                           <div className="text-base-content/60">No messages yet.</div>
+                         )}
+                         <div className="flex flex-col gap-3">
+                           {conversation.messages.map(renderMessageBubble)}
+                         </div>
+                       </div>
+
+                       <div className="divider"></div>
+
+                       <div className="space-y-4">
+                         <h3 className="text-lg font-semibold">Send Reply</h3>
+                         <ReplyComposer
+                           onSend={handleSendMessage}
+                           isSending={isSendingMessage}
+                           error={sendError || undefined}
+                           showError={!!sendError}
+                           onErrorDismiss={() => setSendError(null)}
+                         />
+                       </div>
+                     </div>
+                   )}
+                 </div>
+               </div>
+             </div>
 
             <div className="card bg-base-100 shadow-xl">
               <div className="card-body">
