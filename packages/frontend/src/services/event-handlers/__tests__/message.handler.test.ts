@@ -7,12 +7,12 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { useWebSocketStore } from '../../../stores/websocket.store';
 import {
   handleMessageSent,
   handleMessageFailed,
   handleMessageReceived,
 } from '../message.handler';
-import { useWebSocketStore } from '../../../stores/websocket.store';
 
 // Mock queryClient
 vi.mock('../../../lib/queryClient', () => ({

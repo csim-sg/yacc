@@ -8,10 +8,10 @@
  * These handlers update both Zustand store and TanStack Query cache
  */
 
-import { useWebSocketStore } from '../../stores/websocket.store';
-import { queryClient } from '../../lib/queryClient';
-import type { ConversationUpdatedEvent, ConversationReopenedEvent } from '../../types/websocket.types';
 import { logger } from '../../lib/logger';
+import { queryClient } from '../../lib/queryClient';
+import { useWebSocketStore } from '../../stores/websocket.store';
+import type { ConversationUpdatedEvent, ConversationReopenedEvent } from '../../types/websocket.types';
 
 /**
  * Handle conversation.updated event

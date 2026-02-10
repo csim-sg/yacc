@@ -9,6 +9,7 @@
  * Updates message status in timeline and handles retries
  */
 
+import { logger } from '../../lib/logger';
 import { queryClient } from '../../lib/queryClient';
 import type {
   MessageReceivedEvent,
@@ -19,7 +20,6 @@ import type {
   ConversationMessage,
   ListMessagesResponse,
 } from '../conversations.service';
-import { logger } from '../../lib/logger';
 
 /**
  * Handle message.sent event
