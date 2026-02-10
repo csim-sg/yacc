@@ -100,33 +100,38 @@ export function handleMessageFailed(event: MessageFailedEvent): void {
        event.conversationId,
      ]);
 
-     if (messagesResponse?.data) {
-       // Find message and update status
-       const updatedMessages = messagesResponse.data.map((msg): ConversationMessage => {
-         if (msg.id === event.messageId) {
-           return {
-             ...msg,
-             status: 'failed' as const,
-           };
-         }
-         return msg;
-       });
+      if (messagesResponse?.data) {
+        // Find message and update status
+        const updatedMessages = messagesResponse.data.map((msg): ConversationMessage => {
+          if (msg.id === event.messageId) {
+            return {
+              ...msg,
+              status: 'failed' as const,
+            };
+          }
+          return msg;
+        });
 
-       // Update cache with complete response
-       queryClient.setQueryData(
-         ['conversationMessages', event.conversationId],
-         {
-           ...messagesResponse,
-           data: updatedMessages,
-         } as ListMessagesResponse,
-       );
-     }
+        // Update cache with complete response
+        queryClient.setQueryData(
+          ['conversationMessages', event.conversationId],
+          {
+            ...messagesResponse,
+            data: updatedMessages,
+          } as ListMessagesResponse,
+        );
+      }
 
-    logger.info('[MessageHandler] Message failed', {
-      conversationId: event.conversationId,
-      messageId: event.messageId,
-      error: event.error,
-    });
+      // Invalidate conversations list to update failed status
+      queryClient.invalidateQueries({
+        queryKey: ['conversations'],
+      });
+
+     logger.info('[MessageHandler] Message failed', {
+       conversationId: event.conversationId,
+       messageId: event.messageId,
+       error: event.error,
+     });
    } catch (error) {
      logger.error('[MessageHandler] Error handling message.failed', error);
    }

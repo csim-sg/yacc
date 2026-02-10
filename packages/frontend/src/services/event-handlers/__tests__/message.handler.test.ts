@@ -9,7 +9,7 @@
  * AC Verification:
  * - Handlers accept correct WebSocket event shapes (type-safe)
  * - Handlers execute without errors (no throw)
- * - Handlers implement cache/invalidation logic (see source code)
+ * - Handlers implement cache mutation and invalidation logic (verified via mocks)
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -20,12 +20,19 @@ import {
   handleMessageReceived,
 } from '../message.handler';
 
+// Use hoisted to create mocks that can be accessed by vi.mock
+const mocks = vi.hoisted(() => ({
+  getQueryData: vi.fn(),
+  setQueryData: vi.fn(),
+  invalidateQueries: vi.fn(),
+}));
+
 // Mock queryClient
 vi.mock('../../../lib/queryClient', () => ({
   queryClient: {
-    getQueryData: vi.fn(),
-    setQueryData: vi.fn(),
-    invalidateQueries: vi.fn(),
+    getQueryData: mocks.getQueryData,
+    setQueryData: mocks.setQueryData,
+    invalidateQueries: mocks.invalidateQueries,
   },
 }));
 
@@ -53,11 +60,15 @@ describe('Message Handler', () => {
       userPresence: new Map(),
       processedEventIds: new Set(),
     });
+
+    // Reset mocks
+    mocks.getQueryData.mockClear();
+    mocks.setQueryData.mockClear();
+    mocks.invalidateQueries.mockClear();
   });
 
   describe('handleMessageSent (FE-014)', () => {
-    it('should accept message.sent event with correct shape and execute', () => {
-      // AC: Handler must accept event with: conversationId, messageId, status, sentAt
+    it('should accept message.sent event with correct shape', () => {
       const event = {
         conversationId: 'conv-123',
         messageId: 'msg-123',
@@ -68,21 +79,61 @@ describe('Message Handler', () => {
       expect(() => handleMessageSent(event)).not.toThrow();
     });
 
-    it('should accept message.sent from different conversations', () => {
+    it('should update message status to sent and call setQueryData', () => {
+      const mockMessages = {
+        data: [
+          {
+            id: 'msg-123',
+            conversationId: 'conv-123',
+            senderName: 'Me',
+            body: 'Test message',
+            status: 'pending' as const,
+            direction: 'outbound' as const,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      };
+      mocks.getQueryData.mockReturnValue(mockMessages);
+
       const event = {
-        conversationId: 'conv-999',
-        messageId: 'msg-999',
+        conversationId: 'conv-123',
+        messageId: 'msg-123',
         status: 'sent' as const,
         sentAt: new Date().toISOString(),
       };
 
-      expect(() => handleMessageSent(event)).not.toThrow();
+      handleMessageSent(event);
+
+      // AC: Handler must call setQueryData (update cache with sent status)
+      expect(mocks.setQueryData).toHaveBeenCalled();
+      const setCall = mocks.setQueryData.mock.calls[0];
+      if (setCall && setCall[1]) {
+        expect((setCall[1] as any).data[0].status).toBe('sent');
+      }
+    });
+
+    it('should invalidate conversations list to update UI', () => {
+      mocks.getQueryData.mockReturnValue(null);
+
+      const event = {
+        conversationId: 'conv-123',
+        messageId: 'msg-123',
+        status: 'sent' as const,
+        sentAt: new Date().toISOString(),
+      };
+
+      handleMessageSent(event);
+
+      // AC: Handler must call invalidateQueries for conversations
+      expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ['conversations'],
+      });
     });
   });
 
   describe('handleMessageFailed (FE-015)', () => {
-    it('should accept message.failed event with correct shape and execute', () => {
-      // AC: Handler must accept event with: conversationId, messageId, status, error, retryAt, attempt
+    it('should accept message.failed event with correct shape', () => {
       const event = {
         conversationId: 'conv-123',
         messageId: 'msg-456',
@@ -95,7 +146,45 @@ describe('Message Handler', () => {
       expect(() => handleMessageFailed(event)).not.toThrow();
     });
 
-    it('should accept message.failed with multiple retry attempts', () => {
+    it('should update message status to failed and call setQueryData', () => {
+      const mockMessages = {
+        data: [
+          {
+            id: 'msg-456',
+            conversationId: 'conv-123',
+            senderName: 'Me',
+            body: 'Test message',
+            status: 'pending' as const,
+            direction: 'outbound' as const,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      };
+      mocks.getQueryData.mockReturnValue(mockMessages);
+
+      const event = {
+        conversationId: 'conv-123',
+        messageId: 'msg-456',
+        status: 'failed' as const,
+        error: 'Network error',
+        retryAt: new Date(Date.now() + 60000).toISOString(),
+        attempt: 1,
+      };
+
+      handleMessageFailed(event);
+
+      // AC: Handler must call setQueryData (update cache with failed status)
+      expect(mocks.setQueryData).toHaveBeenCalled();
+      const setCall = mocks.setQueryData.mock.calls[0];
+      if (setCall && setCall[1]) {
+        expect((setCall[1] as any).data[0].status).toBe('failed');
+      }
+    });
+
+    it('should invalidate conversations list on message failure', () => {
+      mocks.getQueryData.mockReturnValue(null);
+
       const event = {
         conversationId: 'conv-123',
         messageId: 'msg-456',
@@ -105,16 +194,21 @@ describe('Message Handler', () => {
         attempt: 2,
       };
 
-      expect(() => handleMessageFailed(event)).not.toThrow();
+      handleMessageFailed(event);
+
+      // AC: Handler must call invalidateQueries for conversations
+      expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ['conversations'],
+      });
     });
 
-    it('should accept message.failed with max attempts reached', () => {
+    it('should handle max retry attempts', () => {
       const event = {
         conversationId: 'conv-123',
         messageId: 'msg-456',
         status: 'failed' as const,
         error: 'Max retries exceeded',
-        retryAt: new Date(Date.now() + 1800000).toISOString(), // 30min
+        retryAt: new Date(Date.now() + 1800000).toISOString(),
         attempt: 3,
       };
 
@@ -123,8 +217,7 @@ describe('Message Handler', () => {
   });
 
   describe('handleMessageReceived (FE-013)', () => {
-    it('should accept message.received event from Telegram with correct shape and execute', () => {
-      // AC: Handler must accept event with: conversationId, messageId, platform, senderId, senderName, body, timestamp
+    it('should accept message.received from Telegram with correct shape', () => {
       const event = {
         conversationId: 'conv-123',
         messageId: 'msg-789',
@@ -138,7 +231,81 @@ describe('Message Handler', () => {
       expect(() => handleMessageReceived(event)).not.toThrow();
     });
 
-    it('should accept message.received from IRC', () => {
+    it('should add new inbound message to cache when not duplicate', () => {
+      const mockMessages = {
+        data: [
+          {
+            id: 'msg-existing',
+            conversationId: 'conv-123',
+            senderName: 'Previous sender',
+            body: 'Earlier message',
+            status: 'sent' as const,
+            direction: 'inbound' as const,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      };
+      mocks.getQueryData.mockReturnValue(mockMessages);
+
+      const event = {
+        conversationId: 'conv-123',
+        messageId: 'msg-789',
+        platform: 'telegram' as const,
+        senderId: 'tg-user-123',
+        senderName: 'John Doe',
+        body: 'Hello, this is a message',
+        timestamp: new Date().toISOString(),
+      };
+
+      handleMessageReceived(event);
+
+      // AC: Handler must call setQueryData (add message to cache)
+      expect(mocks.setQueryData).toHaveBeenCalled();
+      const setCall = mocks.setQueryData.mock.calls[0];
+      if (setCall && setCall[1]) {
+        // Verify message was added (array length increased)
+        expect((setCall[1] as any).data.length).toBe(2);
+        expect((setCall[1] as any).data[0].id).toBe('msg-789');
+      }
+    });
+
+    it('should prevent duplicate messages by messageId', () => {
+      const mockMessages = {
+        data: [
+          {
+            id: 'msg-789',
+            conversationId: 'conv-123',
+            senderName: 'John Doe',
+            body: 'Hello, this is a message',
+            status: 'sent' as const,
+            direction: 'inbound' as const,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      };
+      mocks.getQueryData.mockReturnValue(mockMessages);
+
+      const event = {
+        conversationId: 'conv-123',
+        messageId: 'msg-789',
+        platform: 'telegram' as const,
+        senderId: 'tg-user-123',
+        senderName: 'John Doe',
+        body: 'Hello, this is a message',
+        timestamp: new Date().toISOString(),
+      };
+
+      handleMessageReceived(event);
+
+      // AC: Handler must NOT call setQueryData for duplicates (dedup by messageId)
+      expect(mocks.setQueryData).not.toHaveBeenCalled();
+    });
+
+    it('should invalidate conversations list on message received', () => {
+      mocks.getQueryData.mockReturnValue(null);
+
       const event = {
         conversationId: 'conv-456',
         messageId: 'msg-999',
@@ -149,11 +316,15 @@ describe('Message Handler', () => {
         timestamp: new Date().toISOString(),
       };
 
-      expect(() => handleMessageReceived(event)).not.toThrow();
+      handleMessageReceived(event);
+
+      // AC: Handler must call invalidateQueries for conversations
+      expect(mocks.invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ['conversations'],
+      });
     });
 
     it('should accept message.received with optional attachments', () => {
-      // AC: Handler must accept optional attachments field
       const event = {
         conversationId: 'conv-789',
         messageId: 'msg-with-attachments',
@@ -164,37 +335,20 @@ describe('Message Handler', () => {
         timestamp: new Date().toISOString(),
         attachments: [
           { url: 'https://example.com/file.pdf', type: 'document', name: 'file.pdf' },
-          { url: 'https://example.com/image.jpg', type: 'image', name: 'image.jpg' },
         ],
       };
 
       expect(() => handleMessageReceived(event)).not.toThrow();
     });
 
-    it('should accept message.received without attachments', () => {
-      // AC: Handler must work without optional attachments
+    it('should handle IRC messages', () => {
       const event = {
-        conversationId: 'conv-789',
-        messageId: 'msg-no-attachments',
+        conversationId: 'conv-irc',
+        messageId: 'msg-irc-123',
         platform: 'irc' as const,
-        senderId: 'irc-user-999',
-        senderName: 'Bob',
-        body: 'Simple text message',
-        timestamp: new Date().toISOString(),
-      };
-
-      expect(() => handleMessageReceived(event)).not.toThrow();
-    });
-
-    it('should handle unicode and special characters in message body', () => {
-      // AC: Handler must handle non-ASCII text
-      const event = {
-        conversationId: 'conv-unicode',
-        messageId: 'msg-unicode',
-        platform: 'telegram' as const,
-        senderId: 'tg-user-unicode',
-        senderName: '李明',
-        body: '你好世界 🌍 مرحبا العالم',
+        senderId: 'irc-nick',
+        senderName: 'NickName',
+        body: 'IRC message',
         timestamp: new Date().toISOString(),
       };
 

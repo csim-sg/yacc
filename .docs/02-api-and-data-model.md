@@ -1410,16 +1410,8 @@ Client connects with auth token in handshake:
 - **Client**: Listens for `ping` event, responds with `pong`
 - **Purpose**: Detect stale connections
 
-### Event Envelope
-```json
-{
-  "type": "conversation.updated",
-  "payload": { /* event data */ },
-  "timestamp": "2026-01-16T10:00:00Z"
-}
-```
-
 ### Events
+**Format**: Socket.io events emit raw payloads (no envelope wrapper). Example: `socket.on('message.sent', payload => {...})`
 
 #### `conversation.updated`
 **Fired when**: Conversation status, priority, or assignment changes
