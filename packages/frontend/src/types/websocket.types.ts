@@ -26,7 +26,17 @@ export type ConnectionState =
  */
 export interface ConversationUpdatedEvent {
   conversationId: string;
-  conversation: any; // TODO: Import from @yacc/common when exported
+  conversation: {
+    id: string;
+    channel: string;
+    status: 'open' | 'pending' | 'resolved';
+    priority: 'low' | 'medium' | 'high' | 'urgent';
+    assignedUserId?: string | null;
+    unreadCount?: number;
+    latestMessagePreview?: string | null;
+    latestMessageAt?: string | null;
+    [key: string]: unknown;
+  };
   changedFields: string[];
   timestamp: string; // ISO8601
   eventId: string; // For deduplication

@@ -45,12 +45,12 @@ export function handleConversationUpdated(event: ConversationUpdatedEvent): void
       queryKey: ['conversations'],
     });
 
-    // Invalidate timeline if conversation has new messages
-    if (event.changedFields.includes('messageCount') || event.changedFields.includes('lastMessage')) {
-      queryClient.invalidateQueries({
-        queryKey: ['conversation', event.conversationId, 'messages'],
-      });
-    }
+     // Invalidate timeline if conversation has new messages
+     if (event.changedFields.includes('messageCount') || event.changedFields.includes('lastMessage')) {
+       queryClient.invalidateQueries({
+         queryKey: ['conversationMessages', event.conversationId],
+       });
+     }
 
     logger.info('[ConversationHandler] Conversation updated', {
       conversationId: event.conversationId,

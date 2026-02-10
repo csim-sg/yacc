@@ -16,7 +16,10 @@ import type {
   MessageSentEvent,
   MessageFailedEvent,
 } from '../../types/websocket.types';
-import type { ConversationMessage } from '../conversations.service';
+import type {
+  ConversationMessage,
+  ListMessagesResponse,
+} from '../conversations.service';
 import { logger } from '../../lib/logger';
 
 /**
@@ -40,18 +43,18 @@ export function handleMessageSent(event: MessageSentEvent): void {
       return;
     }
 
-    // Mark event as processed
-    store.markEventProcessed(event.eventId);
+     // Mark event as processed
+     store.markEventProcessed(event.eventId);
 
      // Get current messages from cache
-     const messagesData = queryClient.getQueryData<ConversationMessage[]>([
+     const messagesResponse = queryClient.getQueryData<ListMessagesResponse>([
        'conversationMessages',
        event.conversationId,
      ]);
 
-     if (messagesData) {
+     if (messagesResponse?.data) {
        // Find message by messageId and update status
-       const updatedMessages = messagesData.map((msg): ConversationMessage => {
+       const updatedMessages = messagesResponse.data.map((msg): ConversationMessage => {
          if (msg.id === event.messageId) {
            return {
              ...msg,
@@ -62,10 +65,13 @@ export function handleMessageSent(event: MessageSentEvent): void {
          return msg;
        });
 
-       // Update cache
+       // Update cache with complete response
        queryClient.setQueryData(
          ['conversationMessages', event.conversationId],
-         updatedMessages,
+         {
+           ...messagesResponse,
+           data: updatedMessages,
+         } as ListMessagesResponse,
        );
      }
 
@@ -105,18 +111,18 @@ export function handleMessageFailed(event: MessageFailedEvent): void {
       return;
     }
 
-    // Mark event as processed
-    store.markEventProcessed(event.eventId);
+     // Mark event as processed
+     store.markEventProcessed(event.eventId);
 
      // Get current messages from cache
-     const messagesData = queryClient.getQueryData<ConversationMessage[]>([
+     const messagesResponse = queryClient.getQueryData<ListMessagesResponse>([
        'conversationMessages',
        event.conversationId,
      ]);
 
-     if (messagesData) {
+     if (messagesResponse?.data) {
        // Find message and update status
-       const updatedMessages = messagesData.map((msg): ConversationMessage => {
+       const updatedMessages = messagesResponse.data.map((msg): ConversationMessage => {
          if (msg.id === event.messageId) {
            return {
              ...msg,
@@ -126,10 +132,13 @@ export function handleMessageFailed(event: MessageFailedEvent): void {
          return msg;
        });
 
-       // Update cache
+       // Update cache with complete response
        queryClient.setQueryData(
          ['conversationMessages', event.conversationId],
-         updatedMessages,
+         {
+           ...messagesResponse,
+           data: updatedMessages,
+         } as ListMessagesResponse,
        );
      }
 
@@ -164,8 +173,8 @@ export function handleMessageReceived(event: MessageReceivedEvent): void {
       return;
     }
 
-    // Mark event as processed
-    store.markEventProcessed(event.eventId);
+     // Mark event as processed
+     store.markEventProcessed(event.eventId);
 
      // Create message object from event
      const newMessage: ConversationMessage = {
@@ -182,19 +191,23 @@ export function handleMessageReceived(event: MessageReceivedEvent): void {
      };
 
      // Get current messages for this conversation from cache
-     const messagesData = queryClient.getQueryData<ConversationMessage[]>([
+     const messagesResponse = queryClient.getQueryData<ListMessagesResponse>([
        'conversationMessages',
        event.conversationId,
      ]);
 
-     if (messagesData) {
+     if (messagesResponse?.data) {
        // Add new message to messages array
-       const updatedMessages = [...messagesData, newMessage];
+       const updatedMessages = [...messagesResponse.data, newMessage];
 
        // Update cache with new message
        queryClient.setQueryData(
          ['conversationMessages', event.conversationId],
-         updatedMessages,
+         {
+           ...messagesResponse,
+           data: updatedMessages,
+           total: messagesResponse.total + 1,
+         } as ListMessagesResponse,
        );
      }
 

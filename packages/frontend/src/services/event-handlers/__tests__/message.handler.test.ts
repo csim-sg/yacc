@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   handleMessageSent,
   handleMessageFailed,
+  handleMessageReceived,
 } from '../message.handler';
 import { useWebSocketStore } from '../../../stores/websocket.store';
 
@@ -86,43 +87,102 @@ describe('Message Handler', () => {
     });
   });
 
-  describe('handleMessageFailed', () => {
-    it('should handle message.failed event', () => {
-      const event = {
-        eventId: 'evt-2',
-        conversationId: 'conv-123',
-        messageId: 'msg-456',
-        status: 'failed' as const,
-        error: 'Network error',
-        canRetry: true,
-        timestamp: new Date().toISOString(),
-      };
+   describe('handleMessageFailed', () => {
+     it('should handle message.failed event', () => {
+       const event = {
+         eventId: 'evt-2',
+         conversationId: 'conv-123',
+         messageId: 'msg-456',
+         status: 'failed' as const,
+         error: 'Network error',
+         canRetry: true,
+         timestamp: new Date().toISOString(),
+       };
 
-      handleMessageFailed(event);
+       handleMessageFailed(event);
 
-      const store = useWebSocketStore.getState();
-      expect(store.isEventProcessed('evt-2')).toBe(true);
-    });
+       const store = useWebSocketStore.getState();
+       expect(store.isEventProcessed('evt-2')).toBe(true);
+     });
 
-    it('should ignore duplicate message.failed events', () => {
-      const event = {
-        eventId: 'evt-2',
-        conversationId: 'conv-123',
-        messageId: 'msg-456',
-        status: 'failed' as const,
-        error: 'Network error',
-        canRetry: true,
-        timestamp: new Date().toISOString(),
-      };
+     it('should ignore duplicate message.failed events', () => {
+       const event = {
+         eventId: 'evt-2',
+         conversationId: 'conv-123',
+         messageId: 'msg-456',
+         status: 'failed' as const,
+         error: 'Network error',
+         canRetry: true,
+         timestamp: new Date().toISOString(),
+       };
 
-      handleMessageFailed(event);
-      const processedCount1 = useWebSocketStore.getState().processedEventIds.size;
+       handleMessageFailed(event);
+       const processedCount1 = useWebSocketStore.getState().processedEventIds.size;
 
-      // Process same event again
-      handleMessageFailed(event);
-      const processedCount2 = useWebSocketStore.getState().processedEventIds.size;
+       // Process same event again
+       handleMessageFailed(event);
+       const processedCount2 = useWebSocketStore.getState().processedEventIds.size;
 
-      expect(processedCount1).toBe(processedCount2);
-    });
-  });
-});
+       expect(processedCount1).toBe(processedCount2);
+     });
+   });
+
+   describe('handleMessageReceived', () => {
+     it('should handle message.received event', () => {
+       const event = {
+         eventId: 'evt-3',
+         conversationId: 'conv-123',
+         messageId: 'msg-789',
+         platform: 'telegram' as const,
+         senderId: 'user-456',
+         senderName: 'John Doe',
+         body: 'Hello, this is a message',
+         timestamp: new Date().toISOString(),
+       };
+
+       handleMessageReceived(event);
+
+       const store = useWebSocketStore.getState();
+       expect(store.isEventProcessed('evt-3')).toBe(true);
+     });
+
+     it('should ignore duplicate message.received events', () => {
+       const event = {
+         eventId: 'evt-3',
+         conversationId: 'conv-123',
+         messageId: 'msg-789',
+         platform: 'telegram' as const,
+         senderId: 'user-456',
+         senderName: 'John Doe',
+         body: 'Hello, this is a message',
+         timestamp: new Date().toISOString(),
+       };
+
+       handleMessageReceived(event);
+       const processedCount1 = useWebSocketStore.getState().processedEventIds.size;
+
+       // Process same event again
+       handleMessageReceived(event);
+       const processedCount2 = useWebSocketStore.getState().processedEventIds.size;
+
+       expect(processedCount1).toBe(processedCount2);
+     });
+
+     it('should handle message.received without optional fields', () => {
+       const event = {
+         eventId: 'evt-4',
+         conversationId: 'conv-456',
+         messageId: 'msg-999',
+         platform: 'irc' as const,
+         senderName: 'Anonymous',
+         body: 'Hello',
+         timestamp: new Date().toISOString(),
+       };
+
+       handleMessageReceived(event);
+
+       const store = useWebSocketStore.getState();
+       expect(store.isEventProcessed('evt-4')).toBe(true);
+     });
+   });
+ });
