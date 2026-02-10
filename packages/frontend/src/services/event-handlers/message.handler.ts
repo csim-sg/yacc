@@ -10,7 +10,7 @@
 
 import { useWebSocketStore } from '../../stores/websocket.store';
 import { queryClient } from '../../lib/queryClient';
-import type { MessageSentEvent, MessageFailedEvent } from '../../types/websocket.types';
+import type { MessageReceivedEvent, MessageSentEvent, MessageFailedEvent } from '../../types/websocket.types';
 import { logger } from '../../lib/logger';
 
 /**
@@ -138,7 +138,98 @@ export function handleMessageFailed(event: MessageFailedEvent): void {
       messageId: event.messageId,
       error: event.error,
     });
+   } catch (error) {
+     logger.error('[MessageHandler] Error handling message.failed', error);
+   }
+}
+
+/**
+ * Handle message.received event
+ * Adds new inbound message to conversation and updates unread count
+ */
+export function handleMessageReceived(event: MessageReceivedEvent): void {
+  try {
+    logger.debug('[MessageHandler] Handling message.received', {
+      conversationId: event.conversationId,
+      messageId: event.messageId,
+      senderName: event.senderName,
+    });
+
+    // Check for duplicates
+    const store = useWebSocketStore.getState();
+    if (store.isEventProcessed(event.eventId)) {
+      logger.warn('[MessageHandler] Duplicate message.received event ignored', {
+        eventId: event.eventId,
+      });
+      return;
+    }
+
+    // Mark event as processed
+    store.markEventProcessed(event.eventId);
+
+    // Create message object from event
+    const newMessage = {
+      id: event.messageId,
+      conversationId: event.conversationId,
+      senderId: event.senderId || null,
+      senderName: event.senderName,
+      body: event.body,
+      status: 'sent' as const,
+      direction: 'inbound' as const,
+      attachments: event.attachments || [],
+      createdAt: event.timestamp,
+      updatedAt: event.timestamp,
+    };
+
+    // Get current conversation data from cache
+    const conversationData = queryClient.getQueryData<any>([
+      'conversation',
+      event.conversationId,
+    ]);
+
+    if (conversationData?.data?.messages) {
+      // Add new message to messages array
+      const updatedMessages = [...conversationData.data.messages, newMessage];
+
+      // Update cache with new message
+      queryClient.setQueryData(['conversation', event.conversationId], {
+        ...conversationData,
+        data: {
+          ...conversationData.data,
+          messages: updatedMessages,
+        },
+      });
+    }
+
+    // Update conversations list to increment unread count
+    const conversationsCacheKey = ['conversations'] as const;
+    const conversationsData = queryClient.getQueryData<any>(conversationsCacheKey);
+    
+    if (conversationsData?.data) {
+      const updatedConversations = conversationsData.data.map((conv: any) => {
+        if (conv.id === event.conversationId) {
+          return {
+            ...conv,
+            unreadCount: (conv.unreadCount || 0) + 1,
+            latestMessagePreview: event.body,
+            latestMessageAt: event.timestamp,
+          };
+        }
+        return conv;
+      });
+
+      queryClient.setQueryData(conversationsCacheKey, {
+        ...conversationsData,
+        data: updatedConversations,
+      });
+    }
+
+    logger.info('[MessageHandler] Message received and added', {
+      conversationId: event.conversationId,
+      messageId: event.messageId,
+      senderName: event.senderName,
+    });
   } catch (error) {
-    logger.error('[MessageHandler] Error handling message.failed', error);
+    logger.error('[MessageHandler] Error handling message.received', error);
   }
 }

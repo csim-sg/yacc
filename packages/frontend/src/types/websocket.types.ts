@@ -58,6 +58,27 @@ export interface MessageFailedEvent {
 }
 
 /**
+ * Inbound message received from external platform
+ */
+export interface MessageReceivedEvent {
+  conversationId: string;
+  messageId: string;
+  platform: 'telegram' | 'irc' | 'whatsapp' | 'wechat' | 'meta' | 'x';
+  senderId?: string;
+  senderName: string;
+  body: string;
+  attachments?: Array<{
+    id: string;
+    name: string;
+    type: string;
+    size: number;
+    url: string;
+  }>;
+  timestamp: string; // ISO8601
+  eventId: string;
+}
+
+/**
  * User started typing
  */
 export interface TypingStartedEvent {
@@ -141,6 +162,7 @@ export interface BacklogSyncEvent {
  */
 export type ServerEvent =
   | ConversationUpdatedEvent
+  | MessageReceivedEvent
   | MessageSentEvent
   | MessageFailedEvent
   | TypingStartedEvent
