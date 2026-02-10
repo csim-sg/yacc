@@ -8,11 +8,11 @@
  * - Error handling and display
  * - Optimistic UI updates
  * - Character limit (5000 chars)
- * - Keyboard shortcut: Ctrl+Enter to send
+ * - Keyboard shortcut: Ctrl+Enter to send (scoped to textarea)
  * - Input validation (prevent empty messages)
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 
 interface ReplyComposerProps {
   /** Called when user submits the reply */
@@ -65,20 +65,6 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
   const isEmpty = !body.trim();
   const isDisabled = isEmpty || isSending || isLocalSending;
 
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      // Ctrl+Enter or Cmd+Enter to send
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        handleSend();
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [body]);
-
   const handleSend = useCallback(async () => {
     if (isEmpty || isDisabled) {
       return;
@@ -100,6 +86,33 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
       setIsLocalSending(false);
     }
   }, [body, isEmpty, isDisabled, onSend]);
+
+  // Handle textarea-scoped keyboard shortcuts
+  // FIXED: Ctrl+Enter only works when textarea is focused (not global)
+  const handleTextareaKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Ctrl+Enter or Cmd+Enter to send (scoped to textarea only)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleSend();
+      }
+
+      // Handle Tab key for indentation
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const textarea = e.currentTarget;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const newValue = body.substring(0, start) + '\t' + body.substring(end);
+        setBody(newValue);
+        // Move cursor after inserted tab
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd = start + 1;
+        }, 0);
+      }
+    },
+    [body, handleSend]
+  );
 
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
@@ -147,21 +160,7 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
               const newValue = e.target.value.slice(0, maxLength);
               setBody(newValue);
             }}
-            onKeyDown={(e) => {
-              // Allow tab in textarea
-              if (e.key === 'Tab') {
-                e.preventDefault();
-                const textarea = e.currentTarget;
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const newValue = body.substring(0, start) + '\t' + body.substring(end);
-                setBody(newValue);
-                // Move cursor after inserted tab
-                setTimeout(() => {
-                  textarea.selectionStart = textarea.selectionEnd = start + 1;
-                }, 0);
-              }
-            }}
+            onKeyDown={handleTextareaKeyDown}
             disabled={isSending || isLocalSending}
             placeholder={placeholder}
             aria-label="Message body"
@@ -175,9 +174,7 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
             <div
               id={isAtLimit ? 'char-limit-warning' : 'char-counter'}
               className={`text-xs font-medium whitespace-nowrap ${
-                isAtLimit
-                  ? 'text-error font-bold'
-                  : 'text-base-content/60'
+                isAtLimit ? 'text-error font-bold' : 'text-base-content/60'
               }`}
               aria-live="polite"
               aria-atomic="true"

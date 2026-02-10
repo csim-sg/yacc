@@ -44,85 +44,100 @@ export function useUnreadBadges() {
    * Updates cache immediately (optimistic)
    * Clears unread count
    */
-  const markAsRead = useCallback(
-    (conversationId: string) => {
-      logger.debug('[UnreadBadges] Marking conversation as read', { conversationId });
+   const markAsRead = useCallback(
+     (conversationId: number | string) => {
+       const id = typeof conversationId === 'string' ? parseInt(conversationId, 10) : conversationId;
+       logger.debug('[UnreadBadges] Marking conversation as read', { conversationId: id });
 
-      // Update conversation cache
-      const cacheKey = ['conversations'];
-      queryClient.setQueryData(cacheKey, (oldData: any) => {
-        if (!oldData || !oldData.data) return oldData;
+       // Update conversation cache using prefix matching for all parameterized queries
+       queryClient.setQueriesData(
+         { queryKey: ['conversations'] },
+         (oldData: unknown) => {
+           const data = oldData as { data?: ConversationListItem[] } | undefined;
+           if (!data || !data.data) return oldData;
 
-        return {
-          ...oldData,
-          data: oldData.data.map((conv: ConversationListItem) =>
-            conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv
-          ),
-        };
-      });
+           return {
+             ...data,
+             data: data.data.map((conv: ConversationListItem) =>
+               conv.id === id ? { ...conv, unreadCount: 0 } : conv
+             ),
+           };
+         }
+       );
 
-      // TODO: Call API: PATCH /api/conversations/:id/markAsRead
-      // try {
-      //   await conversationsService.markAsRead(conversationId);
-      // } catch (error) {
-      //   logger.error('[UnreadBadges] Failed to mark as read', error);
-      //   // Revert optimistic update on error
-      //   queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      // }
-    },
-    [queryClient]
-  );
+       // TODO: Call API: PATCH /api/conversations/:id/markAsRead
+       // try {
+       //   await conversationsService.markAsRead(conversationId);
+       // } catch (error) {
+       //   logger.error('[UnreadBadges] Failed to mark as read', error);
+       //   // Revert optimistic update on error
+       //   queryClient.invalidateQueries({ queryKey: ['conversations'] });
+       // }
+     },
+     [queryClient]
+   );
 
-  /**
-   * Updates unread count for a specific conversation
-   * Called when new message arrives via WebSocket
-   */
-  const updateUnreadCount = useCallback(
-    (conversationId: string, newCount: number) => {
-      logger.debug('[UnreadBadges] Updating unread count', {
-        conversationId,
-        newCount,
-      });
+   /**
+    * Updates unread count for a specific conversation
+    * Called when new message arrives via WebSocket
+    */
+   const updateUnreadCount = useCallback(
+     (conversationId: number | string, newCount: number) => {
+       const id = typeof conversationId === 'string' ? parseInt(conversationId, 10) : conversationId;
+       logger.debug('[UnreadBadges] Updating unread count', {
+         conversationId: id,
+         newCount,
+       });
 
-      const cacheKey = ['conversations'];
-      queryClient.setQueryData(cacheKey, (oldData: any) => {
-        if (!oldData || !oldData.data) return oldData;
+       // Update all conversation list queries using prefix matching
+       queryClient.setQueriesData(
+         { queryKey: ['conversations'] },
+         (oldData: unknown) => {
+           const data = oldData as { data?: ConversationListItem[] } | undefined;
+           if (!data || !data.data) return oldData;
 
-        return {
-          ...oldData,
-          data: oldData.data.map((conv: ConversationListItem) =>
-            conv.id === conversationId
-              ? { ...conv, unreadCount: newCount }
-              : conv
-          ),
-        };
-      });
-    },
-    [queryClient]
-  );
+           return {
+             ...data,
+             data: data.data.map((conv: ConversationListItem) =>
+               conv.id === id
+                 ? { ...conv, unreadCount: newCount }
+                 : conv
+             ),
+           };
+         }
+       );
+     },
+     [queryClient]
+   );
 
-  /**
-   * Increments unread count by 1
-   * Called when new inbound message arrives
-   */
-  const incrementUnreadCount = useCallback(
-    (conversationId: string) => {
-      const cacheKey = ['conversations'];
-      queryClient.setQueryData(cacheKey, (oldData: any) => {
-        if (!oldData || !oldData.data) return oldData;
+   /**
+    * Increments unread count by 1
+    * Called when new inbound message arrives
+    */
+   const incrementUnreadCount = useCallback(
+     (conversationId: number | string) => {
+       const id = typeof conversationId === 'string' ? parseInt(conversationId, 10) : conversationId;
+       
+       // Update all conversation list queries using prefix matching
+       queryClient.setQueriesData(
+         { queryKey: ['conversations'] },
+         (oldData: unknown) => {
+           const data = oldData as { data?: ConversationListItem[] } | undefined;
+           if (!data || !data.data) return oldData;
 
-        return {
-          ...oldData,
-          data: oldData.data.map((conv: ConversationListItem) =>
-            conv.id === conversationId
-              ? { ...conv, unreadCount: (conv.unreadCount || 0) + 1 }
-              : conv
-          ),
-        };
-      });
-    },
-    [queryClient]
-  );
+           return {
+             ...data,
+             data: data.data.map((conv: ConversationListItem) =>
+               conv.id === id
+                 ? { ...conv, unreadCount: (conv.unreadCount || 0) + 1 }
+                 : conv
+             ),
+           };
+         }
+       );
+     },
+     [queryClient]
+   );
 
   return {
     markAsRead,

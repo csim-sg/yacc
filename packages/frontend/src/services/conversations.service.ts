@@ -64,8 +64,6 @@ export interface ConversationDetail {
   assignedUserId?: string | null;
   createdAt: string;
   updatedAt: string;
-  lastActivityAt: string;
-  messages: ConversationMessage[];
   tags?: ConversationTag[];
 }
 
@@ -93,7 +91,6 @@ export interface ListConversationsParams {
 }
 
 export interface GetConversationResponse {
-  success: boolean;
   data: ConversationDetail;
 }
 

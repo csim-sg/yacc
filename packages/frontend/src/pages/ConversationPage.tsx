@@ -3,11 +3,10 @@
  * Read-only conversation view
  */
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth.store';
-import { ReplyComposer } from '../components/ReplyComposer';
 import {
   conversationsService,
   type ConversationDetail,
@@ -49,8 +48,8 @@ export function ConversationPage() {
   const { id } = useParams();
 
   const conversationId = useMemo(() => {
-    // URL parameter 'id' is already a string (UUID)
-    return id || null;
+    const parsed = Number(id);
+    return Number.isNaN(parsed) ? null : parsed;
   }, [id]);
 
   useEffect(() => {
@@ -64,57 +63,32 @@ export function ConversationPage() {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
+  // Fetch conversation metadata
   const {
     data,
     isLoading,
     isFetching,
     error,
     refetch,
-   } = useQuery<GetConversationResponse, { error?: string; message?: string }>({
-     queryKey: ['conversation', conversationId],
-     queryFn: () => conversationsService.getById(conversationId!),
-     enabled: !!conversationId,
-   });
-
-  const conversation: ConversationDetail | null = data?.data ?? null;
-  const errorMessage = error?.error || error?.message || 'Failed to load conversation';
-
-  // Send message mutation
-  const queryClient = useQueryClient();
-  const [sendError, setSendError] = useState<string | null>(null);
-
-  const {
-    mutateAsync: sendMessage,
-    isPending: isSendingMessage,
-  } = useMutation({
-    mutationFn: async (body: string) => {
-      if (!conversationId) {
-        throw new Error('Conversation ID is required');
-      }
-      return conversationsService.sendMessage(conversationId, body);
-    },
-    onSuccess: () => {
-      // Invalidate conversation query to refetch messages
-      queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] });
-      setSendError(null);
-    },
-    onError: (error: unknown) => {
-      const errorMsg = error instanceof Error ? error.message : 'Failed to send message';
-      setSendError(errorMsg);
-    },
+  } = useQuery<GetConversationResponse, { error?: string; message?: string }>({
+    queryKey: ['conversation', conversationId],
+    queryFn: () => conversationsService.getById(conversationId as number),
+    enabled: Number.isFinite(conversationId),
   });
 
-  const handleSendMessage = useCallback(
-    async (body: string) => {
-      try {
-        await sendMessage(body);
-      } catch (err) {
-        console.error('[ConversationPage] Failed to send message:', err);
-        // Error is already handled by mutation callbacks
-      }
-    },
-    [sendMessage]
-  );
+  // Fetch messages separately
+  const {
+    data: messagesData,
+    isLoading: messagesLoading,
+  } = useQuery({
+    queryKey: ['conversationMessages', conversationId],
+    queryFn: () => conversationsService.getMessages(conversationId as number),
+    enabled: Number.isFinite(conversationId),
+  });
+
+  const conversation: ConversationDetail | null = data?.data ?? null;
+  const messages = messagesData?.data ?? [];
+  const errorMessage = error?.error || error?.message || 'Failed to load conversation';
 
   const handleLogout = async () => {
     await logout();
@@ -432,14 +406,10 @@ export function ConversationPage() {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div>
                           <div className="text-base-content/60">Thread</div>
                           <div className="font-semibold">{conversation.title || conversation.externalThreadId}</div>
-                        </div>
-                        <div>
-                          <div className="text-base-content/60">Last activity</div>
-                          <div className="font-semibold">{formatTimestamp(conversation.lastActivityAt)}</div>
                         </div>
                         <div>
                           <div className="text-base-content/60">Created</div>
@@ -464,32 +434,24 @@ export function ConversationPage() {
                       <div className="divider"></div>
 
                       <div className="space-y-4">
-                         <h3 className="text-lg font-semibold">Messages</h3>
-                         {conversation.messages.length === 0 && (
-                           <div className="text-base-content/60">No messages yet.</div>
-                         )}
-                         <div className="flex flex-col gap-3">
-                           {conversation.messages.map(renderMessageBubble)}
-                         </div>
-                       </div>
-
-                       <div className="divider"></div>
-
-                       <div className="space-y-4">
-                         <h3 className="text-lg font-semibold">Send Reply</h3>
-                         <ReplyComposer
-                           onSend={handleSendMessage}
-                           isSending={isSendingMessage}
-                           error={sendError || undefined}
-                           showError={!!sendError}
-                           onErrorDismiss={() => setSendError(null)}
-                         />
-                       </div>
-                     </div>
-                   )}
-                 </div>
-               </div>
-             </div>
+                        <h3 className="text-lg font-semibold">Messages</h3>
+                        {messagesLoading && (
+                          <div className="loading loading-spinner loading-md"></div>
+                        )}
+                        {!messagesLoading && messages.length === 0 && (
+                          <div className="text-base-content/60">No messages yet.</div>
+                        )}
+                        {!messagesLoading && messages.length > 0 && (
+                          <div className="flex flex-col gap-3">
+                            {messages.map(renderMessageBubble)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
             <div className="card bg-base-100 shadow-xl">
               <div className="card-body">
