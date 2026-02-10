@@ -9,7 +9,6 @@
  * Updates message status in timeline and handles retries
  */
 
-import { useWebSocketStore } from '../../stores/websocket.store';
 import { queryClient } from '../../lib/queryClient';
 import type {
   MessageReceivedEvent,
@@ -24,27 +23,18 @@ import { logger } from '../../lib/logger';
 
 /**
  * Handle message.sent event
- * Updates message status to "sent" and reconciles tempId with serverId
+ * Updates message status to "sent"
  */
 export function handleMessageSent(event: MessageSentEvent): void {
-  try {
-    logger.debug('[MessageHandler] Handling message.sent', {
-      conversationId: event.conversationId,
-      messageId: event.messageId,
-      serverId: event.serverId,
-    });
+   try {
+     logger.debug('[MessageHandler] Handling message.sent', {
+       conversationId: event.conversationId,
+       messageId: event.messageId,
+       sentAt: event.sentAt,
+     });
 
-    // Check for duplicates
-    const store = useWebSocketStore.getState();
-    if (store.isEventProcessed(event.eventId)) {
-      logger.warn('[MessageHandler] Duplicate message.sent event ignored', {
-        eventId: event.eventId,
-      });
-      return;
-    }
-
-     // Mark event as processed
-     store.markEventProcessed(event.eventId);
+     // Note: Backend doesn't send eventId, so deduplication is not available
+     // Duplicate handling will be managed by message ID uniqueness
 
      // Get current messages from cache
      const messagesResponse = queryClient.getQueryData<ListMessagesResponse>([
@@ -58,7 +48,6 @@ export function handleMessageSent(event: MessageSentEvent): void {
          if (msg.id === event.messageId) {
            return {
              ...msg,
-             id: event.serverId || msg.id, // Use server ID if provided
              status: 'sent' as const,
            };
          }
@@ -94,25 +83,16 @@ export function handleMessageSent(event: MessageSentEvent): void {
  * Updates message status to "failed" and shows error
  */
 export function handleMessageFailed(event: MessageFailedEvent): void {
-  try {
-    logger.warn('[MessageHandler] Handling message.failed', {
-      conversationId: event.conversationId,
-      messageId: event.messageId,
-      error: event.error,
-      canRetry: event.canRetry,
-    });
+   try {
+     logger.warn('[MessageHandler] Handling message.failed', {
+       conversationId: event.conversationId,
+       messageId: event.messageId,
+       error: event.error,
+       retryAt: event.retryAt,
+       attempt: event.attempt,
+     });
 
-    // Check for duplicates
-    const store = useWebSocketStore.getState();
-    if (store.isEventProcessed(event.eventId)) {
-      logger.warn('[MessageHandler] Duplicate message.failed event ignored', {
-        eventId: event.eventId,
-      });
-      return;
-    }
-
-     // Mark event as processed
-     store.markEventProcessed(event.eventId);
+     // Note: Backend doesn't send eventId, so deduplication is not available
 
      // Get current messages from cache
      const messagesResponse = queryClient.getQueryData<ListMessagesResponse>([
@@ -154,111 +134,19 @@ export function handleMessageFailed(event: MessageFailedEvent): void {
 
 /**
  * Handle message.received event
- * Adds new inbound message to conversation and updates unread count
+ * 
+ * NOTE: Backend does not currently emit this event.
+ * Inbound messages from external platforms are fetched via API polling.
+ * This handler is a placeholder for future implementation.
  */
 export function handleMessageReceived(event: MessageReceivedEvent): void {
-  try {
-    logger.debug('[MessageHandler] Handling message.received', {
-      conversationId: event.conversationId,
-      messageId: event.messageId,
-      senderName: event.senderName,
-    });
-
-    // Check for duplicates
-    const store = useWebSocketStore.getState();
-    if (store.isEventProcessed(event.eventId)) {
-      logger.warn('[MessageHandler] Duplicate message.received event ignored', {
-        eventId: event.eventId,
-      });
-      return;
-    }
-
-     // Mark event as processed
-     store.markEventProcessed(event.eventId);
-
-     // Create message object from event
-     const newMessage: ConversationMessage = {
-       id: event.messageId,
+   try {
+     logger.info('[MessageHandler] Message received event (currently unused - backend does not emit)', {
        conversationId: event.conversationId,
-       senderId: event.senderId || null,
-       senderName: event.senderName,
-       body: event.body,
-       status: 'sent',
-       direction: 'inbound',
-       externalMessageId: undefined,
-       createdAt: event.timestamp,
-       updatedAt: event.timestamp,
-     };
-
-     // Get current messages for this conversation from cache
-     const messagesResponse = queryClient.getQueryData<ListMessagesResponse>([
-       'conversationMessages',
-       event.conversationId,
-     ]);
-
-     if (messagesResponse?.data) {
-       // Add new message to messages array
-       const updatedMessages = [...messagesResponse.data, newMessage];
-
-       // Update cache with new message
-       queryClient.setQueryData(
-         ['conversationMessages', event.conversationId],
-         {
-           ...messagesResponse,
-           data: updatedMessages,
-           total: messagesResponse.total + 1,
-         } as ListMessagesResponse,
-       );
-     }
-
-     // Update conversations list to increment unread count
-     // Note: Use setQueriesData to update all conversations caches (with different filters/params)
-     queryClient.setQueriesData(
-       { queryKey: ['conversations'] },
-       (old: unknown): unknown => {
-         interface ConversationWithMetadata {
-           id: string;
-           unreadCount?: number;
-           latestMessagePreview?: string;
-           latestMessageAt?: string;
-           [key: string]: unknown;
-         }
-
-         interface CachedConversations {
-           data: ConversationWithMetadata[];
-           [key: string]: unknown;
-         }
-
-         const conversationsData = old as CachedConversations | undefined;
-         if (!conversationsData?.data) return old;
-
-         const updatedConversations = conversationsData.data.map(
-           (conv: ConversationWithMetadata): ConversationWithMetadata => {
-             if (conv.id === event.conversationId) {
-               return {
-                 ...conv,
-                 unreadCount: (conv.unreadCount || 0) + 1,
-                 latestMessagePreview: event.body,
-                 latestMessageAt: event.timestamp,
-               };
-             }
-             return conv;
-           }
-         );
-
-         return {
-           ...conversationsData,
-           data: updatedConversations,
-         };
-       },
-     );
-
-    logger.info('[MessageHandler] Message received and added', {
-      conversationId: event.conversationId,
-      messageId: event.messageId,
-      senderName: event.senderName,
-    });
-  } catch (error) {
-    logger.error('[MessageHandler] Error handling message.received', error);
-  }
+       messageId: event.messageId,
+     });
+     // TODO: Implement when backend connectors emit message.received events
+   } catch (error) {
+     logger.error('[MessageHandler] Error handling message.received', error);
+   }
 }

@@ -22,24 +22,13 @@ export type ConnectionState =
 // ============================================================================
 
 /**
- * Conversation was updated (message added, status changed, etc.)
+ * Conversation was updated (status/priority/assignment changes)
  */
 export interface ConversationUpdatedEvent {
   conversationId: string;
-  conversation: {
-    id: string;
-    channel: string;
-    status: 'open' | 'pending' | 'resolved';
-    priority: 'low' | 'medium' | 'high' | 'urgent';
-    assignedUserId?: string | null;
-    unreadCount?: number;
-    latestMessagePreview?: string | null;
-    latestMessageAt?: string | null;
-    [key: string]: unknown;
-  };
-  changedFields: string[];
-  timestamp: string; // ISO8601
-  eventId: string; // For deduplication
+  updatedFields: Record<string, unknown>; // Map of changed fields and values
+  changedBy: string; // UUID of user who made the change
+  changedAt: string; // ISO8601 timestamp
 }
 
 /**
@@ -48,10 +37,8 @@ export interface ConversationUpdatedEvent {
 export interface MessageSentEvent {
   conversationId: string;
   messageId: string;
-  serverId?: string; // Map from tempId to actual ID
   status: 'sent';
-  timestamp: string; // ISO8601
-  eventId: string;
+  sentAt: string; // ISO8601 - actual backend field name
 }
 
 /**
@@ -62,30 +49,21 @@ export interface MessageFailedEvent {
   messageId: string;
   status: 'failed';
   error: string;
-  canRetry: boolean;
-  timestamp: string; // ISO8601
-  eventId: string;
+  retryAt: string; // ISO8601 - when next retry will occur
+  attempt: number; // Retry attempt number (1-3)
 }
 
 /**
- * Inbound message received from external platform
+ * NOTE: message.received for inbound platform messages is NOT currently emitted by backend.
+ * This is a placeholder for future implementation when connectors emit inbound messages.
+ * For now, inbound messages are fetched via polling in the API layer.
  */
 export interface MessageReceivedEvent {
   conversationId: string;
   messageId: string;
-  platform: 'telegram' | 'irc' | 'whatsapp' | 'wechat' | 'meta' | 'x';
-  senderId?: string;
   senderName: string;
   body: string;
-  attachments?: Array<{
-    id: string;
-    name: string;
-    type: string;
-    size: number;
-    url: string;
-  }>;
-  timestamp: string; // ISO8601
-  eventId: string;
+  receivedAt: string; // ISO8601
 }
 
 /**

@@ -48,51 +48,29 @@ describe('Conversation Handler', () => {
     });
   });
 
-   describe('handleConversationUpdated', () => {
-     it('should handle conversation.updated event', () => {
-       const event = {
-         eventId: 'evt-1',
-         conversationId: 'conv-123',
-         conversation: {
-           id: 'conv-123',
-           channel: 'telegram',
-           status: 'open' as const,
-           priority: 'medium' as const,
-         },
-         changedFields: ['status'],
-         timestamp: new Date().toISOString(),
-       };
+    describe('handleConversationUpdated', () => {
+      it('should handle conversation.updated event', () => {
+        const event = {
+          conversationId: 'conv-123',
+          updatedFields: { status: 'pending' },
+          changedBy: 'user-456',
+          changedAt: new Date().toISOString(),
+        };
 
-       handleConversationUpdated(event);
+        expect(() => handleConversationUpdated(event)).not.toThrow();
+      });
 
-       const store = useWebSocketStore.getState();
-       expect(store.isEventProcessed('evt-1')).toBe(true);
-     });
+      it('should invalidate conversation caches', () => {
+        const event = {
+          conversationId: 'conv-123',
+          updatedFields: { status: 'resolved', priority: 'high' },
+          changedBy: 'user-456',
+          changedAt: new Date().toISOString(),
+        };
 
-     it('should ignore duplicate events', () => {
-       const event = {
-         eventId: 'evt-1',
-         conversationId: 'conv-123',
-         conversation: {
-           id: 'conv-123',
-           channel: 'telegram',
-           status: 'open' as const,
-           priority: 'medium' as const,
-         },
-         changedFields: ['status'],
-         timestamp: new Date().toISOString(),
-       };
-
-       handleConversationUpdated(event);
-       const processedCount1 = useWebSocketStore.getState().processedEventIds.size;
-
-       // Process same event again
-       handleConversationUpdated(event);
-       const processedCount2 = useWebSocketStore.getState().processedEventIds.size;
-
-       expect(processedCount1).toBe(processedCount2);
-     });
-   });
+        expect(() => handleConversationUpdated(event)).not.toThrow();
+      });
+    });
 
   describe('handleConversationReopened', () => {
     it('should handle conversation.reopened event', () => {

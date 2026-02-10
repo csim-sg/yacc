@@ -15,50 +15,37 @@ import { logger } from '../../lib/logger';
 
 /**
  * Handle conversation.updated event
- * Updates conversation in cache and invalidates related queries
+ * Backend emits when: status/priority/assignment changes
+ * Invalidates caches to refetch from server
  */
 export function handleConversationUpdated(event: ConversationUpdatedEvent): void {
-  try {
-    logger.debug('[ConversationHandler] Handling conversation.updated', {
-      conversationId: event.conversationId,
-      changedFields: event.changedFields,
-    });
+   try {
+     logger.info('[ConversationHandler] Handling conversation.updated', {
+       conversationId: event.conversationId,
+       changedBy: event.changedBy,
+       changedAt: event.changedAt,
+     });
 
-    // Check for duplicates
-    const store = useWebSocketStore.getState();
-    if (store.isEventProcessed(event.eventId)) {
-      logger.warn('[ConversationHandler] Duplicate conversation.updated event ignored', {
-        eventId: event.eventId,
-      });
-      return;
-    }
+     // Note: Backend doesn't send eventId, so deduplication is not available
+     // Updates are idempotent (invalidate to refetch fresh data)
 
-    // Mark event as processed
-    store.markEventProcessed(event.eventId);
+     // Invalidate conversation detail and list to refetch fresh data from server
+     queryClient.invalidateQueries({
+       queryKey: ['conversation', event.conversationId],
+     });
 
-    // Update TanStack Query cache
-    // Key: ['conversations', conversationId]
-    queryClient.setQueryData(['conversation', event.conversationId], event.conversation);
+     // Invalidate conversation list (for sorting, filtering updates)
+     queryClient.invalidateQueries({
+       queryKey: ['conversations'],
+     });
 
-    // Invalidate conversation list (for sorting, filtering updates)
-    queryClient.invalidateQueries({
-      queryKey: ['conversations'],
-    });
-
-     // Invalidate timeline if conversation has new messages
-     if (event.changedFields.includes('messageCount') || event.changedFields.includes('lastMessage')) {
-       queryClient.invalidateQueries({
-         queryKey: ['conversationMessages', event.conversationId],
-       });
-     }
-
-    logger.info('[ConversationHandler] Conversation updated', {
-      conversationId: event.conversationId,
-    });
-  } catch (error) {
-    logger.error('[ConversationHandler] Error handling conversation.updated', error);
-  }
-}
+     logger.info('[ConversationHandler] Conversation updated', {
+       conversationId: event.conversationId,
+     });
+   } catch (error) {
+     logger.error('[ConversationHandler] Error handling conversation.updated', error);
+   }
+ }
 
 /**
  * Handle conversation.reopened event
