@@ -4,71 +4,70 @@
  * Handles server events related to message delivery:
  * - Message sent (confirmation)
  * - Message failed (delivery error)
+ * - Message received (inbound from external platform)
  *
  * Updates message status in timeline and handles retries
  */
 
-import { useWebSocketStore } from '../../stores/websocket.store';
-import { queryClient } from '../../lib/queryClient';
-import type { MessageSentEvent, MessageFailedEvent } from '../../types/websocket.types';
 import { logger } from '../../lib/logger';
+import { queryClient } from '../../lib/queryClient';
+import type {
+  MessageReceivedEvent,
+  MessageSentEvent,
+  MessageFailedEvent,
+} from '../../types/websocket.types';
+import type {
+  ConversationMessage,
+  ListMessagesResponse,
+} from '../conversations.service';
 
 /**
  * Handle message.sent event
- * Updates message status to "sent" and reconciles tempId with serverId
+ * Updates message status to "sent"
  */
 export function handleMessageSent(event: MessageSentEvent): void {
-  try {
-    logger.debug('[MessageHandler] Handling message.sent', {
-      conversationId: event.conversationId,
-      messageId: event.messageId,
-      serverId: event.serverId,
-    });
+   try {
+     logger.debug('[MessageHandler] Handling message.sent', {
+       conversationId: event.conversationId,
+       messageId: event.messageId,
+       sentAt: event.sentAt,
+     });
 
-    // Check for duplicates
-    const store = useWebSocketStore.getState();
-    if (store.isEventProcessed(event.eventId)) {
-      logger.warn('[MessageHandler] Duplicate message.sent event ignored', {
-        eventId: event.eventId,
-      });
-      return;
-    }
+     // Note: Backend doesn't send eventId, so deduplication is not available
+     // Duplicate handling will be managed by message ID uniqueness
 
-    // Mark event as processed
-    store.markEventProcessed(event.eventId);
+     // Get current messages from cache
+     const messagesResponse = queryClient.getQueryData<ListMessagesResponse>([
+       'conversationMessages',
+       event.conversationId,
+     ]);
 
-    // Get current messages from cache
-    const messagesData = queryClient.getQueryData<any[]>([
-      'conversation',
-      event.conversationId,
-      'messages',
-    ]);
+     if (messagesResponse?.data) {
+       // Find message by messageId and update status
+       const updatedMessages = messagesResponse.data.map((msg): ConversationMessage => {
+         if (msg.id === event.messageId) {
+           return {
+             ...msg,
+             status: 'sent' as const,
+           };
+         }
+         return msg;
+       });
 
-    if (messagesData) {
-      // Find message by tempId or messageId and update status
-      const updatedMessages = messagesData.map((msg) => {
-        if (msg.id === event.messageId || msg.tempId === event.messageId) {
-          return {
-            ...msg,
-            id: event.serverId || msg.id, // Use server ID if provided
-            status: 'sent' as const,
-            sentAt: event.timestamp,
-          };
-        }
-        return msg;
-      });
+       // Update cache with complete response
+       queryClient.setQueryData(
+         ['conversationMessages', event.conversationId],
+         {
+           ...messagesResponse,
+           data: updatedMessages,
+         } as ListMessagesResponse,
+       );
+     }
 
-      // Update cache
-      queryClient.setQueryData(
-        ['conversation', event.conversationId, 'messages'],
-        updatedMessages,
-      );
-    }
-
-    // Invalidate conversation to update "last message" and timestamp
-    queryClient.invalidateQueries({
-      queryKey: ['conversation', event.conversationId],
-    });
+     // Invalidate conversations list to update "last message" and timestamp
+     queryClient.invalidateQueries({
+       queryKey: ['conversations'],
+     });
 
     logger.info('[MessageHandler] Message sent', {
       conversationId: event.conversationId,
@@ -84,61 +83,124 @@ export function handleMessageSent(event: MessageSentEvent): void {
  * Updates message status to "failed" and shows error
  */
 export function handleMessageFailed(event: MessageFailedEvent): void {
+   try {
+     logger.warn('[MessageHandler] Handling message.failed', {
+       conversationId: event.conversationId,
+       messageId: event.messageId,
+       error: event.error,
+       retryAt: event.retryAt,
+       attempt: event.attempt,
+     });
+
+     // Note: Backend doesn't send eventId, so deduplication is not available
+
+     // Get current messages from cache
+     const messagesResponse = queryClient.getQueryData<ListMessagesResponse>([
+       'conversationMessages',
+       event.conversationId,
+     ]);
+
+      if (messagesResponse?.data) {
+        // Find message and update status
+        const updatedMessages = messagesResponse.data.map((msg): ConversationMessage => {
+          if (msg.id === event.messageId) {
+            return {
+              ...msg,
+              status: 'failed' as const,
+            };
+          }
+          return msg;
+        });
+
+        // Update cache with complete response
+        queryClient.setQueryData(
+          ['conversationMessages', event.conversationId],
+          {
+            ...messagesResponse,
+            data: updatedMessages,
+          } as ListMessagesResponse,
+        );
+      }
+
+      // Invalidate conversations list to update failed status
+      queryClient.invalidateQueries({
+        queryKey: ['conversations'],
+      });
+
+     logger.info('[MessageHandler] Message failed', {
+       conversationId: event.conversationId,
+       messageId: event.messageId,
+       error: event.error,
+     });
+   } catch (error) {
+     logger.error('[MessageHandler] Error handling message.failed', error);
+   }
+}
+
+/**
+ * Handle message.received event
+ * Backend emits when external platform (Telegram, IRC) sends new message
+ * Adds inbound message to conversation without manual refresh
+ */
+export function handleMessageReceived(event: MessageReceivedEvent): void {
   try {
-    logger.warn('[MessageHandler] Handling message.failed', {
+    logger.debug('[MessageHandler] Handling message.received', {
       conversationId: event.conversationId,
       messageId: event.messageId,
-      error: event.error,
-      canRetry: event.canRetry,
+      platform: event.platform,
+      senderName: event.senderName,
+      timestamp: event.timestamp,
     });
-
-    // Check for duplicates
-    const store = useWebSocketStore.getState();
-    if (store.isEventProcessed(event.eventId)) {
-      logger.warn('[MessageHandler] Duplicate message.failed event ignored', {
-        eventId: event.eventId,
-      });
-      return;
-    }
-
-    // Mark event as processed
-    store.markEventProcessed(event.eventId);
 
     // Get current messages from cache
-    const messagesData = queryClient.getQueryData<any[]>([
-      'conversation',
+    const messagesResponse = queryClient.getQueryData<ListMessagesResponse>([
+      'conversationMessages',
       event.conversationId,
-      'messages',
     ]);
 
-    if (messagesData) {
-      // Find message and update status
-      const updatedMessages = messagesData.map((msg) => {
-        if (msg.id === event.messageId || msg.tempId === event.messageId) {
-          return {
-            ...msg,
-            status: 'failed' as const,
-            error: event.error,
-            canRetry: event.canRetry,
-            failedAt: event.timestamp,
-          };
-        }
-        return msg;
-      });
+    if (messagesResponse?.data) {
+      // Check if message already exists (avoid duplicates)
+      const messageExists = messagesResponse.data.some((msg) => msg.id === event.messageId);
 
-      // Update cache
-      queryClient.setQueryData(
-        ['conversation', event.conversationId, 'messages'],
-        updatedMessages,
-      );
+      if (!messageExists) {
+        // Create new inbound message object
+        const newMessage: ConversationMessage = {
+          id: event.messageId,
+          conversationId: event.conversationId,
+          senderId: event.senderId,
+          senderName: event.senderName,
+          body: event.body,
+          status: 'sent' as const, // Inbound messages are already delivered by platform
+          direction: 'inbound' as const,
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
+        };
+
+        // Add to beginning of messages array (most recent first)
+        const updatedMessages = [newMessage, ...messagesResponse.data];
+
+        // Update cache
+        queryClient.setQueryData(
+          ['conversationMessages', event.conversationId],
+          {
+            ...messagesResponse,
+            data: updatedMessages,
+          } as ListMessagesResponse,
+        );
+      }
     }
 
-    logger.info('[MessageHandler] Message failed', {
+    // Invalidate conversations list to update "last message" and timestamp
+    queryClient.invalidateQueries({
+      queryKey: ['conversations'],
+    });
+
+    logger.info('[MessageHandler] Inbound message added to conversation', {
       conversationId: event.conversationId,
       messageId: event.messageId,
-      error: event.error,
+      platform: event.platform,
     });
   } catch (error) {
-    logger.error('[MessageHandler] Error handling message.failed', error);
+    logger.error('[MessageHandler] Error handling message.received', error);
   }
 }

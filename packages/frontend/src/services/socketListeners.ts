@@ -14,6 +14,7 @@ import {
   handleConversationReopened,
 } from './event-handlers/conversation.handler';
 import {
+  handleMessageReceived,
   handleMessageSent,
   handleMessageFailed,
 } from './event-handlers/message.handler';
@@ -27,6 +28,7 @@ import { handleNotificationReceived } from './event-handlers/notification.handle
 import type {
   ConversationUpdatedEvent,
   ConversationReopenedEvent,
+  MessageReceivedEvent,
   MessageSentEvent,
   MessageFailedEvent,
   TypingStartedEvent,
@@ -53,6 +55,10 @@ export function registerSocketListeners(): void {
   });
 
   // Message events
+  webSocketService.on('message.received', (event: MessageReceivedEvent) => {
+    handleMessageReceived(event);
+  });
+
   webSocketService.on('message.sent', (event: MessageSentEvent) => {
     handleMessageSent(event);
   });
@@ -95,6 +101,7 @@ export function unregisterSocketListeners(): void {
   webSocketService.off('conversation.reopened');
 
   // Unregister message listeners
+  webSocketService.off('message.received');
   webSocketService.off('message.sent');
   webSocketService.off('message.failed');
 
