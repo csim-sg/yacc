@@ -16,3 +16,5 @@ build/
 coverage/
 .nyc_output/
 .cursor/
+packages/frontend/test-results/
+packages/frontend/playwright-report/

@@ -1,8 +1,8 @@
 # Active Execution Plans Index
 
-**Last Updated**: 2026-02-09  
-**Status**: ✅ Week 1 COMPLETE, ✅ BE-009/010 COMPLETE (PR #240), ✅ BE-011 COMPLETE (PR #241), ✅ BE-014 Phases 1-3 COMPLETE
-**Current Focus**: BE-014 Phase 4 ready, BE-011 architect review (Feb 9, 16:30 UTC)  
+**Last Updated**: 2026-02-10  
+**Status**: ✅ Week 1 COMPLETE, ✅ BE-009/010 COMPLETE (PR #240), ✅ BE-011 COMPLETE (PR #241), ✅ BE-014 Phases 1-3 COMPLETE, ✅ FE-008/009/010 COMPLETE (PR #243), ⏳ FE-013/014/015 IN REVIEW (PR #244)
+**Current Focus**: FE-013/014/015 WebSocket listeners architect review (Feb 10), BE-014 Phase 4 ready  
 
 ---
 
@@ -30,10 +30,10 @@ Governance references:
 ## ✅ Current Status
 
 ### Phase 1.4: MVP Core-First Execution (APPROVED)
-**Status**: ✅ **COMPLETE - Week 1 Backend (Feb 8)** (PR #227 merged; 253 tests passing)  
+**Status**: ⏳ **IN PROGRESS - Week 2 Frontend (Feb 9-10)**  
 **Approval Date**: 2026-02-06  
-**Completion Date**: 2026-02-08  
-**Timeline**: Week 1 complete, Phase 2 kickoff Feb 9
+**Backend Completion**: 2026-02-08 (Week 1 complete)
+**Current Milestone**: Frontend real-time listeners (FE-013/014/015) architect review in progress
 
 **MVP Scope**:
 - Backend: BE-007 (Inbox API), BE-008 (Conversation Detail), BE-009/010 (Messages), BE-017-019 (WebSocket Events)
@@ -71,6 +71,17 @@ Governance references:
 - Task 2: E2E Tests (3-4 hours) - 15+ tests
 - Task 3: Performance Verification (2 hours) - SLO compliance
 - Task 4: Regression Testing (1 hour) - Zero breakage
+
+### FE-013/014/015: WebSocket Real-Time Message Listeners
+**Status**: ⏳ **IN ARCHITECT REVIEW (Feb 10)**  
+**PR**: #244 (feature/FE-013-014-015-websocket-listeners)  
+**Implementation**:
+- Message.sent listener: Real-time delivery status updates
+- Message.failed listener: Retry status and timing
+- Conversation.updated listener: Status/priority/assignment changes
+- Message.received listener: Inbound message handling (placeholder for future)
+**Type Safety**: 100% (zero `any` types, backend-frontend contract aligned)
+**Tests**: 29 passing (message, conversation, typing, presence, notification handlers)
 
 ### BE-003: BetterAuth Authentication
 **Status**: ✅ **COMPLETE**  
@@ -116,9 +127,9 @@ Governance references:
 - [ ] BE-017/018/019: WebSocket Events - START Feb 13
 
 **Frontend** (Parallel):
-- [ ] FE-008/009 API Integration - START Feb 9
-- [ ] FE-010: Reply Composer - START Feb 9
-- [ ] FE-013/014/015: WebSocket Listeners - START Feb 13
+- [x] FE-008/009 API Integration - COMPLETE (PR #243 merged)
+- [x] FE-010: Reply Composer - COMPLETE (PR #243 merged)
+- [x] FE-013/014/015: WebSocket Listeners - IMPLEMENTATION COMPLETE (PR #244 in architect review)
 
 **QA** (Parallel):
 - [ ] Integration tests (BE) - START Feb 9
