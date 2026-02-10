@@ -19,6 +19,7 @@ import {
   handleMessageFailed,
   handleMessageReceived,
 } from '../message.handler';
+import type { ListMessagesResponse } from '../../conversations.service';
 
 // Use hoisted to create mocks that can be accessed by vi.mock
 const mocks = vi.hoisted(() => ({
@@ -109,7 +110,8 @@ describe('Message Handler', () => {
       expect(mocks.setQueryData).toHaveBeenCalled();
       const setCall = mocks.setQueryData.mock.calls[0];
       if (setCall && setCall[1]) {
-        expect((setCall[1] as any).data[0].status).toBe('sent');
+        const cachedData = setCall[1] as ListMessagesResponse;
+        expect(cachedData.data[0].status).toBe('sent');
       }
     });
 
@@ -178,7 +180,8 @@ describe('Message Handler', () => {
       expect(mocks.setQueryData).toHaveBeenCalled();
       const setCall = mocks.setQueryData.mock.calls[0];
       if (setCall && setCall[1]) {
-        expect((setCall[1] as any).data[0].status).toBe('failed');
+        const cachedData = setCall[1] as ListMessagesResponse;
+        expect(cachedData.data[0].status).toBe('failed');
       }
     });
 
@@ -265,8 +268,9 @@ describe('Message Handler', () => {
       const setCall = mocks.setQueryData.mock.calls[0];
       if (setCall && setCall[1]) {
         // Verify message was added (array length increased)
-        expect((setCall[1] as any).data.length).toBe(2);
-        expect((setCall[1] as any).data[0].id).toBe('msg-789');
+        const cachedData = setCall[1] as ListMessagesResponse;
+        expect(cachedData.data.length).toBe(2);
+        expect(cachedData.data[0].id).toBe('msg-789');
       }
     });
 
