@@ -48,8 +48,8 @@ export function ConversationPage() {
   const { id } = useParams();
 
   const conversationId = useMemo(() => {
-    const parsed = Number(id);
-    return Number.isNaN(parsed) ? null : parsed;
+    // IDs are UUID strings, not numbers
+    return id && id.length > 0 ? id : null;
   }, [id]);
 
   useEffect(() => {
@@ -72,8 +72,8 @@ export function ConversationPage() {
     refetch,
   } = useQuery<GetConversationResponse, { error?: string; message?: string }>({
     queryKey: ['conversation', conversationId],
-    queryFn: () => conversationsService.getById(conversationId as number),
-    enabled: Number.isFinite(conversationId),
+    queryFn: () => conversationsService.getById(conversationId as string),
+    enabled: !!conversationId,
   });
 
   // Fetch messages separately
@@ -82,8 +82,8 @@ export function ConversationPage() {
     isLoading: messagesLoading,
   } = useQuery({
     queryKey: ['conversationMessages', conversationId],
-    queryFn: () => conversationsService.getMessages(conversationId as number),
-    enabled: Number.isFinite(conversationId),
+    queryFn: () => conversationsService.getMessages(conversationId as string),
+    enabled: !!conversationId,
   });
 
   const conversation: ConversationDetail | null = data?.data ?? null;

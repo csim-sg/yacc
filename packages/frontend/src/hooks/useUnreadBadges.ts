@@ -44,26 +44,27 @@ export function useUnreadBadges() {
    * Updates cache immediately (optimistic)
    * Clears unread count
    */
-   const markAsRead = useCallback(
-     (conversationId: number | string) => {
-       const id = typeof conversationId === 'string' ? parseInt(conversationId, 10) : conversationId;
-       logger.debug('[UnreadBadges] Marking conversation as read', { conversationId: id });
+  const markAsRead = useCallback(
+    (conversationId: string | number) => {
+      // Ensure ID is a string for comparison with ConversationListItem.id
+      const id = String(conversationId);
+      logger.debug('[UnreadBadges] Marking conversation as read', { conversationId: id });
 
-       // Update conversation cache using prefix matching for all parameterized queries
-       queryClient.setQueriesData(
-         { queryKey: ['conversations'] },
-         (oldData: unknown) => {
-           const data = oldData as { data?: ConversationListItem[] } | undefined;
-           if (!data || !data.data) return oldData;
+      // Update conversation cache using prefix matching for all parameterized queries
+      queryClient.setQueriesData(
+        { queryKey: ['conversations'] },
+        (oldData: unknown) => {
+          const data = oldData as { data?: ConversationListItem[] } | undefined;
+          if (!data || !data.data) return oldData;
 
-           return {
-             ...data,
-             data: data.data.map((conv: ConversationListItem) =>
-               conv.id === id ? { ...conv, unreadCount: 0 } : conv
-             ),
-           };
-         }
-       );
+          return {
+            ...data,
+            data: data.data.map((conv: ConversationListItem) =>
+              conv.id === id ? { ...conv, unreadCount: 0 } : conv
+            ),
+          };
+        }
+      );
 
        // TODO: Call API: PATCH /api/conversations/:id/markAsRead
        // try {
@@ -82,8 +83,9 @@ export function useUnreadBadges() {
     * Called when new message arrives via WebSocket
     */
    const updateUnreadCount = useCallback(
-     (conversationId: number | string, newCount: number) => {
-       const id = typeof conversationId === 'string' ? parseInt(conversationId, 10) : conversationId;
+     (conversationId: string | number, newCount: number) => {
+       // Ensure ID is a string for comparison with ConversationListItem.id
+       const id = String(conversationId);
        logger.debug('[UnreadBadges] Updating unread count', {
          conversationId: id,
          newCount,
@@ -115,8 +117,9 @@ export function useUnreadBadges() {
     * Called when new inbound message arrives
     */
    const incrementUnreadCount = useCallback(
-     (conversationId: number | string) => {
-       const id = typeof conversationId === 'string' ? parseInt(conversationId, 10) : conversationId;
+     (conversationId: string | number) => {
+       // Ensure ID is a string for comparison with ConversationListItem.id
+       const id = String(conversationId);
        
        // Update all conversation list queries using prefix matching
        queryClient.setQueriesData(
