@@ -1427,49 +1427,80 @@ Client connects with auth token in handshake:
 **Payload**:
 ```json
 {
-  "conversation": { /* Conversation Summary */ }
+  "conversationId": "uuid",
+  "updatedFields": { "status": "pending", "priority": "high" },
+  "changedBy": "uuid",
+  "changedAt": "2026-01-16T10:00:00Z"
 }
 ```
+**Notes**: 
+- `updatedFields`: Map of changed field names and new values
+- `changedBy`: UUID of user who made the change
+- `changedAt`: ISO8601 timestamp of change
 
 ---
 
 #### `message.received`
-**Fired when**: New inbound message arrives
+**Fired when**: New inbound message arrives from Telegram or IRC
 
 **Payload**:
 ```json
 {
   "conversationId": "uuid",
-  "message": { /* Message model */ }
+  "messageId": "uuid",
+  "platform": "telegram",
+  "senderId": "123456789",
+  "senderName": "John Doe",
+  "body": "Message text",
+  "timestamp": "2026-01-16T10:00:00Z",
+  "attachments": [
+    { "url": "https://...", "type": "image", "name": "file.jpg" }
+  ]
 }
 ```
+**Notes**:
+- `platform`: "telegram" or "irc"
+- `attachments`: Optional array of attachment objects with url, type, name
 
 ---
 
 #### `message.sent`
-**Fired when**: Outbound message successfully delivered
+**Fired when**: Outbound message successfully delivered to platform
 
 **Payload**:
 ```json
 {
   "conversationId": "uuid",
-  "message": { /* Message model with status: sent */ }
+  "messageId": "uuid",
+  "status": "sent",
+  "sentAt": "2026-01-16T10:00:00Z"
 }
 ```
+**Notes**:
+- `sentAt`: ISO8601 timestamp when platform confirmed delivery
+- Backend only emits when successfully delivered to external platform
 
 ---
 
 #### `message.failed`
-**Fired when**: Outbound message fails to deliver
+**Fired when**: Outbound message fails to deliver (will retry)
 
 **Payload**:
 ```json
 {
   "conversationId": "uuid",
-  "message": { /* Message model with status: failed */ },
-  "canRetry": true
+  "messageId": "uuid",
+  "status": "failed",
+  "error": "Network timeout",
+  "retryAt": "2026-01-16T10:01:00Z",
+  "attempt": 1
 }
 ```
+**Notes**:
+- `error`: Description of delivery failure
+- `retryAt`: ISO8601 timestamp of next automatic retry (exponential backoff: 1m, 5m, 30m)
+- `attempt`: Current retry attempt (1-3)
+- After 3 failed attempts, message moves to Dead Letter Queue for ops review
 
 ---
 
