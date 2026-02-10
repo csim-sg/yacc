@@ -63,6 +63,7 @@ export function ConversationPage() {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
+  // Fetch conversation metadata
   const {
     data,
     isLoading,
@@ -75,7 +76,18 @@ export function ConversationPage() {
     enabled: Number.isFinite(conversationId),
   });
 
+  // Fetch messages separately
+  const {
+    data: messagesData,
+    isLoading: messagesLoading,
+  } = useQuery({
+    queryKey: ['conversationMessages', conversationId],
+    queryFn: () => conversationsService.getMessages(conversationId as number),
+    enabled: Number.isFinite(conversationId),
+  });
+
   const conversation: ConversationDetail | null = data?.data ?? null;
+  const messages = messagesData?.data ?? [];
   const errorMessage = error?.error || error?.message || 'Failed to load conversation';
 
   const handleLogout = async () => {
@@ -394,14 +406,10 @@ export function ConversationPage() {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div>
                           <div className="text-base-content/60">Thread</div>
                           <div className="font-semibold">{conversation.title || conversation.externalThreadId}</div>
-                        </div>
-                        <div>
-                          <div className="text-base-content/60">Last activity</div>
-                          <div className="font-semibold">{formatTimestamp(conversation.lastActivityAt)}</div>
                         </div>
                         <div>
                           <div className="text-base-content/60">Created</div>
@@ -427,12 +435,17 @@ export function ConversationPage() {
 
                       <div className="space-y-4">
                         <h3 className="text-lg font-semibold">Messages</h3>
-                        {conversation.messages.length === 0 && (
+                        {messagesLoading && (
+                          <div className="loading loading-spinner loading-md"></div>
+                        )}
+                        {!messagesLoading && messages.length === 0 && (
                           <div className="text-base-content/60">No messages yet.</div>
                         )}
-                        <div className="flex flex-col gap-3">
-                          {conversation.messages.map(renderMessageBubble)}
-                        </div>
+                        {!messagesLoading && messages.length > 0 && (
+                          <div className="flex flex-col gap-3">
+                            {messages.map(renderMessageBubble)}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
