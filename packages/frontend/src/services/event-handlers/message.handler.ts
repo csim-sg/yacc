@@ -4,13 +4,19 @@
  * Handles server events related to message delivery:
  * - Message sent (confirmation)
  * - Message failed (delivery error)
+ * - Message received (inbound from external platform)
  *
  * Updates message status in timeline and handles retries
  */
 
 import { useWebSocketStore } from '../../stores/websocket.store';
 import { queryClient } from '../../lib/queryClient';
-import type { MessageReceivedEvent, MessageSentEvent, MessageFailedEvent } from '../../types/websocket.types';
+import type {
+  MessageReceivedEvent,
+  MessageSentEvent,
+  MessageFailedEvent,
+} from '../../types/websocket.types';
+import type { ConversationMessage } from '../conversations.service';
 import { logger } from '../../lib/logger';
 
 /**
@@ -37,38 +43,36 @@ export function handleMessageSent(event: MessageSentEvent): void {
     // Mark event as processed
     store.markEventProcessed(event.eventId);
 
-    // Get current messages from cache
-    const messagesData = queryClient.getQueryData<any[]>([
-      'conversation',
-      event.conversationId,
-      'messages',
-    ]);
+     // Get current messages from cache
+     const messagesData = queryClient.getQueryData<ConversationMessage[]>([
+       'conversationMessages',
+       event.conversationId,
+     ]);
 
-    if (messagesData) {
-      // Find message by tempId or messageId and update status
-      const updatedMessages = messagesData.map((msg) => {
-        if (msg.id === event.messageId || msg.tempId === event.messageId) {
-          return {
-            ...msg,
-            id: event.serverId || msg.id, // Use server ID if provided
-            status: 'sent' as const,
-            sentAt: event.timestamp,
-          };
-        }
-        return msg;
-      });
+     if (messagesData) {
+       // Find message by messageId and update status
+       const updatedMessages = messagesData.map((msg): ConversationMessage => {
+         if (msg.id === event.messageId) {
+           return {
+             ...msg,
+             id: event.serverId || msg.id, // Use server ID if provided
+             status: 'sent' as const,
+           };
+         }
+         return msg;
+       });
 
-      // Update cache
-      queryClient.setQueryData(
-        ['conversation', event.conversationId, 'messages'],
-        updatedMessages,
-      );
-    }
+       // Update cache
+       queryClient.setQueryData(
+         ['conversationMessages', event.conversationId],
+         updatedMessages,
+       );
+     }
 
-    // Invalidate conversation to update "last message" and timestamp
-    queryClient.invalidateQueries({
-      queryKey: ['conversation', event.conversationId],
-    });
+     // Invalidate conversations list to update "last message" and timestamp
+     queryClient.invalidateQueries({
+       queryKey: ['conversations'],
+     });
 
     logger.info('[MessageHandler] Message sent', {
       conversationId: event.conversationId,
@@ -104,34 +108,30 @@ export function handleMessageFailed(event: MessageFailedEvent): void {
     // Mark event as processed
     store.markEventProcessed(event.eventId);
 
-    // Get current messages from cache
-    const messagesData = queryClient.getQueryData<any[]>([
-      'conversation',
-      event.conversationId,
-      'messages',
-    ]);
+     // Get current messages from cache
+     const messagesData = queryClient.getQueryData<ConversationMessage[]>([
+       'conversationMessages',
+       event.conversationId,
+     ]);
 
-    if (messagesData) {
-      // Find message and update status
-      const updatedMessages = messagesData.map((msg) => {
-        if (msg.id === event.messageId || msg.tempId === event.messageId) {
-          return {
-            ...msg,
-            status: 'failed' as const,
-            error: event.error,
-            canRetry: event.canRetry,
-            failedAt: event.timestamp,
-          };
-        }
-        return msg;
-      });
+     if (messagesData) {
+       // Find message and update status
+       const updatedMessages = messagesData.map((msg): ConversationMessage => {
+         if (msg.id === event.messageId) {
+           return {
+             ...msg,
+             status: 'failed' as const,
+           };
+         }
+         return msg;
+       });
 
-      // Update cache
-      queryClient.setQueryData(
-        ['conversation', event.conversationId, 'messages'],
-        updatedMessages,
-      );
-    }
+       // Update cache
+       queryClient.setQueryData(
+         ['conversationMessages', event.conversationId],
+         updatedMessages,
+       );
+     }
 
     logger.info('[MessageHandler] Message failed', {
       conversationId: event.conversationId,
@@ -167,62 +167,78 @@ export function handleMessageReceived(event: MessageReceivedEvent): void {
     // Mark event as processed
     store.markEventProcessed(event.eventId);
 
-    // Create message object from event
-    const newMessage = {
-      id: event.messageId,
-      conversationId: event.conversationId,
-      senderId: event.senderId || null,
-      senderName: event.senderName,
-      body: event.body,
-      status: 'sent' as const,
-      direction: 'inbound' as const,
-      attachments: event.attachments || [],
-      createdAt: event.timestamp,
-      updatedAt: event.timestamp,
-    };
+     // Create message object from event
+     const newMessage: ConversationMessage = {
+       id: event.messageId,
+       conversationId: event.conversationId,
+       senderId: event.senderId || null,
+       senderName: event.senderName,
+       body: event.body,
+       status: 'sent',
+       direction: 'inbound',
+       externalMessageId: undefined,
+       createdAt: event.timestamp,
+       updatedAt: event.timestamp,
+     };
 
-    // Get current conversation data from cache
-    const conversationData = queryClient.getQueryData<any>([
-      'conversation',
-      event.conversationId,
-    ]);
+     // Get current messages for this conversation from cache
+     const messagesData = queryClient.getQueryData<ConversationMessage[]>([
+       'conversationMessages',
+       event.conversationId,
+     ]);
 
-    if (conversationData?.data?.messages) {
-      // Add new message to messages array
-      const updatedMessages = [...conversationData.data.messages, newMessage];
+     if (messagesData) {
+       // Add new message to messages array
+       const updatedMessages = [...messagesData, newMessage];
 
-      // Update cache with new message
-      queryClient.setQueryData(['conversation', event.conversationId], {
-        ...conversationData,
-        data: {
-          ...conversationData.data,
-          messages: updatedMessages,
-        },
-      });
-    }
+       // Update cache with new message
+       queryClient.setQueryData(
+         ['conversationMessages', event.conversationId],
+         updatedMessages,
+       );
+     }
 
-    // Update conversations list to increment unread count
-    const conversationsCacheKey = ['conversations'] as const;
-    const conversationsData = queryClient.getQueryData<any>(conversationsCacheKey);
-    
-    if (conversationsData?.data) {
-      const updatedConversations = conversationsData.data.map((conv: any) => {
-        if (conv.id === event.conversationId) {
-          return {
-            ...conv,
-            unreadCount: (conv.unreadCount || 0) + 1,
-            latestMessagePreview: event.body,
-            latestMessageAt: event.timestamp,
-          };
-        }
-        return conv;
-      });
+     // Update conversations list to increment unread count
+     // Note: Use setQueriesData to update all conversations caches (with different filters/params)
+     queryClient.setQueriesData(
+       { queryKey: ['conversations'] },
+       (old: unknown): unknown => {
+         interface ConversationWithMetadata {
+           id: string;
+           unreadCount?: number;
+           latestMessagePreview?: string;
+           latestMessageAt?: string;
+           [key: string]: unknown;
+         }
 
-      queryClient.setQueryData(conversationsCacheKey, {
-        ...conversationsData,
-        data: updatedConversations,
-      });
-    }
+         interface CachedConversations {
+           data: ConversationWithMetadata[];
+           [key: string]: unknown;
+         }
+
+         const conversationsData = old as CachedConversations | undefined;
+         if (!conversationsData?.data) return old;
+
+         const updatedConversations = conversationsData.data.map(
+           (conv: ConversationWithMetadata): ConversationWithMetadata => {
+             if (conv.id === event.conversationId) {
+               return {
+                 ...conv,
+                 unreadCount: (conv.unreadCount || 0) + 1,
+                 latestMessagePreview: event.body,
+                 latestMessageAt: event.timestamp,
+               };
+             }
+             return conv;
+           }
+         );
+
+         return {
+           ...conversationsData,
+           data: updatedConversations,
+         };
+       },
+     );
 
     logger.info('[MessageHandler] Message received and added', {
       conversationId: event.conversationId,
