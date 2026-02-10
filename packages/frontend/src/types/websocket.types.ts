@@ -54,16 +54,18 @@ export interface MessageFailedEvent {
 }
 
 /**
- * NOTE: message.received for inbound platform messages is NOT currently emitted by backend.
- * This is a placeholder for future implementation when connectors emit inbound messages.
- * For now, inbound messages are fetched via polling in the API layer.
+ * Inbound message received from external platform (Telegram, IRC)
+ * Emitted by backend connector when platforms send new messages
  */
 export interface MessageReceivedEvent {
   conversationId: string;
   messageId: string;
+  platform: 'telegram' | 'irc';
+  senderId: string;
   senderName: string;
   body: string;
-  receivedAt: string; // ISO8601
+  timestamp: string; // ISO8601
+  attachments?: Array<{ url: string; type: string; name: string }>;
 }
 
 /**

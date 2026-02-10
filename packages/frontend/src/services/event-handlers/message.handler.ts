@@ -134,19 +134,68 @@ export function handleMessageFailed(event: MessageFailedEvent): void {
 
 /**
  * Handle message.received event
- * 
- * NOTE: Backend does not currently emit this event.
- * Inbound messages from external platforms are fetched via API polling.
- * This handler is a placeholder for future implementation.
+ * Backend emits when external platform (Telegram, IRC) sends new message
+ * Adds inbound message to conversation without manual refresh
  */
 export function handleMessageReceived(event: MessageReceivedEvent): void {
-   try {
-     logger.info('[MessageHandler] Message received event (currently unused - backend does not emit)', {
-       conversationId: event.conversationId,
-       messageId: event.messageId,
-     });
-     // TODO: Implement when backend connectors emit message.received events
-   } catch (error) {
-     logger.error('[MessageHandler] Error handling message.received', error);
-   }
+  try {
+    logger.debug('[MessageHandler] Handling message.received', {
+      conversationId: event.conversationId,
+      messageId: event.messageId,
+      platform: event.platform,
+      senderName: event.senderName,
+      timestamp: event.timestamp,
+    });
+
+    // Get current messages from cache
+    const messagesResponse = queryClient.getQueryData<ListMessagesResponse>([
+      'conversationMessages',
+      event.conversationId,
+    ]);
+
+    if (messagesResponse?.data) {
+      // Check if message already exists (avoid duplicates)
+      const messageExists = messagesResponse.data.some((msg) => msg.id === event.messageId);
+
+      if (!messageExists) {
+        // Create new inbound message object
+        const newMessage: ConversationMessage = {
+          id: event.messageId,
+          conversationId: event.conversationId,
+          senderId: event.senderId,
+          senderName: event.senderName,
+          body: event.body,
+          status: 'sent' as const, // Inbound messages are already delivered by platform
+          direction: 'inbound' as const,
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
+        };
+
+        // Add to beginning of messages array (most recent first)
+        const updatedMessages = [newMessage, ...messagesResponse.data];
+
+        // Update cache
+        queryClient.setQueryData(
+          ['conversationMessages', event.conversationId],
+          {
+            ...messagesResponse,
+            data: updatedMessages,
+          } as ListMessagesResponse,
+        );
+      }
+    }
+
+    // Invalidate conversations list to update "last message" and timestamp
+    queryClient.invalidateQueries({
+      queryKey: ['conversations'],
+    });
+
+    logger.info('[MessageHandler] Inbound message added to conversation', {
+      conversationId: event.conversationId,
+      messageId: event.messageId,
+      platform: event.platform,
+    });
+  } catch (error) {
+    logger.error('[MessageHandler] Error handling message.received', error);
+  }
 }

@@ -102,25 +102,15 @@ describe('Message Handler', () => {
     });
 
     describe('handleMessageReceived', () => {
-      it('should handle message.received event', () => {
+      it('should handle message.received event from Telegram', () => {
         const event = {
           conversationId: 'conv-123',
           messageId: 'msg-789',
+          platform: 'telegram' as const,
+          senderId: 'telegram-user-123',
           senderName: 'John Doe',
           body: 'Hello, this is a message',
-          receivedAt: new Date().toISOString(),
-        };
-
-        expect(() => handleMessageReceived(event)).not.toThrow();
-      });
-
-      it('should handle message.received from Telegram', () => {
-        const event = {
-          conversationId: 'conv-123',
-          messageId: 'msg-789',
-          senderName: 'John Doe',
-          body: 'Hello from Telegram',
-          receivedAt: new Date().toISOString(),
+          timestamp: new Date().toISOString(),
         };
 
         expect(() => handleMessageReceived(event)).not.toThrow();
@@ -130,9 +120,28 @@ describe('Message Handler', () => {
         const event = {
           conversationId: 'conv-456',
           messageId: 'msg-999',
+          platform: 'irc' as const,
+          senderId: 'irc-user-456',
           senderName: 'Anonymous',
           body: 'Hello from IRC',
-          receivedAt: new Date().toISOString(),
+          timestamp: new Date().toISOString(),
+        };
+
+        expect(() => handleMessageReceived(event)).not.toThrow();
+      });
+
+      it('should handle message.received with attachments', () => {
+        const event = {
+          conversationId: 'conv-789',
+          messageId: 'msg-with-attachments',
+          platform: 'telegram' as const,
+          senderId: 'tg-user-789',
+          senderName: 'Alice',
+          body: 'Check out this file',
+          timestamp: new Date().toISOString(),
+          attachments: [
+            { url: 'https://example.com/file.pdf', type: 'document', name: 'file.pdf' },
+          ],
         };
 
         expect(() => handleMessageReceived(event)).not.toThrow();
