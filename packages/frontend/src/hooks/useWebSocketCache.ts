@@ -14,7 +14,7 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { webSocketService } from '../services/websocket.service';
-import { registerSocketListeners, unregisterSocketListeners } from '../services/socket-listeners';
+import { registerSocketListeners, unregisterSocketListeners } from '../services/socketListeners';
 import { logger } from '../lib/logger';
 
 /**
