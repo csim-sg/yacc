@@ -125,7 +125,7 @@ Governance references:
 
 ## 🚀 Phase 2: Collaboration & Rules (Feb 11 onwards)
 
-**Status**: ⏸️ **TICKET #1 IN ARCHITECTURE REVIEW (PR #246)** — Critical fixes requested (GOV-022)
+**Status**: ✅ **TICKET #1 FIXES COMPLETE (PR #246)** — Ready for re-review (GOV-022)
 
 **Governance Gate**: Phase 2 approved under conditions documented in GOV-021:
 - RBAC matrix finalized (assignment/bulk = manager+admin+super_admin, NOT user)
@@ -136,14 +136,20 @@ Governance references:
 
 **Ticket #1 Status** (BE-P2-001: Backend Tags CRUD):
 - **PR #246 created** (feature/BE-P2-001-tags)
-- **Status**: ⏸️ ARCHITECTURE REVIEW — CHANGES REQUESTED
-- **Blocking Issues** (per GOV-022):
-  1. Missing resource-level authorization (conversation access check)
-  2. WebSocket event bypasses backlog helper
-  3. Audit logging not enforced (best-effort, not transactional)
-  4. Tests failing (pnpm test red)
+- **Status**: ✅ FIXES COMPLETE — Awaiting architect re-review
+- **Blocking Issues Fixed** (per GOV-022):
+  1. ✅ Added resource-level authorization check (conversation access verified)
+  2. ✅ Use WebSocket backlog helper (emitToConversation instead of raw gateway)
+  3. ✅ Audit logging enforced (transactional with error propagation)
+  4. ✅ Tests passing (pnpm test green, WebSocket gateway mock fixed)
+- **Non-Blocking Issues Fixed**:
+  1. ✅ TagTypes extracted to types/tag.types.ts (one-definition-per-file)
+  2. ✅ Removed all `any` types from integration tests
+  3. ✅ Fixed idempotency race condition (atomic INSERT...ON CONFLICT)
+  4. ✅ Enhanced test coverage (all 4 roles, super_admin verified)
 - **Reference**: `.docs/governance/GOV-022-pr246-architecture-review-findings.md`
-- **Next Step**: Developer fixes all blocking + non-blocking issues, pushes to branch, re-requests review
+- **Commit**: 8163534 (BE-P2-001: Fix architecture review findings)
+- **Next Step**: Architect re-reviews and approves (target: Feb 12-13)
 
 **Remediation Pattern** (all Phase 2 tickets):
 - Resource-level authorization REQUIRED on all conversation-scoped operations
