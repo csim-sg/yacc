@@ -26,7 +26,6 @@ import { ListConversationsRequest } from '@yacc/common/requests/conversations/li
 import { UpdateStatusRequest } from '@yacc/common/requests/conversations/updateStatus.request';
 import { UpdatePriorityRequest } from '@yacc/common/requests/conversations/updatePriority.request';
 import { AssignRequest } from '@yacc/common/requests/conversations/assign.request';
-import { TagRequest } from '@yacc/common/requests/conversations/tag.request';
 import type { AuthUser } from '../types/auth.types';
 
 interface AuthenticatedRequest extends Request {
@@ -284,61 +283,9 @@ export class ConversationsController {
     };
   }
 
-  /**
-   * POST /api/conversations/:id/tags
-   * Add tag to conversation
-   */
-  @Post('/:id/tags')
-  @Authorized(['admin', 'super_admin'])
-  @HttpCode(201)
-  async addTag(
-    @Param('id') id: string,
-    @Body() body: TagRequest,
-    @CurrentUser() user: AuthUser
-  ) {
-    await conversationService.addTag(id, body.tagId);
-
-    // Log audit
-    await auditService.logAction({
-      actorId: user.id,
-      action: 'conversation_tagged',
-      entityType: 'conversation',
-      entityId: id,
-      metadata: { tagId: body.tagId },
-    });
-
-    return {
-      data: { success: true, message: 'Tag added successfully' },
-    };
-  }
-
-  /**
-   * DELETE /api/conversations/:id/tags/:tagId
-   * Remove tag from conversation
-   */
-  @Delete('/:id/tags/:tagId')
-  @Authorized(['admin', 'super_admin'])
-  @HttpCode(200)
-  async removeTag(
-    @Param('id') id: string,
-    @Param('tagId') tagId: number,
-    @CurrentUser() user: AuthUser
-  ) {
-    await conversationService.removeTag(id, tagId);
-
-    // Log audit
-    await auditService.logAction({
-      actorId: user.id,
-      action: 'conversation_tag_removed',
-      entityType: 'conversation',
-      entityId: id,
-      metadata: { tagId },
-    });
-
-    return {
-      data: { success: true, message: 'Tag removed successfully' },
-    };
-  }
+   // Tag management endpoints moved to TagController
+   // This provides a unified tag API with proper response formatting
+   // See packages/backend/src/controllers/tag.controller.ts
 
   /**
    * GET /api/conversations/:id/messages

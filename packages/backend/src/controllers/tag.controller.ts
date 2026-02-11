@@ -20,12 +20,12 @@ import {
   BadRequestError,
   ForbiddenError,
 } from 'routing-controllers';
-import { tagService } from '../services/tag.service';
+import type { CreateTagRequest } from '@yacc/common/requests/tags/createTag.request';
+import type { AddTagToConversationRequest } from '@yacc/common/requests/tags/addTagToConversation.request';
+import type { AuthUser } from '../types/auth.types';
 import { authorizationService } from '../services/authorization.service';
 import { logger } from '../infrastructure/logger';
-import { CreateTagRequest } from '@yacc/common/requests/tags/createTag.request';
-import { AddTagToConversationRequest } from '@yacc/common/requests/tags/addTagToConversation.request';
-import type { AuthUser } from '../types/auth.types';
+import { tagService } from '../services/tag.service';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;
@@ -149,17 +149,17 @@ export class TagController {
     }
   }
 
-  /**
-   * POST /api/conversations/:id/tags
-   * Add tag to conversation
-   * Allowed roles: admin, manager, user, super_admin (per GOV-021)
-   * 
-   * Resource-level authorization: User must have access to the conversation
-   * GOV-021: All roles can tag conversations (with resource-level auth check)
-   */
-  @Post('/conversations/:id/tags')
-  @Authorized()
-  @HttpCode(200)
+   /**
+    * POST /api/conversations/:id/tags
+    * Add tag to conversation
+    * Allowed roles: admin, manager, user, super_admin (per GOV-021)
+    * 
+    * Resource-level authorization: User must have access to the conversation
+    * GOV-021: All roles can tag conversations (with resource-level auth check)
+    */
+   @Post('/conversations/:id/tags')
+   @Authorized()
+   @HttpCode(201)
   async addTagToConversation(
     @Param('id') conversationId: string,
     @Body() body: AddTagToConversationRequest,
@@ -169,29 +169,35 @@ export class TagController {
     const startTime = performance.now();
     const correlationId = req.correlationId || 'unknown';
 
-    try {
-      if (!body.tagId || body.tagId <= 0) {
-        throw new BadRequestError('Valid tagId is required');
-      }
+     try {
+       // Validate tagId
+       if (body.tagId === undefined || body.tagId === null) {
+         throw new BadRequestError('Valid tagId is required');
+       }
 
-      // Resource-level authorization: Check if user has access to this conversation
-      const canAccess = await authorizationService.canAccessConversation(user, conversationId);
-      if (!canAccess) {
-        throw new ForbiddenError('Not authorized to access this conversation');
-      }
+       const parsedTagId = Number(body.tagId);
+       if (!Number.isInteger(parsedTagId) || parsedTagId <= 0) {
+         throw new BadRequestError('Valid tagId is required');
+       }
 
-      const result = await tagService.addTagToConversation({
-        conversationId,
-        tagId: body.tagId,
-        userId: user.id,
-      });
+       // Resource-level authorization: Check if user has access to this conversation
+       const canAccess = await authorizationService.canAccessConversation(user, conversationId);
+       if (!canAccess) {
+         throw new ForbiddenError('Not authorized to access this conversation');
+       }
 
-      if (!result.success) {
-        if (result.statusCode === 404) {
-          throw new NotFoundError(result.error || 'Conversation or tag not found');
-        }
-        throw new Error(result.error || 'Failed to add tag to conversation');
-      }
+       const result = await tagService.addTagToConversation({
+         conversationId,
+         tagId: parsedTagId,
+         userId: user.id,
+       });
+
+       if (!result.success) {
+         if (result.statusCode === 404) {
+           throw new NotFoundError(result.error || 'Conversation or tag not found');
+         }
+         throw new Error(result.error || 'Failed to add tag to conversation');
+       }
 
       const duration = performance.now() - startTime;
       logger.debug(
