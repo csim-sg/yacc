@@ -24,10 +24,10 @@
 ## 1. Product Overview
 
 ### Concept
-**YACC (Yet Another Chat Client)** is a cloud-hosted, single-tenant omni-channel chat platform that centralizes social communications (Phase 1: Telegram groups/channels and IRC; Phase 2: WhatsApp, WeChat, Meta/Facebook/Instagram, and X) into one unified inbox. Built with React, Node.js, PostgreSQL, and deployed to Cloudflare R2 + CDN for frontend assets and file storage, with backend on VPS.
+**YACC (Yet Another Chat Client)** is a cloud-hosted, single-tenant omni-channel chat platform that centralizes social communications (MVP Phase 1: Telegram groups/channels and IRC) into one unified inbox. Built with React, Node.js, PostgreSQL, and deployed to Cloudflare R2 + CDN for frontend assets and file storage, with backend on VPS.
 
 **Initial Release (Phase 1)**: Unified Inbox + Auth + Basic Ops + Telegram/IRC messaging  
-**Phase 2**: WhatsApp/WeChat/Meta/X channels + advanced features
+**Post-MVP**: Additional channels (WhatsApp/WeChat/Meta/X) + advanced features
 
 ---
 
@@ -45,7 +45,9 @@
 ## 3. MVP Scope
 
 ### Core Features (Required)
-**Phase 1 Platform Scope**: Telegram + IRC (Phase 2 adds WhatsApp/WeChat/Meta/X).
+**MVP Definition**: MVP includes **Phase 1 + Phase 2** (collaboration + rules). Additional external platforms are post-MVP.
+
+**MVP Platform Scope**: Telegram + IRC (additional platforms: WhatsApp/WeChat/Meta/X are post-MVP).
 - ✅ Unified inbox with real-time updates
 - ✅ Role-based authentication (login, logout, forgot password)
 - ✅ Conversation handling: tags, notes, assignments, bulk actions
@@ -60,9 +62,9 @@
 - ✅ Attachment handling (5 MB max, stored on R2, re-hosted)
 - ✅ Message retry with exponential backoff (Redis + BullMQ)
 
-### Deferred Features (Phase 2+)
+### Deferred Features (Post-MVP)
 - Email notifications
-- WhatsApp, WeChat, Meta, X integrations (Phase 2)
+- WhatsApp, WeChat, Meta, X integrations
 - RTL support
 - Multi-tenant architecture
 - Elasticsearch for search (use PostgreSQL FTS in MVP)
@@ -131,7 +133,7 @@
 ### 5.4 Integrations (Phase 1)
 - Telegram groups/channels
 - IRC networks
-- Other platforms deferred to Phase 2 (WhatsApp, WeChat, Meta, X)
+- Other platforms deferred to post-MVP (WhatsApp, WeChat, Meta, X)
 
 ### 5.5 Rule-Based Routing
 - Rules engine with conditions: channel, keyword, sender, tag, time
@@ -147,7 +149,7 @@
 ### 5.7 Localization
 - English is default language
 - i18n scaffolding for future translations
-- No RTL support in MVP (defer to Phase 2)
+- No RTL support in MVP (post-MVP)
 
 ### 5.8 Raw Payload Storage
 - Store raw inbound payloads as plain text on Cloudflare R2

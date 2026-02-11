@@ -1,18 +1,22 @@
 # Active Execution Plans Index
 
-**Last Updated**: 2026-02-10  
-**Status**: ✅ Week 1 COMPLETE, ✅ BE-009/010 COMPLETE (PR #240), ✅ BE-011 COMPLETE (PR #241), ✅ BE-014 Phases 1-3 COMPLETE, ✅ FE-008/009/010 COMPLETE (PR #243), ⏳ FE-013/014/015 IN REVIEW (PR #244)
-**Current Focus**: FE-013/014/015 WebSocket listeners architect review (Feb 10), BE-014 Phase 4 ready  
+**Last Updated**: 2026-02-11  
+**Status**: ✅ Phase 1 COMPLETE | 📋 Phase 2 DEV START (Feb 12 kickoff)
+**Current Focus**: Phase 2 handoff complete, all blockers resolved, ready for dev  
+**MVP Scope**: Phase 1 + Phase 2 (collaboration + rules) - GOV-021 approved
+**Next**: Execute Phase 2 sequential dev plan (tags → notes → assign → rules → bulk → audit)
 
 ---
 
 ## 📋 Document Catalog
 
-### Active Plans
+### Active Plans (Priority Order)
 
-- **[BE-206-phase4-integration-plan.md](./BE-206-phase4-integration-plan.md)** - BE-206 Phase 4 Integration Testing Plan (⏳ READY FOR EXECUTION - 10-12 hours)
-- **[BE-206-PHASE-4-EXECUTION-LOG.md](./BE-206-PHASE-4-EXECUTION-LOG.md)** - BE-206 Phase 4 execution log (⏳ IN PROGRESS)
-- **[BE-206-PHASE-4-STATUS.md](./BE-206-PHASE-4-STATUS.md)** - BE-206 Phase 4 status snapshot (⏳ READY)
+- **[PHASE-2-DEV-START-CHECKLIST.md](./PHASE-2-DEV-START-CHECKLIST.md)** - ✅ Phase 2 sequential dev plan (Feb 12-19 kickoff) - START HERE
+- **[WEEK-2-MESSAGING-REALTIME-EXECUTION-PLAN.md](./WEEK-2-MESSAGING-REALTIME-EXECUTION-PLAN.md)** - ⏳ Week 2 execution (Phase 1.4) in progress
+- **[BE-206-phase4-integration-plan.md](./BE-206-phase4-integration-plan.md)** - ⏳ Phase 4 integration testing (10-12 hours)
+- **[PHASE-2-EXECUTION-PLAN.md](./PHASE-2-EXECUTION-PLAN.md)** - ✅ Phase 2 execution overview (MVP extension approved)
+- **[PHASE-2-COLLABORATION-RULES-HANDOFF.md](./PHASE-2-COLLABORATION-RULES-HANDOFF.md)** - ✅ Phase 2 handoff (blockers resolved, RBAC matrix added)
 
 ### Completed Work (Reference)
 

@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-YACC — Omni-channel social inbox. Phase 1 platforms: Telegram + IRC. Phase 2 platforms: WhatsApp, WeChat, Meta, X.
+YACC — omni-channel social inbox. MVP platforms: Telegram + IRC. Additional platforms (WhatsApp, WeChat, Meta, X) are post-MVP.
 Phase 1 UI filters expose Telegram + IRC only (future channels remain in enums).
 
 See [01-product-specification.md](./01-product-specification.md) for full scope and user stories, and [03-implementation-guide.md](./03-implementation-guide.md) for architecture and tech stack.
@@ -61,7 +61,7 @@ pnpm --filter @yacc/common lint       # Common package linter
 | **Bulk failure silent**: 50 of 100 fail without feedback | Always return failure list with reasons |
 | **Group threading wrong**: Messages in separate conversations | Design: one conversation per group (Telegram group ID) |
 | **Role check missing**: User can do admin action | Enforce RBAC on every endpoint via middleware |
-| **Attachment not deleted**: R2 grows unbounded | Manual cleanup or archival policy (defer to Phase 2) |
+| **Attachment not deleted**: R2 grows unbounded | Manual cleanup or archival policy (post-MVP) |
 
 ---
 
@@ -98,7 +98,7 @@ pnpm --filter @yacc/common lint       # Common package linter
 ---
 
 **Version**: 1.0  
-**Last Updated**: January 17, 2026  
-**Status**: MVP Ready for Launch  
+**Last Updated**: 2026-02-11  
+**Status**: Active (MVP in progress)  
 
-**Print this page. Pin it on your wall. Reference frequently. 📌**
+Print this page. Pin it on your wall. Reference frequently.

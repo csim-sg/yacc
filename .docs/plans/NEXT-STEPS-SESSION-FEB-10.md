@@ -1,6 +1,6 @@
-# Next Steps - Phase 1 Frontend Completion + Phase 2 Backend Integration
+# Next Steps - Phase 1 Frontend Completion + Week 2 Backend Integration
 **Date**: February 10, 2026 (Tuesday)  
-**Session Focus**: Complete Frontend PRs, Execute Backend Phase 4 Integration Tests, Plan Phase 2  
+**Session Focus**: Complete Frontend PRs, Execute Backend Phase 4 Integration Tests, Plan Phase 2 (Collaboration & Rules)  
 **Status**: 🚀 READY TO EXECUTE
 
 ---
@@ -69,7 +69,7 @@ After PRs merge, update:
    - [x] FE-013/014/015: WebSocket Listeners - COMPLETE (PR #244 merged)
    ```
 
-2. **`.docs/plans/PHASE-2-EXECUTION-PLAN.md`** - Update status sections:
+2. **`.docs/plans/WEEK-2-MESSAGING-REALTIME-EXECUTION-PLAN.md`** - Update status sections:
    ```markdown
    **TUESDAY, Feb 10 (Day 2)**:
    - [x] FE-008/009: COMPLETE & MERGED (PR #243)
@@ -215,7 +215,7 @@ gh pr merge <PR_NUMBER> --squash
 **Who**: Architect + All developers  
 **What**: Refine Phase 2 plan with actual team availability
 
-**Current Phase 2 Plan** (`.docs/plans/PHASE-2-EXECUTION-PLAN.md`):
+**Current Week 2 Plan** (`.docs/plans/WEEK-2-MESSAGING-REALTIME-EXECUTION-PLAN.md`):
 - **Duration**: Feb 9-16, 2026 (8 days)
 - **Backend**: BE-012 (manual retry), BE-017/018/019 (WebSocket events)
 - **Frontend**: FE-011 (retry button), FE-012 (typing indicators), Admin pages
@@ -223,7 +223,7 @@ gh pr merge <PR_NUMBER> --squash
 
 **Action**:
 ```bash
-# 1. Review PHASE-2-EXECUTION-PLAN.md for any changes
+# 1. Review WEEK-2-MESSAGING-REALTIME-EXECUTION-PLAN.md for any changes
 # 2. Identify blockers from Phase 1 that affect Phase 2
 # 3. Adjust timeline if needed
 # 4. Create daily standup checklist
@@ -288,7 +288,7 @@ gh pr merge <PR_NUMBER> --squash
 
 ### 4. Phase 2 Scope
 **Question**: Any scope changes needed?  
-**Answer**: Review PHASE-2-EXECUTION-PLAN.md for readiness  
+**Answer**: Review `.docs/plans/PHASE-2-COLLABORATION-RULES-HANDOFF.md` for readiness  
 **Action**: Confirm with team before Feb 12 kickoff
 
 ---
@@ -321,7 +321,7 @@ gh pr merge <PR_NUMBER> --squash
 | PR #244 (WebSocket) | https://github.com/csim-sg/yacc/pull/244 |
 | FE Test Plan | `packages/frontend/QA-TEST-PLAN.md` |
 | BE Phase 4 Plan | `.docs/plans/BE-206-phase4-integration-plan.md` |
-| Phase 2 Plan | `.docs/plans/PHASE-2-EXECUTION-PLAN.md` |
+| Week 2 Plan | `.docs/plans/WEEK-2-MESSAGING-REALTIME-EXECUTION-PLAN.md` |
 | Workflow | `AGENTS.md` (Fullstack Developer section) |
 | API Contract | `.docs/02-api-and-data-model.md` |
 

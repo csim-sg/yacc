@@ -18,7 +18,7 @@
 
 ## 1. System Architecture
 
-**Phase Scope Reference**: See `.docs/06-phase1-execution-guide.md` for authoritative Phase 1 scope and acceptance criteria.
+**Phase Scope Reference**: See `.docs/plans/00-INDEX.md` and `.docs/plans/PHASE-1-COMPLETION-SUMMARY.md` for current execution status and Phase 1 scope.
 
 ### High-Level Overview
 
@@ -755,6 +755,8 @@ Client Receives Event
 
 ## 5. Implementation Phases
 
+**MVP** includes **Phase 1 + Phase 2** (see GOV-021).
+
 ### Phase 1: Core + Messaging + Integrations (Week 1–2)
 **Goal**: Auth + data model + inbox + messaging + Telegram/IRC integrations
 
@@ -894,7 +896,7 @@ REACT_APP_WS_URL=https://api.example.com
 | **Database** | PostgreSQL | Mature, reliable, FTS support, ACID transactions |
 | **File Storage** | Cloudflare R2 | Cheaper than S3, fast CDN, easy S3-compatible API |
 | **Message Queue** | Redis + BullMQ | Simple, fast, built-in retry scheduling |
-| **Search** | PostgreSQL FTS (MVP) → Elasticsearch (Phase 2) | FTS sufficient for MVP, easy to migrate |
+| **Search** | PostgreSQL FTS (MVP) → Elasticsearch (post-MVP) | FTS sufficient for MVP, easy to migrate |
 | **Auth** | BetterAuth | Flexible, supports email/password + OAuth, JWT + session |
 | **Real-Time** | Socket.io | Mature, handles reconnection, fallbacks (polling) |
 | **Retry Strategy** | Exponential backoff (1m, 5m, 30m) | Standard practice, reduces server load on failures |
