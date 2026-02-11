@@ -6,25 +6,31 @@
  * Controllers:
  * - AuthController: Authentication endpoints (sign-up, sign-in, forgot password)
  * - ConversationsController: Inbox & conversation management
+ * - TagsController: Tag CRUD endpoints
+ * - NotesController: Note CRUD endpoints with @mention parsing
  * - AuditController: Audit logging endpoints
  * - HealthController: Health check endpoints
  * - QueueController: Message queue status endpoints
  */
 
+import { AuditController } from './audit.controller.js';
 import { AuthController } from './auth.controller.js';
 import { ConversationsController } from './conversations.controller.js';
 import { DLQController } from './dlq.controller.js';
-import { MessageController } from './message.controller.js';
-import { AuditController } from './audit.controller.js';
 import { HealthController } from './health.controller.js';
+import { MessageController } from './message.controller.js';
+import { NotesController } from './notes.controller.js';
 import { QueueController } from './queue.controller.js';
+import { TagsController } from './tags.controller.js';
 
 export const controllers = [
+  AuditController,
   AuthController,
   ConversationsController,
   DLQController,
-  MessageController,
-  AuditController,
   HealthController,
+  MessageController,
+  NotesController,
   QueueController,
+  TagsController,
 ];
