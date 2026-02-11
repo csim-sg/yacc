@@ -57,11 +57,12 @@ export class TagService {
         .returning();
 
       // Audit log: tag.created
+      // Use nil UUID (00000000-0000-0000-0000-000000000000) for global tag creation
       await auditService.logAction({
         actorId: createdById,
         action: 'tag.created',
         entityType: 'conversation',
-        entityId: 'global', // Tag creation is global, not conversation-specific
+        entityId: '00000000-0000-0000-0000-000000000000',
         metadata: {
           tagId: newTag[0]?.id,
           tagName: name,
