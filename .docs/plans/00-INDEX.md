@@ -125,7 +125,7 @@ Governance references:
 
 ## 🚀 Phase 2: Collaboration & Rules (Feb 11 onwards)
 
-**Status**: ✅ **EA VALIDATION COMPLETE (GOV-021)** → **READY FOR DEVELOPER KICKOFF**
+**Status**: ✅ **EA VALIDATION COMPLETE (GOV-021)** → **IMPLEMENTATION STARTED (BE-P2-001 in progress)**
 
 **Governance Gate**: Phase 2 approved under conditions documented in GOV-021:
 - RBAC matrix finalized (assignment/bulk = manager+admin+super_admin, NOT user)
@@ -136,12 +136,12 @@ Governance references:
 
 **Developer Handoff**:
 1. Read **GOV-021-phase2-architecture-decisions.md** (mandatory, covers RBAC, events, audit, data model)
-2. Start with ticket #1: Backend tags (CRUD + conversation add/remove) + audit
+2. Start with ticket #1: Backend tags (CRUD + conversation add/remove) + audit ✅ **IN PROGRESS**
 3. Follow sequential order (8 tickets total, small PRs)
 4. Target completion: Feb 23 (Week 3-4, per original timeline)
 
 **Tickets (In Order)**:
-1. Backend tags
+1. ⏳ **BE-P2-001: Backend tags** (CRUD + conversation add/remove + audit + WebSocket) - Feature branch: `feature/BE-P2-001-tags`
 2. Backend notes + mention parsing + notifications
 3. Backend assignment + notification
 4. Backend bulk actions
