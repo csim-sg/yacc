@@ -1054,7 +1054,7 @@ Resets user password using a valid reset token.
 
 ### Tags
 
-#### `GET /tags`
+#### `GET /api/tags`
 **Response:**
 ```json
 { "data": [/* Tag models */] }
@@ -1062,7 +1062,7 @@ Resets user password using a valid reset token.
 
 ---
 
-#### `POST /tags`
+#### `POST /api/tags`
 **Request:**
 ```json
 {
@@ -1078,24 +1078,35 @@ Resets user password using a valid reset token.
 
 ---
 
-#### `POST /conversations/:id/tags`
+#### `POST /api/conversations/:id/tags`
 **Request:**
 ```json
-{ "tagId": "uuid" }  // or create inline
+{ "tagId": 123 }
 ```
 
 **Response:**
 ```json
 { "data": { "tags": [/* Tag models */] } }
 ```
+
+**Response Codes:**
+- `201 Created` when request is accepted (idempotent if already tagged)
+- `400 Bad Request` invalid `tagId`
+- `403 Forbidden` not authorized to access the conversation (user not assigned)
+- `404 Not Found` conversation or tag not found
 
 ---
 
-#### `DELETE /conversations/:id/tags/:tagId`
+#### `DELETE /api/conversations/:id/tags/:tagId`
 **Response:**
 ```json
 { "data": { "tags": [/* Tag models */] } }
 ```
+
+**Response Codes:**
+- `200 OK` (graceful if tag was not present)
+- `403 Forbidden` not authorized to access the conversation (user not assigned)
+- `404 Not Found` conversation or tag not found
 
 ---
 

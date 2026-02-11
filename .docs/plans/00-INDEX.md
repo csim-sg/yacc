@@ -1,8 +1,8 @@
 # Active Execution Plans Index
 
-**Last Updated**: 2026-02-10  
-**Status**: ✅ Week 1 COMPLETE, ✅ BE-009/010 COMPLETE (PR #240), ✅ BE-011 COMPLETE (PR #241), ✅ BE-014 Phases 1-3 COMPLETE, ✅ FE-008/009/010 COMPLETE (PR #243), ⏳ FE-013/014/015 IN REVIEW (PR #244)
-**Current Focus**: FE-013/014/015 WebSocket listeners architect review (Feb 10), BE-014 Phase 4 ready  
+**Last Updated**: 2026-02-11  
+**Status**: ✅ Week 1 COMPLETE, ✅ Phase 1.4 Week 2 COMPLETE (merged PRs #241, #242, #243, #244, #245), ✅ Phase 2 EA validation done (GOV-021), Phase 2 implementation ready to kickoff
+**Current Focus**: Phase 2 (Collaboration & Rules) developer kickoff  
 
 ---
 
@@ -23,6 +23,7 @@ Governance references:
 - PR #227 governance trail: `.docs/governance/GOV-015-pr227-week1-docs-entrypoint-tests.md`
 - BE-206 session summary: `.docs/governance/GOV-016-be-206-phase4-session-summary.md`
 - Plans cleanup decision: `.docs/governance/GOV-017-plans-directory-cleanup-phase2.md`
+- **Phase 2 EA validation & conditions: `.docs/governance/GOV-021-phase2-architecture-decisions.md`** ← Developer MUST read before starting Phase 2 tickets
 
 
 ---
@@ -30,10 +31,11 @@ Governance references:
 ## ✅ Current Status
 
 ### Phase 1.4: MVP Core-First Execution (APPROVED)
-**Status**: ⏳ **IN PROGRESS - Week 2 Frontend (Feb 9-10)**  
+**Status**: ✅ **COMPLETE - Week 2 (Feb 9-11)**  
 **Approval Date**: 2026-02-06  
-**Backend Completion**: 2026-02-08 (Week 1 complete)
-**Current Milestone**: Frontend real-time listeners (FE-013/014/015) architect review in progress
+**Backend Completion**: 2026-02-09 (BE-009/010/011/014 merged)
+**Frontend Completion**: 2026-02-10 (FE-008/009/010/012/013/014/015 merged)
+**GitHub Issues & Project Sync**: 2026-02-11 (13 issues closed, Project board updated)
 
 **MVP Scope**:
 - Backend: BE-007 (Inbox API), BE-008 (Conversation Detail), BE-009/010 (Messages), BE-017-019 (WebSocket Events)
@@ -121,29 +123,50 @@ Governance references:
 
 ---
 
-## 🚀 Week 2 Execution (Feb 9-16)
+## 🚀 Phase 2: Collaboration & Rules (Feb 11 onwards)
 
-**Status**: READY FOR KICKOFF (Feb 9, 9am)
+**Status**: ✅ **TICKET #1 FIXES COMPLETE (PR #246)** — Ready for re-review (GOV-022)
 
-**Backend** (Priority Order):
-- [x] BE-009/010: Message Retrieval & Send - COMPLETE (PR #240 merged)
-- [x] BE-011: Message Status Tracking - COMPLETE (PR #241 in review)
-- [x] BE-014: Exponential Backoff Retry - PHASES 1-3 COMPLETE (Phase 4 ready)
-- [ ] BE-014 Phase 4: Service integration & worker registration - START Feb 11
-- [ ] BE-012: Message Retry Endpoint - START Feb 12 (unblocked by BE-014)
-- [ ] BE-017/018/019: WebSocket Events - START Feb 13
+**Governance Gate**: Phase 2 approved under conditions documented in GOV-021:
+- RBAC matrix finalized (assignment/bulk = manager+admin+super_admin, NOT user)
+- Event semantics locked (`conversation.updated` includes tag changes; `notification.received` for assignments+mentions)
+- Mention resolution: `@username` → email local-part match
+- Routing rules override policy documented
+- Sequential ticket order validated
 
-**Frontend** (Parallel):
-- [x] FE-008/009 API Integration - COMPLETE (PR #243 merged)
-- [x] FE-010: Reply Composer - COMPLETE (PR #243 merged)
-- [x] FE-013/014/015: WebSocket Listeners - IMPLEMENTATION COMPLETE (PR #244 in architect review)
+**Ticket #1 Status** (BE-P2-001: Backend Tags CRUD):
+- **PR #246 created** (feature/BE-P2-001-tags)
+- **Status**: ✅ FIXES COMPLETE — Awaiting architect re-review
+- **Blocking Issues Fixed** (per GOV-022):
+  1. ✅ Added resource-level authorization check (conversation access verified)
+  2. ✅ Use WebSocket backlog helper (emitToConversation instead of raw gateway)
+  3. ✅ Audit logging enforced (transactional with error propagation)
+  4. ✅ Tests passing (pnpm test green, WebSocket gateway mock fixed)
+- **Non-Blocking Issues Fixed**:
+  1. ✅ TagTypes extracted to types/tag.types.ts (one-definition-per-file)
+  2. ✅ Removed all `any` types from integration tests
+  3. ✅ Fixed idempotency race condition (atomic INSERT...ON CONFLICT)
+  4. ✅ Enhanced test coverage (all 4 roles, super_admin verified)
+- **Reference**: `.docs/governance/GOV-022-pr246-architecture-review-findings.md`
+- **Commit**: 8163534 (BE-P2-001: Fix architecture review findings)
+- **Next Step**: Architect re-reviews and approves (target: Feb 12-13)
 
-**QA** (Parallel):
-- [ ] Integration tests (BE) - START Feb 9
-- [ ] E2E tests (FE) - START Feb 9
-- [ ] Real-time test scenarios - START Feb 13
+**Remediation Pattern** (all Phase 2 tickets):
+- Resource-level authorization REQUIRED on all conversation-scoped operations
+- WebSocket events MUST use backlog helper (not raw gateway)
+- Audit logging MUST be transactional (enforce on all actions)
+- Tests MUST verify side effects (WebSocket events, audit log persistence)
+- All 4 roles MUST be tested in RBAC scenarios
 
-**Target MVP Completion**: Feb 16, 2026 (EOD)
+**Tickets (In Order)**:
+1. ⏸️ **BE-P2-001: Backend tags** (IN REVIEW — awaiting fixes) - PR #246
+2. ⏳ Backend notes + mention parsing + notifications (BLOCKED on #1 approval)
+3. ⏳ Backend assignment + notification (BLOCKED on #1 approval)
+4. ⏳ Backend bulk actions (BLOCKED on #1 approval)
+5. ⏳ Backend routing rules CRUD + executions listing (BLOCKED on #1 approval)
+6. ⏳ Backend routing rules evaluation on inbound messages (BLOCKED on #1 approval)
+7. ⏳ Frontend right panel (tags/notes/assign) (BLOCKED on BE tickets)
+8. ⏳ Frontend rules builder UI (BLOCKED on BE tickets)
 
 ---
 

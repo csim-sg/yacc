@@ -4,7 +4,7 @@
  * Uses BetterAuth session validation
  */
 
-import { Action } from 'routing-controllers';
+import { Action, UnauthorizedError, ForbiddenError } from 'routing-controllers';
 import type { Request } from 'express';
 import { dbClient } from '../infrastructure/db.client';
 import { users } from '../schemas/user.schema';
@@ -68,38 +68,38 @@ export async function authorizationChecker(
        // BetterAuth session found
        userId = session.user.id as string;
       } else {
-        // Try to extract JWT token directly (for testing)
-        const authHeader = request.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-          const token = authHeader.substring(7);
-          try {
-            const { verify } = await import('jsonwebtoken');
-            const decoded = verify(token, appConfig.BETTER_AUTH_SECRET) as JWTPayload;
-            userId = decoded.sub;
-          } catch {
-            // Invalid or expired token
-            return false;
-          }
-        }
+         // Try to extract JWT token directly (for testing)
+         const authHeader = request.headers.authorization;
+         if (authHeader && authHeader.startsWith('Bearer ')) {
+           const token = authHeader.substring(7);
+           try {
+             const { verify } = await import('jsonwebtoken');
+             const decoded = verify(token, appConfig.BETTER_AUTH_SECRET) as JWTPayload;
+             userId = decoded.sub;
+           } catch {
+             // Invalid or expired token
+             throw new UnauthorizedError('Invalid or expired token');
+           }
+         }
       }
 
-     if (!userId) {
-       return false;
-     }
+      if (!userId) {
+        throw new UnauthorizedError('Authentication required');
+      }
 
-     // Fetch full user from database to get role and status
-     const user = await dbClient.query.users.findFirst({
-       where: eq(users.id, userId),
-     });
+      // Fetch full user from database to get role and status
+      const user = await dbClient.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
 
-     if (!user) {
-       return false;
-     }
+      if (!user) {
+        throw new UnauthorizedError('User not found');
+      }
 
-     // Check user status - inactive or suspended users cannot login
-     if (user.status === 'inactive' || user.status === 'suspended') {
-       return false;
-     }
+      // Check user status - inactive or suspended users cannot login
+      if (user.status === 'inactive' || user.status === 'suspended') {
+        throw new UnauthorizedError('User account is inactive or suspended');
+      }
 
      // Attach user to request (for currentUserChecker)
      request.user = {
@@ -122,18 +122,26 @@ export async function authorizationChecker(
        };
      }
 
-     // If no specific roles required, just check if authenticated
-     if (!roles || roles.length === 0) {
-       return true;
-     }
+      // If no specific roles required, just check if authenticated
+      if (!roles || roles.length === 0) {
+        return true;
+      }
 
-     // Check if user has required role
-     return roles.includes(user.role);
+      // Check if user has required role
+      // 403 Forbidden: User is authenticated but lacks required role
+      if (!roles.includes(user.role)) {
+        throw new ForbiddenError('User does not have required role');
+      }
 
-     return false;
-   } catch (error) {
-     return false;
-   }
+      return true;
+    } catch (error) {
+      // Re-throw UnauthorizedError to preserve 401 status
+      if (error instanceof UnauthorizedError) {
+        throw error;
+      }
+      // For other errors, return false (which routing-controllers treats as 403)
+      return false;
+    }
 }
 
 /**
