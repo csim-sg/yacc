@@ -173,10 +173,12 @@ export async function createTestUser(app: Express, options: TestUserOptions): Pr
      throw new Error('Failed to generate test token');
    }
 
-   // Step 5: (Optional) Update user role if specified
-   if (options.role) {
-     await dbClient.update(users).set({ role: options.role as any }).where(eq(users.id, userId)).execute();
-   }
+    // Step 5: (Optional) Update user role if specified
+    if (options.role) {
+      const validRoles = ['admin', 'manager', 'user', 'super_admin'];
+      const roleValue = validRoles.includes(options.role) ? options.role : 'user';
+      await dbClient.update(users).set({ role: roleValue as 'admin' | 'manager' | 'user' | 'super_admin' }).where(eq(users.id, userId)).execute();
+    }
 
    return { id: userId, token };
 }

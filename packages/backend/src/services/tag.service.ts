@@ -56,19 +56,23 @@ export class TagService {
         })
         .returning();
 
-      // Audit log: tag.created
-      // Use nil UUID (00000000-0000-0000-0000-000000000000) for global tag creation
-      await auditService.logAction({
-        actorId: createdById,
-        action: 'tag.created',
-        entityType: 'conversation',
-        entityId: '00000000-0000-0000-0000-000000000000',
-        metadata: {
-          tagId: newTag[0]?.id,
-          tagName: name,
-          color,
-        },
-      });
+       // Audit log: tag.created (transactional - must succeed)
+       // Use nil UUID (00000000-0000-0000-0000-000000000000) for global tag creation
+       const auditResult = await auditService.logAction({
+         actorId: createdById,
+         action: 'tag.created',
+         entityType: 'conversation',
+         entityId: '00000000-0000-0000-0000-000000000000',
+         metadata: {
+           tagId: newTag[0]?.id,
+           tagName: name,
+           color,
+         },
+       });
+
+       if (!auditResult.success) {
+         throw new Error(`Audit logging failed: ${auditResult.error}`);
+       }
 
       return {
         success: true,
@@ -145,29 +149,27 @@ export class TagService {
         )
         .limit(1);
 
-      // Audit log: conversation.tag_added
-      // Make this transactional: throw error if audit fails (don't silently ignore)
-      if (tagWasAdded[0]) {
-        try {
-          await auditService.logAction({
-            actorId: userId,
-            action: 'conversation.tag_added',
-            entityType: 'conversation',
-            entityId: conversationId,
-            metadata: {
-              tagId,
-              tagName: tag[0].name,
-            },
-          });
-        } catch (auditError: unknown) {
-          logger.error(
-            { err: auditError },
-            'Audit logging failed for tag addition - rolling back WebSocket event'
-          );
-          // Rethrow to fail the operation if audit can't be logged
-          throw auditError;
-        }
-      }
+       // Audit log: conversation.tag_added (transactional)
+       if (tagWasAdded[0]) {
+         const auditResult = await auditService.logAction({
+           actorId: userId,
+           action: 'conversation.tag_added',
+           entityType: 'conversation',
+           entityId: conversationId,
+           metadata: {
+             tagId,
+             tagName: tag[0].name,
+           },
+         });
+
+         if (!auditResult.success) {
+           logger.error(
+             { auditError: auditResult.error },
+             'Audit logging failed for tag addition'
+           );
+           throw new Error(`Audit logging failed: ${auditResult.error}`);
+         }
+       }
 
       // Fetch updated tags for conversation
       const updatedTags = await dbClient
@@ -269,28 +271,26 @@ export class TagService {
             )
           );
 
-        // Audit log: conversation.tag_removed
-        // Make this transactional: throw error if audit fails (don't silently ignore)
-        try {
-          await auditService.logAction({
-            actorId: userId,
-            action: 'conversation.tag_removed',
-            entityType: 'conversation',
-            entityId: conversationId,
-            metadata: {
-              tagId,
-              tagName: tag[0].name,
-            },
-          });
-        } catch (auditError: unknown) {
-          logger.error(
-            { err: auditError },
-            'Audit logging failed for tag removal - rolling back WebSocket event'
-          );
-          // Rethrow to fail the operation if audit can't be logged
-          throw auditError;
-        }
-      }
+         // Audit log: conversation.tag_removed (transactional)
+         const auditResult = await auditService.logAction({
+           actorId: userId,
+           action: 'conversation.tag_removed',
+           entityType: 'conversation',
+           entityId: conversationId,
+           metadata: {
+             tagId,
+             tagName: tag[0].name,
+           },
+         });
+
+         if (!auditResult.success) {
+           logger.error(
+             { auditError: auditResult.error },
+             'Audit logging failed for tag removal'
+           );
+           throw new Error(`Audit logging failed: ${auditResult.error}`);
+         }
+       }
 
       // Fetch updated tags for conversation
       const updatedTags = await dbClient

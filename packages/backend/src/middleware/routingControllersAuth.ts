@@ -4,7 +4,7 @@
  * Uses BetterAuth session validation
  */
 
-import { Action, UnauthorizedError } from 'routing-controllers';
+import { Action, UnauthorizedError, ForbiddenError } from 'routing-controllers';
 import type { Request } from 'express';
 import { dbClient } from '../infrastructure/db.client';
 import { users } from '../schemas/user.schema';
@@ -128,8 +128,9 @@ export async function authorizationChecker(
       }
 
       // Check if user has required role
+      // 403 Forbidden: User is authenticated but lacks required role
       if (!roles.includes(user.role)) {
-        throw new UnauthorizedError('User does not have required role');
+        throw new ForbiddenError('User does not have required role');
       }
 
       return true;
