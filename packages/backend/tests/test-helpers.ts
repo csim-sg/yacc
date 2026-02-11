@@ -183,23 +183,31 @@ export async function createTestUser(app: Express, options: TestUserOptions): Pr
 
 /**
  * Seeds the database with test conversations for the given user.
- * Requires dbClient and conversation schema. userId is UUID (optional assignee).
+ * Returns array of created conversation objects with id.
  */
 export async function seedTestConversations(
   userId: string,
   count: number
-): Promise<void> {
+): Promise<Array<{ id: string }>> {
   const { dbClient } = await import('../src/infrastructure/db.client.js');
   const { conversations } = await import('../src/schemas/conversation.schema.js');
 
+  const createdConversations: Array<{ id: string }> = [];
+
   for (let i = 0; i < count; i++) {
-    await dbClient.insert(conversations).values({
+    const result = await dbClient.insert(conversations).values({
       channel: i % 2 === 0 ? 'telegram' : 'irc',
       externalThreadId: `test-${Date.now()}-${i}`,
       title: `Test conversation ${i}`,
       status: i % 3 === 0 ? 'open' : i % 3 === 1 ? 'pending' : 'resolved',
       priority: (['low', 'medium', 'high', 'urgent'] as const)[i % 4],
       assignedUserId: i % 5 === 0 ? null : userId,
-    }).onConflictDoNothing();
+    }).returning({ id: conversations.id });
+
+    if (result[0]?.id) {
+      createdConversations.push({ id: result[0].id });
+    }
   }
+
+  return createdConversations;
 }

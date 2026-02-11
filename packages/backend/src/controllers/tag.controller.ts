@@ -32,13 +32,13 @@ interface AuthenticatedRequest extends Request {
 }
 
 @JsonController('/api')
-@Authorized()
 export class TagController {
   /**
    * GET /api/tags
-   * List all tags
+   * List all tags - Requires authentication (any role)
    */
   @Get('/tags')
+  @Authorized()
   async listTags(@Req() req: AuthenticatedRequest) {
     const startTime = performance.now();
     const correlationId = req.correlationId || 'unknown';
@@ -79,11 +79,11 @@ export class TagController {
 
   /**
    * POST /api/tags
-   * Create a new tag
-   * Allowed roles: admin, manager, user, super_admin (per GOV-021)
+   * Create a new tag - Requires authentication (any role)
+   * GOV-021: All roles (admin, manager, user, super_admin) can create tags
    */
   @Post('/tags')
-  @Authorized(['admin', 'manager', 'user', 'super_admin'])
+  @Authorized()
   @HttpCode(201)
   async createTag(
     @Body() body: CreateTagRequest,
@@ -155,9 +155,10 @@ export class TagController {
    * Allowed roles: admin, manager, user, super_admin (per GOV-021)
    * 
    * Resource-level authorization: User must have access to the conversation
+   * GOV-021: All roles can tag conversations (with resource-level auth check)
    */
   @Post('/conversations/:id/tags')
-  @Authorized(['admin', 'manager', 'user', 'super_admin'])
+  @Authorized()
   @HttpCode(200)
   async addTagToConversation(
     @Param('id') conversationId: string,
@@ -227,9 +228,10 @@ export class TagController {
    * Allowed roles: admin, manager, user, super_admin (per GOV-021)
    * 
    * Resource-level authorization: User must have access to the conversation
+   * GOV-021: All roles can untag conversations (with resource-level auth check)
    */
   @Delete('/conversations/:id/tags/:tagId')
-  @Authorized(['admin', 'manager', 'user', 'super_admin'])
+  @Authorized()
   @HttpCode(200)
   async removeTagFromConversation(
     @Param('id') conversationId: string,
