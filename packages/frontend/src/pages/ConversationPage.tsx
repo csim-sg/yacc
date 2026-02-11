@@ -442,12 +442,15 @@ export function ConversationPage() {
                       </div>
 
                       {conversation.tags && conversation.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2" data-testid="conversation-tags">
                           {conversation.tags.map((tag: ConversationTag) => (
                             <span
                               key={tag.id}
                               className="badge badge-sm"
                               style={{ backgroundColor: tag.color, color: '#fff' }}
+                              data-testid="conversation-tag"
+                              data-tag-id={tag.id}
+                              data-tag-name={tag.name}
                             >
                               {tag.name}
                             </span>

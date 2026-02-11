@@ -1,7 +1,6 @@
 import 'reflect-metadata';
 import 'dotenv/config';
 import express from 'express';
-import { Server } from 'socket.io';
 import http from 'http';
 import { useExpressServer } from 'routing-controllers';
 import { SocketControllers } from 'socket-controllers';
@@ -15,6 +14,8 @@ import { socketControllers } from './socket-controllers';
 import { appConfig } from './config/appConfig';
 import { logger } from './infrastructure/logger';
 import { wsGateway } from './websockets/gateway';
+import { WebSocketServer } from './websockets/websocket.server';
+import { setWebSocketGateway } from './services/websocket/websocket-gateway';
 
 // ===== EXPRESS APP =====
 const app = express();
@@ -46,13 +47,8 @@ useExpressServer(app, {
 
 // ===== HTTP & WEBSOCKET SERVER =====
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: appConfig.APP_FRONTEND_URL,
-    credentials: true,
-    exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
-  },
-});
+const webSocketServer = new WebSocketServer(server);
+const io = webSocketServer.getServer();
 
 // ===== DATABASE AND STARTUP =====
 export async function start(): Promise<void> {
@@ -70,6 +66,10 @@ export async function start(): Promise<void> {
 
     // Initialize WebSocket gateway
     logger.info('Initializing WebSocket gateway...');
+    // Wire the typed WebSocket gateway used by services (conversation.updated, backlog, etc.)
+    setWebSocketGateway(webSocketServer);
+
+    // Legacy gateway (kept for compatibility with existing emitters)
     wsGateway.initialize(io);
     logger.info('WebSocket gateway initialized successfully');
 

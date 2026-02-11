@@ -6,179 +6,344 @@
 import 'dotenv/config';
 import { dbClient } from '../src/infrastructure/db.client.js';
 import { hashPassword } from 'better-auth/crypto';
-import { sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { users } from '../src/schemas/user.schema.js';
+import { account } from '../src/schemas/account.schema.js';
+import { conversations } from '../src/schemas/conversation.schema.js';
+import { conversationTags } from '../src/schemas/conversationTag.schema.js';
+import { tags } from '../src/schemas/tag.schema.js';
+import { messages } from '../src/schemas/message.schema.js';
+import { notes } from '../src/schemas/note.schema.js';
+import { auditLogs } from '../src/schemas/auditLog.schema.js';
+
+const FIXTURE = {
+  users: {
+    superAdmin: {
+      id: '00000000-0000-0000-0000-000000000001',
+      email: 'admin@yacc.local',
+      name: 'System Administrator',
+      role: 'super_admin' as const,
+    },
+    admin: {
+      id: '00000000-0000-0000-0000-000000000002',
+      email: 'admin2@yacc.local',
+      name: 'Admin User',
+      role: 'admin' as const,
+    },
+    manager: {
+      id: '00000000-0000-0000-0000-000000000003',
+      email: 'manager@yacc.local',
+      name: 'Manager User',
+      role: 'manager' as const,
+    },
+    user: {
+      id: '00000000-0000-0000-0000-000000000004',
+      email: 'user@yacc.local',
+      name: 'Support User',
+      role: 'user' as const,
+    },
+  },
+  conversations: {
+    telegram: {
+      id: '00000000-0000-0000-0000-000000001001',
+      channel: 'telegram' as const,
+      externalThreadId: 'tg-mock-101',
+      title: 'Mock Support Thread',
+    },
+    irc: {
+      id: '00000000-0000-0000-0000-000000001002',
+      channel: 'irc' as const,
+      externalThreadId: 'irc-#support',
+      title: 'IRC #support',
+    },
+  },
+  tags: {
+    vip: {
+      name: 'VIP',
+      color: '#2563EB',
+    },
+  },
+} as const;
 
 async function seedTestFixtures() {
   try {
     console.log('🧪 Seeding test fixtures...');
 
-    // Clean existing test data
-    await dbClient.execute(sql`DELETE FROM raw_payloads WHERE message_id IN (SELECT id FROM messages WHERE conversation_id >= 1000)`);
-    await dbClient.execute(sql`DELETE FROM audit_logs WHERE entity_type = 'conversation' AND entity_id >= 1000`);
-    await dbClient.execute(sql`DELETE FROM messages WHERE conversation_id >= 1000`);
-    await dbClient.execute(sql`DELETE FROM notes WHERE conversation_id >= 1000`);
-    await dbClient.execute(sql`DELETE FROM conversation_tags WHERE conversation_id >= 1000`);
-    await dbClient.execute(sql`DELETE FROM conversations WHERE id >= 1000`);
-    await dbClient.execute(sql`DELETE FROM tags WHERE id >= 1000`);
+    // Clean existing fixture data (UUID-safe)
+    // Important: delete by deterministic fixture IDs (not numeric comparisons)
+    const fixtureConversationIds = [
+      FIXTURE.conversations.telegram.id,
+      FIXTURE.conversations.irc.id,
+    ];
+
+    // Remove audit logs that reference fixture conversations
+    await dbClient.delete(auditLogs).where(
+      and(
+        eq(auditLogs.entityType, 'conversation'),
+        inArray(auditLogs.entityId, fixtureConversationIds)
+      )
+    );
+
+    // Remove dependent rows explicitly (defensive) then delete conversations
+    await dbClient.delete(conversationTags).where(inArray(conversationTags.conversationId, fixtureConversationIds));
+    await dbClient.delete(messages).where(inArray(messages.conversationId, fixtureConversationIds));
+    await dbClient.delete(notes).where(inArray(notes.conversationId, fixtureConversationIds));
+
+    // Delete fixture conversations (FK cascades should also handle most dependents)
+    await dbClient.delete(conversations).where(inArray(conversations.id, fixtureConversationIds));
+
+    // Delete fixture tag (by name+creator to avoid deleting user data)
+    await dbClient
+      .delete(tags)
+      .where(
+        and(
+          eq(tags.createdById, FIXTURE.users.superAdmin.id),
+          eq(tags.name, FIXTURE.tags.vip.name)
+        )
+      );
 
     // Ensure users exist for RBAC coverage (Better Auth compatible hash)
     const hashedPassword = await hashPassword('admin123');
-    const adminResult = await dbClient.execute(sql`
-      INSERT INTO users (email, name, password_hash, role, status, email_verified)
-      VALUES ('admin@yacc.local', 'System Administrator', ${hashedPassword}, 'super_admin', 'active', true)
-      ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
-      RETURNING id
-    `);
-    const adminId = (adminResult.rows[0] as { id: string })?.id;
 
-    if (!adminId) {
-      throw new Error('Failed to create admin user for fixtures');
+    const fixtureUsers = [FIXTURE.users.superAdmin, FIXTURE.users.admin, FIXTURE.users.manager, FIXTURE.users.user];
+
+    for (const u of fixtureUsers) {
+      await dbClient
+        .insert(users)
+        .values({
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          passwordHash: hashedPassword,
+          role: u.role,
+          status: 'active',
+          emailVerified: true,
+        })
+        .onConflictDoUpdate({
+          target: users.email,
+          set: {
+            name: u.name,
+            passwordHash: hashedPassword,
+            role: u.role,
+            status: 'active',
+            emailVerified: true,
+            updatedAt: sql`now()`,
+          },
+        });
+
+      // BetterAuth credential login requires an account row.
+      // Use providerId='credential' and accountId=email.
+      await dbClient
+        .insert(account)
+        .values({
+          id: `${u.id}-credential`,
+          userId: u.id,
+          accountId: u.email,
+          providerId: 'credential',
+        })
+        .onConflictDoUpdate({
+          target: [account.providerId, account.accountId],
+          set: {
+            userId: u.id,
+            updatedAt: sql`now()`,
+          },
+        });
     }
 
-    await dbClient.execute(sql`
-      INSERT INTO users (email, name, password_hash, role, status, email_verified)
-      VALUES ('admin2@yacc.local', 'Admin User', ${hashedPassword}, 'admin', 'active', true)
-      ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
-    `);
+    // Create fixture tag (VIP) owned by super_admin
+    const [vipTag] = await dbClient
+      .insert(tags)
+      .values({
+        name: FIXTURE.tags.vip.name,
+        color: FIXTURE.tags.vip.color,
+        createdById: FIXTURE.users.superAdmin.id,
+      })
+      .onConflictDoUpdate({
+        target: [tags.name, tags.createdById],
+        set: {
+          color: FIXTURE.tags.vip.color,
+        },
+      })
+      .returning({ id: tags.id });
 
-    await dbClient.execute(sql`
-      INSERT INTO users (email, name, password_hash, role, status, email_verified)
-      VALUES ('manager@yacc.local', 'Manager User', ${hashedPassword}, 'manager', 'active', true)
-      ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
-    `);
-
-    await dbClient.execute(sql`
-      INSERT INTO users (email, name, password_hash, role, status, email_verified)
-      VALUES ('user@yacc.local', 'Support User', ${hashedPassword}, 'user', 'active', true)
-      ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
-    `);
-
-    // Create tag
-    await dbClient.execute(sql`
-      INSERT INTO tags (id, name, color, created_by_id, created_at)
-      VALUES (1001, 'VIP', '#2563EB', ${adminId}, NOW())
-      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name
-    `);
-
-    // Create conversation
-    await dbClient.execute(sql`
-      INSERT INTO conversations (id, channel, external_thread_id, title, status, priority, assigned_user_id, created_at, updated_at, last_activity_at)
-      VALUES (1001, 'telegram', 'tg-mock-101', 'Mock Support Thread', 'resolved', 'medium', ${adminId}, NOW() - INTERVAL '20 minutes', NOW() - INTERVAL '15 minutes', NOW() - INTERVAL '15 minutes')
-      ON CONFLICT (id) DO UPDATE SET
-        status = EXCLUDED.status,
-        priority = EXCLUDED.priority,
-        assigned_user_id = EXCLUDED.assigned_user_id,
-        updated_at = EXCLUDED.updated_at,
-        last_activity_at = EXCLUDED.last_activity_at
-    `);
-
-    // Associate tag
-    await dbClient.execute(sql`
-      INSERT INTO conversation_tags (conversation_id, tag_id)
-      VALUES (1001, 1001)
-      ON CONFLICT DO NOTHING
-    `);
-
-    // Insert messages
-    const inboundResult = await dbClient.execute(sql`
-      INSERT INTO messages (conversation_id, sender_name, body, status, direction, created_at, updated_at)
-      VALUES (1001, 'Alice', 'Hello from Telegram', 'sent', 'inbound', NOW() - INTERVAL '12 minutes', NOW() - INTERVAL '12 minutes')
-      RETURNING id
-    `);
-    const inboundMessageId = inboundResult.rows[0]?.id;
-
-    await dbClient.execute(sql`
-      INSERT INTO messages (conversation_id, sender_name, body, status, direction, created_at, updated_at)
-      VALUES (1001, 'Support', 'We are looking into this.', 'pending', 'outbound', NOW() - INTERVAL '3 minutes', NOW() - INTERVAL '3 minutes')
-    `);
-
-    await dbClient.execute(sql`
-      INSERT INTO messages (conversation_id, sender_name, body, status, direction, created_at, updated_at)
-      VALUES (1001, 'Support', 'This message failed to send.', 'failed', 'outbound', NOW() - INTERVAL '4 minutes', NOW() - INTERVAL '4 minutes')
-    `);
-
-
-    await dbClient.execute(sql`
-      INSERT INTO messages (conversation_id, sender_name, body, status, direction, created_at, updated_at)
-      VALUES (1001, 'Support', 'We are looking into this.', 'pending', 'outbound', NOW() - INTERVAL '3 minutes', NOW() - INTERVAL '3 minutes')
-    `);
-
-
-    await dbClient.execute(sql`
-      INSERT INTO messages (conversation_id, sender_name, body, status, direction, created_at, updated_at)
-      VALUES (1001, 'Support', 'We are looking into this.', 'pending', 'outbound', NOW() - INTERVAL '3 minutes', NOW() - INTERVAL '3 minutes')
-    `);
-
-    const latestInboundResult = await dbClient.execute(sql`
-      INSERT INTO messages (conversation_id, sender_name, body, status, direction, created_at, updated_at)
-      VALUES (1001, 'Alice', 'Any updates?', 'sent', 'inbound', NOW() - INTERVAL '2 minutes', NOW() - INTERVAL '2 minutes')
-      RETURNING id
-    `);
-    const latestInboundId = latestInboundResult.rows[0]?.id;
-
-    if (inboundMessageId) {
-      await dbClient.execute(sql`
-        INSERT INTO raw_payloads (message_id, platform, payload, storage_key, created_at, expires_at)
-        VALUES (${inboundMessageId}, 'telegram', '{"fixture": true}', 'payloads/test-1001.json', NOW() - INTERVAL '12 minutes', NOW() + INTERVAL '7 days')
-        ON CONFLICT DO NOTHING
-      `);
+    if (!vipTag?.id) {
+      throw new Error('Failed to create VIP tag for fixtures');
     }
 
-    // Insert internal note
-    await dbClient.execute(sql`
-      INSERT INTO notes (conversation_id, author_id, body, created_at, updated_at)
-      VALUES (1001, ${adminId}, 'Internal note: follow up with customer.', NOW() - INTERVAL '9 minutes', NOW() - INTERVAL '9 minutes')
-    `);
+    // Create Telegram conversation (assigned to super_admin)
+    await dbClient
+      .insert(conversations)
+      .values({
+        id: FIXTURE.conversations.telegram.id,
+        channel: FIXTURE.conversations.telegram.channel,
+        externalThreadId: FIXTURE.conversations.telegram.externalThreadId,
+        title: FIXTURE.conversations.telegram.title,
+        status: 'resolved',
+        priority: 'medium',
+        assignedUserId: FIXTURE.users.superAdmin.id,
+        createdAt: sql`now() - interval '20 minutes'`,
+        updatedAt: sql`now() - interval '15 minutes'`,
+        lastActivityAt: sql`now() - interval '15 minutes'`,
+      })
+      .onConflictDoUpdate({
+        target: conversations.id,
+        set: {
+          status: 'resolved',
+          priority: 'medium',
+          assignedUserId: FIXTURE.users.superAdmin.id,
+          updatedAt: sql`now() - interval '15 minutes'`,
+          lastActivityAt: sql`now() - interval '15 minutes'`,
+        },
+      });
 
-    await dbClient.execute(sql`
-      INSERT INTO notes (conversation_id, author_id, body, created_at, updated_at)
-      VALUES (1001, ${adminId}, 'Internal note: pending status follow-up.', NOW() - INTERVAL '4 minutes', NOW() - INTERVAL '4 minutes')
-    `);
+    // Associate VIP tag to Telegram conversation
+    await dbClient
+      .insert(conversationTags)
+      .values({
+        conversationId: FIXTURE.conversations.telegram.id,
+        tagId: vipTag.id,
+      })
+      .onConflictDoNothing();
 
-    // Audit log entries for assignment/tag/status change
-    if (latestInboundId) {
-      await dbClient.execute(sql`
-        INSERT INTO raw_payloads (message_id, platform, payload, storage_key, created_at, expires_at)
-        VALUES (${latestInboundId}, 'telegram', '{"fixture": true}', 'payloads/test-1001-latest.json', NOW() - INTERVAL '2 minutes', NOW() + INTERVAL '7 days')
-        ON CONFLICT DO NOTHING
-      `);
-    }
+    // Insert messages for Telegram conversation
+    const [inbound] = await dbClient
+      .insert(messages)
+      .values({
+        conversationId: FIXTURE.conversations.telegram.id,
+        senderName: 'Alice',
+        body: 'Hello from Telegram',
+        status: 'sent',
+        direction: 'inbound',
+        createdAt: sql`now() - interval '12 minutes'`,
+        updatedAt: sql`now() - interval '12 minutes'`,
+      })
+      .returning({ id: messages.id });
 
-    // Audit log entries for assignment/tag/status change
-    await dbClient.execute(sql`
-      INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata, created_at)
-      VALUES (${adminId}, 'conversation_assigned', 'conversation', 1001, ${sql`jsonb_build_object('oldAssignedUserId', null, 'newAssignedUserId', ${sql`${adminId}::int`})`}, NOW() - INTERVAL '14 minutes')
-    `);
+    await dbClient.insert(messages).values({
+      conversationId: FIXTURE.conversations.telegram.id,
+      senderName: 'Support',
+      body: 'We are looking into this.',
+      status: 'pending',
+      direction: 'outbound',
+      createdAt: sql`now() - interval '3 minutes'`,
+      updatedAt: sql`now() - interval '3 minutes'`,
+    });
 
-    await dbClient.execute(sql`
-      INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata, created_at)
-      VALUES (${adminId}, 'conversation_tagged', 'conversation', 1001, ${sql`jsonb_build_object('tagId', 1001)`}, NOW() - INTERVAL '13 minutes')
-    `);
+    await dbClient.insert(messages).values({
+      conversationId: FIXTURE.conversations.telegram.id,
+      senderName: 'Support',
+      body: 'This message failed to send.',
+      status: 'failed',
+      direction: 'outbound',
+      createdAt: sql`now() - interval '4 minutes'`,
+      updatedAt: sql`now() - interval '4 minutes'`,
+    });
 
-    await dbClient.execute(sql`
-      INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata, created_at)
-      VALUES (${adminId}, 'conversation_status_change', 'conversation', 1001, ${sql`jsonb_build_object('oldStatus', 'open', 'newStatus', 'resolved')`}, NOW() - INTERVAL '11 minutes')
-    `);
+    const [latestInbound] = await dbClient
+      .insert(messages)
+      .values({
+        conversationId: FIXTURE.conversations.telegram.id,
+        senderName: 'Alice',
+        body: 'Any updates?',
+        status: 'sent',
+        direction: 'inbound',
+        createdAt: sql`now() - interval '2 minutes'`,
+        updatedAt: sql`now() - interval '2 minutes'`,
+      })
+      .returning({ id: messages.id });
 
-    await dbClient.execute(sql`
-      INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata, created_at)
-      VALUES (NULL, 'conversation_reopened', 'conversation', 1001, ${sql`jsonb_build_object('reason', 'inbound_message', 'oldStatus', 'resolved', 'newStatus', 'open')`}, NOW() - INTERVAL '2 minutes')
-    `);
+    // Insert internal notes
+    await dbClient.insert(notes).values({
+      conversationId: FIXTURE.conversations.telegram.id,
+      authorId: FIXTURE.users.superAdmin.id,
+      body: 'Internal note: follow up with customer.',
+      createdAt: sql`now() - interval '9 minutes'`,
+      updatedAt: sql`now() - interval '9 minutes'`,
+    });
 
-    // Second conversation: IRC channel (per QA doc: 1 Telegram + 1 IRC)
-    await dbClient.execute(sql`
-      INSERT INTO conversations (id, channel, external_thread_id, title, status, priority, assigned_user_id, created_at, updated_at, last_activity_at)
-      VALUES (1002, 'irc', 'irc-#support', 'IRC #support', 'open', 'low', NULL, NOW() - INTERVAL '1 hour', NOW() - INTERVAL '30 minutes', NOW() - INTERVAL '30 minutes')
-      ON CONFLICT (id) DO UPDATE SET
-        status = EXCLUDED.status,
-        priority = EXCLUDED.priority,
-        updated_at = EXCLUDED.updated_at,
-        last_activity_at = EXCLUDED.last_activity_at
-    `);
-    await dbClient.execute(sql`
-      INSERT INTO messages (conversation_id, sender_name, body, status, direction, created_at, updated_at)
-      VALUES (1002, 'bob', 'Hi, need help with API', 'sent', 'inbound', NOW() - INTERVAL '30 minutes', NOW() - INTERVAL '30 minutes')
-    `);
+    await dbClient.insert(notes).values({
+      conversationId: FIXTURE.conversations.telegram.id,
+      authorId: FIXTURE.users.superAdmin.id,
+      body: 'Internal note: pending status follow-up.',
+      createdAt: sql`now() - interval '4 minutes'`,
+      updatedAt: sql`now() - interval '4 minutes'`,
+    });
+
+    // Insert minimal audit log entries for timeline coverage
+    await dbClient.insert(auditLogs).values({
+      actorId: FIXTURE.users.superAdmin.id,
+      action: 'conversation_assigned',
+      entityType: 'conversation',
+      entityId: FIXTURE.conversations.telegram.id,
+      metadata: {
+        oldAssignedUserId: null,
+        newAssignedUserId: FIXTURE.users.superAdmin.id,
+      },
+      createdAt: sql`now() - interval '14 minutes'`,
+    });
+
+    await dbClient.insert(auditLogs).values({
+      actorId: FIXTURE.users.superAdmin.id,
+      action: 'conversation_tagged',
+      entityType: 'conversation',
+      entityId: FIXTURE.conversations.telegram.id,
+      metadata: {
+        tagId: vipTag.id,
+      },
+      createdAt: sql`now() - interval '13 minutes'`,
+    });
+
+    await dbClient.insert(auditLogs).values({
+      actorId: FIXTURE.users.superAdmin.id,
+      action: 'conversation_status_change',
+      entityType: 'conversation',
+      entityId: FIXTURE.conversations.telegram.id,
+      metadata: {
+        oldStatus: 'open',
+        newStatus: 'resolved',
+      },
+      createdAt: sql`now() - interval '11 minutes'`,
+    });
+
+    // Second conversation: IRC channel (unassigned)
+    await dbClient
+      .insert(conversations)
+      .values({
+        id: FIXTURE.conversations.irc.id,
+        channel: FIXTURE.conversations.irc.channel,
+        externalThreadId: FIXTURE.conversations.irc.externalThreadId,
+        title: FIXTURE.conversations.irc.title,
+        status: 'open',
+        priority: 'low',
+        assignedUserId: null,
+        createdAt: sql`now() - interval '1 hour'`,
+        updatedAt: sql`now() - interval '30 minutes'`,
+        lastActivityAt: sql`now() - interval '30 minutes'`,
+      })
+      .onConflictDoUpdate({
+        target: conversations.id,
+        set: {
+          status: 'open',
+          priority: 'low',
+          assignedUserId: null,
+          updatedAt: sql`now() - interval '30 minutes'`,
+          lastActivityAt: sql`now() - interval '30 minutes'`,
+        },
+      });
+
+    await dbClient.insert(messages).values({
+      conversationId: FIXTURE.conversations.irc.id,
+      senderName: 'bob',
+      body: 'Hi, need help with API',
+      status: 'sent',
+      direction: 'inbound',
+      createdAt: sql`now() - interval '30 minutes'`,
+      updatedAt: sql`now() - interval '30 minutes'`,
+    });
+
+    // Optional raw payload rows are omitted here; they are not required for frontend smoke tests.
+    void inbound;
+    void latestInbound;
 
     console.log('✅ Test fixtures seeded successfully');
     process.exit(0);
