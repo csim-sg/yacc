@@ -30,6 +30,11 @@ describe('BE-P2-001: Backend Tags CRUD', () => {
   beforeAll(async () => {
     app = await createTestApp();
 
+    // Clean up any tags from previous test runs
+    const { dbClient } = await import('../src/infrastructure/db.client');
+    const { tags } = await import('../src/schemas/tag.schema');
+    await dbClient.delete(tags);
+
     // Create users with different roles
     const admin = await createTestUser(app, {
       email: 'admin-tags@yacc.local',
@@ -67,7 +72,10 @@ describe('BE-P2-001: Backend Tags CRUD', () => {
   });
 
   afterAll(async () => {
-    // Cleanup
+    // Clean up tags created during tests
+    const { dbClient } = await import('../src/infrastructure/db.client');
+    const { tags } = await import('../src/schemas/tag.schema');
+    await dbClient.delete(tags);
   });
 
   // ============================================
