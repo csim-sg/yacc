@@ -345,13 +345,15 @@ messageId: string       // UUID format
 **Completion Target**: Phase 1.5 MVP Ready
 
 ### Phase 2 Scope
-- **BE-012**: Manual retry endpoint (FE-011 unblocked)
-- **FE-011**: Retry button UI
-- **FE-012**: Typing indicators
-- **Admin Pages**: User management, audit logs, integration settings
-- **Tags & Notes**: Create, view, manage
-- **Assignments**: Assign conversations to users
-- **Full E2E Integration**: End-to-end Telegram + IRC
+- **Collaboration**: Tags, notes (with @mentions), assignments
+- **Routing rules**: CRUD + evaluation (priority order; first match wins)
+- **Notifications**: In-app (assignment + mention), persisted + real-time
+- **Bulk actions**: assign/tag/status (max 100; best-effort)
+- **Audit logging**: full coverage + query/filter + CSV export
+
+**Carryover (if not completed in Phase 1.4)**:
+- FE-011 retry button UI (depends on BE retry behavior)
+- FE-012 typing indicators
 
 ### Success Criteria
 - [x] Phase 1 MVP core working (inbox, messaging, real-time)
@@ -385,7 +387,8 @@ messageId: string       // UUID format
 | Complete Next Steps | Action items for today | `.docs/plans/NEXT-STEPS-SESSION-FEB-10.md` |
 | QA Test Plan | 100+ test cases | `packages/frontend/QA-TEST-PLAN.md` |
 | BE Phase 4 Plan | Integration test details | `.docs/plans/BE-206-phase4-integration-plan.md` |
-| Phase 2 Plan | Week 2 execution | `.docs/plans/PHASE-2-EXECUTION-PLAN.md` |
+| Week 2 Plan | Messaging + real-time execution | `.docs/plans/WEEK-2-MESSAGING-REALTIME-EXECUTION-PLAN.md` |
+| Phase 2 Handoff | Collaboration + rules execution handoff | `.docs/plans/PHASE-2-COLLABORATION-RULES-HANDOFF.md` |
 | API Contract | All endpoints + WebSocket | `.docs/02-api-and-data-model.md` |
 | Product Spec | User stories + AC | `.docs/01-product-specification.md` |
 

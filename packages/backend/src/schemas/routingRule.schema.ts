@@ -16,7 +16,7 @@ export const routingRules = pgTable(
     actions: jsonb('actions').notNull(), // JSON array of actions
     createdById: text('created_by_id')
        .notNull()
-       .references(() => users.id, { onDelete: 'set null' }),
+       .references(() => users.id, { onDelete: 'cascade' }),
     lastRunAt: timestamp('last_run_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),

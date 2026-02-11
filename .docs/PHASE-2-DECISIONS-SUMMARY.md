@@ -1,6 +1,8 @@
 # Phase 2 Architecture Decisions Summary
 ## Quick Reference for Implementation Teams
 
+NOTE: This document predates the current phase naming. It covers Week 2 / Phase 1.4 (messaging + real-time), not Phase 2 (collaboration + rules).
+
 **Review Date**: February 9, 2026  
 **Status**: ✅ APPROVED  
 **Document**: Full details in `PHASE-2-TECHNICAL-ARCHITECTURE-REVIEW.md`

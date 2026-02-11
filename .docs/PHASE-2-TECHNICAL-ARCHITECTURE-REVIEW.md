@@ -1,6 +1,8 @@
 # Phase 2 Technical Architecture Review
 ## YACC MVP: Messages, WebSocket, Retry Queue, Attachments
 
+NOTE: This document predates the current phase naming. It covers Week 2 / Phase 1.4 (messaging + real-time), not Phase 2 (collaboration + rules).
+
 **Status**: ✅ APPROVED FOR IMPLEMENTATION  
 **Review Date**: February 9, 2026  
 **Architect**: Enterprise Architect (Claude Code)  

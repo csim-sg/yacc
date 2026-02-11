@@ -5,7 +5,7 @@
 **YACC - Yet Another Chat Client** — A unified inbox application that centralizes social communications from multiple platforms (Telegram, IRC) into one interface with role-based access, real-time updates, message routing rules, notifications, search, and full audit logging.
 
 **Status**: Monorepo + Turborepo setup complete, ready for Phase 1 implementation (auth, core inbox, messaging)  
-**Scope**: Single-tenant MVP with 2 integrations (Telegram, IRC); additional platforms deferred to Phase 2+
+**Scope**: Single-tenant MVP with 2 integrations (Telegram, IRC); additional platforms deferred to post-MVP
 **Deployment**: Frontend to AWS S3 + CloudFront, Backend to Docker on VPS
 
 ---
@@ -33,7 +33,7 @@
 | **Users** | 4 roles: Super Admin (full control), Admin (operations), Manager (oversight), User (handle messages) |
 | **MVP Features** | 15 core features: inbox, auth, messaging, collaboration (tags/notes/assignments), routing rules, notifications (in-app), search (full-text), attachments (5 MB max), real-time (WebSocket), audit logging (1-year retention), presence, integrations |
 | **Initial Platforms** | Telegram groups/channels, IRC networks |
-| **Deferred Platforms** | WhatsApp, WeChat, Meta (FB/Instagram), X/Twitter (Phase 2+) |
+| **Deferred Platforms** | WhatsApp, WeChat, Meta (FB/Instagram), X/Twitter (post-MVP) |
 | **Monorepo Structure** | `packages/backend/` (Node.js API), `packages/frontend/` (React SPA), `packages/common/` (shared types/schemas) |
 | **Architecture** | Backend (Node.js + Express), Frontend (React 18 + TanStack Start), Database (PostgreSQL + Drizzle), Cache (Redis + BullMQ), Storage (AWS S3), Real-time (Socket.io) |
 | **Timeline** | 6 weeks (4 implementation phases) |
@@ -316,35 +316,30 @@ Complete specifications in `.docs/`:
 
 ## 🚦 Implementation Phases (6 Weeks)
 
-### Phase 1: Core (Week 1–2)
+### Phase 1: MVP Core (Week 1-2)
 - Auth (BetterAuth, login/logout/forgot password)
 - Data model (PostgreSQL schema)
-- Basic inbox API (GET /conversations, filters)
-- RBAC middleware
-- Frontend: login page + inbox list
+- Unified inbox API + UI
+- Messaging (send/receive) + delivery status
+- Real-time (WebSocket) + retry queue (BullMQ)
+- Telegram + IRC integrations (MVP)
 
-### Phase 2: Real-Time & Messages (Week 3–4)
-- WebSocket gateway (Socket.io)
-- Send/receive messages
-- Redis + BullMQ retry queue
-- Telegram webhook ingestion
-- IRC socket connection
-- Frontend: conversation view + reply composer
-
-### Phase 3: Collaboration & Rules (Week 5)
+### Phase 2: Collaboration + Rules (Week 3-4)
 - Tags, notes, assignments
-- Routing rules engine
-- Notifications (in-app)
-- Audit logging (all actions)
+- Routing rules engine (first match wins)
+- Notifications (in-app: assignment, @mention)
 - Bulk actions
+- Audit logging + query/export
 
-### Phase 4: Polish & Integrations (Week 6)
+### Phase 3: Search + Files (Week 5)
 - Search (PostgreSQL FTS)
 - Attachments (R2 upload/download)
-- Telegram + IRC end-to-end
-- Integration credential setup UI
+- Raw payload access controls
+
+### Phase 4: Admin + Polish (Week 6)
 - Admin panel (users, audit logs, rules)
-- QA (Playwright E2E, regression suite)
+- Integration setup UI (credential management)
+- QA hardening + bug fixes + regression suite
 
 ---
 
@@ -362,7 +357,7 @@ Complete specifications in `.docs/`:
 | **Rules** | First match wins | Simple, predictable, avoids conflicts |
 | **Retry** | Exponential backoff (1m, 5m, 30m) | Standard, reduces server load |
 | **Bulk Actions** | Best-effort (partial OK) | Pragmatic, better UX than all-or-nothing |
-| **Notifications** | In-app only (email Phase 2) | Simpler MVP, WebSocket instant delivery |
+| **Notifications** | In-app only (email post-MVP) | Simpler MVP, WebSocket instant delivery |
 | **Attachments** | Re-host on R2 | Preserves files, faster via CDN |
 
 ---
@@ -547,7 +542,7 @@ Complete specifications in `.docs/`:
 
 ## ⚠️ Important Notes
 
-1. **Single-Tenant MVP**: Credentials stored in env vars (Telegram token, IRC password). Multi-tenant with vault (Phase 2).
+1. **Single-Tenant MVP**: Credentials stored in env vars (Telegram token, IRC password). Multi-tenant with vault (post-MVP).
 
 2. **Message Retry**: Exponential backoff (1m, 5m, 30m; 3 attempts max) via Redis + BullMQ. Failed messages go to DLQ for ops review.
 
@@ -559,7 +554,7 @@ Complete specifications in `.docs/`:
 
 6. **Audit Logging**: 1-year retention (configurable). Every action logged (assignments, tags, notes, status changes, rule executions, retries, etc.).
 
-7. **Search**: PostgreSQL FTS in MVP (sufficient). Migrate to Elasticsearch if needed (Phase 2+).
+7. **Search**: PostgreSQL FTS in MVP (sufficient). Migrate to Elasticsearch if needed (post-MVP).
 
 8. **Attachment Re-Hosting**: Download inbound files, store on R2 (5 MB max). Preserves files if platform deletes, faster via CDN.
 
@@ -577,6 +572,6 @@ Complete specifications in `.docs/`:
 
 ---
 
-**Last Updated**: January 25, 2026  
-**Status**: Phase 1 Development in Progress (BE-003 Complete, BE-004 Ready)  
+**Last Updated**: 2026-02-11  
+**Status**: Phase 1.4 in progress; MVP extended to include Phase 2 (collaboration + rules)  
 **Questions?** See `.docs/05-quick-reference.md` → "Quick Links" section

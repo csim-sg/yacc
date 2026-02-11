@@ -1,5 +1,7 @@
 # Phase 2 Architecture Review - Document Index
 
+NOTE: This document predates the current phase naming. It covers Week 2 / Phase 1.4 (messaging + real-time), not Phase 2 (collaboration + rules).
+
 **Review Date**: February 9, 2026  
 **Status**: ✅ APPROVED FOR IMPLEMENTATION  
 **Architect**: Claude Code (Enterprise Architect)

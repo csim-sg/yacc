@@ -298,8 +298,8 @@ export const ircConv = { channel: 'irc', externalThreadId: 'irc-456' };
 
 - Performance testing (search <1s, bulk <5s)
 - Load testing (concurrent users)
-- RTL support (deferred to Phase 2)
-- Localization (deferred to Phase 2)
+- RTL support (post-MVP)
+- Localization (post-MVP)
 
 ---
 

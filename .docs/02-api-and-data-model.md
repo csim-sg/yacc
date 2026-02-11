@@ -6,7 +6,8 @@
 
 ## Phase Scope Notes
 - **Phase 1** includes WebSocket gateway + message retry queue delivery + Telegram + IRC integration, including Telegram/IRC messaging endpoints. Phase 1 UI filters must only show Telegram + IRC despite forward-compatible enums.
-- **Phase 2** includes additional platforms (WhatsApp, WeChat, Meta, X).
+- **Phase 2** includes collaboration + rules (tags, notes, assignments, routing rules, notifications, bulk actions, audit query/export).
+- **Post-MVP** includes additional platforms (WhatsApp, WeChat, Meta, X).
 - Channel enums remain inclusive of future platforms (WhatsApp, WeChat, Meta, X, email, slack) for forward compatibility.
 
 ---
@@ -637,7 +638,7 @@ CREATE TABLE dead_letter_queue (
 **Access**: Manager+ roles only
 
 ### Audit Logs
-Conversation-scoped audit events only (entity_type is always `conversation`).
+Audit events are emitted across multiple entity types (e.g., `conversation`, `routing_rule`, `user`, `message`).
 ```sql
 CREATE TABLE audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1320,7 +1321,7 @@ Resets user password using a valid reset token.
 
 ### Integrations
 
-Phase 1 includes Telegram + IRC integration. Additional platforms are deferred to Phase 2 (WhatsApp, WeChat, Meta, X).
+Phase 1 includes Telegram + IRC integration. Additional platforms are deferred to post-MVP (WhatsApp, WeChat, Meta, X).
 
 #### `POST /integrations/telegram/connect`
 **Request:**
@@ -1385,10 +1386,10 @@ Phase 1 includes Telegram + IRC integration. Additional platforms are deferred t
 
 ### Audit Logs
 
-#### `GET /api/conversations/:conversationId/audit-logs`
-Get audit logs for a specific conversation. Audit logs are conversation-scoped only.
+#### `GET /api/audit-logs`
+Query audit logs across all entity types with optional filters.
 
-**Query**: `page`, `limit`
+**Query**: `actor`, `action`, `entity_type`, `entity_id`, `dateFrom`, `dateTo`, `page` (default 1), `limit` (default 50)
 
 **Response:**
 ```json
@@ -1398,13 +1399,50 @@ Get audit logs for a specific conversation. Audit logs are conversation-scoped o
   "pagination": {
     "page": 1,
     "limit": 50,
-    "total": 100,
-    "pages": 2
+    "total": 250,
+    "pages": 5
   }
 }
 ```
 
 **Auth**: Manager+ only
+
+**Notes**:
+- Supports multi-entity queries (conversations, routing rules, users, messages, etc.)
+- Filters can be combined
+- Results sorted by created_at DESC
+- All audit queries are themselves logged (audit log access audit-logged)
+
+---
+
+#### `GET /api/conversations/:conversationId/audit-logs`
+Convenience endpoint: get audit logs for a specific conversation only.
+
+**Query**: `page`, `limit`
+
+**Response**: Same as above, filtered to conversation
+
+**Auth**: Manager+ only
+
+---
+
+#### `POST /api/audit-logs/export`
+Export filtered audit logs to CSV.
+
+**Request**:
+```json
+{
+  "actor": "uuid",
+  "action": "conversation.assigned",
+  "entity_type": "conversation",
+  "dateFrom": "2026-01-01T00:00:00Z",
+  "dateTo": "2026-02-11T23:59:59Z"
+}
+```
+
+**Response**: CSV file (text/csv, Content-Disposition: attachment)
+
+**Auth**: Super Admin + Admin only
 
 ---
 

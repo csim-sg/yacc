@@ -1,5 +1,7 @@
 # Phase 2 Architecture Review: Question-by-Question Decisions
 
+NOTE: This document predates the current phase naming. It covers Week 2 / Phase 1.4 (messaging + real-time), not Phase 2 (collaboration + rules).
+
 **Date**: February 9, 2026  
 **Status**: ✅ APPROVED  
 **Scope**: Addresses all 7 questions from architecture review request
