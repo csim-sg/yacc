@@ -10,6 +10,7 @@
  * - NotesController: Note CRUD endpoints with @mention parsing
  * - AssignmentsController: Conversation assignment endpoints
  * - NotificationsController: Notification CRUD endpoints
+ * - RoutingRulesController: Routing rules CRUD + evaluation endpoints
  * - AuditController: Audit logging endpoints
  * - HealthController: Health check endpoints
  * - QueueController: Message queue status endpoints
@@ -25,6 +26,7 @@ import { MessageController } from './message.controller.js';
 import { NotesController } from './notes.controller.js';
 import { NotificationsController } from './notifications.controller.js';
 import { QueueController } from './queue.controller.js';
+import { RoutingRulesController } from './routing-rules.controller.js';
 import { TagsController } from './tags.controller.js';
 
 export const controllers = [
@@ -38,5 +40,6 @@ export const controllers = [
   NotesController,
   NotificationsController,
   QueueController,
+  RoutingRulesController,
   TagsController,
 ];

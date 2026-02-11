@@ -4,12 +4,12 @@ import { desc, eq, and } from 'drizzle-orm';
 
 /**
  * Log audit action parameters
- * Audit logs are conversation-scoped only
+ * Supports multi-entity audit logging (conversation, rule, user, message, etc.)
  */
 export interface LogAuditParams {
   actorId?: string;
   action: string;
-  entityType: 'conversation';
+  entityType: 'conversation' | 'rule' | 'user' | 'message' | 'notification' | 'tag';
   entityId: string;
   metadata?: Record<string, unknown>;
   ipAddress?: string;
@@ -25,40 +25,41 @@ export interface GetConversationAuditLogsParams {
 }
 
 export class AuditService {
-  /**
-   * Log an audit event for a conversation
-   * Only conversation entity types are allowed per conversation-only scope
-   */
-  async logAction(params: LogAuditParams) {
-    const { actorId, action, entityType, entityId, metadata, ipAddress } = params;
+   /**
+    * Log an audit event for any entity type (conversation, rule, user, etc.)
+    * Supports multi-entity audit logging
+    */
+   async logAction(params: LogAuditParams) {
+     const { actorId, action, entityType, entityId, metadata, ipAddress } = params;
 
-    // Enforce conversation-only scope
-    if (entityType !== 'conversation') {
-      console.error(
-        '❌ Audit log error: entityType must be "conversation", got:',
-        entityType,
-      );
-      return { success: false, error: 'Invalid entityType: only conversation allowed' };
-    }
+     // Validate entityType
+     const validEntityTypes = ['conversation', 'rule', 'user', 'message', 'notification', 'tag'];
+     if (!validEntityTypes.includes(entityType)) {
+       console.error(
+         '❌ Audit log error: invalid entityType:',
+         entityType,
+       );
+       return { success: false, error: `Invalid entityType: ${entityType}` };
+     }
 
-    try {
-      await dbClient.insert(auditLogs).values({
-        actorId: actorId || null,
-        action,
-        entityType: 'conversation',
-        entityId,
-        metadata: metadata || null,
-        ipAddress: ipAddress || null,
-      });
+     try {
+       await dbClient.insert(auditLogs).values({
+         actorId: actorId || null,
+         action,
+         entityType,
+         entityId,
+         metadata: metadata || null,
+         ipAddress: ipAddress || null,
+       });
 
-      return { success: true };
-    } catch (error: unknown) {
-      console.error('❌ Failed to log audit action:', error);
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      // Don't throw - audit failures shouldn't break application
-      return { success: false, error: message };
-    }
-  }
+       return { success: true };
+     } catch (error: unknown) {
+       console.error('❌ Failed to log audit action:', error);
+       const message = error instanceof Error ? error.message : 'Unknown error';
+       // Don't throw - audit failures shouldn't break application
+       return { success: false, error: message };
+     }
+   }
 
   /**
    * Get audit logs for a specific conversation
