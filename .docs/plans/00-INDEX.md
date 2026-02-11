@@ -125,7 +125,7 @@ Governance references:
 
 ## 🚀 Phase 2: Collaboration & Rules (Feb 11 onwards)
 
-**Status**: ✅ **EA VALIDATION COMPLETE (GOV-021)** → **IMPLEMENTATION STARTED (BE-P2-001 in progress)**
+**Status**: ⏸️ **TICKET #1 IN ARCHITECTURE REVIEW (PR #246)** — Critical fixes requested (GOV-022)
 
 **Governance Gate**: Phase 2 approved under conditions documented in GOV-021:
 - RBAC matrix finalized (assignment/bulk = manager+admin+super_admin, NOT user)
@@ -134,21 +134,33 @@ Governance references:
 - Routing rules override policy documented
 - Sequential ticket order validated
 
-**Developer Handoff**:
-1. Read **GOV-021-phase2-architecture-decisions.md** (mandatory, covers RBAC, events, audit, data model)
-2. Start with ticket #1: Backend tags (CRUD + conversation add/remove) + audit ✅ **IN PROGRESS**
-3. Follow sequential order (8 tickets total, small PRs)
-4. Target completion: Feb 23 (Week 3-4, per original timeline)
+**Ticket #1 Status** (BE-P2-001: Backend Tags CRUD):
+- **PR #246 created** (feature/BE-P2-001-tags)
+- **Status**: ⏸️ ARCHITECTURE REVIEW — CHANGES REQUESTED
+- **Blocking Issues** (per GOV-022):
+  1. Missing resource-level authorization (conversation access check)
+  2. WebSocket event bypasses backlog helper
+  3. Audit logging not enforced (best-effort, not transactional)
+  4. Tests failing (pnpm test red)
+- **Reference**: `.docs/governance/GOV-022-pr246-architecture-review-findings.md`
+- **Next Step**: Developer fixes all blocking + non-blocking issues, pushes to branch, re-requests review
+
+**Remediation Pattern** (all Phase 2 tickets):
+- Resource-level authorization REQUIRED on all conversation-scoped operations
+- WebSocket events MUST use backlog helper (not raw gateway)
+- Audit logging MUST be transactional (enforce on all actions)
+- Tests MUST verify side effects (WebSocket events, audit log persistence)
+- All 4 roles MUST be tested in RBAC scenarios
 
 **Tickets (In Order)**:
-1. ⏳ **BE-P2-001: Backend tags** (CRUD + conversation add/remove + audit + WebSocket) - Feature branch: `feature/BE-P2-001-tags`
-2. Backend notes + mention parsing + notifications
-3. Backend assignment + notification
-4. Backend bulk actions
-5. Backend routing rules CRUD + executions listing
-6. Backend routing rules evaluation on inbound messages
-7. Frontend right panel (tags/notes/assign)
-8. Frontend rules builder UI
+1. ⏸️ **BE-P2-001: Backend tags** (IN REVIEW — awaiting fixes) - PR #246
+2. ⏳ Backend notes + mention parsing + notifications (BLOCKED on #1 approval)
+3. ⏳ Backend assignment + notification (BLOCKED on #1 approval)
+4. ⏳ Backend bulk actions (BLOCKED on #1 approval)
+5. ⏳ Backend routing rules CRUD + executions listing (BLOCKED on #1 approval)
+6. ⏳ Backend routing rules evaluation on inbound messages (BLOCKED on #1 approval)
+7. ⏳ Frontend right panel (tags/notes/assign) (BLOCKED on BE tickets)
+8. ⏳ Frontend rules builder UI (BLOCKED on BE tickets)
 
 ---
 
