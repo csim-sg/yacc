@@ -1,10 +1,8 @@
 # Active Execution Plans Index
 
-**Last Updated**: 2026-02-11  
-**Status**: ✅ Phase 1 COMPLETE | 📋 Phase 2 DEV START (Feb 12 kickoff)
-**Current Focus**: Phase 2 handoff complete, all blockers resolved, ready for dev  
-**MVP Scope**: Phase 1 + Phase 2 (collaboration + rules) - GOV-021 approved
-**Next**: Execute Phase 2 sequential dev plan (tags → notes → assign → rules → bulk → audit)
+**Last Updated**: 2026-02-12 (EOD)  
+**Status**: ✅ Phase 1.4 COMPLETE | ⏳ Phase 2 Backend 60% DONE (tags, notes, assign, rules) | 🎯 MVP Feb 20  
+**Next**: Phase 2 Days 7-8 - Backend bulk/audit completion (Feb 13) + Frontend UI (Feb 13-14) + QA (Feb 19)
 
 ---
 
@@ -34,30 +32,31 @@ Governance references:
 ## ✅ Current Status
 
 ### Phase 1.4: MVP Core-First Execution (APPROVED)
-**Status**: ⏳ **IN PROGRESS - Week 2 Frontend (Feb 9-10)**  
-**Approval Date**: 2026-02-06  
-**Backend Completion**: 2026-02-08 (Week 1 complete)
-**Current Milestone**: Frontend real-time listeners (FE-013/014/015) architect review in progress
+**Status**: ✅ **COMPLETE**  
+**Completion Date**: 2026-02-12
+**Test Results**: 253+ tests passing (100% pass rate)
+**Coverage**: ≥85% across all new code
+**Code Quality**: Zero `any` types, flat structure, 1 def per file
 
-**MVP Scope**:
-- Backend: BE-007 (Inbox API), BE-008 (Conversation Detail), BE-009/010 (Messages), BE-017-019 (WebSocket Events)
-- Frontend: FE-008 (Inbox List), FE-009 (Conversation Detail), FE-010 (Reply Composer), FE-013-015 (WebSocket Listeners)
-- QA: QA-001-003 (Integration + E2E + Real-Time tests)
+**Implemented**:
+- ✅ Backend: BE-007 (Inbox API), BE-008 (Conversation Detail), BE-009/010 (Messages), BE-017-019 (WebSocket Events)
+- ✅ Frontend: FE-008 (Inbox List), FE-009 (Conversation Detail), FE-010 (Reply Composer), FE-013-015 (WebSocket Listeners)
+- ✅ QA: Integration + E2E + Real-Time tests written and passing
 
-**Target Success Criteria (when Phase 1.4 completes)**:
-- Users can view unified inbox with filters
-- Users can read conversation messages
-- Users can send replies
-- Real-time updates work (message received/sent/failed)
-- Full RBAC enforcement (4 roles)
-- ≥85% test coverage
+**Deliverables**:
+- ✅ Users can view unified inbox with filters (5+ filter options)
+- ✅ Users can read conversation messages with full history
+- ✅ Users can send replies with delivery status tracking
+- ✅ Real-time updates work (message received/sent/failed + typing + presence)
+- ✅ Full RBAC enforcement (4 roles: Super Admin, Admin, Manager, User)
+- ✅ ≥85% test coverage
 
-**GitHub Issues Created**:
-- BE-007 (#183), BE-008 (#184), BE-009/010 (#185)
-- BE-017 (#186), BE-018 (#187), BE-019 (#188)
-- FE-008 (#189), FE-009 (#190), FE-010 (#191)
-- FE-013 (#192), FE-014 (#193), FE-015 (#194)
-- QA-001 (#195), QA-002 (#196), QA-003 (#197)
+**Merged PRs**:
+- #227 (Week 1 complete)
+- #243 (FE-008/009/010)
+- #244 (FE-013/014/015)
+- #242 (BE-014 retry queue)
+- #241 (BE-011 message status)
 
 ### BE-206: Socket-Controllers Migration (Phases 1-3)
 **Status**: ✅ **COMPLETE**  
@@ -76,23 +75,33 @@ Governance references:
 - Task 3: Performance Verification (2 hours) - SLO compliance
 - Task 4: Regression Testing (1 hour) - Zero breakage
 
-### FE-013/014/015: WebSocket Real-Time Message Listeners
-**Status**: ⏳ **IN ARCHITECT REVIEW (Feb 10 - test enhancements)**  
-**PR**: #244 (feature/FE-013-014-015-websocket-listeners)  
-**Implementation Complete**:
-- ✅ FE-013: Message.received listener - inbound messages appear without refresh (deduped, cached)
-- ✅ FE-014: Message.sent listener - real-time delivery status updates
-- ✅ FE-015: Message.failed listener - retry status and timing
-- ✅ Conversation.updated listener - status/priority/assignment changes in real-time
-**Type Safety**: 100% (zero `any` types, backend-frontend contract fully aligned)
-**Tests**: 39 passing (message 10 tests + conversation + typing + presence + notification handlers)
-**AC Verification**:
-- Type-safe event handlers accept correct WebSocket event shapes
-- Handlers execute without errors
-- Cache mutation and invalidation logic implemented (see source)
-- FE-013 accepts `message.received` with platform/senderId/attachments
-- FE-014 accepts `message.sent` with delivery status
-- FE-015 accepts `message.failed` with retry timing
+### Phase 2: Collaboration & Rules (IN PROGRESS)
+**Status**: ⏳ **BACKEND 60% DONE (Tags, Notes, Assign, Rules) | FRONTEND & QA STARTING FEB 13**  
+**Scope**: Extended MVP to include Phase 2 (GOV-021 approved)
+**Timeline**: Feb 12-19 (8 days)
+**Target Completion**: Feb 20, 2026
+
+**Days 1-6 Complete (BACKEND)**:
+- ✅ BE-TAGS-01: Tags CRUD (6 endpoints) - 61 tests passing
+- ✅ BE-NOTES-01: Notes + @mention parsing (2 endpoints) - 20 tests passing  
+- ✅ BE-ASSIGN-01: Assignments CRUD (1 endpoint) - 15 tests passing
+- ✅ BE-NOTIFICATIONS: Notification CRUD (4 endpoints) - 22 tests passing
+- ✅ BE-ROUTING-RULES-01: Rules CRUD + Engine (5 endpoints) - 20 tests passing
+- **Total: 20 endpoints, 133+ tests (100% pass rate), ≥85% coverage**
+
+**Days 7-8 Next (BACKEND)**:
+- ⏳ BE-BULK-ACTIONS-01: Bulk assign/tag/status (1 endpoint)
+- ⏳ BE-AUDIT-QUERY: Audit log query + export (3 endpoints)
+- **Target: 25+ tests, ≥85% coverage, ready for handoff**
+
+**Days 7-8 Parallel (FRONTEND)**:
+- ⏳ FE-TAGS-NOTES-UI: Right panel components + E2E tests
+- ⏳ FE-ASSIGN-NOTIFY-UI: Assignment dropdown + Notification center
+- ⏳ FE-RULES-AUDIT-BULK: Admin page + audit viewer + bulk actions UX
+- **Target: 40+ E2E tests**
+
+**Day 8 (QA)**:
+- ⏳ Final verification, RBAC testing, regression suite, sign-off
 
 ### BE-003: BetterAuth Authentication
 **Status**: ✅ **COMPLETE**  
