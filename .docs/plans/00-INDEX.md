@@ -1,8 +1,8 @@
 # Active Execution Plans Index
 
-**Last Updated**: 2026-02-10  
-**Status**: ✅ Week 1 COMPLETE, ✅ BE-009/010 COMPLETE (PR #240), ✅ BE-011 COMPLETE (PR #241), ✅ BE-014 Phases 1-3 COMPLETE, ✅ FE-008/009/010 COMPLETE (PR #243), ⏳ FE-013/014/015 IN REVIEW (PR #244)
-**Current Focus**: FE-013/014/015 WebSocket listeners architect review (Feb 10), BE-014 Phase 4 ready  
+**Last Updated**: 2026-02-11  
+**Status**: ✅ Week 1 COMPLETE, ✅ Phase 1.4 Week 2 COMPLETE (merged PRs #241, #242, #243, #244, #245), ✅ Phase 2 EA validation done (GOV-021), Phase 2 implementation ready to kickoff
+**Current Focus**: Phase 2 (Collaboration & Rules) developer kickoff  
 
 ---
 
@@ -23,6 +23,7 @@ Governance references:
 - PR #227 governance trail: `.docs/governance/GOV-015-pr227-week1-docs-entrypoint-tests.md`
 - BE-206 session summary: `.docs/governance/GOV-016-be-206-phase4-session-summary.md`
 - Plans cleanup decision: `.docs/governance/GOV-017-plans-directory-cleanup-phase2.md`
+- **Phase 2 EA validation & conditions: `.docs/governance/GOV-021-phase2-architecture-decisions.md`** ← Developer MUST read before starting Phase 2 tickets
 
 
 ---
@@ -30,10 +31,11 @@ Governance references:
 ## ✅ Current Status
 
 ### Phase 1.4: MVP Core-First Execution (APPROVED)
-**Status**: ⏳ **IN PROGRESS - Week 2 Frontend (Feb 9-10)**  
+**Status**: ✅ **COMPLETE - Week 2 (Feb 9-11)**  
 **Approval Date**: 2026-02-06  
-**Backend Completion**: 2026-02-08 (Week 1 complete)
-**Current Milestone**: Frontend real-time listeners (FE-013/014/015) architect review in progress
+**Backend Completion**: 2026-02-09 (BE-009/010/011/014 merged)
+**Frontend Completion**: 2026-02-10 (FE-008/009/010/012/013/014/015 merged)
+**GitHub Issues & Project Sync**: 2026-02-11 (13 issues closed, Project board updated)
 
 **MVP Scope**:
 - Backend: BE-007 (Inbox API), BE-008 (Conversation Detail), BE-009/010 (Messages), BE-017-019 (WebSocket Events)
@@ -121,29 +123,32 @@ Governance references:
 
 ---
 
-## 🚀 Week 2 Execution (Feb 9-16)
+## 🚀 Phase 2: Collaboration & Rules (Feb 11 onwards)
 
-**Status**: READY FOR KICKOFF (Feb 9, 9am)
+**Status**: ✅ **EA VALIDATION COMPLETE (GOV-021)** → **READY FOR DEVELOPER KICKOFF**
 
-**Backend** (Priority Order):
-- [x] BE-009/010: Message Retrieval & Send - COMPLETE (PR #240 merged)
-- [x] BE-011: Message Status Tracking - COMPLETE (PR #241 in review)
-- [x] BE-014: Exponential Backoff Retry - PHASES 1-3 COMPLETE (Phase 4 ready)
-- [ ] BE-014 Phase 4: Service integration & worker registration - START Feb 11
-- [ ] BE-012: Message Retry Endpoint - START Feb 12 (unblocked by BE-014)
-- [ ] BE-017/018/019: WebSocket Events - START Feb 13
+**Governance Gate**: Phase 2 approved under conditions documented in GOV-021:
+- RBAC matrix finalized (assignment/bulk = manager+admin+super_admin, NOT user)
+- Event semantics locked (`conversation.updated` includes tag changes; `notification.received` for assignments+mentions)
+- Mention resolution: `@username` → email local-part match
+- Routing rules override policy documented
+- Sequential ticket order validated
 
-**Frontend** (Parallel):
-- [x] FE-008/009 API Integration - COMPLETE (PR #243 merged)
-- [x] FE-010: Reply Composer - COMPLETE (PR #243 merged)
-- [x] FE-013/014/015: WebSocket Listeners - IMPLEMENTATION COMPLETE (PR #244 in architect review)
+**Developer Handoff**:
+1. Read **GOV-021-phase2-architecture-decisions.md** (mandatory, covers RBAC, events, audit, data model)
+2. Start with ticket #1: Backend tags (CRUD + conversation add/remove) + audit
+3. Follow sequential order (8 tickets total, small PRs)
+4. Target completion: Feb 23 (Week 3-4, per original timeline)
 
-**QA** (Parallel):
-- [ ] Integration tests (BE) - START Feb 9
-- [ ] E2E tests (FE) - START Feb 9
-- [ ] Real-time test scenarios - START Feb 13
-
-**Target MVP Completion**: Feb 16, 2026 (EOD)
+**Tickets (In Order)**:
+1. Backend tags
+2. Backend notes + mention parsing + notifications
+3. Backend assignment + notification
+4. Backend bulk actions
+5. Backend routing rules CRUD + executions listing
+6. Backend routing rules evaluation on inbound messages
+7. Frontend right panel (tags/notes/assign)
+8. Frontend rules builder UI
 
 ---
 

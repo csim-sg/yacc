@@ -1,26 +1,28 @@
 # 06. Issues & User stories
 
-**Last Updated**: February 8, 2026 (14:30 UTC)  
-**Status**: ✅ Phase 1.4 COMPLETE (Week 1 Feb 3–8, PR #227 merged), Phase 2 Ready (Kickoff Feb 9 9am)  
-**Total P0 Issues**: 22  
-**Current focus (per 00-INDEX)**: Week 2 Phase 2 Execution (BE-009/010/011/012/014 messaging + BE-017/018/019 WebSocket events + FE-008/009/010/013/014/015)  
-**Governance**: ADR-003, GOV-006, GOV-007, GOV-012, ADR-014 (approved v1.5), GOV-015 v1.7 (approved)
+**Last Updated**: February 11, 2026  
+**Status**: ✅ Week 1 COMPLETE; ⏳ Phase 1.4 IN PROGRESS (Week 2); Phase 2 (Collaboration & Rules) PLANNED  
+**Current focus (per 00-INDEX)**: Week 2 delivery (messaging send/retry + WebSocket events + frontend real-time listeners)  
+**Governance**: ADR-003, GOV-006, GOV-007, GOV-012, ADR-014, GOV-015, GOV-016, GOV-017
 
 ---
 
-## 1. Phase 1 Scope (Authoritative)
+## 1. Phase Scope (Authoritative)
 
-**In scope (Phase 1):**
+**Phase 1 (Weeks 1-2) In scope:**
 - Telegram + IRC integrations (inbound/outbound messaging)
-- Unified inbox with filters, search, and status lifecycle (open/pending/resolved)
+- Unified inbox with filters and status lifecycle (open/pending/resolved)
 - Authentication & RBAC (Super Admin/Admin/Manager/User)
 - Messaging lifecycle (pending → sent/failed), retry queue (1m/5m/30m, 3 attempts), DLQ
-- Real-time updates via WebSocket events
-- Collaboration: tags, notes, assignments
-- Audit logging (action log retention per Phase 1 requirements)
-- Storage: attachments + raw payloads via Cloudflare R2
+- Real-time updates via WebSocket events (message.received/sent/failed, conversation.updated)
 
-**Out of scope (Phase 2+):**
+**Phase 2 (Weeks 3-4) In scope:**
+- Collaboration: tags, notes, assignments
+- Notifications (in-app): assignment + @mentions (persisted + WebSocket push)
+- Routing rules: CRUD + evaluation (priority order, first-match-wins) + execution logs
+- Bulk actions: assign/tag/status (max 100 per request, best-effort)
+
+**Out of scope (Phase 2+ / future):**
 - Platforms: WhatsApp, WeChat, Meta (FB/Instagram), X/Twitter
 - Email notifications
 - Multi-tenant support / credential vault
@@ -28,19 +30,61 @@
 
 **Enum policy:** Channel enums include future channels (email, slack, whatsapp, wechat, meta, x) for forward compatibility. Phase 1 UI filters must only show Telegram + IRC.
 
+## 1.1 Phase 2 Developer Ask (Collaboration & Rules)
+
+Build Phase 2 features end-to-end (backend + frontend) following `.docs/02-api-and-data-model.md` and the Phase 2 scope in `.docs/03-implementation-guide.md`.
+
+**Pre-conditions**
+- Phase 1.4 is stable enough to demo: login, inbox list/detail, send reply, WebSocket updates.
+
+**Backend deliverables (API + side effects)**
+- Tags: `GET /tags`, `POST /tags`, `POST /conversations/:id/tags`, `DELETE /conversations/:id/tags/:tagId` (audit + `conversation.updated`)
+- Notes: `GET /conversations/:id/notes`, `POST /conversations/:id/notes` with `@username` mention parsing (creates notifications)
+- Assignment: `POST /conversations/:id/assign` (creates notification to assignee; audit + `conversation.updated`)
+- Notifications: `GET /notifications`, `PATCH /notifications/:id`, `DELETE /notifications/:id`, `POST /notifications/mark-all-read` and WebSocket `notification.received`
+- Bulk actions: `POST /conversations/bulk` (max 100 IDs, best-effort response, emits `conversation.updated` for successful changes)
+- Routing rules: `GET /routing-rules`, `POST /routing-rules`, `PATCH /routing-rules/:id`, `DELETE /routing-rules/:id`, `GET /routing-rules/:id/executions`
+- Rule evaluation: run on inbound message ingestion; apply actions (assign/tag/priority); record `routing_rule_executions`; audit `rule.executed`; emit `conversation.updated`
+
+**Frontend deliverables**
+- Conversation right panel: tags (add/remove/create), notes (list/create with mentions), assignment (change assignee)
+- Rules builder UI: routing rule CRUD (name/status/priority/conditions/actions)
+- Notifications: handle `notification.received` and reflect unread state
+
+**RBAC expectations (unless existing enforcement is already stricter)**
+- Tags/notes/assign/bulk: `admin`, `manager`, `user`, `super_admin`
+- Routing rules CRUD: `super_admin` only
+- Notifications: users can only access their own notifications
+
+**Recommendation (sequential tickets; keep PRs small and auditable)**
+1) Backend tags (incl. conversation tag add/remove) + audit + `conversation.updated`
+2) Backend notes + mention parsing + notifications + `notification.received`
+3) Backend assignment + notification + audit + `conversation.updated`
+4) Backend bulk actions (best-effort) + audit + `conversation.updated`
+5) Backend routing rules CRUD + executions listing
+6) Backend routing rules evaluation on inbound messages
+7) Frontend right panel (tags/notes/assign) + thin E2E happy path
+8) Frontend rules builder UI + thin E2E create/disable rule
+
+**Definition of done (Phase 2)**
+- Endpoints match `.docs/02-api-and-data-model.md` request/response shapes
+- WebSocket emits `conversation.updated` and `notification.received` where applicable
+- Audit logs created for tags/notes/assign/bulk/rules actions
+- New logic has >= 85% unit/integration coverage; at least one Playwright flow proving tags/notes/assign updates from UI
+
 ---
 
 ## 2. Statement of Work (Phase 1)
 
 ### Scope & Objectives
-Phase 1 delivers Telegram + IRC integrations, core inbox operations, authentication, routing, real-time updates, and audit logging. The focus is to ship a stable MVP with essential workflows for ingesting inbound messages, replying from a unified UI, and managing conversations with role-based controls.
+Phase 1 delivers Telegram + IRC integrations, core inbox operations, authentication, messaging send/retry, real-time updates, and the audit logging foundation. The focus is to ship a stable MVP with essential workflows for ingesting inbound messages, replying from a unified UI, and managing conversations with role-based controls.
 
 ### Deliverables
 1. **Backend API & Data Layer**
-   - REST endpoints for auth, conversations, messages, tags, notes, assignments, audit logs
+   - REST endpoints for auth, conversations, messages, and WebSocket gateway events
    - PostgreSQL schema and migrations (channel enums include future channels for forward compatibility)
    - Redis + BullMQ retry queue with 1m/5m/30m backoff
-   - Cloudflare R2 integration for attachments and raw payload storage
+   - Cloudflare R2 scaffolding (client/config) to support Phase 3 attachments + raw payload storage
 2. **Integrations**
    - Telegram connector (inbound + outbound)
    - IRC connector (inbound + outbound)
@@ -57,23 +101,21 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 
 ### Acceptance Criteria
 - **Telegram + IRC are live in Phase 1** (inbound + outbound)
-- **Inbox operations are functional** (filters, search, status lifecycle)
+- **Inbox operations are functional** (filters, status lifecycle)
 - **Message lifecycle is correct** (pending → sent/failed, retry queue, DLQ)
 - **Auth and RBAC operate correctly**
 - **Real-time updates** via WebSocket events
 - **Audit logging** of key actions
-- **Storage constraints**: attachments <= 5 MB, raw payload retention 7 days
 - **Governance alignment** with ADR-003/GOV-006/GOV-007
 
 ### Validation Checklist
 - Authentication & RBAC (Super Admin/Admin/Manager/User)
-- Inbox operations (filters, search, status lifecycle)
+- Inbox operations (filters, status lifecycle)
 - Messaging (send/receive, status tracking, retry queue, DLQ)
 - Telegram + IRC integrations (inbound/outbound)
 - Real-time updates (WebSocket events)
-- Collaboration (tags, notes, assignments)
 - Audit logging (action log retained per Phase 1 requirements)
-- Storage (attachments + raw payloads via Cloudflare R2)
+
 
 ### Timeline (High-Level)
 - **Duration:** 2 weeks total
@@ -109,14 +151,14 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | BE-006 | Create user management endpoints (CRUD for users, roles) | Not Started | P1 | Backend | BE-005 | GET/POST/PUT/DELETE /users, /roles working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_5rk | 17 |
 | BE-007 | Implement inbox API (GET /conversations with filters: channel, assignee, tag, status, priority) | **Done** (PR #227 merged) | P0 | Backend | BE-002, BE-005 | Filtering and pagination working ✅ | PVTI_lAHOAB4wV84BNGcwzgj_5sA | 14 |
 | BE-008 | Implement conversation detail endpoint (GET /conversations/:id) | **Done** (PR #227 merged) | P0 | Backend | BE-007 | Returns conversation with messages and metadata ✅ | PVTI_lAHOAB4wV84BNGcwzgj_5rM | 15 |
-| BE-009 | Implement message retrieval endpoint (GET /conversations/:id/messages) | Not Started | P0 | Backend | BE-002, BE-008 | Returns paginated messages with direction (inbound/outbound) | PVTI_lAHOAB4wV84BNGcwzgj_5r4 | 10 |
-| BE-010 | Implement send message endpoint (POST /conversations/:id/messages) | Not Started | P0 | Backend | BE-008 | Queues message for delivery, returns pending status | PVTI_lAHOAB4wV84BNGcwzgj_5ro | 11 |
-| BE-011 | Implement message status tracking (pending → sent/failed) | Not Started | P0 | Backend | BE-010 | Status updates working, database reflects delivery state | PVTI_lAHOAB4wV84BNGcwzgj_54c | 30 |
+| BE-009 | Implement message retrieval endpoint (GET /conversations/:id/messages) | **Done** (PR #240 merged) | P0 | Backend | BE-002, BE-008 | Returns paginated messages with direction (inbound/outbound) | PVTI_lAHOAB4wV84BNGcwzgj_5r4 | 10 |
+| BE-010 | Implement send message endpoint (POST /conversations/:id/messages) | **Done** (PR #240 merged) | P0 | Backend | BE-008 | Queues message for delivery, returns pending status | PVTI_lAHOAB4wV84BNGcwzgj_5ro | 11 |
+| BE-011 | Implement message status tracking (pending → sent/failed) | **Done** (PR #241) | P0 | Backend | BE-010 | Status updates working, database reflects delivery state | PVTI_lAHOAB4wV84BNGcwzgj_54c | 30 |
 | BE-012 | Implement message retry endpoint (POST /conversations/:id/messages/:msgId/retry) | Not Started | P1 | Backend | BE-011 | Requeues failed message, updates status to pending | PVTI_lAHOAB4wV84BNGcwzgj_54Q | 22 |
 | BE-013 | Set up Redis + BullMQ for message retry queue | **Done** | P0 | Backend | - | Redis connection working, BullMQ jobs processing | PVTI_lAHOAB4wV84BNGcwzgj_55I | 23 |
-| BE-014 | Implement exponential backoff for retries (1m, 5m, 30m; 3 attempts max) | Not Started | P0 | Backend | BE-013 | Failed messages retried with correct backoff schedule |  |  |
-| BE-014A | Fix retry queue removal and backoff schedule alignment | Not Started | P0 | Backend | BE-013 | removeFromQueue uses supported job lookup; backoff is 1m/5m/30m |  |  |
-| BE-015 | Implement dead-letter queue (DLQ) for failed messages | Not Started | P1 | Backend | BE-014 | Messages with 3 failed attempts moved to DLQ |  |  |
+| BE-014 | Implement exponential backoff for retries (1m, 5m, 30m; 3 attempts max) | **Done** (PR #242 merged) | P0 | Backend | BE-013 | Failed messages retried with correct backoff schedule |  |  |
+| BE-014A | Fix retry queue removal and backoff schedule alignment | **Done** (PR #242 merged) | P0 | Backend | BE-013 | removeFromQueue uses supported job lookup; backoff is 1m/5m/30m |  |  |
+| BE-015 | Implement dead-letter queue (DLQ) for failed messages | **Done** (PR #242 merged) | P1 | Backend | BE-014 | Messages with 3 failed attempts moved to DLQ |  |  |
 | BE-016 | Set up Socket.io WebSocket server | Ready | P0 | Backend | - | WebSocket server running on configured port |  |  |
 | BE-017 | Implement message.received event (push on inbound message) | Not Started | P0 | Backend | BE-016 | Event emitted when inbound message received |  |  |
 | BE-018 | Implement message.sent event (push on successful delivery) | Not Started | P0 | Backend | BE-016 | Event emitted when message status → sent | PVTI_lAHOAB4wV84BNGcwzgj_54g | 31 |
@@ -147,14 +189,14 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | FE-005 | Implement login page (email/password form) | **Done** | P0 | Frontend | FE-002, BE-003 | Login functional, redirects on success, error handling working | PVTI_lAHOAB4wV84BNGcwzgj_6EI | 42 |
 | FE-006 | Implement forgot password page (email input form) | Not Started | P1 | Frontend | FE-002, BE-004 | Request reset working, confirmation message shown |  |  |
 | FE-007 | Implement password reset page (new password form) | Not Started | P1 | Frontend | FE-002, BE-004 | Password reset functional, login redirect on success |  |  |
-| FE-008 | Implement inbox list page (conversation cards with filters) | Not Started | P0 | Frontend | FE-004, BE-007 | Filters: channel, assignee, tag, status, priority, search, date range |  |  |
-| FE-009 | Implement conversation detail page (messages timeline, reply composer) | Not Started | P0 | Frontend | FE-004, BE-008 | Shows conversation with messages, reply form functional | PVTI_lAHOAB4wV84BNGcwzgj_6D0 | 41 |
-| FE-010 | Implement message reply composer (text input, attachment upload) | Not Started | P0 | Frontend | FE-009, BE-010 | Send message working, attachment upload to R2 |  |  |
+| FE-008 | Implement inbox list page (conversation cards with filters) | **Done** (PR #243 merged) | P0 | Frontend | FE-004, BE-007 | Filters: channel, assignee, tag, status, priority, search, date range |  |  |
+| FE-009 | Implement conversation detail page (messages timeline, reply composer) | **Done** (PR #243 merged) | P0 | Frontend | FE-004, BE-008 | Shows conversation with messages, reply form functional | PVTI_lAHOAB4wV84BNGcwzgj_6D0 | 41 |
+| FE-010 | Implement message reply composer (text input, attachment upload) | **Done** (PR #243 merged) | P0 | Frontend | FE-009, BE-010 | Send message working, attachment upload to R2 |  |  |
 | FE-011 | Implement message status display (pending/sent/failed with retry button) | Not Started | P0 | Frontend | FE-009, BE-011 | Status icons visible, retry button for failed messages |  |  |
-| FE-012 | Set up Socket.io client for WebSocket | Not Started | P0 | Frontend | - | Socket.io client connected to server |  |  |
-| FE-013 | Implement message.received event listener (real-time inbox update) | Not Started | P0 | Frontend | FE-012, BE-017 | New inbound messages appear in inbox without refresh |  |  |
-| FE-014 | Implement message.sent event listener (update message status in UI) | Not Started | P0 | Frontend | FE-012, BE-018 | Message status changes to sent in real-time |  |  |
-| FE-015 | Implement message.failed event listener (show failed status) | Not Started | P0 | Frontend | FE-012, BE-019 | Failed messages updated in UI, retry button appears |  |  |
+| FE-012 | Set up Socket.io client for WebSocket | **Done** (PR #244 merged) | P0 | Frontend | - | Socket.io client connected to server |  |  |
+| FE-013 | Implement message.received event listener (real-time inbox update) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-017 | New inbound messages appear in inbox without refresh |  |  |
+| FE-014 | Implement message.sent event listener (update message status in UI) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-018 | Message status changes to sent in real-time |  |  |
+| FE-015 | Implement message.failed event listener (show failed status) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-019 | Failed messages updated in UI, retry button appears |  |  |
 | FE-012A | Implement WebSocket client with one-definition-per-file structure | Deferred | P0 | Frontend | FE-012, GOV-005 | Follow GOV-005 guidance for constants, types, and service file structure. Blocked: WebSocket client not implemented yet |  |  |
 | FE-012B | Implement WebSocket client observability (metrics, traces, SLO) | Deferred | P0 | Frontend | FE-012, GOV-005 | Emit all required metrics per GOV-005; define SLOs in governance log. Blocked: WebSocket client not implemented yet |  |  |
 | FE-016 | Implement admin panel - IRC configuration (server, port, username, password inputs) | Not Started | P0 | Frontend | FE-002, BE-026 | Form to save IRC credentials, validation working |  |  |
@@ -318,10 +360,10 @@ This document provides the complete execution plan for all 22 P0 Backend issues 
 | **BE-013** | Set up Redis + BullMQ for message retry queue | **Done** | None | 2 |
 | **BE-007** | Implement inbox API | Ready | BE-002, BE-005 | 2 |
 | **BE-008** | Implement conversation detail endpoint | Ready | BE-007 | 2 |
-| **BE-009** | Implement message retrieval endpoint | Ready | BE-002, BE-003, BE-008 | 2 |
-| **BE-010** | Implement send message endpoint | Ready | BE-008, BE-013, BE-020 | 2 |
-| **BE-014** | Implement exponential backoff for retries | Ready | BE-013 | 3 |
-| **BE-011** | Implement message status tracking | Ready | BE-010 | 3 |
+| **BE-009** | Implement message retrieval endpoint | **Done** (PR #240 merged) | BE-002, BE-003, BE-008 | 2 |
+| **BE-010** | Implement send message endpoint | **Done** (PR #240 merged) | BE-008, BE-013, BE-020 | 2 |
+| **BE-014** | Implement exponential backoff for retries | **Done** (PR #242 merged) | BE-013 | 3 |
+| **BE-011** | Implement message status tracking | **Done** (PR #241) | BE-010 | 3 |
 | **BE-012** | Implement message retry endpoint | Ready | BE-011 | 3 |
 | **BE-017** | Implement message.received event | Ready | BE-016, BE-008 | 3 |
 | **BE-018** | Implement message.sent event | Ready | BE-016, BE-008, BE-010 | 3 |
