@@ -18,8 +18,10 @@ import {
   HttpCode,
   NotFoundError,
   BadRequestError,
+  ForbiddenError,
 } from 'routing-controllers';
 import { tagService } from '../services/tag.service';
+import { authorizationService } from '../services/authorization.service';
 import { logger } from '../infrastructure/logger';
 import { CreateTagRequest } from '@yacc/common/requests/tags/createTag.request';
 import { AddTagToConversationRequest } from '@yacc/common/requests/tags/addTagToConversation.request';
@@ -151,6 +153,8 @@ export class TagController {
    * POST /api/conversations/:id/tags
    * Add tag to conversation
    * Allowed roles: admin, manager, user, super_admin (per GOV-021)
+   * 
+   * Resource-level authorization: User must have access to the conversation
    */
   @Post('/conversations/:id/tags')
   @Authorized(['admin', 'manager', 'user', 'super_admin'])
@@ -167,6 +171,12 @@ export class TagController {
     try {
       if (!body.tagId || body.tagId <= 0) {
         throw new BadRequestError('Valid tagId is required');
+      }
+
+      // Resource-level authorization: Check if user has access to this conversation
+      const canAccess = await authorizationService.canAccessConversation(user, conversationId);
+      if (!canAccess) {
+        throw new ForbiddenError('Not authorized to access this conversation');
       }
 
       const result = await tagService.addTagToConversation({
@@ -215,6 +225,8 @@ export class TagController {
    * DELETE /api/conversations/:id/tags/:tagId
    * Remove tag from conversation
    * Allowed roles: admin, manager, user, super_admin (per GOV-021)
+   * 
+   * Resource-level authorization: User must have access to the conversation
    */
   @Delete('/conversations/:id/tags/:tagId')
   @Authorized(['admin', 'manager', 'user', 'super_admin'])
@@ -232,6 +244,12 @@ export class TagController {
       const parsedTagId = parseInt(tagId, 10);
       if (!Number.isInteger(parsedTagId) || parsedTagId <= 0) {
         throw new BadRequestError('Valid tagId is required');
+      }
+
+      // Resource-level authorization: Check if user has access to this conversation
+      const canAccess = await authorizationService.canAccessConversation(user, conversationId);
+      if (!canAccess) {
+        throw new ForbiddenError('Not authorized to access this conversation');
       }
 
       const result = await tagService.removeTagFromConversation({

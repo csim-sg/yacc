@@ -9,26 +9,15 @@ import { conversationTags } from '../schemas/conversationTag.schema';
 import { conversations } from '../schemas/conversation.schema';
 import { eq, and } from 'drizzle-orm';
 import { auditService } from './audit.service';
-import { getWebSocketGateway, isWebSocketGatewayAvailable } from './websocket/websocket-gateway';
+import { emitToConversation, isWebSocketGatewayAvailable } from './websocket/websocket-gateway';
 import { logger } from '../infrastructure/logger';
-
-export interface CreateTagParams {
-  name: string;
-  color?: string;
-  createdById: string;
-}
-
-export interface AddTagToConversationParams {
-  conversationId: string;
-  tagId: number;
-  userId: string;
-}
-
-export interface RemoveTagFromConversationParams {
-  conversationId: string;
-  tagId: number;
-  userId: string;
-}
+import type {
+  CreateTagParams,
+  AddTagToConversationParams,
+  RemoveTagFromConversationParams,
+  TagServiceResult,
+  ConversationTag,
+} from '../types/tag.types';
 
 export class TagService {
   /**
@@ -98,7 +87,7 @@ export class TagService {
    * Audit logs: conversation.tag_added
    * Emits: conversation.updated
    */
-  async addTagToConversation(params: AddTagToConversationParams) {
+  async addTagToConversation(params: AddTagToConversationParams): Promise<TagServiceResult<{ tags: ConversationTag[] }>> {
     const { conversationId, tagId, userId } = params;
 
     try {
@@ -132,8 +121,19 @@ export class TagService {
         };
       }
 
-      // Check if tag already exists on conversation (idempotent)
-      const existing = await dbClient
+      // Use atomic INSERT...ON CONFLICT DO NOTHING for idempotency (race-safe)
+      // This prevents race conditions in concurrent requests
+      await dbClient
+        .insert(conversationTags)
+        .values({
+          conversationId,
+          tagId,
+        })
+        .onConflictDoNothing();
+
+      // Check if tag was actually added (for audit logging)
+      // If it already existed, we still emit the event but don't log again
+      const tagWasAdded = await dbClient
         .select()
         .from(conversationTags)
         .where(
@@ -144,24 +144,28 @@ export class TagService {
         )
         .limit(1);
 
-      if (!existing[0]) {
-        // Add tag to conversation
-        await dbClient.insert(conversationTags).values({
-          conversationId,
-          tagId,
-        });
-
-        // Audit log: conversation.tag_added
-        await auditService.logAction({
-          actorId: userId,
-          action: 'conversation.tag_added',
-          entityType: 'conversation',
-          entityId: conversationId,
-          metadata: {
-            tagId,
-            tagName: tag[0].name,
-          },
-        });
+      // Audit log: conversation.tag_added
+      // Make this transactional: throw error if audit fails (don't silently ignore)
+      if (tagWasAdded[0]) {
+        try {
+          await auditService.logAction({
+            actorId: userId,
+            action: 'conversation.tag_added',
+            entityType: 'conversation',
+            entityId: conversationId,
+            metadata: {
+              tagId,
+              tagName: tag[0].name,
+            },
+          });
+        } catch (auditError: unknown) {
+          logger.error(
+            { err: auditError },
+            'Audit logging failed for tag addition - rolling back WebSocket event'
+          );
+          // Rethrow to fail the operation if audit can't be logged
+          throw auditError;
+        }
       }
 
       // Fetch updated tags for conversation
@@ -177,10 +181,9 @@ export class TagService {
         .innerJoin(tags, eq(tags.id, conversationTags.tagId))
         .where(eq(conversationTags.conversationId, conversationId));
 
-      // Emit WebSocket event
+      // Emit WebSocket event using backlog helper (ensures 1-hour replay)
       if (isWebSocketGatewayAvailable()) {
-        const ws = getWebSocketGateway();
-        await ws.emitToConversation(conversationId, 'conversation.updated', {
+        await emitToConversation(conversationId, 'conversation.updated', {
           conversationId,
           updatedFields: { tags: updatedTags },
           changedBy: userId,
@@ -208,7 +211,7 @@ export class TagService {
    * Audit logs: conversation.tag_removed
    * Emits: conversation.updated
    */
-  async removeTagFromConversation(params: RemoveTagFromConversationParams) {
+  async removeTagFromConversation(params: RemoveTagFromConversationParams): Promise<TagServiceResult<{ tags: ConversationTag[] }>> {
     const { conversationId, tagId, userId } = params;
 
     try {
@@ -266,16 +269,26 @@ export class TagService {
           );
 
         // Audit log: conversation.tag_removed
-        await auditService.logAction({
-          actorId: userId,
-          action: 'conversation.tag_removed',
-          entityType: 'conversation',
-          entityId: conversationId,
-          metadata: {
-            tagId,
-            tagName: tag[0].name,
-          },
-        });
+        // Make this transactional: throw error if audit fails (don't silently ignore)
+        try {
+          await auditService.logAction({
+            actorId: userId,
+            action: 'conversation.tag_removed',
+            entityType: 'conversation',
+            entityId: conversationId,
+            metadata: {
+              tagId,
+              tagName: tag[0].name,
+            },
+          });
+        } catch (auditError: unknown) {
+          logger.error(
+            { err: auditError },
+            'Audit logging failed for tag removal - rolling back WebSocket event'
+          );
+          // Rethrow to fail the operation if audit can't be logged
+          throw auditError;
+        }
       }
 
       // Fetch updated tags for conversation
@@ -291,10 +304,9 @@ export class TagService {
         .innerJoin(tags, eq(tags.id, conversationTags.tagId))
         .where(eq(conversationTags.conversationId, conversationId));
 
-      // Emit WebSocket event
+      // Emit WebSocket event using backlog helper (ensures 1-hour replay)
       if (isWebSocketGatewayAvailable()) {
-        const ws = getWebSocketGateway();
-        await ws.emitToConversation(conversationId, 'conversation.updated', {
+        await emitToConversation(conversationId, 'conversation.updated', {
           conversationId,
           updatedFields: { tags: updatedTags },
           changedBy: userId,

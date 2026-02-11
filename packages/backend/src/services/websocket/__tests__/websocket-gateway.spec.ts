@@ -41,6 +41,7 @@ const createMockGateway = (): WebSocketServer => {
     unsubscribeFromConversation: vi.fn(),
     isSubscribedToConversation: vi.fn().mockReturnValue(false),
     getConversationSubscribers: vi.fn().mockReturnValue(new Set()),
+    getConnectedUserIds: vi.fn().mockReturnValue([]),
   } as unknown as WebSocketServer;
 };
 
