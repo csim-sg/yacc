@@ -5,12 +5,12 @@
  */
 
 import { useEffect } from 'react';
+import type { ConversationDetail } from '../../services/conversations.service';
 import { useNotesStore } from '../../stores/notes.store';
 import { useTagsStore } from '../../stores/tags.store';
-import type { ConversationDetail } from '../../services/conversations.service';
 import { AssignmentSection } from './AssignmentSection';
-import { TagsSection } from './TagsSection';
 import { NotesSection } from './NotesSection';
+import { TagsSection } from './TagsSection';
 
 interface RightPanelProps {
   conversation: ConversationDetail;

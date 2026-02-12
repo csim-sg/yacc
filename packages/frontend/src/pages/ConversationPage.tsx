@@ -3,11 +3,11 @@
  * Read-only conversation view
  */
 
-import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useAuthStore } from '../stores/auth.store';
 import { ReplyComposer } from '../components/ReplyComposer';
+import { RightPanel } from '../components/RightPanel/RightPanel';
 import {
   conversationsService,
   type ConversationDetail,
@@ -15,9 +15,9 @@ import {
   type ConversationStatus,
   type ConversationPriority,
   type ChannelType,
-  type ConversationTag,
   type GetConversationResponse,
 } from '../services/conversations.service';
+import { useAuthStore } from '../stores/auth.store';
 
 const CHANNEL_LABELS: Record<ChannelType, string> = {
   telegram: 'Telegram',
@@ -362,191 +362,159 @@ export function ConversationPage() {
         </aside>
 
         <main
-          className={`flex-1 overflow-y-auto transition-all duration-300 
+          className={`flex-1 overflow-hidden transition-all duration-300 
             ${sidebarOpen ? 'ml-[280px]' : 'ml-0 lg:ml-[280px]'}`}
         >
-          <div className="container mx-auto p-4 md:p-6 max-w-7xl">
-            <div className="card bg-base-100 shadow-xl mb-6">
-              <div className="card-body">
-                <div className="flex flex-col gap-4">
-                   <div className="flex items-center gap-3" data-testid="conversation-header">
-                     <Link to="/" className="btn btn-ghost btn-sm" data-testid="back-button">
-                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                       </svg>
-                       Back
-                     </Link>
-                     <div className="flex items-center gap-2">
-                       <h2 className="card-title text-2xl">Conversation</h2>
-                      {isFetching && !isLoading && (
-                        <span className="loading loading-spinner loading-sm text-primary"></span>
-                      )}
-                    </div>
-                  </div>
-
-                  {isLoading && (
-                    <div className="space-y-4">
-                      <div className="skeleton h-6 w-1/3"></div>
-                      <div className="skeleton h-4 w-1/2"></div>
-                      <div className="skeleton h-4 w-2/3"></div>
-                    </div>
-                  )}
-
-                   {!isLoading && error && (
-                     <div className="alert alert-error" data-testid="error-message">
-                       <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                       </svg>
-                       <div className="flex-1">
-                         <h3 className="font-semibold">Failed to load conversation</h3>
-                         <div className="text-sm opacity-80">{errorMessage}</div>
+          {/* Conversation view with right panel */}
+          <div className="h-full flex flex-col lg:flex-row">
+            {/* Main conversation area */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="container mx-auto p-4 md:p-6 max-w-4xl">
+                <div className="card bg-base-100 shadow-xl mb-6">
+                  <div className="card-body">
+                    <div className="flex flex-col gap-4">
+                       <div className="flex items-center gap-3" data-testid="conversation-header">
+                          <Link to="/" className="btn btn-ghost btn-sm" data-testid="back-button">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                            </svg>
+                            Back
+                          </Link>
+                          <div className="flex items-center gap-2">
+                            <h2 className="card-title text-2xl">Conversation</h2>
+                           {isFetching && !isLoading && (
+                             <span className="loading loading-spinner loading-sm text-primary"></span>
+                           )}
+                         </div>
                        </div>
-                       <button className="btn btn-sm" onClick={() => refetch()} data-testid="retry-button">
-                         Retry
-                       </button>
-                     </div>
-                   )}
 
-                   {!isLoading && !error && !conversation && (
-                     <div className="text-center text-base-content/70" data-testid="conversation-detail">Conversation not found.</div>
-                   )}
+                       {isLoading && (
+                         <div className="space-y-4">
+                           <div className="skeleton h-6 w-1/3"></div>
+                           <div className="skeleton h-4 w-1/2"></div>
+                           <div className="skeleton h-4 w-2/3"></div>
+                         </div>
+                       )}
 
-                   {!isLoading && !error && conversation && (
-                     <div className="flex flex-col gap-6" data-testid="conversation-detail">
-                       <div className="flex flex-wrap items-center gap-2">
-                         <span className="badge badge-outline badge-sm" data-testid="conversation-channel">
-                           {CHANNEL_LABELS[conversation.channel] || conversation.channel}
-                         </span>
-                         <span className={`badge badge-sm ${STATUS_BADGE[conversation.status]}`} data-testid="conversation-status">
-                           {conversation.status}
-                         </span>
-                         <span className={`badge badge-sm ${PRIORITY_BADGE[conversation.priority]}`} data-testid="conversation-priority">
-                           {conversation.priority}
-                         </span>
-                        {conversation.assignedUserId && (
-                          <span className="badge badge-sm badge-ghost">
-                            Assigned to #{conversation.assignedUserId}
-                          </span>
+                        {!isLoading && error && (
+                          <div className="alert alert-error" data-testid="error-message">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div className="flex-1">
+                              <h3 className="font-semibold">Failed to load conversation</h3>
+                              <div className="text-sm opacity-80">{errorMessage}</div>
+                            </div>
+                            <button className="btn btn-sm" onClick={() => refetch()} data-testid="retry-button">
+                              Retry
+                            </button>
+                          </div>
+                        )}
+
+                        {!isLoading && !error && !conversation && (
+                          <div className="text-center text-base-content/70" data-testid="conversation-detail">Conversation not found.</div>
+                        )}
+
+                        {!isLoading && !error && conversation && (
+                          <div className="flex flex-col gap-6" data-testid="conversation-detail">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="badge badge-outline badge-sm" data-testid="conversation-channel">
+                                {CHANNEL_LABELS[conversation.channel] || conversation.channel}
+                              </span>
+                              <span className={`badge badge-sm ${STATUS_BADGE[conversation.status]}`} data-testid="conversation-status">
+                                {conversation.status}
+                              </span>
+                              <span className={`badge badge-sm ${PRIORITY_BADGE[conversation.priority]}`} data-testid="conversation-priority">
+                                {conversation.priority}
+                              </span>
+                             {conversation.assignedUserId && (
+                               <span className="badge badge-sm badge-ghost">
+                                 Assigned to #{conversation.assignedUserId}
+                               </span>
+                             )}
+                           </div>
+
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                             <div>
+                               <div className="text-base-content/60">Thread</div>
+                               <div className="font-semibold">{conversation.title || conversation.externalThreadId}</div>
+                             </div>
+                             <div>
+                               <div className="text-base-content/60">Created</div>
+                               <div className="font-semibold">{formatTimestamp(conversation.createdAt)}</div>
+                             </div>
+                           </div>
+
+                           <div className="divider"></div>
+
+                            <div className="space-y-4" data-testid="conversation-messages">
+                              <h3 className="text-lg font-semibold">Messages</h3>
+                              {messagesLoading && (
+                                <div className="loading loading-spinner loading-md"></div>
+                              )}
+                              {!messagesLoading && messages.length === 0 && (
+                                <div className="text-base-content/60">No messages yet.</div>
+                              )}
+                              {!messagesLoading && messages.length > 0 && (
+                                <div className="flex flex-col gap-3">
+                                  {messages.map((msg) => (
+                                    <div key={msg.id} data-testid="message-item">
+                                      {renderMessageBubble(msg)}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="divider"></div>
+
+                            {/* Reply Composer */}
+                            <div>
+                              <h3 className="text-lg font-semibold mb-4">Reply</h3>
+                              <ReplyComposer
+                                onSend={async (body) => {
+                                  await sendMessageMutation.mutateAsync(body);
+                                }}
+                                isSending={sendMessageMutation.isPending}
+                                error={
+                                  sendMessageMutation.error instanceof Error
+                                    ? sendMessageMutation.error.message
+                                    : sendMessageMutation.error
+                                      ? String(sendMessageMutation.error)
+                                      : undefined
+                                }
+                                showError={true}
+                                onErrorDismiss={() => sendMessageMutation.reset()}
+                              />
+                            </div>
+                          </div>
                         )}
                       </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <div className="text-base-content/60">Thread</div>
-                          <div className="font-semibold">{conversation.title || conversation.externalThreadId}</div>
-                        </div>
-                        <div>
-                          <div className="text-base-content/60">Created</div>
-                          <div className="font-semibold">{formatTimestamp(conversation.createdAt)}</div>
-                        </div>
-                      </div>
-
-                      {conversation.tags && conversation.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2" data-testid="conversation-tags">
-                          {conversation.tags.map((tag: ConversationTag) => (
-                            <span
-                              key={tag.id}
-                              className="badge badge-sm"
-                              style={{ backgroundColor: tag.color, color: '#fff' }}
-                              data-testid="conversation-tag"
-                              data-tag-id={tag.id}
-                              data-tag-name={tag.name}
-                            >
-                              {tag.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="divider"></div>
-
-                       <div className="space-y-4" data-testid="conversation-messages">
-                         <h3 className="text-lg font-semibold">Messages</h3>
-                         {messagesLoading && (
-                           <div className="loading loading-spinner loading-md"></div>
-                         )}
-                         {!messagesLoading && messages.length === 0 && (
-                           <div className="text-base-content/60">No messages yet.</div>
-                         )}
-                         {!messagesLoading && messages.length > 0 && (
-                           <div className="flex flex-col gap-3">
-                             {messages.map((msg) => (
-                               <div key={msg.id} data-testid="message-item">
-                                 {renderMessageBubble(msg)}
-                               </div>
-                             ))}
-                           </div>
-                         )}
-                       </div>
-
-                       <div className="divider"></div>
-
-                       {/* Reply Composer */}
-                       <div>
-                         <h3 className="text-lg font-semibold mb-4">Reply</h3>
-                         <ReplyComposer
-                           onSend={async (body) => {
-                             await sendMessageMutation.mutateAsync(body);
-                           }}
-                           isSending={sendMessageMutation.isPending}
-                           error={
-                             sendMessageMutation.error instanceof Error
-                               ? sendMessageMutation.error.message
-                               : sendMessageMutation.error
-                                 ? String(sendMessageMutation.error)
-                                 : undefined
-                           }
-                           showError={true}
-                           onErrorDismiss={() => sendMessageMutation.reset()}
-                         />
-                       </div>
-                     </div>
-                   )}
-                 </div>
-               </div>
-             </div>
-
-             <div className="card bg-base-100 shadow-xl">
-              <div className="card-body">
-                <h3 className="card-title text-xl mb-4">Account Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div>
-                    <div className="text-sm text-base-content/60 font-medium mb-1">Name</div>
-                    <div className="text-base font-semibold">{user?.name}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-base-content/60 font-medium mb-1">Email</div>
-                    <div className="text-base font-semibold">{user?.email}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-base-content/60 font-medium mb-1">Role</div>
-                    <div className="badge badge-primary badge-lg capitalize">
-                      {user?.role?.replace('_', ' ')}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-sm text-base-content/60 font-medium mb-1">Status</div>
-                    <div className="badge badge-success badge-lg capitalize">{user?.status}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-base-content/60 font-medium mb-1">Member Since</div>
-                    <div className="text-base">
-                      {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-base-content/60 font-medium mb-1">Email Verified</div>
-                    <div className="text-base">
-                      {user?.emailVerified ? (
-                        <span className="badge badge-success badge-sm">Verified</span>
-                      ) : (
-                        <span className="badge badge-warning badge-sm">Not Verified</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
+
+            {/* Right Panel - Hidden on mobile, visible on lg screens */}
+            {!isLoading && !error && conversation && (
+              <div className="hidden lg:flex">
+                <RightPanel
+                  conversation={conversation}
+                  onAssignmentChange={() => {
+                    // Refetch conversation to get updated assignment
+                    void queryClient.invalidateQueries({
+                      queryKey: ['conversation', conversation.id],
+                    });
+                  }}
+                  onTagsChange={() => {
+                    // Refetch conversation to get updated tags
+                    void queryClient.invalidateQueries({
+                      queryKey: ['conversation', conversation.id],
+                    });
+                  }}
+                />
+              </div>
+            )}
           </div>
         </main>
       </div>

@@ -4,9 +4,9 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ConversationDetail } from '../../services/conversations.service';
-import { assignmentsService } from '../../services/assignments.service';
 import { useState } from 'react';
+import { assignmentsService } from '../../services/assignments.service';
+import type { ConversationDetail } from '../../services/conversations.service';
 
 interface AssignmentSectionProps {
   conversation: ConversationDetail;

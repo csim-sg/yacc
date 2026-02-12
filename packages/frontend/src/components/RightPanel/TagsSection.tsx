@@ -5,9 +5,9 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import type { ConversationDetail, ConversationTag } from '../../services/conversations.service';
-import { useTagsStore } from '../../stores/tags.store';
+import type { ConversationDetail } from '../../services/conversations.service';
 import { tagsService } from '../../services/tags.service';
+import { useTagsStore } from '../../stores/tags.store';
 
 interface TagsSectionProps {
   conversation: ConversationDetail;

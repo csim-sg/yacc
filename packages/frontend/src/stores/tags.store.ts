@@ -19,7 +19,7 @@ interface TagsStore {
   clearError: () => void;
 }
 
-export const useTagsStore = create<TagsStore>((set, get) => ({
+export const useTagsStore = create<TagsStore>((set) => ({
   tags: [],
   isLoading: false,
   error: null,
