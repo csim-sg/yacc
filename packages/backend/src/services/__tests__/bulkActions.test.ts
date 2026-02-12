@@ -22,7 +22,7 @@ import {
   bulkAssign,
   bulkTag,
   bulkUpdateStatus,
-} from '../../services/bulk-actions.service';
+} from '../../services/bulkActions.service';
 import type { Conversation } from '../../schemas/conversation.schema';
 
 // Mock audit service
@@ -142,9 +142,9 @@ describe('Bulk Actions Service', () => {
 
       const result = await bulkAssign(conversationIds, testUserId, testUser2Id);
 
-      expect(result.successCount).toBe(3);
-      expect(result.failureCount).toBe(0);
-      expect(result.failures).toHaveLength(0);
+      expect(result.data.successCount).toBe(3);
+      expect(result.data.failureCount).toBe(0);
+      expect(result.data.failures).toHaveLength(0);
 
       // Verify assignments in database
       const updatedConvs = await dbClient
@@ -166,11 +166,11 @@ describe('Bulk Actions Service', () => {
         testUser2Id
       );
 
-      expect(result.successCount).toBe(1);
-      expect(result.failureCount).toBe(1);
-      expect(result.failures).toHaveLength(1);
-      expect(result.failures[0].id).toBe(invalidId);
-      expect(result.failures[0].reason).toContain('not found');
+      expect(result.data.successCount).toBe(1);
+      expect(result.data.failureCount).toBe(1);
+      expect(result.data.failures).toHaveLength(1);
+      expect(result.data.failures[0].id).toBe(invalidId);
+      expect(result.data.failures[0].reason).toContain('not found');
     });
 
     it('should enforce max 100 conversations limit', async () => {
@@ -180,18 +180,18 @@ describe('Bulk Actions Service', () => {
 
       const result = await bulkAssign(tooMany, testUserId, testUser2Id);
 
-      expect(result.successCount).toBe(0);
-      expect(result.failureCount).toBe(101);
-      expect(result.failures).toHaveLength(101);
-      expect(result.failures[0].reason).toContain('Max 100');
+      expect(result.data.successCount).toBe(0);
+      expect(result.data.failureCount).toBe(101);
+      expect(result.data.failures).toHaveLength(101);
+      expect(result.data.failures[0].reason).toContain('Max 100');
     });
 
     it('should handle empty conversation list', async () => {
       const result = await bulkAssign([], testUserId, testUser2Id);
 
-      expect(result.successCount).toBe(0);
-      expect(result.failureCount).toBe(0);
-      expect(result.failures).toHaveLength(0);
+      expect(result.data.successCount).toBe(0);
+      expect(result.data.failureCount).toBe(0);
+      expect(result.data.failures).toHaveLength(0);
     });
 
     it('should log audit events for each successful assignment', async () => {
@@ -223,8 +223,8 @@ describe('Bulk Actions Service', () => {
       // Now unassign (assign to null)
       const result = await bulkAssign([conversationId], testUserId, null as any);
 
-      expect(result.successCount).toBe(1);
-      expect(result.failureCount).toBe(0);
+      expect(result.data.successCount).toBe(1);
+      expect(result.data.failureCount).toBe(0);
 
       // Verify unassigned
       const updated = await dbClient
@@ -242,9 +242,9 @@ describe('Bulk Actions Service', () => {
 
       const result = await bulkTag(conversationIds, testTag.id, testUserId);
 
-      expect(result.successCount).toBe(3);
-      expect(result.failureCount).toBe(0);
-      expect(result.failures).toHaveLength(0);
+      expect(result.data.successCount).toBe(3);
+      expect(result.data.failureCount).toBe(0);
+      expect(result.data.failures).toHaveLength(0);
 
       // Verify tags attached
       const attachedTags = await dbClient
@@ -264,7 +264,7 @@ describe('Bulk Actions Service', () => {
         testTag.id,
         testUserId
       );
-      expect(result1.successCount).toBe(1);
+      expect(result1.data.successCount).toBe(1);
 
       // Attach again (should skip, not fail)
       const result2 = await bulkTag(
@@ -272,8 +272,8 @@ describe('Bulk Actions Service', () => {
         testTag.id,
         testUserId
       );
-      expect(result2.successCount).toBe(1);
-      expect(result2.failures).toHaveLength(0);
+      expect(result2.data.successCount).toBe(1);
+      expect(result2.data.failures).toHaveLength(0);
 
       // Verify only one attachment
       const attachedTags = await dbClient
@@ -290,10 +290,10 @@ describe('Bulk Actions Service', () => {
 
       const result = await bulkTag(conversationIds, invalidTagId, testUserId);
 
-      expect(result.successCount).toBe(0);
-      expect(result.failureCount).toBe(3);
-      expect(result.failures).toHaveLength(3);
-      expect(result.failures[0].reason).toContain('Tag not found');
+      expect(result.data.successCount).toBe(0);
+      expect(result.data.failureCount).toBe(3);
+      expect(result.data.failures).toHaveLength(3);
+      expect(result.data.failures[0].reason).toContain('Tag not found');
     });
 
     it('should handle partial failures with mixed valid/invalid conversations', async () => {
@@ -302,9 +302,9 @@ describe('Bulk Actions Service', () => {
 
       const result = await bulkTag([validId, invalidId], testTag.id, testUserId);
 
-      expect(result.successCount).toBe(1);
-      expect(result.failureCount).toBe(1);
-      expect(result.failures).toHaveLength(1);
+      expect(result.data.successCount).toBe(1);
+      expect(result.data.failureCount).toBe(1);
+      expect(result.data.failures).toHaveLength(1);
 
       // Verify valid one was tagged
       const attached = await dbClient
@@ -323,29 +323,30 @@ describe('Bulk Actions Service', () => {
 
       const result = await bulkTag(tooMany, testTag.id, testUserId);
 
-      expect(result.successCount).toBe(0);
-      expect(result.failureCount).toBe(101);
+      expect(result.data.successCount).toBe(0);
+      expect(result.data.failureCount).toBe(101);
     });
 
-    it('should log audit events for each successful tag', async () => {
-      const conversationIds = testConversations.slice(0, 2).map((c) => c.id);
+     it('should log audit events for each successful tag', async () => {
+       const conversationIds = testConversations.slice(0, 2).map((c) => c.id);
 
-      await bulkTag(conversationIds, testTag.id, testUserId);
+       await bulkTag(conversationIds, testTag.id, testUserId);
 
-      expect(auditService.logAction).toHaveBeenCalledTimes(2);
-      expect(auditService.logAction).toHaveBeenCalledWith(
-        expect.objectContaining({
-          actorId: testUserId,
-          action: 'bulk_action_applied',
-          entityType: 'tag',
-          metadata: expect.objectContaining({
-            action: 'tag',
-            tagId: testTag.id,
-            bulkOperation: true,
-          }),
-        })
-      );
-    });
+       expect(auditService.logAction).toHaveBeenCalledTimes(2);
+       expect(auditService.logAction).toHaveBeenCalledWith(
+         expect.objectContaining({
+           actorId: testUserId,
+           action: 'bulk_action_applied',
+           entityType: 'conversation',
+           entityId: expect.any(String),
+           metadata: expect.objectContaining({
+             action: 'tag',
+             tagId: testTag.id,
+             bulkOperation: true,
+           }),
+         })
+       );
+     });
   });
 
   describe('bulkUpdateStatus', () => {
@@ -358,9 +359,9 @@ describe('Bulk Actions Service', () => {
         testUserId
       );
 
-      expect(result.successCount).toBe(3);
-      expect(result.failureCount).toBe(0);
-      expect(result.failures).toHaveLength(0);
+      expect(result.data.successCount).toBe(3);
+      expect(result.data.failureCount).toBe(0);
+      expect(result.data.failures).toHaveLength(0);
 
       // Verify status updated
       const updated = await dbClient
@@ -380,9 +381,9 @@ describe('Bulk Actions Service', () => {
         testUserId
       );
 
-      expect(result.successCount).toBe(0);
-      expect(result.failureCount).toBe(3);
-      expect(result.failures[0].reason).toContain('Invalid status');
+      expect(result.data.successCount).toBe(0);
+      expect(result.data.failureCount).toBe(3);
+      expect(result.data.failures[0].reason).toContain('Invalid status');
     });
 
     it('should handle partial failures for status update', async () => {
@@ -395,8 +396,8 @@ describe('Bulk Actions Service', () => {
         testUserId
       );
 
-      expect(result.successCount).toBe(1);
-      expect(result.failureCount).toBe(1);
+      expect(result.data.successCount).toBe(1);
+      expect(result.data.failureCount).toBe(1);
 
       // Verify valid one was updated
       const updated = await dbClient
@@ -418,8 +419,8 @@ describe('Bulk Actions Service', () => {
       for (const status of statuses) {
         const result = await bulkUpdateStatus([conversationId], status, testUserId);
 
-        expect(result.successCount).toBe(1);
-        expect(result.failures).toHaveLength(0);
+        expect(result.data.successCount).toBe(1);
+        expect(result.data.failures).toHaveLength(0);
 
         const updated = await dbClient
           .select()
@@ -437,8 +438,8 @@ describe('Bulk Actions Service', () => {
 
       const result = await bulkUpdateStatus(tooMany, 'resolved', testUserId);
 
-      expect(result.successCount).toBe(0);
-      expect(result.failureCount).toBe(101);
+      expect(result.data.successCount).toBe(0);
+      expect(result.data.failureCount).toBe(101);
     });
 
     it('should log audit events with old and new status', async () => {
@@ -473,27 +474,28 @@ describe('Bulk Actions Service', () => {
       );
 
       // Should have some result structure
-      expect(result).toHaveProperty('successCount');
-      expect(result).toHaveProperty('failureCount');
-      expect(result).toHaveProperty('failures');
+      expect(result).toHaveProperty('data');
+      expect(result.data).toHaveProperty('successCount');
+      expect(result.data).toHaveProperty('failureCount');
+      expect(result.data).toHaveProperty('failures');
     });
 
     it('should handle null/undefined input gracefully', async () => {
       const result1 = await bulkAssign(null as any, testUserId, testUser2Id);
-      expect(result1.successCount).toBe(0);
-      expect(result1.failureCount).toBe(0);
+      expect(result1.data.successCount).toBe(0);
+      expect(result1.data.failureCount).toBe(0);
 
       const result2 = await bulkTag(undefined as any, testTag.id, testUserId);
-      expect(result2.successCount).toBe(0);
-      expect(result2.failureCount).toBe(0);
+      expect(result2.data.successCount).toBe(0);
+      expect(result2.data.failureCount).toBe(0);
 
       const result3 = await bulkUpdateStatus(
         [] as any,
         'open',
         testUserId
       );
-      expect(result3.successCount).toBe(0);
-      expect(result3.failureCount).toBe(0);
+      expect(result3.data.successCount).toBe(0);
+      expect(result3.data.failureCount).toBe(0);
     });
   });
 
@@ -505,14 +507,16 @@ describe('Bulk Actions Service', () => {
 
       expect(result).toEqual(
         expect.objectContaining({
-          successCount: expect.any(Number),
-          failureCount: expect.any(Number),
-          failures: expect.any(Array),
+          data: expect.objectContaining({
+            successCount: expect.any(Number),
+            failureCount: expect.any(Number),
+            failures: expect.any(Array),
+          }),
         })
       );
 
-      expect(result.successCount + result.failureCount).toBe(2);
-      expect(result.failures).toHaveLength(result.failureCount);
+      expect(result.data.successCount + result.data.failureCount).toBe(2);
+      expect(result.data.failures).toHaveLength(result.data.failureCount);
     });
 
     it('failure items should have id and reason', async () => {
@@ -525,8 +529,8 @@ describe('Bulk Actions Service', () => {
         testUser2Id
       );
 
-      expect(result.failures).toHaveLength(1);
-      expect(result.failures[0]).toEqual(
+      expect(result.data.failures).toHaveLength(1);
+      expect(result.data.failures[0]).toEqual(
         expect.objectContaining({
           id: invalidId,
           reason: expect.any(String),

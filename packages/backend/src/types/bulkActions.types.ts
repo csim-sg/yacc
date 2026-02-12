@@ -41,15 +41,25 @@ export interface BulkActionFailure {
 }
 
 /**
- * Bulk action response
+ * Bulk action response (inner data)
  * 
  * Returns success count, failure count, and detailed failure reasons.
  * Example: { successCount: 98, failureCount: 2, failures: [{id: 'c1', reason: 'Not found'}] }
  */
-export interface BulkActionResponse {
+export interface BulkActionResponseData {
   successCount: number;
   failureCount: number;
   failures: BulkActionFailure[];
+}
+
+/**
+ * Bulk action response (envelope)
+ * 
+ * Wraps the bulk action result in a standard data envelope per API contract.
+ * Example: { data: { successCount: 98, failureCount: 2, failures: [...] } }
+ */
+export interface BulkActionResponse {
+  data: BulkActionResponseData;
 }
 
 /**

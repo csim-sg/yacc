@@ -878,13 +878,18 @@ Resets user password using a valid reset token.
 ---
 
 #### `POST /api/conversations/bulk`
+
+Bulk action endpoint for assign, tag, or status update on multiple conversations.
+
 **Request:**
 ```json
 {
   "conversationIds": ["uuid", "uuid", "uuid"],
-  "action": {
-    "type": "assign",  // assign, tag, status
-    "value": "uuid"    // user_id, tag_id, status_value
+  "action": "assign" | "tag" | "status",
+  "data": {
+    // For assign: { "assigneeId": "user-uuid-or-null" }
+    // For tag: { "tagId": 123 }
+    // For status: { "status": "open" | "pending" | "resolved" }
   }
 }
 ```
@@ -896,13 +901,26 @@ Resets user password using a valid reset token.
     "successCount": 98,
     "failureCount": 2,
     "failures": [
-      { "conversationId": "uuid", "reason": "Conversation not found" }
+      { "id": "conversation-uuid", "reason": "Conversation not found" },
+      { "id": "conversation-uuid", "reason": "Tag not found" }
     ]
   }
 }
 ```
 
-**Note**: Max 100 conversations per request
+**Auth**: Manager+ only
+
+**Features**:
+- **Best-effort**: Partial success is OK (not all-or-nothing)
+- **Max 100**: Enforced per request
+- **Failures**: Detailed array with conversation ID and reason for each failure
+- **Audit logged**: Each successful action is logged as `bulk_action_applied`
+- **Atomic per conversation**: Each conversation update is wrapped in a transaction
+
+**Error Codes**:
+- `400`: Invalid request (validation error on conversationIds, action, or data)
+- `401`: Unauthorized (not authenticated)
+- `403`: Forbidden (insufficient role - requires manager+)
 
 ---
 
@@ -1387,21 +1405,36 @@ Phase 1 includes Telegram + IRC integration. Additional platforms are deferred t
 ### Audit Logs
 
 #### `GET /api/audit-logs`
-Query audit logs across all entity types with optional filters.
+Query audit logs across all entity types with optional filters and pagination.
 
-**Query**: `actor`, `action`, `entity_type`, `entity_id`, `dateFrom`, `dateTo`, `page` (default 1), `limit` (default 50)
+**Query Parameters**:
+- `actorId`: Filter by user ID who performed the action
+- `action`: Filter by action type (e.g., `conversation_assigned`, `bulk_action_applied`)
+- `entityType`: Filter by entity type (e.g., `conversation`, `tag`)
+- `entityId`: Filter by specific entity UUID
+- `dateFrom`: Filter by start date (ISO 8601 string)
+- `dateTo`: Filter by end date (ISO 8601 string)
+- `page`: Pagination page number (default 1)
+- `limit`: Results per page (default 20, max 100)
 
 **Response:**
 ```json
 {
-  "success": true,
-  "data": [/* Audit Log models */],
-  "pagination": {
-    "page": 1,
-    "limit": 50,
-    "total": 250,
-    "pages": 5
-  }
+  "items": [
+    {
+      "id": "uuid",
+      "actorId": "uuid",
+      "action": "conversation_assigned",
+      "entityType": "conversation",
+      "entityId": "uuid",
+      "metadata": { /* action-specific data */ },
+      "createdAt": "2026-01-16T10:00:00Z"
+    }
+  ],
+  "total": 250,
+  "page": 1,
+  "limit": 20,
+  "pages": 13
 }
 ```
 
@@ -1410,39 +1443,57 @@ Query audit logs across all entity types with optional filters.
 **Notes**:
 - Supports multi-entity queries (conversations, routing rules, users, messages, etc.)
 - Filters can be combined
-- Results sorted by created_at DESC
-- All audit queries are themselves logged (audit log access audit-logged)
+- Results sorted by created_at DESC (newest first)
+- Limit capped at 100 (requests for higher limit are reduced to 100)
 
 ---
 
-#### `GET /api/conversations/:conversationId/audit-logs`
+#### `GET /api/audit-logs/conversations/:conversationId`
 Convenience endpoint: get audit logs for a specific conversation only.
 
-**Query**: `page`, `limit`
+**Query Parameters**:
+- `action`: Filter by action type
+- `entityType`: Filter by entity type
+- `dateFrom`: Filter by start date
+- `dateTo`: Filter by end date
+- `page`: Pagination page number (default 1)
+- `limit`: Results per page (default 20, max 100)
 
-**Response**: Same as above, filtered to conversation
+**Response**: Same structure as `/api/audit-logs`, filtered to specified conversation
 
 **Auth**: Manager+ only
 
 ---
 
 #### `POST /api/audit-logs/export`
-Export filtered audit logs to CSV.
+Export filtered audit logs as CSV or JSON file.
 
 **Request**:
 ```json
 {
-  "actor": "uuid",
-  "action": "conversation.assigned",
-  "entity_type": "conversation",
-  "dateFrom": "2026-01-01T00:00:00Z",
-  "dateTo": "2026-02-11T23:59:59Z"
+  "format": "csv" | "json",
+  "filters": {
+    "actorId": "uuid",
+    "action": "conversation_assigned",
+    "entityType": "conversation",
+    "entityId": "uuid",
+    "dateFrom": "2026-01-01T00:00:00Z",
+    "dateTo": "2026-02-11T23:59:59Z"
+  }
 }
 ```
 
-**Response**: CSV file (text/csv, Content-Disposition: attachment)
+**Response**: File download (CSV: `text/csv`, JSON: `application/json`)
+- Content-Disposition header set to `attachment; filename="audit-logs-<timestamp>.<format>"`
+- CSV includes headers: ID, Actor ID, Action, Entity Type, Entity ID, Created At, Metadata
+- CSV values starting with `=`, `+`, `-`, `@` are escaped to prevent formula injection
 
-**Auth**: Super Admin + Admin only
+**Auth**: Admin+ only (stricter than read queries)
+
+**Notes**:
+- `format` defaults to `csv` if not specified
+- `filters` object is optional (empty filters export all matching logs)
+- Large exports may take longer but use pagination internally
 
 ---
 

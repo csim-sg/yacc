@@ -18,10 +18,10 @@ export interface AuditLogQueryFilters {
   entityId?: string;
 
   // Date range: from (inclusive)
-  dateFrom?: Date | string;
+  dateFrom?: string | Date;
 
   // Date range: to (inclusive)
-  dateTo?: Date | string;
+  dateTo?: string | Date;
 
   // Pagination
   page?: number;

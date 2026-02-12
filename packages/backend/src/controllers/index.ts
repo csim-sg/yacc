@@ -19,9 +19,9 @@
 
 import { AssignmentsController } from './assignments.controller.js';
 import { AuditController } from './audit.controller.js';
-import { AuditLogsQueryController } from './audit-logs-query.controller.js';
+import { AuditLogsQueryController } from './auditLogsQuery.controller.js';
 import { AuthController } from './auth.controller.js';
-import { BulkActionsController } from './bulk-actions.controller.js';
+import { BulkActionsController } from './bulkActions.controller.js';
 import { ConversationsController } from './conversations.controller.js';
 import { DLQController } from './dlq.controller.js';
 import { HealthController } from './health.controller.js';

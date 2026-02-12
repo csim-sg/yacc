@@ -26,11 +26,11 @@ import {
   BadRequestError,
   ForbiddenError,
 } from 'routing-controllers';
-import { bulkActionsService } from '../services/bulk-actions.service';
+import { bulkActionsService } from '../services/bulkActions.service';
 import { logger } from '../infrastructure/logger';
 import type { AuthUser } from '../types/auth.types';
-import type { BulkActionRequest, BulkActionResponse } from '../types/bulk-actions.types';
-import { isValidActionType, isValidStatus } from '../types/bulk-actions.types';
+import type { BulkActionRequest, BulkActionResponse } from '../types/bulkActions.types';
+import { isValidActionType, isValidStatus } from '../types/bulkActions.types';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;
@@ -181,12 +181,12 @@ export class BulkActionsController {
           throw new BadRequestError(`Unknown action: ${action}`);
       }
 
-      logger.info(
-        { correlationId, action, successCount: result.successCount, failureCount: result.failureCount },
-        'Bulk action completed'
-      );
+       logger.info(
+         { correlationId, action, successCount: result.data.successCount, failureCount: result.data.failureCount },
+         'Bulk action completed'
+       );
 
-      return result;
+       return result;
     } catch (error: unknown) {
       if (error instanceof BadRequestError || error instanceof ForbiddenError) {
         throw error;

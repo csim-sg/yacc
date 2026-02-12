@@ -5,7 +5,7 @@
  * Handles pagination and date range filtering
  */
 
-import { and, desc, gte, lte, eq } from 'drizzle-orm';
+import { and, desc, gte, lte, eq, count } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
 import { auditLogs } from '../schemas/auditLog.schema';
 import type {
@@ -14,7 +14,7 @@ import type {
   AuditLogExportRequest,
   AuditLogExportResponse,
   AuditLogEntry,
-} from '../types/audit-logs-query.types';
+} from '../types/auditLogsQuery.types';
 import { logger } from '../infrastructure/logger';
 
 const DEFAULT_PAGE = 1;
@@ -28,6 +28,7 @@ const MAX_LIMIT = 100;
  * Defaults to newest first (by createdAt DESC)
  */
 export async function queryAuditLogs(
+  userId: string,
   filters: AuditLogQueryFilters,
   correlationId: string = 'unknown'
 ): Promise<AuditLogQueryResponse> {
@@ -36,8 +37,32 @@ export async function queryAuditLogs(
   const offset = (page - 1) * limit;
 
   try {
-    // Build WHERE conditions dynamically
-    const conditions: Array<any> = [];
+    // Validate date range
+    let dateFromVal: Date | undefined;
+    let dateToVal: Date | undefined;
+
+    if (filters.dateFrom) {
+      dateFromVal = new Date(filters.dateFrom);
+      if (Number.isNaN(dateFromVal.getTime())) {
+        throw new Error('Invalid dateFrom format');
+      }
+    }
+
+    if (filters.dateTo) {
+      dateToVal = new Date(filters.dateTo);
+      if (Number.isNaN(dateToVal.getTime())) {
+        throw new Error('Invalid dateTo format');
+      }
+      // Set time to end of day
+      dateToVal.setHours(23, 59, 59, 999);
+    }
+
+    if (dateFromVal && dateToVal && dateFromVal > dateToVal) {
+      throw new Error('dateFrom must be before or equal to dateTo');
+    }
+
+    // Build WHERE conditions
+    const conditions: ReturnType<typeof eq>[] = [];
 
     if (filters.actorId) {
       conditions.push(eq(auditLogs.actorId, filters.actorId));
@@ -55,25 +80,20 @@ export async function queryAuditLogs(
       conditions.push(eq(auditLogs.entityId, filters.entityId));
     }
 
-    // Date range filtering
-    if (filters.dateFrom) {
-      const dateFrom = new Date(filters.dateFrom);
-      conditions.push(gte(auditLogs.createdAt, dateFrom));
+    if (dateFromVal) {
+      conditions.push(gte(auditLogs.createdAt, dateFromVal));
     }
 
-    if (filters.dateTo) {
-      const dateTo = new Date(filters.dateTo);
-      // Set time to end of day
-      dateTo.setHours(23, 59, 59, 999);
-      conditions.push(lte(auditLogs.createdAt, dateTo));
+    if (dateToVal) {
+      conditions.push(lte(auditLogs.createdAt, dateToVal));
     }
 
     // Build WHERE clause
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    // Execute count query
+    // Execute count query with proper COUNT(*)
     let countQuery = dbClient
-      .select({ count: auditLogs.id })
+      .select({ count: count() })
       .from(auditLogs) as any;
 
     if (whereClause) {
@@ -81,7 +101,7 @@ export async function queryAuditLogs(
     }
 
     const countResult = await countQuery;
-    const total = countResult.length > 0 ? countResult[0].count : 0;
+    const total = countResult[0]?.count || 0;
 
     // Execute data query
     let dataQuery = dbClient
@@ -140,11 +160,13 @@ export async function queryAuditLogs(
  * Returns all audit entries related to a conversation
  */
 export async function queryConversationAuditLogs(
+  userId: string,
   conversationId: string,
   filters?: Omit<AuditLogQueryFilters, 'entityId'>,
   correlationId: string = 'unknown'
 ): Promise<AuditLogQueryResponse> {
   return queryAuditLogs(
+    userId,
     {
       ...filters,
       entityId: conversationId,
@@ -160,20 +182,16 @@ export async function queryConversationAuditLogs(
  * Returns data as string (CSV or JSON format)
  */
 export async function exportAuditLogs(
+  userId: string,
   request: AuditLogExportRequest,
   correlationId: string = 'unknown'
 ): Promise<AuditLogExportResponse> {
   const format = request.format || 'csv';
 
   try {
-    // Query all matching logs (no pagination for export)
-    const queryResponse = await queryAuditLogs(
-      {
-        ...(request.filters || {}),
-        limit: MAX_LIMIT,
-      },
-      correlationId
-    );
+    // Query all matching logs with pagination
+    const filters = request.filters || {};
+    const queryResponse = await queryAuditLogs(userId, filters, correlationId);
 
     let data: string;
 
@@ -209,7 +227,7 @@ export async function exportAuditLogs(
 }
 
 /**
- * Convert audit log entries to CSV format
+ * Convert audit log entries to CSV format with injection protection
  */
 function convertToCSV(entries: AuditLogEntry[]): string {
   // CSV headers
@@ -223,16 +241,28 @@ function convertToCSV(entries: AuditLogEntry[]): string {
     'Metadata',
   ];
 
-  // Escape CSV values
+  /**
+   * Escape CSV values and prevent Excel formula injection
+   * Values starting with =, +, -, or @ are prefixed with single quote
+   */
   const escapeCsvValue = (value: unknown): string => {
     if (value === null || value === undefined) {
       return '';
     }
 
     const str = String(value);
+    
+    // Check for Excel formula injection
+    if (/^[=+\-@]/.test(str)) {
+      // Prefix with single quote to prevent formula injection
+      return `"'${str}"`;
+    }
+    
+    // Standard CSV escaping for commas, quotes, newlines
     if (str.includes(',') || str.includes('"') || str.includes('\n')) {
       return `"${str.replace(/"/g, '""')}"`;
     }
+    
     return str;
   };
 

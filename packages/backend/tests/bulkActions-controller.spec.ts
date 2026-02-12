@@ -89,23 +89,25 @@ describe('Bulk Actions Controller', () => {
 
   describe('POST /api/conversations/bulk', () => {
     describe('Bulk Assign', () => {
-      it('should bulk assign conversations for manager', async () => {
-        const response = await request(app)
-          .post('/api/conversations/bulk')
-          .set('Authorization', `Bearer ${managerToken}`)
-          .send({
-            conversationIds: testConversationIds.slice(0, 2),
-            action: 'assign',
-            data: { assigneeId: managerUserId },
-          });
+       it('should bulk assign conversations for manager', async () => {
+         const response = await request(app)
+           .post('/api/conversations/bulk')
+           .set('Authorization', `Bearer ${managerToken}`)
+           .send({
+             conversationIds: testConversationIds.slice(0, 2),
+             action: 'assign',
+             data: { assigneeId: managerUserId },
+           });
 
-        expect(response.status).toBe(200);
-        expect(response.body).toEqual({
-          successCount: 2,
-          failureCount: 0,
-          failures: [],
-        });
-      });
+         expect(response.status).toBe(200);
+         expect(response.body).toEqual({
+           data: {
+             successCount: 2,
+             failureCount: 0,
+             failures: [],
+           },
+         });
+       });
 
       it('should reject bulk assign for non-manager user', async () => {
         const response = await request(app)
@@ -132,25 +134,25 @@ describe('Bulk Actions Controller', () => {
         expect(response.status).toBe(401);
       });
 
-      it('should return partial failures for invalid conversations', async () => {
-        const validId = testConversationIds[0];
-        const invalidId = `invalid-${Date.now()}`;
+       it('should return partial failures for invalid conversations', async () => {
+         const validId = testConversationIds[0];
+         const invalidId = `invalid-${Date.now()}`;
 
-        const response = await request(app)
-          .post('/api/conversations/bulk')
-          .set('Authorization', `Bearer ${managerToken}`)
-          .send({
-            conversationIds: [validId, invalidId],
-            action: 'assign',
-            data: { assigneeId: managerUserId },
-          });
+         const response = await request(app)
+           .post('/api/conversations/bulk')
+           .set('Authorization', `Bearer ${managerToken}`)
+           .send({
+             conversationIds: [validId, invalidId],
+             action: 'assign',
+             data: { assigneeId: managerUserId },
+           });
 
-        expect(response.status).toBe(200);
-        expect(response.body.successCount).toBe(1);
-        expect(response.body.failureCount).toBe(1);
-        expect(response.body.failures).toHaveLength(1);
-        expect(response.body.failures[0].id).toBe(invalidId);
-      });
+         expect(response.status).toBe(200);
+         expect(response.body.data.successCount).toBe(1);
+         expect(response.body.data.failureCount).toBe(1);
+         expect(response.body.data.failures).toHaveLength(1);
+         expect(response.body.data.failures[0].id).toBe(invalidId);
+       });
     });
 
     describe('Bulk Tag', () => {
@@ -165,8 +167,8 @@ describe('Bulk Actions Controller', () => {
           });
 
         expect(response.status).toBe(200);
-        expect(response.body.successCount).toBe(2);
-        expect(response.body.failureCount).toBe(0);
+        expect(response.body.data.successCount).toBe(2);
+        expect(response.body.data.failureCount).toBe(0);
       });
 
       it('should reject invalid tag ID (not a number)', async () => {
@@ -182,21 +184,21 @@ describe('Bulk Actions Controller', () => {
         expect(response.status).toBe(400);
       });
 
-      it('should reject for non-existent tag', async () => {
-        const response = await request(app)
-          .post('/api/conversations/bulk')
-          .set('Authorization', `Bearer ${managerToken}`)
-          .send({
-            conversationIds: testConversationIds.slice(0, 2),
-            action: 'tag',
-            data: { tagId: 99999 },
-          });
+       it('should reject for non-existent tag', async () => {
+         const response = await request(app)
+           .post('/api/conversations/bulk')
+           .set('Authorization', `Bearer ${managerToken}`)
+           .send({
+             conversationIds: testConversationIds.slice(0, 2),
+             action: 'tag',
+             data: { tagId: 99999 },
+           });
 
-        expect(response.status).toBe(200);
-        expect(response.body.successCount).toBe(0);
-        expect(response.body.failureCount).toBe(2);
-        expect(response.body.failures[0].reason).toContain('Tag not found');
-      });
+         expect(response.status).toBe(200);
+         expect(response.body.data.successCount).toBe(0);
+         expect(response.body.data.failureCount).toBe(2);
+         expect(response.body.data.failures[0].reason).toContain('Tag not found');
+       });
     });
 
     describe('Bulk Status Update', () => {
@@ -211,8 +213,8 @@ describe('Bulk Actions Controller', () => {
           });
 
         expect(response.status).toBe(200);
-        expect(response.body.successCount).toBe(2);
-        expect(response.body.failureCount).toBe(0);
+        expect(response.body.data.successCount).toBe(2);
+        expect(response.body.data.failureCount).toBe(0);
       });
 
       it('should reject invalid status value', async () => {
@@ -242,7 +244,7 @@ describe('Bulk Actions Controller', () => {
             });
 
           expect(response.status).toBe(200);
-          expect(response.body.successCount).toBe(1);
+          expect(response.body.data.successCount).toBe(1);
         }
       });
     });
@@ -340,41 +342,43 @@ describe('Bulk Actions Controller', () => {
     });
 
     describe('Response Format', () => {
-      it('should return consistent response structure', async () => {
-        const response = await request(app)
-          .post('/api/conversations/bulk')
-          .set('Authorization', `Bearer ${managerToken}`)
-          .send({
-            conversationIds: testConversationIds.slice(0, 1),
-            action: 'status',
-            data: { status: 'open' },
-          });
+       it('should return consistent response structure', async () => {
+         const response = await request(app)
+           .post('/api/conversations/bulk')
+           .set('Authorization', `Bearer ${managerToken}`)
+           .send({
+             conversationIds: testConversationIds.slice(0, 1),
+             action: 'status',
+             data: { status: 'open' },
+           });
 
-        expect(response.status).toBe(200);
-        expect(response.body).toEqual({
-          successCount: expect.any(Number),
-          failureCount: expect.any(Number),
-          failures: expect.any(Array),
-        });
-      });
+         expect(response.status).toBe(200);
+         expect(response.body).toEqual({
+           data: {
+             successCount: expect.any(Number),
+             failureCount: expect.any(Number),
+             failures: expect.any(Array),
+           },
+         });
+       });
 
-      it('failures should contain id and reason', async () => {
-        const response = await request(app)
-          .post('/api/conversations/bulk')
-          .set('Authorization', `Bearer ${managerToken}`)
-          .send({
-            conversationIds: [`invalid-${Date.now()}`],
-            action: 'assign',
-            data: { assigneeId: 'someone' },
-          });
+       it('failures should contain id and reason', async () => {
+         const response = await request(app)
+           .post('/api/conversations/bulk')
+           .set('Authorization', `Bearer ${managerToken}`)
+           .send({
+             conversationIds: [`invalid-${Date.now()}`],
+             action: 'assign',
+             data: { assigneeId: 'someone' },
+           });
 
-        expect(response.status).toBe(200);
-        expect(response.body.failures).toHaveLength(1);
-        expect(response.body.failures[0]).toEqual({
-          id: expect.any(String),
-          reason: expect.any(String),
-        });
-      });
+         expect(response.status).toBe(200);
+         expect(response.body.data.failures).toHaveLength(1);
+         expect(response.body.data.failures[0]).toEqual({
+           id: expect.any(String),
+           reason: expect.any(String),
+         });
+       });
     });
 
     describe('RBAC Enforcement', () => {
