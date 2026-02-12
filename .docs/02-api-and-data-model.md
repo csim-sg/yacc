@@ -663,7 +663,7 @@ CREATE TABLE audit_logs (
 
 ### Auth
 
-#### `POST /auth/login`
+#### `POST /api/auth/login`
 **Request:**
 ```json
 {
@@ -687,7 +687,7 @@ CREATE TABLE audit_logs (
 
 ---
 
-#### `POST /auth/logout`
+#### `POST /api/auth/logout`
 **Response (200):**
 ```json
 { "data": { "success": true } }
@@ -877,7 +877,7 @@ Resets user password using a valid reset token.
 
 ---
 
-#### `POST /conversations/bulk`
+#### `POST /api/conversations/bulk`
 **Request:**
 ```json
 {
@@ -986,7 +986,7 @@ Resets user password using a valid reset token.
 
 ### Dead Letter Queue (DLQ)
 
-#### `GET /dlq`
+#### `GET /api/dlq`
 **Query**: `page`, `limit`, `failureReason`
 
 **Auth**: Manager+ only
@@ -1003,7 +1003,7 @@ Resets user password using a valid reset token.
 
 ---
 
-#### `GET /dlq/stats`
+#### `GET /api/dlq/stats`
 **Auth**: Manager+ only
 
 **Response:**
@@ -1113,7 +1113,7 @@ Resets user password using a valid reset token.
 
 ### Notes
 
-#### `GET /conversations/:id/notes`
+#### `GET /api/conversations/:id/notes`
 **Query**: `page`, `pageSize`
 
 **Response:**
@@ -1128,7 +1128,7 @@ Resets user password using a valid reset token.
 
 ---
 
-#### `POST /conversations/:id/notes`
+#### `POST /api/conversations/:id/notes`
 **Request:**
 ```json
 { "body": "Internal note with @mention support" }
@@ -1145,7 +1145,7 @@ Resets user password using a valid reset token.
 
 ### Assignments
 
-#### `POST /conversations/:id/assign`
+#### `POST /api/conversations/:id/assign`
 **Request:**
 ```json
 { "assignedUserId": "uuid" }
@@ -1162,7 +1162,7 @@ Resets user password using a valid reset token.
 
 ### Notifications
 
-#### `GET /notifications`
+#### `GET /api/notifications`
 **Query**: `page`, `pageSize`, `unread`, `type`
 
 **Response:**
@@ -1177,7 +1177,7 @@ Resets user password using a valid reset token.
 
 ---
 
-#### `PATCH /notifications/:id`
+#### `PATCH /api/notifications/:id`
 **Request:**
 ```json
 { "isRead": true }
@@ -1252,7 +1252,7 @@ Resets user password using a valid reset token.
 
 ### Routing Rules
 
-#### `GET /routing-rules`
+#### `GET /api/routing-rules`
 **Response:**
 ```json
 { "data": [/* Routing Rule models */] }
@@ -1260,7 +1260,7 @@ Resets user password using a valid reset token.
 
 ---
 
-#### `POST /routing-rules`
+#### `POST /api/routing-rules`
 **Request:**
 ```json
 {
@@ -1283,7 +1283,7 @@ Resets user password using a valid reset token.
 
 ---
 
-#### `PATCH /routing-rules/:id`
+#### `PATCH /api/routing-rules/:id`
 **Request:**
 ```json
 { "status": "disabled", "priority": 150 }
@@ -1296,7 +1296,7 @@ Resets user password using a valid reset token.
 
 ---
 
-#### `DELETE /routing-rules/:id`
+#### `DELETE /api/routing-rules/:id`
 **Response:**
 ```json
 { "data": { "success": true } }
@@ -1304,7 +1304,7 @@ Resets user password using a valid reset token.
 
 ---
 
-#### `GET /routing-rules/:id/executions`
+#### `GET /api/routing-rules/:id/executions`
 **Query**: `page`, `pageSize`
 
 **Response:**

@@ -30,7 +30,7 @@ interface AuthenticatedRequest extends Request {
  * Assignments API endpoints
  * Only manager+ roles can assign conversations
  */
-@JsonController('/conversations/:conversationId/assign')
+@JsonController('/api/conversations/:conversationId/assign')
 @Authorized()
 export class AssignmentsController {
   /**

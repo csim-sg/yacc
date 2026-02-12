@@ -64,7 +64,7 @@ function validateGetMessagesQuery(query: Record<string, unknown>): GetMessagesQu
   };
 }
 
-@JsonController('/conversations/:conversationId/messages')
+@JsonController('/api/conversations/:conversationId/messages')
 @Authorized()
 export class MessageController {
   /**

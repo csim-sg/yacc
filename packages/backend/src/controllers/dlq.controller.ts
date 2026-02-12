@@ -35,7 +35,7 @@ interface DLQQueryParams {
   failureReason?: string;
 }
 
-@JsonController('/dlq')
+@JsonController('/api/dlq')
 @Authorized()
 export class DLQController {
   /**

@@ -36,7 +36,7 @@ interface AuthenticatedRequest extends Request {
  * Admin+ for create/update/delete
  * Manager+ for list and query executions
  */
-@JsonController('/routing-rules')
+@JsonController('/api/routing-rules')
 @Authorized()
 export class RoutingRulesController {
   /**
