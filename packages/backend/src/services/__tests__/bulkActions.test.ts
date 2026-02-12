@@ -221,7 +221,11 @@ describe('Bulk Actions Service', () => {
       await bulkAssign([conversationId], testUserId, testUser2Id);
 
       // Now unassign (assign to null)
-      const result = await bulkAssign([conversationId], testUserId, null as any);
+      const result = await bulkAssign(
+        [conversationId],
+        testUserId,
+        null as unknown as string
+      );
 
       expect(result.data.successCount).toBe(1);
       expect(result.data.failureCount).toBe(0);
@@ -377,7 +381,7 @@ describe('Bulk Actions Service', () => {
 
       const result = await bulkUpdateStatus(
         conversationIds,
-        'invalid_status' as any,
+        'invalid_status' as unknown as 'open' | 'pending' | 'resolved',
         testUserId
       );
 
@@ -481,16 +485,24 @@ describe('Bulk Actions Service', () => {
     });
 
     it('should handle null/undefined input gracefully', async () => {
-      const result1 = await bulkAssign(null as any, testUserId, testUser2Id);
+      const result1 = await bulkAssign(
+        null as unknown as string[],
+        testUserId,
+        testUser2Id
+      );
       expect(result1.data.successCount).toBe(0);
       expect(result1.data.failureCount).toBe(0);
 
-      const result2 = await bulkTag(undefined as any, testTag.id, testUserId);
+      const result2 = await bulkTag(
+        undefined as unknown as string[],
+        testTag.id,
+        testUserId
+      );
       expect(result2.data.successCount).toBe(0);
       expect(result2.data.failureCount).toBe(0);
 
       const result3 = await bulkUpdateStatus(
-        [] as any,
+        [] as unknown as string[],
         'open',
         testUserId
       );

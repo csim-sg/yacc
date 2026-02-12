@@ -7,11 +7,11 @@
  * - Bulk status update (change conversation status)
  *
  * Features:
- * - Best-effort approach (partial success is OK)
+ * - Best-effort approach (partial success is OK, failures are returned)
  * - Max 100 conversations per request
- * - Transaction-per-conversation for safety
+ * - Atomic per-conversation updates (each conversation processed independently)
  * - RBAC: manager+ only
- * - Audit logging: bulk_action_applied
+ * - Audit logging: bulk_action_applied for each successful action
  */
 
 import type { Request } from 'express';
@@ -25,6 +25,7 @@ import {
   HttpCode,
   BadRequestError,
   ForbiddenError,
+  InternalServerError,
 } from 'routing-controllers';
 import { bulkActionsService } from '../services/bulkActions.service';
 import { logger } from '../infrastructure/logger';
@@ -58,15 +59,17 @@ export class BulkActionsController {
    *   }
    * }
    *
-   * Response:
-   * {
-   *   "successCount": 98,
-   *   "failureCount": 2,
-   *   "failures": [
-   *     {"id": "c1", "reason": "Conversation not found"},
-   *     {"id": "c2", "reason": "Assignment failed: ..."}
-   *   ]
-   * }
+    * Response (envelope format):
+    * {
+    *   "data": {
+    *     "successCount": 98,
+    *     "failureCount": 2,
+    *     "failures": [
+    *       {"id": "c1", "reason": "Conversation not found"},
+    *       {"id": "c2", "reason": "Assignment failed: ..."}
+    *     ]
+    *   }
+    * }
    *
    * Status codes:
    * - 200: Bulk operation complete (success + failures returned)
@@ -198,7 +201,8 @@ export class BulkActionsController {
         'Bulk action failed'
       );
 
-      throw new Error(`Bulk action failed: ${errorMsg}`);
+      // Return generic error to client, detailed error logged server-side
+      throw new InternalServerError('Bulk action failed');
     }
   }
 }

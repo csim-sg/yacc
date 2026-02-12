@@ -5,7 +5,7 @@
  * Handles pagination and date range filtering
  */
 
-import { and, desc, gte, lte, eq, count } from 'drizzle-orm';
+import { and, desc, gte, lte, eq, count, type SQL } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
 import { auditLogs } from '../schemas/auditLog.schema';
 import type {
@@ -62,7 +62,7 @@ export async function queryAuditLogs(
     }
 
     // Build WHERE conditions
-    const conditions: ReturnType<typeof eq>[] = [];
+    const conditions: SQL<unknown>[] = [];
 
     if (filters.actorId) {
       conditions.push(eq(auditLogs.actorId, filters.actorId));
@@ -89,41 +89,59 @@ export async function queryAuditLogs(
     }
 
     // Build WHERE clause
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const whereClause: SQL<unknown> | undefined = conditions.length > 0 ? and(...conditions) : undefined;
 
     // Execute count query with proper COUNT(*)
-    let countQuery = dbClient
-      .select({ count: count() })
-      .from(auditLogs) as any;
-
-    if (whereClause) {
-      countQuery = countQuery.where(whereClause);
-    }
-
-    const countResult = await countQuery;
+    const countResult = await (whereClause 
+      ? dbClient
+          .select({ count: count() })
+          .from(auditLogs)
+          .where(whereClause)
+      : dbClient
+          .select({ count: count() })
+          .from(auditLogs)
+    );
     const total = countResult[0]?.count || 0;
 
     // Execute data query
-    let dataQuery = dbClient
-      .select({
-        id: auditLogs.id,
-        actorId: auditLogs.actorId,
-        action: auditLogs.action,
-        entityType: auditLogs.entityType,
-        entityId: auditLogs.entityId,
-        metadata: auditLogs.metadata,
-        createdAt: auditLogs.createdAt,
-      })
-      .from(auditLogs)
-      .orderBy(desc(auditLogs.createdAt))
-      .limit(limit)
-      .offset(offset) as any;
+    const rawItems = await (whereClause
+      ? dbClient
+          .select({
+            id: auditLogs.id,
+            actorId: auditLogs.actorId,
+            action: auditLogs.action,
+            entityType: auditLogs.entityType,
+            entityId: auditLogs.entityId,
+            metadata: auditLogs.metadata,
+            createdAt: auditLogs.createdAt,
+          })
+          .from(auditLogs)
+          .where(whereClause)
+          .orderBy(desc(auditLogs.createdAt))
+          .limit(limit)
+          .offset(offset)
+      : dbClient
+          .select({
+            id: auditLogs.id,
+            actorId: auditLogs.actorId,
+            action: auditLogs.action,
+            entityType: auditLogs.entityType,
+            entityId: auditLogs.entityId,
+            metadata: auditLogs.metadata,
+            createdAt: auditLogs.createdAt,
+          })
+          .from(auditLogs)
+          .orderBy(desc(auditLogs.createdAt))
+          .limit(limit)
+          .offset(offset)
+    );
 
-    if (whereClause) {
-      dataQuery = dataQuery.where(whereClause);
-    }
-
-    const items = (await dataQuery) as AuditLogEntry[];
+    // Cast to AuditLogEntry (actorId is guaranteed non-null in production audit logs)
+    const items = rawItems.map((item) => ({
+      ...item,
+      actorId: item.actorId ?? 'system',
+      metadata: (item.metadata ?? {}) as Record<string, unknown>,
+    })) as AuditLogEntry[];
 
     logger.info(
       {
@@ -180,6 +198,9 @@ export async function queryConversationAuditLogs(
  * 
  * Supports filtering same as queryAuditLogs
  * Returns data as string (CSV or JSON format)
+ * 
+ * Note: Iterates through all pages to export ALL matching logs
+ * (not just the first page)
  */
 export async function exportAuditLogs(
   userId: string,
@@ -189,23 +210,47 @@ export async function exportAuditLogs(
   const format = request.format || 'csv';
 
   try {
-    // Query all matching logs with pagination
     const filters = request.filters || {};
-    const queryResponse = await queryAuditLogs(userId, filters, correlationId);
+    
+    // Fetch all matching logs by iterating through pages
+    const allItems: AuditLogEntry[] = [];
+    let currentPage = 1;
+    const pageSize = 100; // Use max page size for efficiency
+    
+    // Fetch first page to know total
+    const firstPageResponse = await queryAuditLogs(
+      userId,
+      { ...filters, page: 1, limit: pageSize },
+      correlationId
+    );
+    
+    allItems.push(...firstPageResponse.items);
+    const totalPages = firstPageResponse.pages;
+    
+    // Fetch remaining pages if any
+    for (let page = 2; page <= totalPages; page++) {
+      const pageResponse = await queryAuditLogs(
+        userId,
+        { ...filters, page, limit: pageSize },
+        correlationId
+      );
+      allItems.push(...pageResponse.items);
+    }
 
     let data: string;
 
     if (format === 'csv') {
-      data = convertToCSV(queryResponse.items);
+      data = convertToCSV(allItems);
     } else {
-      data = JSON.stringify(queryResponse.items, null, 2);
+      data = JSON.stringify(allItems, null, 2);
     }
 
     logger.info(
       {
         correlationId,
         format,
-        count: queryResponse.items.length,
+        count: allItems.length,
+        totalPages,
         filters: request.filters,
       },
       'Audit logs exported'
