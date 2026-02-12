@@ -13,7 +13,7 @@
  * - Max 100 conversations per request
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
 import { conversations } from '../schemas/conversation.schema';
 import { conversationTags } from '../schemas/conversationTag.schema';
@@ -66,47 +66,51 @@ export async function bulkAssign(
   // Note: We don't strictly require assignee to exist - they might be getting unassigned
   // But we log if it's suspicious
 
-  // Process each conversation
-  for (const conversationId of conversationIds) {
-    try {
-      // Update conversation
-      const result = await dbClient
-        .update(conversations)
-        .set({
-          assignedUserId: assigneeId,
-          updatedAt: new Date(),
-        })
-        .where(eq(conversations.id, conversationId))
-        .returning();
+   // Process each conversation
+   for (const conversationId of conversationIds) {
+     try {
+       // Update conversation
+       const result = await dbClient
+         .update(conversations)
+         .set({
+           assignedUserId: assigneeId,
+           updatedAt: new Date(),
+         })
+         .where(eq(conversations.id, conversationId))
+         .returning();
 
-      if (!result || result.length === 0) {
-        failures.push({ id: conversationId, reason: 'Conversation not found' });
-        continue;
-      }
+       if (!result || result.length === 0) {
+         failures.push({ id: conversationId, reason: 'Conversation not found' });
+         continue;
+       }
 
-      // Log audit event
-      await auditService.logAction({
-        actorId: userId,
-        action: 'bulk_action_applied',
-        entityType: 'conversation',
-        entityId: conversationId,
-        metadata: {
-          action: 'assign',
-          assigneeId,
-          bulkOperation: true,
-        },
-      });
+       // Log audit event
+       await auditService.logAction({
+         actorId: userId,
+         action: 'bulk_action_applied',
+         entityType: 'conversation',
+         entityId: conversationId,
+         metadata: {
+           action: 'assign',
+           assigneeId,
+           bulkOperation: true,
+         },
+       });
 
-      successCount++;
-    } catch (error: unknown) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.warn(
-        { correlationId, conversationId, error: errorMsg },
-        'Failed to bulk assign conversation'
-      );
-      failures.push({ id: conversationId, reason: `Assignment failed: ${errorMsg}` });
-    }
-  }
+       successCount++;
+     } catch (error: unknown) {
+       // Check if it's a FK constraint error (assignee doesn't exist)
+       const errorMsg = error instanceof Error ? error.message : String(error);
+       const isForeignKeyError = errorMsg.includes('foreign key') || errorMsg.includes('violates');
+       const reason = isForeignKeyError ? 'Assignee user not found' : 'Conversation not found';
+       
+       logger.warn(
+         { correlationId, conversationId, error: errorMsg },
+         'Failed to bulk assign conversation'
+       );
+       failures.push({ id: conversationId, reason });
+     }
+   }
 
   logger.info(
     { correlationId, successCount, failureCount: failures.length },
@@ -178,8 +182,10 @@ export async function bulkTag(
         .select({ id: conversationTags.conversationId })
         .from(conversationTags)
         .where(
-          eq(conversationTags.conversationId, conversationId) &&
+          and(
+            eq(conversationTags.conversationId, conversationId),
             eq(conversationTags.tagId, tagId)
+          )
         )
         .limit(1)
         .catch(() => null);
