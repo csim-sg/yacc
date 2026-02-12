@@ -17,7 +17,7 @@ import {
   type ChannelType,
   type GetConversationResponse,
 } from '../services/conversations.service';
-import { useAuthStore } from '../stores/auth.store';
+import { useAuth } from '../contexts/AuthContext';
 
 const CHANNEL_LABELS: Record<ChannelType, string> = {
   telegram: 'Telegram',
@@ -44,7 +44,7 @@ const STATUS_BADGE: Record<ConversationStatus, string> = {
 };
 
 export function ConversationPage() {
-  const { user, logout, isLoading: authLoading } = useAuthStore();
+  const { user, logout, isLoading: authLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { id } = useParams();
 

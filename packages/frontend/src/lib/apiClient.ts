@@ -115,15 +115,15 @@ async function attemptTokenRefresh(): Promise<boolean> {
 
   isRefreshing = true;
 
-  refreshPromise = (async (): Promise<boolean> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/refresh-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Send session cookie
-      });
+   refreshPromise = (async (): Promise<boolean> => {
+     try {
+       const response = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+         },
+         credentials: 'include', // Send session cookie
+       });
 
       if (response.ok) {
         const data = await response.json() as Record<string, string>;
