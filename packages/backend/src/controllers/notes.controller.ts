@@ -31,7 +31,7 @@ interface AuthenticatedRequest extends Request {
  * Notes API endpoints
  * All endpoints accessible to authenticated users
  */
-@JsonController('/conversations/:conversationId/notes')
+@JsonController('/api/conversations/:conversationId/notes')
 @Authorized()
 export class NotesController {
   /**

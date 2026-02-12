@@ -31,7 +31,7 @@ interface AuthenticatedRequest extends Request {
  * Tags API endpoints
  * All endpoints accessible to authenticated users
  */
-@JsonController('/tags')
+@JsonController('/api/tags')
 @Authorized()
 export class TagsController {
   /**

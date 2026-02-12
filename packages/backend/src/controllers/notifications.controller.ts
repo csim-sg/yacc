@@ -33,7 +33,7 @@ interface AuthenticatedRequest extends Request {
  * Notifications API endpoints
  * All authenticated users can manage their own notifications
  */
-@JsonController('/notifications')
+@JsonController('/api/notifications')
 @Authorized()
 export class NotificationsController {
   /**

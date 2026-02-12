@@ -41,7 +41,7 @@ interface BetterAuthRequest {
 // TODO: Implement EmailService in infrastructure layer
 // import { emailService } from '../infrastructure/email.client';
 
-@JsonController('/auth')
+@JsonController('/api/auth')
 export class AuthController {
   /**
    * POST /auth/forgot-password
