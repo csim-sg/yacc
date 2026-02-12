@@ -160,7 +160,8 @@ async function attemptTokenRefresh(): Promise<boolean> {
  */
 async function apiFetch<T>(
   endpoint: string,
-  options: FetchOptions = {}
+  options: FetchOptions = {},
+  responseType: 'json' | 'blob' = 'json'
 ): Promise<T> {
   const {
     timeout = 30000, // 30 seconds default
@@ -201,6 +202,9 @@ async function apiFetch<T>(
       
       // Response interceptor - handle success
       if (response.ok) {
+        if (responseType === 'blob') {
+          return await response.blob() as T;
+        }
         return await response.json() as T;
       }
       
@@ -269,32 +273,43 @@ async function apiFetch<T>(
  */
 export const api = {
   get: <T>(endpoint: string, options?: FetchOptions) =>
-    apiFetch<T>(endpoint, { ...options, method: 'GET' }),
+    apiFetch<T>(endpoint, { ...options, method: 'GET' }, 'json'),
   
   post: <T>(endpoint: string, body?: unknown, options?: FetchOptions) =>
     apiFetch<T>(endpoint, {
       ...options,
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,
-    }),
+    }, 'json'),
   
   patch: <T>(endpoint: string, body?: unknown, options?: FetchOptions) =>
     apiFetch<T>(endpoint, {
       ...options,
       method: 'PATCH',
       body: body ? JSON.stringify(body) : undefined,
-    }),
+    }, 'json'),
   
   put: <T>(endpoint: string, body?: unknown, options?: FetchOptions) =>
     apiFetch<T>(endpoint, {
       ...options,
       method: 'PUT',
       body: body ? JSON.stringify(body) : undefined,
-    }),
+    }, 'json'),
   
   delete: <T>(endpoint: string, options?: FetchOptions) =>
     apiFetch<T>(endpoint, {
       ...options,
       method: 'DELETE',
-    }),
+    }, 'json'),
+  
+  /**
+   * Download blob (e.g., file export)
+   * Returns response as Blob instead of JSON
+   */
+  blob: <T extends Blob>(endpoint: string, body?: unknown, options?: FetchOptions) =>
+    apiFetch<T>(endpoint, {
+      ...options,
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    }, 'blob'),
 };

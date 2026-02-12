@@ -98,6 +98,12 @@ export const auditLogsService = {
    * POST /api/audit-logs/export
    * Body: { format?: 'csv'|'json', filters?: {...} }
    * Response: Blob (CSV/JSON content directly)
+   * 
+   * Uses centralized API client with:
+   * - Authorization header (Bearer token)
+   * - Token refresh on 401
+   * - Retry logic for network failures
+   * - Full URL resolution (no relative paths)
    */
   async export(format: 'csv' | 'json' = 'csv', filters?: Record<string, unknown>): Promise<Blob> {
     const payload: AuditLogsExportRequest = {
@@ -105,18 +111,6 @@ export const auditLogsService = {
       filters,
     };
 
-    const response = await fetch('/api/audit-logs/export', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to export audit logs: ${response.statusText}`);
-    }
-
-    return response.blob();
+    return api.blob<Blob>('/api/audit-logs/export', payload);
   },
 };
