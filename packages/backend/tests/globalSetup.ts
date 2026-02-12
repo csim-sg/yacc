@@ -39,17 +39,28 @@ export async function setup() {
 
     // Simple test query to verify connection
     const result = await dbClient.execute('SELECT NOW() as now');
-    const timestamp = (result.rows?.[0] as any)?.now;
-
-    if (timestamp) {
-      console.log(`✅ Database connection successful (${timestamp})\n`);
+    
+    // Safely extract timestamp without using 'any'
+    if (result && typeof result === 'object' && 'rows' in result) {
+      const rows = result.rows;
+      if (Array.isArray(rows) && rows.length > 0) {
+        const firstRow = rows[0];
+        if (firstRow && typeof firstRow === 'object' && 'now' in firstRow) {
+          const timestamp = firstRow.now;
+          console.log(`✅ Database connection successful (${timestamp})\n`);
+        } else {
+          console.log('✅ Database connection verified\n');
+        }
+      }
     } else {
       console.log('✅ Database connection verified\n');
     }
 
     console.log('✅ Test environment ready\n');
-  } catch (error: any) {
-    console.error('❌ Global setup failed:', error);
+  } catch (error: unknown) {
+    // Safely handle error without using 'any'
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('❌ Global setup failed:', errorMessage);
     console.error('Make sure PostgreSQL is running and migrations have been applied');
     throw error;
   }
@@ -64,8 +75,10 @@ export async function teardown() {
   try {
     // For now, just log completion
     console.log('✅ Test suite cleanup completed\n');
-  } catch (error) {
-    console.error('⚠️ Teardown warning:', error);
+  } catch (error: unknown) {
+    // Safely handle error without using 'any'
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('⚠️ Teardown warning:', errorMessage);
     // Don't fail on teardown errors
   }
 }

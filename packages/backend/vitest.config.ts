@@ -18,11 +18,22 @@ export default defineConfig({
     environment: 'node',
 
     // Test file patterns
-    include: [
-      'tests/**/*.test.ts',
-      'tests/**/*.spec.ts',
-      '**/__tests__/**/*.ts',
-    ],
+    // By default, skip integration tests (WebSocket, queue tests)
+    // To run integration tests: RUN_INTEGRATION_TESTS=true pnpm test
+    include: process.env.RUN_INTEGRATION_TESTS === 'true'
+      ? [
+          'tests/**/*.test.ts',
+          'tests/**/*.spec.ts',
+          '**/__tests__/**/*.ts',
+        ]
+      : [
+          'tests/**/*.test.ts',
+          'tests/**/*.spec.ts',
+          '**/__tests__/**/*.ts',
+          // Explicitly exclude integration tests when not requested
+          '!tests/integration/**',
+          '!src/services/__tests__/**/*integration*',
+        ],
 
     // Global test timeout
     testTimeout: 10000,
