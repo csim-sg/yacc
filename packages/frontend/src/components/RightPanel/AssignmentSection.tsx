@@ -39,7 +39,7 @@ export function AssignmentSection({
 
   // Assign mutation
   const assignMutation = useMutation({
-    mutationFn: (userId: string | null) =>
+    mutationFn: (userId: string) =>
       assignmentsService.assign(conversation.id, userId),
     onSuccess: () => {
       // Invalidate conversation queries to refetch

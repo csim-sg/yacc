@@ -8,7 +8,7 @@ import { api } from '../lib/apiClient';
 export type BulkActionType = 'assign' | 'tag' | 'status';
 
 export type BulkActionData =
-  | { assigneeId: string | null }
+  | { assigneeId: string }
   | { tagId: number }
   | { status: 'open' | 'pending' | 'resolved' };
 
@@ -58,10 +58,13 @@ export const bulkActionsService = {
 
   /**
    * Bulk assign conversations to a user
+   * PHASE 2 MVP: Unassign not supported
+   * - assigneeId is required (non-nullable)
+   * - No null/unassign option exposed in UI
    */
   async bulkAssign(
     conversationIds: string[],
-    assigneeId: string | null
+    assigneeId: string
   ): Promise<BulkActionResponse> {
     return this.execute(conversationIds, 'assign', { assigneeId });
   },

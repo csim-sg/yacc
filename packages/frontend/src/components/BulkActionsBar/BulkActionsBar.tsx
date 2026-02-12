@@ -29,7 +29,7 @@ export function BulkActionsBar({ onActionsComplete }: BulkActionsBarProps) {
 
   // Bulk assign mutation
   const bulkAssignMutation = useMutation({
-    mutationFn: (assignedUserId: string | null) =>
+    mutationFn: (assignedUserId: string) =>
       bulkActionsService.bulkAssign(conversationIds, assignedUserId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
