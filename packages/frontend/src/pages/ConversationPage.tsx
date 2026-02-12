@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ReplyComposer } from '../components/ReplyComposer';
 import { RightPanel } from '../components/RightPanel/RightPanel';
+import { useAuth } from '../contexts/AuthContext';
 import {
   conversationsService,
   type ConversationDetail,
@@ -17,7 +18,6 @@ import {
   type ChannelType,
   type GetConversationResponse,
 } from '../services/conversations.service';
-import { useAuth } from '../contexts/AuthContext';
 
 const CHANNEL_LABELS: Record<ChannelType, string> = {
   telegram: 'Telegram',
