@@ -7,10 +7,11 @@
  * - Bulk status update (change conversation status)
  * 
  * Strategy:
- * - Best-effort: process each conversation individually
- * - Transaction-per-conversation (not bulk transaction)
- * - Collect failures and return to caller
+ * - Best-effort: process each conversation independently
+ * - Atomic per-conversation (partial success acceptable)
+ * - Collect failures with safe error messages
  * - Max 100 conversations per request
+ * - Never expose internal DB errors to clients
  */
 
 import { eq, and } from 'drizzle-orm';
@@ -23,6 +24,26 @@ import type { BulkActionResponse, BulkActionFailure, ConversationStatus } from '
 import { logger } from '../infrastructure/logger';
 
 const MAX_BULK_SIZE = 100;
+
+/**
+ * Map internal errors to safe client-facing messages
+ * Never expose database/system internals to API clients
+ * Log detailed errors server-side with correlationId for debugging
+ */
+function getSafeErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    // Map specific known errors to safe generic messages
+    if (msg.includes('foreign key') || msg.includes('constraint')) {
+      return 'Invalid reference: resource not found';
+    }
+    if (msg.includes('not found')) {
+      return 'Resource not found';
+    }
+    // Default safe message for any other database/system error
+  }
+  return 'Operation failed';
+}
 
 /**
  * Bulk assign conversations to a user
@@ -221,7 +242,9 @@ export async function bulkTag(
         { correlationId, conversationId, tagId, error: errorMsg },
         'Failed to bulk tag conversation'
       );
-      failures.push({ id: conversationId, reason: `Tagging failed: ${errorMsg}` });
+      // Use safe error message (don't expose DB internals)
+      const safeReason = errorMsg.includes('not found') ? 'Tag not found' : 'Tagging operation failed';
+      failures.push({ id: conversationId, reason: safeReason });
     }
   }
 
@@ -339,7 +362,9 @@ export async function bulkUpdateStatus(
         { correlationId, conversationId, status, error: errorMsg },
         'Failed to bulk update conversation status'
       );
-      failures.push({ id: conversationId, reason: `Status update failed: ${errorMsg}` });
+      // Use safe error message (don't expose DB internals)
+      const safeReason = 'Status update failed';
+      failures.push({ id: conversationId, reason: safeReason });
     }
   }
 

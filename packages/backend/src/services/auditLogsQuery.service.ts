@@ -57,8 +57,12 @@ export async function queryAuditLogs(
       if (Number.isNaN(dateToVal.getTime())) {
         throw new Error('Invalid dateTo format. Expected ISO 8601 string.');
       }
-      // Set time to end of day
-      dateToVal.setHours(23, 59, 59, 999);
+      // Set time to end of day (use UTC to avoid timezone issues)
+      // If user provides a date-only string like "2026-02-12", treat as end of that UTC day
+      const year = dateToVal.getUTCFullYear();
+      const month = dateToVal.getUTCMonth();
+      const day = dateToVal.getUTCDate();
+      dateToVal = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
     }
 
     if (dateFromVal && dateToVal && dateFromVal > dateToVal) {
