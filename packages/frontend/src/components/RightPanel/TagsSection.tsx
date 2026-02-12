@@ -36,7 +36,7 @@ export function TagsSection({
 
   // Add tag mutation
   const addTagMutation = useMutation({
-    mutationFn: (tagId: string) =>
+    mutationFn: (tagId: number) =>
       tagsService.addToConversation(conversation.id, { tagId }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -48,7 +48,7 @@ export function TagsSection({
 
   // Remove tag mutation
   const removeTagMutation = useMutation({
-    mutationFn: (tagId: string) =>
+    mutationFn: (tagId: number) =>
       tagsService.removeFromConversation(conversation.id, tagId),
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -71,7 +71,7 @@ export function TagsSection({
 
   const conversationTags = conversation.tags || [];
   const availableTags = tags.filter(
-    (tag) => !conversationTags.some((ct) => ct.id === tag.id)
+    (tag) => !conversationTags.some((ct) => ct.id === String(tag.id))
   );
 
   return (
@@ -95,15 +95,15 @@ export function TagsSection({
             data-testid={`tag-badge-${tag.id}`}
           >
             <span>{tag.name}</span>
-            <button
-              onClick={() => removeTagMutation.mutate(tag.id)}
-              className="ml-1 hover:opacity-80 cursor-pointer"
-              disabled={removeTagMutation.isPending}
-              aria-label={`Remove ${tag.name} tag`}
-              data-testid={`remove-tag-${tag.id}`}
-            >
-              ✕
-            </button>
+             <button
+               onClick={() => removeTagMutation.mutate(Number(tag.id))}
+               className="ml-1 hover:opacity-80 cursor-pointer"
+               disabled={removeTagMutation.isPending}
+               aria-label={`Remove ${tag.name} tag`}
+               data-testid={`remove-tag-${tag.id}`}
+             >
+               ✕
+             </button>
           </div>
         ))}
       </div>

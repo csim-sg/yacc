@@ -8,7 +8,6 @@ import { api } from '../lib/apiClient';
 export interface AuditLog {
   id: string;
   actorId: string;
-  actorName: string;
   action: string;
   entityType: string;
   entityId: string;
@@ -17,10 +16,14 @@ export interface AuditLog {
 }
 
 export interface AuditLogsListResponse {
+  success: boolean;
   data: AuditLog[];
-  total: number;
-  page: number;
-  pageSize: number;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  };
 }
 
 export interface AuditLogsQueryParams {
@@ -40,6 +43,11 @@ export interface ConversationAuditLogsQueryParams {
   dateTo?: string;
   page?: number;
   limit?: number;
+}
+
+export interface AuditLogsExportRequest {
+  format?: 'csv' | 'json';
+  filters?: Record<string, unknown>;
 }
 
 export const auditLogsService = {
@@ -65,6 +73,8 @@ export const auditLogsService = {
 
   /**
    * Get audit logs for a specific conversation
+   * GET /api/conversations/:conversationId/audit-logs?page=1&limit=50
+   * Response: { success, data, pagination: { total, page, limit, pages } }
    */
   async queryByConversation(
     conversationId: string,
@@ -80,38 +90,34 @@ export const auditLogsService = {
 
     const queryString = query.toString();
     const endpoint = queryString
-      ? `/api/audit-logs/conversations/${conversationId}?${queryString}`
-      : `/api/audit-logs/conversations/${conversationId}`;
+      ? `/api/conversations/${conversationId}/audit-logs?${queryString}`
+      : `/api/conversations/${conversationId}/audit-logs`;
 
     return api.get<AuditLogsListResponse>(endpoint);
   },
 
   /**
-   * Export audit logs as CSV
+   * Export audit logs as CSV or JSON
+   * POST /api/audit-logs/export
+   * Body: { format?: 'csv'|'json', filters?: {...} }
+   * Response: Blob (CSV/JSON content directly)
    */
-  async export(params: AuditLogsQueryParams = {}): Promise<Blob> {
-    const query = new URLSearchParams();
+  async export(format: 'csv' | 'json' = 'csv', filters?: Record<string, unknown>): Promise<Blob> {
+    const payload: AuditLogsExportRequest = {
+      format,
+      filters,
+    };
 
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        query.set(key, String(value));
-      }
-    });
-
-    const queryString = query.toString();
-    const endpoint = queryString
-      ? `/api/audit-logs/export?${queryString}`
-      : '/api/audit-logs/export';
-
-    const response = await fetch(endpoint, {
+    const response = await fetch('/api/audit-logs/export', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to export audit logs');
+      throw new Error(`Failed to export audit logs: ${response.statusText}`);
     }
 
     return response.blob();

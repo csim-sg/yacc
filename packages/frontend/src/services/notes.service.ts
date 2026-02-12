@@ -9,7 +9,6 @@ export interface Note {
   id: string;
   conversationId: string;
   authorId: string;
-  authorName: string;
   body: string;
   mentions: string[];
   createdAt: string;
@@ -18,7 +17,6 @@ export interface Note {
 
 export interface CreateNoteRequest {
   body: string;
-  mentions?: string[];
 }
 
 export interface CreateNoteResponse {
@@ -27,19 +25,33 @@ export interface CreateNoteResponse {
 
 export interface ListNotesResponse {
   data: Note[];
+  page: number;
+  pageSize: number;
+  total: number;
 }
 
 export const notesService = {
   /**
-   * Get all notes for a conversation
+   * Get all notes for a conversation with pagination
+   * GET /api/conversations/:conversationId/notes?page=1&pageSize=50
    */
-  async list(conversationId: string): Promise<ListNotesResponse> {
-    return api.get<ListNotesResponse>(`/api/conversations/${conversationId}/notes`);
+  async list(
+    conversationId: string,
+    page: number = 1,
+    pageSize: number = 50
+  ): Promise<ListNotesResponse> {
+    return api.get<ListNotesResponse>(
+      `/api/conversations/${conversationId}/notes?page=${page}&pageSize=${pageSize}`
+    );
   },
 
   /**
-   * Create a new note with optional @mentions
-   * @mention format: @username or @[userId]
+   * Create a new note
+   * POST /api/conversations/:conversationId/notes
+   * Body: { body: string }
+   * Backend parses @mentions server-side from body text
+   * @mention format: @username (no spaces, matches email local-part)
+   * Response includes parsed mentions array
    */
   async create(
     conversationId: string,

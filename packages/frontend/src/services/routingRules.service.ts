@@ -68,6 +68,8 @@ export interface ListRoutingRuleExecutionsResponse {
 export const routingRulesService = {
   /**
    * List all routing rules
+   * GET /api/routing-rules
+   * RBAC: manager+ only
    */
   async list(): Promise<ListRoutingRulesResponse> {
     return api.get<ListRoutingRulesResponse>('/api/routing-rules');
@@ -75,6 +77,8 @@ export const routingRulesService = {
 
   /**
    * Get a specific routing rule
+   * GET /api/routing-rules/:id
+   * RBAC: manager+ only
    */
   async getById(id: string): Promise<{ data: RoutingRule }> {
     return api.get<{ data: RoutingRule }>(`/api/routing-rules/${id}`);
@@ -82,6 +86,8 @@ export const routingRulesService = {
 
   /**
    * Create a new routing rule
+   * POST /api/routing-rules
+   * RBAC: admin+ only
    */
   async create(
     payload: CreateRoutingRuleRequest
@@ -91,32 +97,39 @@ export const routingRulesService = {
 
   /**
    * Update a routing rule
+   * PATCH /api/routing-rules/:id (NOT PUT)
+   * RBAC: admin+ only
    */
   async update(
     id: string,
     payload: UpdateRoutingRuleRequest
   ): Promise<{ data: RoutingRule }> {
-    return api.put<{ data: RoutingRule }>(`/api/routing-rules/${id}`, payload);
+    return api.patch<{ data: RoutingRule }>(`/api/routing-rules/${id}`, payload);
   },
 
   /**
    * Delete a routing rule
+   * DELETE /api/routing-rules/:id
+   * RBAC: admin+ only
    */
-  async delete(id: string): Promise<void> {
-    return api.delete<void>(`/api/routing-rules/${id}`);
+  async delete(id: string): Promise<{ data: unknown }> {
+    return api.delete<{ data: unknown }>(`/api/routing-rules/${id}`);
   },
 
   /**
    * Get execution history for a routing rule
+   * GET /api/routing-rules/:id/executions?page=1&pageSize=50
+   * Note: Backend uses 'pageSize' NOT 'limit' for pagination
+   * RBAC: manager+ only
    */
   async getExecutions(
     ruleId: string,
     page: number = 1,
-    limit: number = 20
+    pageSize: number = 50
   ): Promise<ListRoutingRuleExecutionsResponse> {
     const query = new URLSearchParams({
       page: String(page),
-      limit: String(limit),
+      pageSize: String(pageSize),
     });
 
     return api.get<ListRoutingRuleExecutionsResponse>(

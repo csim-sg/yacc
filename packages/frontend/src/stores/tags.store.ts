@@ -14,8 +14,8 @@ interface TagsStore {
   // Actions
   fetchTags: () => Promise<void>;
   createTag: (name: string, color: string) => Promise<Tag>;
-  addTagToConversation: (conversationId: string, tagId: string) => Promise<void>;
-  removeTagFromConversation: (conversationId: string, tagId: string) => Promise<void>;
+  addTagToConversation: (conversationId: string, tagId: number) => Promise<void>;
+  removeTagFromConversation: (conversationId: string, tagId: number) => Promise<void>;
   clearError: () => void;
 }
 
@@ -54,7 +54,7 @@ export const useTagsStore = create<TagsStore>((set) => ({
     }
   },
 
-  addTagToConversation: async (conversationId: string, tagId: string) => {
+  addTagToConversation: async (conversationId: string, tagId: number) => {
     set({ error: null });
     try {
       await tagsService.addToConversation(conversationId, { tagId });
@@ -66,7 +66,7 @@ export const useTagsStore = create<TagsStore>((set) => ({
     }
   },
 
-  removeTagFromConversation: async (conversationId: string, tagId: string) => {
+  removeTagFromConversation: async (conversationId: string, tagId: number) => {
     set({ error: null });
     try {
       await tagsService.removeFromConversation(conversationId, tagId);

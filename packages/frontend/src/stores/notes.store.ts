@@ -14,7 +14,7 @@ interface NotesStore {
 
   // Actions
   fetchNotes: (conversationId: string) => Promise<void>;
-  addNote: (conversationId: string, body: string, mentions?: string[]) => Promise<Note>;
+  addNote: (conversationId: string, body: string) => Promise<Note>;
   setCurrentConversation: (conversationId: string | null) => void;
   clearError: () => void;
 }
@@ -37,12 +37,11 @@ export const useNotesStore = create<NotesStore>((set) => ({
     }
   },
 
-  addNote: async (conversationId: string, body: string, mentions?: string[]) => {
+  addNote: async (conversationId: string, body: string) => {
     set({ error: null });
     try {
       const response = await notesService.create(conversationId, {
         body,
-        mentions,
       });
       const newNote = response.data;
       set((state) => ({

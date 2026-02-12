@@ -7,21 +7,24 @@ import { api } from '../lib/apiClient';
 
 export type BulkActionType = 'assign' | 'tag' | 'status';
 
-export interface BulkActionData {
-  assign?: string | null;
-  tag?: string;
-  status?: 'open' | 'pending' | 'resolved';
-}
+export type BulkActionData =
+  | { assigneeId: string | null }
+  | { tagId: number }
+  | { status: 'open' | 'pending' | 'resolved' };
 
 export interface BulkActionFailure {
   id: string;
   reason: string;
 }
 
-export interface BulkActionResponse {
+export interface BulkActionResponseData {
   successCount: number;
   failureCount: number;
   failures: BulkActionFailure[];
+}
+
+export interface BulkActionResponse {
+  data: BulkActionResponseData;
 }
 
 export interface BulkActionRequest {
@@ -33,9 +36,11 @@ export interface BulkActionRequest {
 export const bulkActionsService = {
   /**
    * Perform bulk actions on conversations
+   * POST /api/conversations/bulk
    * @param conversationIds - Array of conversation IDs to update
    * @param action - Type of action: 'assign', 'tag', or 'status'
    * @param data - Action-specific data (assigneeId for assign, tagId for tag, status for status)
+   * Response: { data: { successCount, failureCount, failures } }
    */
   async execute(
     conversationIds: string[],
@@ -58,7 +63,7 @@ export const bulkActionsService = {
     conversationIds: string[],
     assigneeId: string | null
   ): Promise<BulkActionResponse> {
-    return this.execute(conversationIds, 'assign', { assign: assigneeId });
+    return this.execute(conversationIds, 'assign', { assigneeId });
   },
 
   /**
@@ -66,9 +71,9 @@ export const bulkActionsService = {
    */
   async bulkTag(
     conversationIds: string[],
-    tagId: string
+    tagId: number
   ): Promise<BulkActionResponse> {
-    return this.execute(conversationIds, 'tag', { tag: tagId });
+    return this.execute(conversationIds, 'tag', { tagId });
   },
 
   /**

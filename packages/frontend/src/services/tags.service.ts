@@ -6,7 +6,7 @@
 import { api } from '../lib/apiClient';
 
 export interface Tag {
-  id: string;
+  id: number;
   name: string;
   color: string;
   createdAt: string;
@@ -26,12 +26,16 @@ export interface ListTagsResponse {
   data: Tag[];
 }
 
-export interface AddTagRequest {
-  tagId: string;
+export interface AttachTagRequest {
+  tagId: number;
 }
 
-export interface RemoveTagResponse {
-  success: boolean;
+export interface AttachTagResponse {
+  data: { tags: Tag[] };
+}
+
+export interface DetachTagResponse {
+  data: { tags: Tag[] };
 }
 
 export const tagsService = {
@@ -51,26 +55,28 @@ export const tagsService = {
 
   /**
    * Add a tag to a conversation
+   * POST /api/tags/conversations/:conversationId
    */
   async addToConversation(
     conversationId: string,
-    payload: AddTagRequest
-  ): Promise<void> {
-    return api.post<void>(
-      `/api/conversations/${conversationId}/tags`,
+    payload: AttachTagRequest
+  ): Promise<AttachTagResponse> {
+    return api.post<AttachTagResponse>(
+      `/api/tags/conversations/${conversationId}`,
       payload
     );
   },
 
   /**
    * Remove a tag from a conversation
+   * DELETE /api/tags/conversations/:conversationId/tags/:tagId
    */
   async removeFromConversation(
     conversationId: string,
-    tagId: string
-  ): Promise<RemoveTagResponse> {
-    return api.delete<RemoveTagResponse>(
-      `/api/conversations/${conversationId}/tags/${tagId}`
+    tagId: number
+  ): Promise<DetachTagResponse> {
+    return api.delete<DetachTagResponse>(
+      `/api/tags/conversations/${conversationId}/tags/${tagId}`
     );
   },
 };

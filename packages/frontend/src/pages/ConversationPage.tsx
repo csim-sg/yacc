@@ -87,28 +87,29 @@ export function ConversationPage() {
      enabled: !!conversationId,
    });
 
-   // Send message mutation
-   const queryClient = useQueryClient();
-   const sendMessageMutation = useMutation({
-     mutationFn: (body: string) =>
-       conversationsService.sendMessage(conversationId as string, body),
-     onSuccess: (newMessage) => {
-       // Add message to the messages list cache
-       queryClient.setQueryData(
-         ['conversationMessages', conversationId],
-         (oldData: unknown) => {
-           if (!oldData || typeof oldData !== 'object' || !('data' in oldData)) {
-             return { data: [newMessage] };
-           }
-           const typedData = oldData as { data: ConversationMessage[] };
-           return {
-             ...typedData,
-             data: [...typedData.data, newMessage],
-           };
-         }
-       );
-     },
-   });
+    // Send message mutation
+    const queryClient = useQueryClient();
+    const sendMessageMutation = useMutation({
+      mutationFn: (body: string) =>
+        conversationsService.sendMessage(conversationId as string, body),
+      onSuccess: (response) => {
+        // Add message to the messages list cache
+        // Response shape: { data: ConversationMessage }
+        queryClient.setQueryData(
+          ['conversationMessages', conversationId],
+          (oldData: unknown) => {
+            if (!oldData || typeof oldData !== 'object' || !('data' in oldData)) {
+              return { data: [response.data] };
+            }
+            const typedData = oldData as { data: ConversationMessage[] };
+            return {
+              ...typedData,
+              data: [...typedData.data, response.data],
+            };
+          }
+        );
+      },
+    });
 
    const conversation: ConversationDetail | null = data?.data ?? null;
    const messages = messagesData?.data ?? [];

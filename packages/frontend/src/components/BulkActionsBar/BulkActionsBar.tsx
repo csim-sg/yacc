@@ -20,17 +20,17 @@ export function BulkActionsBar({ onActionsComplete }: BulkActionsBarProps) {
   const selectedCount = selectedIds.size;
   const conversationIds = getSelectedIds();
 
-  // Mock users
-  const users = [
-    { id: '1', name: 'Alice Johnson' },
-    { id: '2', name: 'Bob Smith' },
-    { id: '3', name: 'Carol White' },
-  ];
+  /**
+   * User list - deferred to Phase 3
+   * TODO: Implement GET /api/users endpoint
+   * Phase 1 MVP: Users dropdown empty; bulk assign still works via direct ID
+   */
+  const users: Array<{ id: string; name: string }> = [];
 
   // Bulk assign mutation
   const bulkAssignMutation = useMutation({
-    mutationFn: (userId: string | null) =>
-      bulkActionsService.bulkAssign(conversationIds, userId),
+    mutationFn: (assignedUserId: string | null) =>
+      bulkActionsService.bulkAssign(conversationIds, assignedUserId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       deselectAll();
@@ -40,7 +40,7 @@ export function BulkActionsBar({ onActionsComplete }: BulkActionsBarProps) {
 
   // Bulk tag mutation
   const bulkTagMutation = useMutation({
-    mutationFn: (tagId: string) =>
+    mutationFn: (tagId: number) =>
       bulkActionsService.bulkTag(conversationIds, tagId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });

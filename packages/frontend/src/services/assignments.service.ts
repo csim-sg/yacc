@@ -5,30 +5,33 @@
 
 import { api } from '../lib/apiClient';
 
-export interface AssignRequest {
-  assigneeId: string | null;
+export interface AssignConversationRequest {
+  assignedUserId: string | null;
+}
+
+export interface Conversation {
+  id: string;
+  assignedUserId: string | null;
+  [key: string]: unknown;
 }
 
 export interface AssignResponse {
-  data: {
-    id: string;
-    assignedUserId: string | null;
-    assignedUserName?: string | null;
-    updatedAt: string;
-  };
+  data: Conversation;
 }
 
 export const assignmentsService = {
   /**
    * Assign a conversation to a user or unassign (set to null)
+   * PATCH /api/conversations/:conversationId/assign
+   * Backend: manager+ only
    */
   async assign(
     conversationId: string,
-    assigneeId: string | null
+    assignedUserId: string | null
   ): Promise<AssignResponse> {
-    return api.put<AssignResponse>(
+    return api.patch<AssignResponse>(
       `/api/conversations/${conversationId}/assign`,
-      { assigneeId }
+      { assignedUserId }
     );
   },
 };

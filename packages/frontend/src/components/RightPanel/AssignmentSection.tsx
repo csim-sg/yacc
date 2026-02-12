@@ -3,7 +3,7 @@
  * Allows assigning/unassigning conversations to users
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { assignmentsService } from '../../services/assignments.service';
 import type { ConversationDetail } from '../../services/conversations.service';
@@ -13,12 +13,12 @@ interface AssignmentSectionProps {
   onChange?: () => void;
 }
 
-// Mock user list - In future, this should come from a backend API
-const MOCK_USERS = [
-  { id: '1', name: 'Alice Johnson', email: 'alice@example.com' },
-  { id: '2', name: 'Bob Smith', email: 'bob@example.com' },
-  { id: '3', name: 'Carol White', email: 'carol@example.com' },
-];
+/**
+ * User list - deferred to Phase 3
+ * TODO: Implement GET /api/users endpoint to fetch real users
+ * Phase 1 MVP: Assignment works but user dropdown is empty
+ * Will be populated once user API is available in Phase 3
+ */
 
 export function AssignmentSection({
   conversation,
@@ -27,11 +27,9 @@ export function AssignmentSection({
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Fetch users (mock for now)
-  const { data: users = MOCK_USERS } = useQuery({
-    queryKey: ['users'],
-    queryFn: async () => MOCK_USERS,
-  });
+  // TODO: Replace with real users API call (GET /api/users)
+  // For Phase 1 MVP, users list is empty - assignment still functions via ID input
+  const users: Array<{ id: string; name: string; email: string }> = [];
 
   // Assign mutation
   const assignMutation = useMutation({

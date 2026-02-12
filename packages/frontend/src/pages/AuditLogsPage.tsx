@@ -32,15 +32,15 @@ export function AuditLogsPage() {
   });
 
   const logs = logsData?.data || [];
-  const total = logsData?.total || 0;
-  const pageSize = logsData?.pageSize || 20;
-  const totalPages = useMemo(() => Math.ceil(total / pageSize), [total, pageSize]);
+  const total = logsData?.pagination?.total || 0;
+  const limit = logsData?.pagination?.limit || 20;
+  const totalPages = useMemo(() => Math.ceil(total / limit), [total, limit]);
 
   // Handle export
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const blob = await auditLogsService.export(filters);
+      const blob = await auditLogsService.export('csv', filters);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -207,8 +207,8 @@ export function AuditLogsPage() {
                       </thead>
                       <tbody>
                         {logs.map((log) => (
-                          <tr key={log.id} data-testid={`log-row-${log.id}`}>
-                            <td className="font-semibold">{log.actorName}</td>
+                           <tr key={log.id} data-testid={`log-row-${log.id}`}>
+                             <td className="font-semibold">{log.actorId}</td>
                             <td>
                               <span className="badge badge-sm badge-primary">
                                 {log.action}
