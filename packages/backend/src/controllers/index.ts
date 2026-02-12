@@ -19,6 +19,7 @@
 
 import { AssignmentsController } from './assignments.controller.js';
 import { AuditController } from './audit.controller.js';
+import { AuditLogsQueryController } from './audit-logs-query.controller.js';
 import { AuthController } from './auth.controller.js';
 import { BulkActionsController } from './bulk-actions.controller.js';
 import { ConversationsController } from './conversations.controller.js';
@@ -34,6 +35,7 @@ import { TagsController } from './tags.controller.js';
 export const controllers = [
   AssignmentsController,
   AuditController,
+  AuditLogsQueryController,
   AuthController,
   BulkActionsController,
   ConversationsController,
