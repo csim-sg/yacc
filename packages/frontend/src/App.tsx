@@ -13,16 +13,18 @@
 import { useState, type ReactElement } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Navigation } from './components/Navigation';
 import { Header } from './components/Header';
 import { ReconnectingIndicator } from './components/ReconnectingIndicator';
-import { queryClient } from './lib/queryClient';
+import { AuditLogsPage } from './pages/AuditLogsPage';
+import { ConversationPage } from './pages/ConversationPage';
+import { InboxPage } from './pages/InboxPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/registerPage';
-import { InboxPage } from './pages/InboxPage';
-import { ConversationPage } from './pages/ConversationPage';
+import { RoutingRulesPage } from './pages/RoutingRulesPage';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { queryClient } from './lib/queryClient';
 
 /**
  * Public Route wrapper
@@ -168,26 +170,26 @@ function AppRoutes(): ReactElement {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/routing-rules"
-        element={
-          <ProtectedRoute requiredRole="SUPER_ADMIN">
-            <MainLayout>
-              <div className="p-8">Admin: Routing Rules (Coming soon)</div>
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/audit-logs"
-        element={
-          <ProtectedRoute requiredRole="MANAGER">
-            <MainLayout>
-              <div className="p-8">Admin: Audit Logs (Coming soon)</div>
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
+       <Route
+         path="/routing-rules"
+         element={
+           <ProtectedRoute requiredRole="ADMIN">
+             <MainLayout>
+               <RoutingRulesPage />
+             </MainLayout>
+           </ProtectedRoute>
+         }
+       />
+       <Route
+         path="/audit-logs"
+         element={
+           <ProtectedRoute requiredRole="MANAGER">
+             <MainLayout>
+               <AuditLogsPage />
+             </MainLayout>
+           </ProtectedRoute>
+         }
+       />
       <Route
         path="/settings"
         element={

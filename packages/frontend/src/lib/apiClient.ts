@@ -115,15 +115,15 @@ async function attemptTokenRefresh(): Promise<boolean> {
 
   isRefreshing = true;
 
-  refreshPromise = (async (): Promise<boolean> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/refresh-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Send session cookie
-      });
+   refreshPromise = (async (): Promise<boolean> => {
+     try {
+       const response = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+         },
+         credentials: 'include', // Send session cookie
+       });
 
       if (response.ok) {
         const data = await response.json() as Record<string, string>;
@@ -160,7 +160,8 @@ async function attemptTokenRefresh(): Promise<boolean> {
  */
 async function apiFetch<T>(
   endpoint: string,
-  options: FetchOptions = {}
+  options: FetchOptions = {},
+  responseType: 'json' | 'blob' = 'json'
 ): Promise<T> {
   const {
     timeout = 30000, // 30 seconds default
@@ -201,25 +202,28 @@ async function apiFetch<T>(
       
       // Response interceptor - handle success
       if (response.ok) {
+        if (responseType === 'blob') {
+          return await response.blob() as T;
+        }
         return await response.json() as T;
       }
       
-      // Response interceptor - handle 401 Unauthorized
-      if (response.status === 401) {
-        const refreshed = await attemptTokenRefresh();
+       // Response interceptor - handle 401 Unauthorized
+       if (response.status === 401) {
+         const refreshed = await attemptTokenRefresh();
 
-        if (refreshed) {
-          // Retry request with new token
-          return await apiFetch<T>(endpoint, {
-            ...options,
-            retries: 0, // Don't retry after refresh to avoid infinite loop
-          });
-        } else {
-          clearToken();
-          window.location.href = '/login';
-          throw new Error('Token expired. Please log in again.');
-        }
-      }
+         if (refreshed) {
+           // Retry request with new token, preserving responseType (crucial for blob)
+           return await apiFetch<T>(endpoint, {
+             ...options,
+             retries: 0, // Don't retry after refresh to avoid infinite loop
+           }, responseType);
+         } else {
+           clearToken();
+           window.location.href = '/login';
+           throw new Error('Token expired. Please log in again.');
+         }
+       }
       
       // Response interceptor - handle 403 Forbidden
       if (response.status === 403) {
@@ -269,32 +273,43 @@ async function apiFetch<T>(
  */
 export const api = {
   get: <T>(endpoint: string, options?: FetchOptions) =>
-    apiFetch<T>(endpoint, { ...options, method: 'GET' }),
+    apiFetch<T>(endpoint, { ...options, method: 'GET' }, 'json'),
   
   post: <T>(endpoint: string, body?: unknown, options?: FetchOptions) =>
     apiFetch<T>(endpoint, {
       ...options,
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,
-    }),
+    }, 'json'),
   
   patch: <T>(endpoint: string, body?: unknown, options?: FetchOptions) =>
     apiFetch<T>(endpoint, {
       ...options,
       method: 'PATCH',
       body: body ? JSON.stringify(body) : undefined,
-    }),
+    }, 'json'),
   
   put: <T>(endpoint: string, body?: unknown, options?: FetchOptions) =>
     apiFetch<T>(endpoint, {
       ...options,
       method: 'PUT',
       body: body ? JSON.stringify(body) : undefined,
-    }),
+    }, 'json'),
   
   delete: <T>(endpoint: string, options?: FetchOptions) =>
     apiFetch<T>(endpoint, {
       ...options,
       method: 'DELETE',
-    }),
+    }, 'json'),
+  
+  /**
+   * Download blob (e.g., file export)
+   * Returns response as Blob instead of JSON
+   */
+  blob: <T extends Blob>(endpoint: string, body?: unknown, options?: FetchOptions) =>
+    apiFetch<T>(endpoint, {
+      ...options,
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    }, 'blob'),
 };

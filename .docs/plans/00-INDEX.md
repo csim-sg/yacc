@@ -1,8 +1,8 @@
 # Active Execution Plans Index
 
-**Last Updated**: 2026-02-12 (EOD)  
-**Status**: ✅ Phase 1.4 COMPLETE | ⏳ Phase 2 Backend 60% DONE (tags, notes, assign, rules) | 🎯 MVP Feb 20  
-**Next**: Phase 2 Days 7-8 - Backend bulk/audit completion (Feb 13) + Frontend UI (Feb 13-14) + QA (Feb 19)
+**Last Updated**: 2026-02-12 (PM - PR #249 Status Update)  
+**Status**: ✅ Phase 1.4 COMPLETE | ✅ Phase 2 Backend COMPLETE | 🔄 Phase 2 Frontend PR #249 CONDITIONALLY APPROVED | 🎯 MVP Feb 20  
+**Next**: QA E2E testing (Feb 13-14) per `.docs/QA-PR249-TEST-PLAN.md` + Merge to dev (Feb 14-15)
 
 ---
 
@@ -75,33 +75,59 @@ Governance references:
 - Task 3: Performance Verification (2 hours) - SLO compliance
 - Task 4: Regression Testing (1 hour) - Zero breakage
 
-### Phase 2: Collaboration & Rules (IN PROGRESS)
-**Status**: ⏳ **BACKEND 60% DONE (Tags, Notes, Assign, Rules) | FRONTEND & QA STARTING FEB 13**  
+### Phase 2: Collaboration & Rules (FRONTEND READY FOR QA)
+**Status**: ✅ **BACKEND COMPLETE | FRONTEND PR #249 CONDITIONALLY APPROVED | QA TESTING IN PROGRESS**  
 **Scope**: Extended MVP to include Phase 2 (GOV-021 approved)
-**Timeline**: Feb 12-19 (8 days)
+**Timeline**: Feb 12-19 (8 days) - ON TRACK
 **Target Completion**: Feb 20, 2026
 
-**Days 1-6 Complete (BACKEND)**:
+**Backend (COMPLETE)**:
 - ✅ BE-TAGS-01: Tags CRUD (6 endpoints) - 61 tests passing
 - ✅ BE-NOTES-01: Notes + @mention parsing (2 endpoints) - 20 tests passing  
 - ✅ BE-ASSIGN-01: Assignments CRUD (1 endpoint) - 15 tests passing
 - ✅ BE-NOTIFICATIONS: Notification CRUD (4 endpoints) - 22 tests passing
 - ✅ BE-ROUTING-RULES-01: Rules CRUD + Engine (5 endpoints) - 20 tests passing
-- **Total: 20 endpoints, 133+ tests (100% pass rate), ≥85% coverage**
+- ✅ BE-BULK-ACTIONS-01: Bulk assign/tag/status (1 endpoint) - 87 tests passing
+- ✅ BE-AUDIT-QUERY: Audit log query + export (3 endpoints) - 43 tests passing
+- **Total: 25 endpoints, 253+ tests (100% pass rate), ≥85% coverage**
+- **PR #248 MERGED to dev (Feb 12)**
 
-**Days 7-8 Next (BACKEND)**:
-- ⏳ BE-BULK-ACTIONS-01: Bulk assign/tag/status (1 endpoint)
-- ⏳ BE-AUDIT-QUERY: Audit log query + export (3 endpoints)
-- **Target: 25+ tests, ≥85% coverage, ready for handoff**
+**Frontend (PR #249 CONDITIONALLY APPROVED)**:
+- ✅ FE-P2-API-SERVICES: Tags, Notes, Assignments, AuditLogs, RoutingRules, BulkActions (6 services - 571 lines)
+- ✅ FE-P2-STATE-STORES: Tags, Notes, SelectedConversations (3 stores - 218 lines)
+- ✅ FE-P2-RIGHT-PANEL: RightPanel, AssignmentSection, TagsSection, NotesSection (4 components - 614 lines)
+- ✅ FE-P2-BULK-ACTIONS: BulkActionsBar component + service (315 lines)
+- ✅ FE-P2-ADMIN-PAGES: AuditLogsPage, RoutingRulesPage (2 pages - 593 lines)
+- ✅ FE-P2-INTEGRATION: RightPanel integrated into ConversationPage (320 lines modified)
+- **Total: 2,116 net new lines, 100% type-safe, 0 TypeScript/ESLint errors**
+- **PR #249 Status**: CONDITIONALLY APPROVED (all 3 EA conditions met)
 
-**Days 7-8 Parallel (FRONTEND)**:
-- ⏳ FE-TAGS-NOTES-UI: Right panel components + E2E tests
-- ⏳ FE-ASSIGN-NOTIFY-UI: Assignment dropdown + Notification center
-- ⏳ FE-RULES-AUDIT-BULK: Admin page + audit viewer + bulk actions UX
-- **Target: 40+ E2E tests**
+**PR #249 Review Summary**:
+- ✅ All 5 original EA blockers fixed (auth consistency, blob refresh, unassign UX, nav RBAC, error UI)
+- ✅ 2 additional EA issues fixed (manager audit view, bulk unassign)
+- ✅ All 3 EA conditions satisfied (non-nullable types, accurate docs)
+- ✅ Architect approved with 2 minor findings (resolved)
+- ✅ Ready for QA/E2E testing
+- **PR Link**: https://github.com/csim-sg/yacc/pull/249
 
-**Day 8 (QA)**:
-- ⏳ Final verification, RBAC testing, regression suite, sign-off
+**QA Testing (In Progress)**:
+- 📋 Test Plan Created: `.docs/QA-PR249-TEST-PLAN.md` (80 scenarios across 11 feature areas)
+- ⏳ RBAC enforcement (8 scenarios) - access control verification
+- ⏳ Audit Logs page (8 scenarios) - admin feature
+- ⏳ Routing Rules page (6 scenarios) - admin feature
+- ⏳ Assignment flows (10 scenarios) - core Phase 2 feature
+- ⏳ Tags & Notes (12 scenarios) - collaboration features
+- ⏳ Bulk Actions (8 scenarios) - core Phase 2 feature
+- ⏳ Status management (4 scenarios) - workflow feature
+- ⏳ Error handling (5 scenarios) - resilience
+- ⏳ UI/UX checks (5 scenarios) - user experience
+
+**Next Steps**:
+- ⏳ QA executes E2E tests per test plan (Feb 13-14)
+- ⏳ File any defects found; separate Critical/High from Low
+- ⏳ Fix Critical/High blockers before merge
+- ✅ Merge PR #249 to dev (Feb 14-15)
+- ✅ Update `.docs/plans/00-INDEX.md` with completion
 
 ### BE-003: BetterAuth Authentication
 **Status**: ✅ **COMPLETE**  
