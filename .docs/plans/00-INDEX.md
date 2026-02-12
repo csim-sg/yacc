@@ -1,8 +1,8 @@
 # Active Execution Plans Index
 
-**Last Updated**: 2026-02-12 (PM)  
-**Status**: ✅ Phase 1.4 COMPLETE | ✅ Phase 2 Backend COMPLETE | ⏳ Phase 2 Frontend READY (PR #249) | 🎯 MVP Feb 20  
-**Next**: Phase 2 - Architect reviews PR #249 (Feb 12) + QA/E2E testing (Feb 13-14) + Merge to dev (Feb 14)
+**Last Updated**: 2026-02-12 (PM - PR #249 Status Update)  
+**Status**: ✅ Phase 1.4 COMPLETE | ✅ Phase 2 Backend COMPLETE | 🔄 Phase 2 Frontend PR #249 CONDITIONALLY APPROVED | 🎯 MVP Feb 20  
+**Next**: QA E2E testing (Feb 13-14) per `.docs/QA-PR249-TEST-PLAN.md` + Merge to dev (Feb 14-15)
 
 ---
 
@@ -75,8 +75,8 @@ Governance references:
 - Task 3: Performance Verification (2 hours) - SLO compliance
 - Task 4: Regression Testing (1 hour) - Zero breakage
 
-### Phase 2: Collaboration & Rules (READY FOR REVIEW)
-**Status**: ✅ **BACKEND COMPLETE | FRONTEND PR #249 READY | QA NEXT**  
+### Phase 2: Collaboration & Rules (FRONTEND READY FOR QA)
+**Status**: ✅ **BACKEND COMPLETE | FRONTEND PR #249 CONDITIONALLY APPROVED | QA TESTING IN PROGRESS**  
 **Scope**: Extended MVP to include Phase 2 (GOV-021 approved)
 **Timeline**: Feb 12-19 (8 days) - ON TRACK
 **Target Completion**: Feb 20, 2026
@@ -92,7 +92,7 @@ Governance references:
 - **Total: 25 endpoints, 253+ tests (100% pass rate), ≥85% coverage**
 - **PR #248 MERGED to dev (Feb 12)**
 
-**Frontend (READY FOR REVIEW)**:
+**Frontend (PR #249 CONDITIONALLY APPROVED)**:
 - ✅ FE-P2-API-SERVICES: Tags, Notes, Assignments, AuditLogs, RoutingRules, BulkActions (6 services - 571 lines)
 - ✅ FE-P2-STATE-STORES: Tags, Notes, SelectedConversations (3 stores - 218 lines)
 - ✅ FE-P2-RIGHT-PANEL: RightPanel, AssignmentSection, TagsSection, NotesSection (4 components - 614 lines)
@@ -100,14 +100,34 @@ Governance references:
 - ✅ FE-P2-ADMIN-PAGES: AuditLogsPage, RoutingRulesPage (2 pages - 593 lines)
 - ✅ FE-P2-INTEGRATION: RightPanel integrated into ConversationPage (320 lines modified)
 - **Total: 2,116 net new lines, 100% type-safe, 0 TypeScript/ESLint errors**
-- **PR #249 OPEN - Ready for Architect Review**
+- **PR #249 Status**: CONDITIONALLY APPROVED (all 3 EA conditions met)
 
-**Next Steps (QA)**:
-- ⏳ Architect reviews PR #249 (Feb 12)
-- ⏳ Address review feedback (Feb 12-13)
-- ⏳ Merge PR #249 to dev (Feb 13)
-- ⏳ QA writes E2E tests (40+ scenarios - Feb 13-14)
-- ⏳ Final verification & sign-off (Feb 14-15)
+**PR #249 Review Summary**:
+- ✅ All 5 original EA blockers fixed (auth consistency, blob refresh, unassign UX, nav RBAC, error UI)
+- ✅ 2 additional EA issues fixed (manager audit view, bulk unassign)
+- ✅ All 3 EA conditions satisfied (non-nullable types, accurate docs)
+- ✅ Architect approved with 2 minor findings (resolved)
+- ✅ Ready for QA/E2E testing
+- **PR Link**: https://github.com/csim-sg/yacc/pull/249
+
+**QA Testing (In Progress)**:
+- 📋 Test Plan Created: `.docs/QA-PR249-TEST-PLAN.md` (80 scenarios across 11 feature areas)
+- ⏳ RBAC enforcement (8 scenarios) - access control verification
+- ⏳ Audit Logs page (8 scenarios) - admin feature
+- ⏳ Routing Rules page (6 scenarios) - admin feature
+- ⏳ Assignment flows (10 scenarios) - core Phase 2 feature
+- ⏳ Tags & Notes (12 scenarios) - collaboration features
+- ⏳ Bulk Actions (8 scenarios) - core Phase 2 feature
+- ⏳ Status management (4 scenarios) - workflow feature
+- ⏳ Error handling (5 scenarios) - resilience
+- ⏳ UI/UX checks (5 scenarios) - user experience
+
+**Next Steps**:
+- ⏳ QA executes E2E tests per test plan (Feb 13-14)
+- ⏳ File any defects found; separate Critical/High from Low
+- ⏳ Fix Critical/High blockers before merge
+- ✅ Merge PR #249 to dev (Feb 14-15)
+- ✅ Update `.docs/plans/00-INDEX.md` with completion
 
 ### BE-003: BetterAuth Authentication
 **Status**: ✅ **COMPLETE**  
