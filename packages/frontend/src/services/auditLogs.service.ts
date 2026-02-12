@@ -16,14 +16,11 @@ export interface AuditLog {
 }
 
 export interface AuditLogsListResponse {
-  success: boolean;
-  data: AuditLog[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    pages: number;
-  };
+  items: AuditLog[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
 }
 
 export interface AuditLogsQueryParams {

@@ -4,7 +4,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { auditLogsService } from '../services/auditLogs.service';
 import { useAuthStore } from '../stores/auth.store';
@@ -31,10 +31,9 @@ export function AuditLogsPage() {
       }),
   });
 
-  const logs = logsData?.data || [];
-  const total = logsData?.pagination?.total || 0;
-  const limit = logsData?.pagination?.limit || 20;
-  const totalPages = useMemo(() => Math.ceil(total / limit), [total, limit]);
+  const logs = logsData?.items || [];
+  const total = logsData?.total || 0;
+  const totalPages = logsData?.pages || 1;
 
   // Handle export
   const handleExport = async () => {
@@ -164,8 +163,9 @@ export function AuditLogsPage() {
               <div className="flex gap-2 mt-4">
                 <button
                   onClick={handleExport}
-                  disabled={isExporting || total === 0}
+                  disabled={isExporting || total === 0 || !['admin', 'super_admin'].includes(user?.role || '')}
                   className="btn btn-sm btn-primary"
+                  title={!['admin', 'super_admin'].includes(user?.role || '') ? 'Only admins can export' : ''}
                   data-testid="export-button"
                 >
                   {isExporting ? 'Exporting...' : 'Export to CSV'}
