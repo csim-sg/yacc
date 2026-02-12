@@ -18,6 +18,7 @@ import { dbClient } from '../src/infrastructure/db.client';
 import { conversations } from '../src/schemas/conversation.schema';
 import { auditLogs } from '../src/schemas/auditLog.schema';
 import { eq } from 'drizzle-orm';
+import type { AuditLogEntry } from '../src/types/auditLogsQuery.types';
 
 describe('Audit Logs Query Controller', () => {
   let app: Express;
@@ -203,7 +204,7 @@ describe('Audit Logs Query Controller', () => {
         const items = response.body.items;
 
         // All returned items should have the specified actor
-        items.forEach((item: any) => {
+        items.forEach((item: AuditLogEntry) => {
           expect(item.actorId).toBe(managerUserId);
         });
       });
@@ -217,7 +218,7 @@ describe('Audit Logs Query Controller', () => {
         expect(response.status).toBe(200);
         const items = response.body.items;
 
-        items.forEach((item: any) => {
+        items.forEach((item: AuditLogEntry) => {
           expect(item.action).toBe('conversation_assigned');
         });
       });
@@ -231,7 +232,7 @@ describe('Audit Logs Query Controller', () => {
         expect(response.status).toBe(200);
         const items = response.body.items;
 
-        items.forEach((item: any) => {
+        items.forEach((item: AuditLogEntry) => {
           expect(item.entityType).toBe('conversation');
         });
       });
@@ -246,7 +247,7 @@ describe('Audit Logs Query Controller', () => {
         const items = response.body.items;
 
         expect(items.length).toBeGreaterThan(0);
-        items.forEach((item: any) => {
+        items.forEach((item: AuditLogEntry) => {
           expect(item.entityId).toBe(testConversationId);
         });
       });
@@ -264,7 +265,7 @@ describe('Audit Logs Query Controller', () => {
         expect(response.status).toBe(200);
         const items = response.body.items;
 
-        items.forEach((item: any) => {
+        items.forEach((item: AuditLogEntry) => {
           expect(item.actorId).toBe(managerUserId);
           expect(item.action).toBe('conversation_assigned');
           expect(item.entityId).toBe(testConversationId);
@@ -305,7 +306,7 @@ describe('Audit Logs Query Controller', () => {
           .query({ dateFrom: 'not-a-date' })
           .set('Authorization', `Bearer ${managerToken}`);
 
-        expect(response.status).toBe(500);
+        expect(response.status).toBe(400);
       });
 
       it('should reject dateFrom > dateTo', async () => {
@@ -321,7 +322,7 @@ describe('Audit Logs Query Controller', () => {
           })
           .set('Authorization', `Bearer ${managerToken}`);
 
-        expect(response.status).toBe(500);
+        expect(response.status).toBe(400);
       });
     });
 
@@ -389,7 +390,7 @@ describe('Audit Logs Query Controller', () => {
         expect(response.status).toBe(200);
         const items = response.body.items;
 
-        items.forEach((item: any) => {
+        items.forEach((item: AuditLogEntry) => {
           expect(item).toHaveProperty('id');
           expect(item).toHaveProperty('actorId');
           expect(item).toHaveProperty('action');
@@ -438,7 +439,7 @@ describe('Audit Logs Query Controller', () => {
         expect(response.status).toBe(200);
         const items = response.body.items;
 
-        items.forEach((item: any) => {
+        items.forEach((item: AuditLogEntry) => {
           expect(item.entityId).toBe(testConversationId);
         });
       });
@@ -452,7 +453,7 @@ describe('Audit Logs Query Controller', () => {
         expect(response.status).toBe(200);
         const items = response.body.items;
 
-        items.forEach((item: any) => {
+        items.forEach((item: AuditLogEntry) => {
           expect(item.action).toBe('conversation_assigned');
           expect(item.entityId).toBe(testConversationId);
         });
@@ -588,7 +589,7 @@ describe('Audit Logs Query Controller', () => {
         const entries = response.body;
 
         expect(entries.length).toBeGreaterThan(0);
-        entries.forEach((entry: any) => {
+        entries.forEach((entry: AuditLogEntry) => {
           expect(entry).toHaveProperty('id');
           expect(entry).toHaveProperty('actorId');
           expect(entry).toHaveProperty('action');
@@ -609,7 +610,7 @@ describe('Audit Logs Query Controller', () => {
         expect(response.status).toBe(200);
         const entries = response.body;
 
-        entries.forEach((entry: any) => {
+        entries.forEach((entry: AuditLogEntry) => {
           expect(entry.actorId).toBe(managerUserId);
         });
       });
@@ -626,7 +627,7 @@ describe('Audit Logs Query Controller', () => {
         expect(response.status).toBe(200);
         const entries = response.body;
 
-        entries.forEach((entry: any) => {
+        entries.forEach((entry: AuditLogEntry) => {
           expect(entry.action).toBe('conversation_assigned');
         });
       });
@@ -646,7 +647,7 @@ describe('Audit Logs Query Controller', () => {
         expect(response.status).toBe(200);
         const entries = response.body;
 
-        entries.forEach((entry: any) => {
+        entries.forEach((entry: AuditLogEntry) => {
           expect(entry.entityId).toBe(testConversationId);
           expect(entry.actorId).toBe(managerUserId);
         });

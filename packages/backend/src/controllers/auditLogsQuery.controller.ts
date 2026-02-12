@@ -6,7 +6,7 @@
  */
 
 import type { Request } from 'express';
-import { JsonController, Get, Post, Param, QueryParam, Req, Res, Authorized, CurrentUser, Body } from 'routing-controllers';
+import { JsonController, Get, Post, Param, QueryParam, Req, Res, Authorized, CurrentUser, Body, BadRequestError } from 'routing-controllers';
 import type { Response } from 'express';
 import {
   queryAuditLogs,
@@ -75,7 +75,16 @@ export class AuditLogsQueryController {
       return res.status(200).json(result);
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error({ error: errorMsg }, 'Failed to query audit logs');
+      
+      // Validation errors (invalid date format, dateFrom > dateTo) return 400
+      if (errorMsg.includes('Invalid dateFrom') || 
+          errorMsg.includes('Invalid dateTo') ||
+          errorMsg.includes('dateFrom must be')) {
+        logger.warn({ correlationId, error: errorMsg }, 'Invalid audit log query parameters');
+        throw new BadRequestError(errorMsg);
+      }
+      
+      logger.error({ correlationId, error: errorMsg }, 'Failed to query audit logs');
       return res.status(500).json({ error: 'Failed to query audit logs' });
     }
   }
@@ -120,8 +129,17 @@ export class AuditLogsQueryController {
       return res.status(200).json(result);
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      
+      // Validation errors return 400
+      if (errorMsg.includes('Invalid dateFrom') || 
+          errorMsg.includes('Invalid dateTo') ||
+          errorMsg.includes('dateFrom must be')) {
+        logger.warn({ correlationId, conversationId, error: errorMsg }, 'Invalid audit log query parameters');
+        throw new BadRequestError(errorMsg);
+      }
+      
       logger.error(
-        { conversationId, error: errorMsg },
+        { correlationId, conversationId, error: errorMsg },
         'Failed to query conversation audit logs'
       );
       return res.status(500).json({ error: 'Failed to query audit logs' });
@@ -165,7 +183,16 @@ export class AuditLogsQueryController {
       return res.status(200).send(result.data);
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error({ error: errorMsg }, 'Failed to export audit logs');
+      
+      // Validation errors return 400
+      if (errorMsg.includes('Invalid dateFrom') || 
+          errorMsg.includes('Invalid dateTo') ||
+          errorMsg.includes('dateFrom must be')) {
+        logger.warn({ correlationId, error: errorMsg }, 'Invalid audit log export parameters');
+        throw new BadRequestError(errorMsg);
+      }
+      
+      logger.error({ correlationId, error: errorMsg }, 'Failed to export audit logs');
       return res.status(500).json({ error: 'Failed to export audit logs' });
     }
   }

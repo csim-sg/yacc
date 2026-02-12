@@ -137,16 +137,15 @@ export class BulkActionsController {
 
       switch (action) {
         case 'assign': {
-          // assigneeId can be any string (including null if reassigning to unassigned)
-          // But if provided, it should be non-empty
-          const assigneeId = (data.assigneeId as unknown) || null;
-          if (assigneeId !== null && typeof assigneeId !== 'string') {
+          // assigneeId can be string (user UUID) or null (to unassign)
+          const assigneeId = data.assigneeId as unknown;
+          if (assigneeId !== null && assigneeId !== undefined && typeof assigneeId !== 'string') {
             throw new BadRequestError('assigneeId must be a string or null');
           }
           result = await bulkActionsService.bulkAssign(
             conversationIds,
             user.id,
-            assigneeId as string,
+            (assigneeId as string) || null,
             correlationId
           );
           break;

@@ -31,11 +31,11 @@ const MAX_BULK_SIZE = 100;
  * Logs each success/failure in audit logs
  */
 export async function bulkAssign(
-   conversationIds: string[],
-   userId: string,
-   assigneeId: string,
-   correlationId: string = 'unknown'
- ): Promise<BulkActionResponse> {
+  conversationIds: string[],
+  userId: string,
+  assigneeId: string | null,
+  correlationId: string = 'unknown'
+): Promise<BulkActionResponse> {
    const failures: BulkActionFailure[] = [];
    let successCount = 0;
 
@@ -55,20 +55,9 @@ export async function bulkAssign(
          })),
        },
      };
-   }
+    }
 
-  // Verify assignee exists
-  const assigneeExists = await dbClient
-    .select({ id: conversations.id })
-    .from(conversations)
-    .where(eq(conversations.assignedUserId, assigneeId))
-    .limit(1)
-    .catch(() => null);
-
-  // Note: We don't strictly require assignee to exist - they might be getting unassigned
-  // But we log if it's suspicious
-
-   // Process each conversation
+  // Process each conversation
    for (const conversationId of conversationIds) {
      try {
        // Update conversation

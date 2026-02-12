@@ -7,11 +7,11 @@
  * - Bulk status update (open/pending/resolved)
  * 
  * Features:
- * - Best-effort: partial success is OK (not all-or-nothing)
+ * - Best-effort: partial success is OK (failures returned, not all-or-nothing)
  * - Max 100 conversations per request
- * - Transaction-per-conversation for safety
+ * - Atomic per-conversation updates (each conversation independently processed)
  * - RBAC: manager+ only
- * - Audit logging: bulk_action_applied
+ * - Audit logging: bulk_action_applied for each successful action
  */
 
 export type BulkActionType = 'assign' | 'tag' | 'status';

@@ -915,7 +915,7 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 - **Max 100**: Enforced per request
 - **Failures**: Detailed array with conversation ID and reason for each failure
 - **Audit logged**: Each successful action is logged as `bulk_action_applied`
-- **Atomic per conversation**: Each conversation update is wrapped in a transaction
+- **Atomic per conversation**: Each conversation update is processed independently; partial success is acceptable
 
 **Error Codes**:
 - `400`: Invalid request (validation error on conversationIds, action, or data)

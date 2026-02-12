@@ -42,23 +42,27 @@ export async function queryAuditLogs(
     let dateToVal: Date | undefined;
 
     if (filters.dateFrom) {
-      dateFromVal = new Date(filters.dateFrom);
+      dateFromVal = typeof filters.dateFrom === 'string' 
+        ? new Date(filters.dateFrom)
+        : filters.dateFrom;
       if (Number.isNaN(dateFromVal.getTime())) {
-        throw new Error('Invalid dateFrom format');
+        throw new Error('Invalid dateFrom format. Expected ISO 8601 string.');
       }
     }
 
     if (filters.dateTo) {
-      dateToVal = new Date(filters.dateTo);
+      dateToVal = typeof filters.dateTo === 'string'
+        ? new Date(filters.dateTo)
+        : filters.dateTo;
       if (Number.isNaN(dateToVal.getTime())) {
-        throw new Error('Invalid dateTo format');
+        throw new Error('Invalid dateTo format. Expected ISO 8601 string.');
       }
       // Set time to end of day
       dateToVal.setHours(23, 59, 59, 999);
     }
 
     if (dateFromVal && dateToVal && dateFromVal > dateToVal) {
-      throw new Error('dateFrom must be before or equal to dateTo');
+      throw new Error('dateFrom must be before or equal to dateTo.');
     }
 
     // Build WHERE conditions
