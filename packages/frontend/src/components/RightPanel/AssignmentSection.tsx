@@ -1,19 +1,18 @@
 /**
  * Assignment Section
- * Allows assigning/unassigning conversations to users
+ * Allows assigning conversations to users
  * 
  * Phase 2 MVP Limitation:
- * - Manager users CAN assign conversations
- * - Manager users CANNOT unassign (backend requires assignedUserId, doesn't accept null)
- * - Only admin+ users can unassign
- * - TODO Phase 3: Expose separate unassign endpoint or allow null in backend
+ * - Manager users CAN assign conversations to other users
+ * - Backend requires assignedUserId (doesn't accept null), so unassign is NOT supported in MVP
+ * - Users must reassign to a different user (no explicit unassign option)
+ * - TODO Phase 3: Expose separate unassign endpoint with proper role gating
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { assignmentsService } from '../../services/assignments.service';
 import type { ConversationDetail } from '../../services/conversations.service';
-import { useAuthStore } from '../../stores/auth.store';
 
 interface AssignmentSectionProps {
   conversation: ConversationDetail;
@@ -32,15 +31,11 @@ export function AssignmentSection({
   onChange,
 }: AssignmentSectionProps) {
   const queryClient = useQueryClient();
-  const { user } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
 
   // TODO: Replace with real users API call (GET /api/users)
   // For Phase 1 MVP, users list is empty - assignment still functions via ID input
   const users: Array<{ id: string; name: string; email: string }> = [];
-
-  // Check if user is admin (can unassign)
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   // Assign mutation
   const assignMutation = useMutation({
@@ -86,36 +81,23 @@ export function AssignmentSection({
            <span className="text-xs">{currentAssigneeDisplay}</span>
          </button>
 
-         {isOpen && (
-           <div
-             className="absolute top-full left-0 right-0 mt-2 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto"
-             data-testid="assignment-dropdown"
-           >
-             {/* Unassign option - only for admin+ users */}
-             {isAdmin ? (
-               <button
-                 onClick={() => assignMutation.mutate(null)}
-                 className="w-full text-left px-4 py-2 text-sm hover:bg-base-200 border-b border-base-300"
-                 disabled={assignMutation.isPending}
-                 data-testid="unassign-option"
-               >
-                 Unassigned
-               </button>
-             ) : (
-               <div
-                 className="w-full text-left px-4 py-2 text-sm text-base-content/50 border-b border-base-300 cursor-not-allowed"
-                 title="Only admins can unassign conversations"
-                 data-testid="unassign-option-disabled"
-               >
-                 <div className="flex items-center justify-between">
-                   <span>Unassigned</span>
-                   <span className="badge badge-xs badge-warning">Admin only</span>
-                 </div>
-               </div>
-             )}
+          {isOpen && (
+            <div
+              className="absolute top-full left-0 right-0 mt-2 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto"
+              data-testid="assignment-dropdown"
+            >
+              {/* Note: Unassign not available in Phase 2 MVP - backend requires assignedUserId */}
+              {users.length === 0 && (
+                <div
+                  className="w-full text-left px-4 py-2 text-sm text-base-content/50"
+                  data-testid="no-users-message"
+                >
+                  User list coming in Phase 3
+                </div>
+              )}
 
-             {/* User options */}
-             {users.map((user) => (
+              {/* User options */}
+              {users.map((user) => (
                <button
                  key={user.id}
                  onClick={() => assignMutation.mutate(user.id)}

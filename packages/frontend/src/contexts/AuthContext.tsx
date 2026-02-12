@@ -11,10 +11,37 @@
  * - POST /api/auth/refresh-token (token refresh)
  * 
  * Uses custom api-client.ts for API calls
+ * 
+ * Role Normalization:
+ * - Backend returns lowercase roles (super_admin, admin, manager, user)
+ * - Frontend normalizes to uppercase (SUPER_ADMIN, ADMIN, MANAGER, USER)
+ * - All RBAC checks use uppercase consistently via useAuth() and ProtectedRoute
  */
 
-import { createContext, useContext, useState, useEffect, ReactNode, type ReactElement } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactElement, type ReactNode } from 'react';
 import { api } from '../lib/apiClient';
+
+/**
+ * Backend user response with lowercase roles
+ */
+interface BackendUser {
+  id: string;
+  email: string;
+  name?: string;
+  role: string;
+}
+
+/**
+ * Normalize backend role (lowercase) to frontend role (uppercase)
+ */
+function normalizeRole(role: string): 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'USER' {
+  const normalized = role.toUpperCase();
+  if (normalized === 'SUPER_ADMIN' || normalized === 'ADMIN' || normalized === 'MANAGER' || normalized === 'USER') {
+    return normalized as 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'USER';
+  }
+  // Default to USER if unknown role
+  return 'USER';
+}
 
 /**
  * User type matching BetterAuth response
@@ -59,52 +86,67 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
     * Load user session on mount
     * Uses GET /api/auth/get-session endpoint
     */
-   useEffect(() => {
-     const loadSession = async (): Promise<void> => {
-       setIsLoading(true);
-       setError(null);
+    useEffect(() => {
+      const loadSession = async (): Promise<void> => {
+        setIsLoading(true);
+        setError(null);
 
-       try {
-         const session = await api.get<User>('/api/auth/get-session');
-         if (session) {
-           setUser(session as User);
-         }
-       } catch (err: unknown) {
-         const message = err instanceof Error ? err.message : 'Failed to load session';
-         console.error('Auth: Failed to load session', { error: message });
-         setError(message);
-       } finally {
-         setIsLoading(false);
-       }
-     };
+        try {
+          const session = await api.get<BackendUser>('/api/auth/get-session');
+          if (session) {
+            // Normalize backend role to uppercase
+            const normalizedUser: User = {
+              id: session.id,
+              email: session.email,
+              name: session.name,
+              role: normalizeRole(session.role),
+            };
+            setUser(normalizedUser);
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Failed to load session';
+          console.error('Auth: Failed to load session', { error: message });
+          setError(message);
+        } finally {
+          setIsLoading(false);
+        }
+      };
 
-     void loadSession();
-   }, []);
+      void loadSession();
+    }, []);
 
    /**
     * Login function
     * Uses POST /api/auth/sign-in/email endpoint
     */
-   const login = async (email: string, password: string): Promise<void> => {
-     setIsLoading(true);
-     setError(null);
+    const login = async (email: string, password: string): Promise<void> => {
+      setIsLoading(true);
+      setError(null);
 
-     try {
-       const response = await api.post<User>('/api/auth/sign-in/email', {
-         email,
-         password,
-       });
+      try {
+        const response = await api.post<BackendUser>('/api/auth/sign-in/email', {
+          email,
+          password,
+        });
 
-       setUser(response as User);
-     } catch (err: unknown) {
-       const message = err instanceof Error ? err.message : 'Login failed';
-       console.error('Auth: Login failed', { error: message });
-       setError(message);
-       throw err;
-     } finally {
-       setIsLoading(false);
-     }
-   };
+        // Normalize backend role to uppercase
+        const normalizedUser: User = {
+          id: response.id,
+          email: response.email,
+          name: response.name,
+          role: normalizeRole(response.role),
+        };
+
+        setUser(normalizedUser);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Login failed';
+        console.error('Auth: Login failed', { error: message });
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
   /**
    * Logout function
@@ -132,23 +174,30 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
     * Restores session by calling GET /api/auth/get-session
     * Called when app starts or user returns to app
     */
-   const loadUser = async (): Promise<void> => {
-     setIsLoading(true);
-     setError(null);
+    const loadUser = async (): Promise<void> => {
+      setIsLoading(true);
+      setError(null);
 
-     try {
-       const session = await api.get<User>('/api/auth/get-session');
-       if (session) {
-         setUser(session as User);
-       }
-     } catch (err: unknown) {
-       const message = err instanceof Error ? err.message : 'Failed to load session';
-       console.error('Auth: Failed to load session', { error: message });
-       setError(message);
-     } finally {
-       setIsLoading(false);
-     }
-   };
+      try {
+        const session = await api.get<BackendUser>('/api/auth/get-session');
+        if (session) {
+          // Normalize backend role to uppercase
+          const normalizedUser: User = {
+            id: session.id,
+            email: session.email,
+            name: session.name,
+            role: normalizeRole(session.role),
+          };
+          setUser(normalizedUser);
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to load session';
+        console.error('Auth: Failed to load session', { error: message });
+        setError(message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
   /**
    * Clear error function

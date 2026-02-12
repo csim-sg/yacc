@@ -6,11 +6,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { auditLogsService } from '../services/auditLogs.service';
-import { useAuthStore } from '../stores/auth.store';
 
 export function AuditLogsPage() {
-  const { user } = useAuthStore();
+  const { user } = useAuth();
   const [filters, setFilters] = useState({
     action: '',
     entityType: '',
@@ -19,9 +19,10 @@ export function AuditLogsPage() {
   });
   const [page, setPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Fetch audit logs
-  const { data: logsData, isLoading } = useQuery({
+  const { data: logsData, isLoading, error: queryError, isError: hasQueryError } = useQuery({
     queryKey: ['audit-logs', page, filters],
     queryFn: () =>
       auditLogsService.query({
@@ -38,6 +39,7 @@ export function AuditLogsPage() {
   // Handle export
   const handleExport = async () => {
     setIsExporting(true);
+    setExportError(null);
     try {
       const blob = await auditLogsService.export('csv', filters);
       const url = window.URL.createObjectURL(blob);
@@ -47,15 +49,16 @@ export function AuditLogsPage() {
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to export audit logs';
+      setExportError(message);
       console.error('Failed to export audit logs:', error);
     } finally {
       setIsExporting(false);
     }
   };
 
-  // Check admin role
-  const isAdmin =
-    user?.role === 'super_admin' || user?.role === 'admin' || user?.role === 'manager';
+  // Check admin role (admin+ only can export)
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
   if (!isAdmin) {
     return (
@@ -163,34 +166,51 @@ export function AuditLogsPage() {
               <div className="flex gap-2 mt-4">
                 <button
                   onClick={handleExport}
-                  disabled={isExporting || total === 0 || !['admin', 'super_admin'].includes(user?.role || '')}
+                  disabled={isExporting || total === 0 || !isAdmin}
                   className="btn btn-sm btn-primary"
-                  title={!['admin', 'super_admin'].includes(user?.role || '') ? 'Only admins can export' : ''}
+                  title={!isAdmin ? 'Only admins can export' : ''}
                   data-testid="export-button"
                 >
                   {isExporting ? 'Exporting...' : 'Export to CSV'}
                 </button>
               </div>
+              
+              {/* Export Error Alert */}
+              {exportError && (
+                <div className="mt-4 alert alert-error" data-testid="export-error">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>{exportError}</span>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Logs Table */}
           <div className="card bg-base-100 shadow-lg">
             <div className="card-body">
-              <h3 className="card-title mb-4">
-                Audit Logs
-                <span className="badge badge-lg ml-2">{total}</span>
-              </h3>
+               <h3 className="card-title mb-4">
+                 Audit Logs
+                 <span className="badge badge-lg ml-2">{total}</span>
+               </h3>
 
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="loading loading-spinner loading-lg"></div>
-                </div>
-              ) : logs.length === 0 ? (
-                <div className="text-center py-8 text-base-content/50">
-                  No audit logs found
-                </div>
-              ) : (
+               {isLoading ? (
+                 <div className="flex justify-center py-8">
+                   <div className="loading loading-spinner loading-lg"></div>
+                 </div>
+               ) : hasQueryError ? (
+                 <div className="alert alert-error" data-testid="query-error">
+                   <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                   </svg>
+                   <span>{queryError instanceof Error ? queryError.message : 'Failed to load audit logs'}</span>
+                 </div>
+               ) : logs.length === 0 ? (
+                 <div className="text-center py-8 text-base-content/50">
+                   No audit logs found
+                 </div>
+               ) : (
                 <>
                   {/* Table */}
                   <div className="overflow-x-auto">

@@ -56,12 +56,12 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     allowedRoles: ['SUPER_ADMIN'],
   },
   {
-    id: 'routing-rules',
-    label: 'Routing Rules',
-    href: '/routing-rules',
-    icon: '⚙️',
-    allowedRoles: ['SUPER_ADMIN'],
-  },
+     id: 'routing-rules',
+     label: 'Routing Rules',
+     href: '/routing-rules',
+     icon: '⚙️',
+     allowedRoles: ['SUPER_ADMIN', 'ADMIN'],
+   },
   {
     id: 'settings',
     label: 'Settings',

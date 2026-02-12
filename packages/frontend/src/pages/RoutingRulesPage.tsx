@@ -6,17 +6,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { routingRulesService, type RoutingRule } from '../services/routingRules.service';
-import { useAuthStore } from '../stores/auth.store';
 
 export function RoutingRulesPage() {
-  const { user } = useAuthStore();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
 
   // Fetch rules
-  const { data: rulesData, isLoading } = useQuery({
+  const { data: rulesData, isLoading, error: rulesError, isError: hasRulesError } = useQuery({
     queryKey: ['routing-rules'],
     queryFn: () => routingRulesService.list(),
   });
@@ -51,9 +51,8 @@ export function RoutingRulesPage() {
     },
   });
 
-  // Check admin role
-  const isAdmin =
-    user?.role === 'super_admin' || user?.role === 'admin';
+  // Check admin role (admin+ only)
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
   if (!isAdmin) {
     return (
@@ -106,14 +105,21 @@ export function RoutingRulesPage() {
                 </div>
 
                 {isLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="loading loading-spinner loading-lg"></div>
-                  </div>
-                ) : rules.length === 0 ? (
-                  <div className="text-center py-8 text-base-content/50">
-                    No routing rules yet
-                  </div>
-                ) : (
+                   <div className="flex justify-center py-8">
+                     <div className="loading loading-spinner loading-lg"></div>
+                   </div>
+                 ) : hasRulesError ? (
+                   <div className="alert alert-error" data-testid="rules-query-error">
+                     <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                     </svg>
+                     <span>{rulesError instanceof Error ? rulesError.message : 'Failed to load routing rules'}</span>
+                   </div>
+                 ) : rules.length === 0 ? (
+                   <div className="text-center py-8 text-base-content/50">
+                     No routing rules yet
+                   </div>
+                 ) : (
                   <div className="space-y-3">
                     {rules.map((rule) => (
                       <div

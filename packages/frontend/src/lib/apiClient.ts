@@ -208,22 +208,22 @@ async function apiFetch<T>(
         return await response.json() as T;
       }
       
-      // Response interceptor - handle 401 Unauthorized
-      if (response.status === 401) {
-        const refreshed = await attemptTokenRefresh();
+       // Response interceptor - handle 401 Unauthorized
+       if (response.status === 401) {
+         const refreshed = await attemptTokenRefresh();
 
-        if (refreshed) {
-          // Retry request with new token
-          return await apiFetch<T>(endpoint, {
-            ...options,
-            retries: 0, // Don't retry after refresh to avoid infinite loop
-          });
-        } else {
-          clearToken();
-          window.location.href = '/login';
-          throw new Error('Token expired. Please log in again.');
-        }
-      }
+         if (refreshed) {
+           // Retry request with new token, preserving responseType (crucial for blob)
+           return await apiFetch<T>(endpoint, {
+             ...options,
+             retries: 0, // Don't retry after refresh to avoid infinite loop
+           }, responseType);
+         } else {
+           clearToken();
+           window.location.href = '/login';
+           throw new Error('Token expired. Please log in again.');
+         }
+       }
       
       // Response interceptor - handle 403 Forbidden
       if (response.status === 403) {
