@@ -5,7 +5,7 @@
  * Handles pagination and date range filtering
  */
 
-import { and, desc, gte, lte, eq, like, or } from 'drizzle-orm';
+import { and, desc, gte, lte, eq } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
 import { auditLogs } from '../schemas/auditLog.schema';
 import type {
@@ -36,8 +36,8 @@ export async function queryAuditLogs(
   const offset = (page - 1) * limit;
 
   try {
-    // Build WHERE conditions
-    const conditions: (typeof auditLogs.id | typeof auditLogs.id)[] = [];
+    // Build WHERE conditions dynamically
+    const conditions: Array<any> = [];
 
     if (filters.actorId) {
       conditions.push(eq(auditLogs.actorId, filters.actorId));
@@ -68,16 +68,23 @@ export async function queryAuditLogs(
       conditions.push(lte(auditLogs.createdAt, dateTo));
     }
 
-    // Execute count query
-    const countResult = await dbClient
-      .select({ count: auditLogs.id })
-      .from(auditLogs)
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    // Build WHERE clause
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const total = countResult[0]?.count || 0;
+    // Execute count query
+    let countQuery = dbClient
+      .select({ count: auditLogs.id })
+      .from(auditLogs) as any;
+
+    if (whereClause) {
+      countQuery = countQuery.where(whereClause);
+    }
+
+    const countResult = await countQuery;
+    const total = countResult.length > 0 ? countResult[0].count : 0;
 
     // Execute data query
-    let query = dbClient
+    let dataQuery = dbClient
       .select({
         id: auditLogs.id,
         actorId: auditLogs.actorId,
@@ -90,13 +97,13 @@ export async function queryAuditLogs(
       .from(auditLogs)
       .orderBy(desc(auditLogs.createdAt))
       .limit(limit)
-      .offset(offset);
+      .offset(offset) as any;
 
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+    if (whereClause) {
+      dataQuery = dataQuery.where(whereClause);
     }
 
-    const items = (await query) as AuditLogEntry[];
+    const items = (await dataQuery) as AuditLogEntry[];
 
     logger.info(
       {
