@@ -97,15 +97,14 @@ export function BulkActionsBar({ onActionsComplete }: BulkActionsBarProps) {
               Assign
             </button>
             <ul className="dropdown-content z-50 menu p-2 shadow bg-base-100 text-base-content rounded-box w-52 border border-base-300">
-              <li>
-                <button
-                  onClick={() => bulkAssignMutation.mutate(null)}
-                  disabled={isPending}
-                  data-testid="assign-unassign-option"
-                >
-                  Unassigned
-                </button>
-              </li>
+              {/* Note: Unassign not available in Phase 2 MVP - backend requires assignedUserId */}
+              {users.length === 0 && (
+                <li>
+                  <div className="text-xs text-base-content/50" data-testid="no-users-message">
+                    User list coming in Phase 3
+                  </div>
+                </li>
+              )}
               {users.map((user) => (
                 <li key={user.id}>
                   <button

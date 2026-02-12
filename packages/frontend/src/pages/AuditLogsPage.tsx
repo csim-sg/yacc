@@ -57,26 +57,8 @@ export function AuditLogsPage() {
     }
   };
 
-  // Check admin role (admin+ only can export)
+  // Check admin role (admin+ only can export; manager+ can view)
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
-
-  if (!isAdmin) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-base-200">
-        <div className="card bg-base-100 shadow-xl">
-          <div className="card-body">
-            <h2 className="card-title text-error">Access Denied</h2>
-            <p>You don't have permission to view audit logs.</p>
-            <div className="card-actions justify-end">
-              <Link to="/" className="btn btn-primary">
-                Go Back
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="h-screen flex flex-col bg-base-200">
