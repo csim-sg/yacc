@@ -60,7 +60,7 @@ export const FIXTURE_DATA = {
       externalThreadId: 'tg-mock-101',
       title: 'Mock Support Thread',
       status: 'resolved',
-      priority: 'medium',
+      priority: 'normal',
       assignedUserId: FIXTURE_IDS.users.superAdmin,
     },
     irc: {

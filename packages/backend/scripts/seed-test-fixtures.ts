@@ -448,10 +448,12 @@ async function seedTestFixtures() {
         })
         .onConflictDoNothing();
 
-      // Add 2-5 messages per conversation with varied statuses
+      // Add 2-5 messages per conversation with varied statuses (deterministic)
       const messageCount = 2 + (i % 4);
       for (let j = 0; j < messageCount; j++) {
-        const messageStatus = j < 2 ? 'sent' : (j === messageCount - 1 ? 'pending' : (Math.random() > 0.8 ? 'failed' : 'sent'));
+        // Deterministic status pattern: first 2 sent, last pending, middle 20% failed
+        const isMidMessage = j > 1 && j < messageCount - 1;
+        const messageStatus = j < 2 ? 'sent' : (j === messageCount - 1 ? 'pending' : (isMidMessage && (i % 5 === 4) ? 'failed' : 'sent'));
         const messageMinutesBack = (messageCount - j) * 10;
         
         const messageDate = new Date(now.getTime() - messageMinutesBack * 60 * 1000);
@@ -614,14 +616,16 @@ async function seedTestFixtures() {
     // Add rule execution logs for testing rule query APIs
     // Note: Skip if routing rules not created yet (dependency)
     try {
+      const ruleId = FIXTURE.routingRules[0].id;
+      const conversationId = FIXTURE.conversations.telegram.id;
       const existingRule = await dbClient.query.routingRules.findFirst({
-        where: eq(routingRules.id, FIXTURE.routingRules[0].id as any),
+        where: eq(routingRules.id, ruleId),
       });
 
       if (existingRule) {
         await dbClient.insert(routingRuleExecutions).values({
-          ruleId: FIXTURE.routingRules[0].id as any,
-          conversationId: FIXTURE.conversations.telegram.id as any,
+          ruleId,
+          conversationId,
           matchedConditions: JSON.stringify({
             tag: 'VIP',
           }),

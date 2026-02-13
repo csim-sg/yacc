@@ -3,6 +3,47 @@ import { Page, APIRequestContext } from '@playwright/test';
 const API_BASE_URL = process.env.API_URL || 'http://localhost:3000/api';
 
 /**
+ * Common API Response Types
+ */
+
+export interface Conversation {
+  id: string;
+  channel: string;
+  title: string;
+  status: string;
+  priority: string;
+  assignedUserId?: string;
+  [key: string]: unknown;
+}
+
+export interface Notification {
+  id: string;
+  type: 'assignment' | 'mention';
+  conversationId: string;
+  isRead: boolean;
+  [key: string]: unknown;
+}
+
+export interface AuditLog {
+  id: string;
+  actorId: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  [key: string]: unknown;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+/**
  * Make an authenticated API request using page context
  */
 export async function apiRequest(page: Page, config: {
@@ -129,7 +170,7 @@ export async function removeTag(
 export async function getConversations(
   page: Page,
   filters?: Record<string, string>
-): Promise<Array<Record<string, unknown>>> {
+): Promise<Conversation[]> {
   let endpoint = '/conversations';
   if (filters && Object.keys(filters).length > 0) {
     const queryString = new URLSearchParams(filters).toString();
@@ -145,14 +186,14 @@ export async function getConversations(
     throw new Error(`Failed to get conversations: ${response.status}`);
   }
 
-  const data = response.data as Record<string, unknown>;
-  return Array.isArray(data) ? data : data.conversations || [];
+  const data = response.data as Record<string, unknown> | Conversation[];
+  return Array.isArray(data) ? data : ((data as Record<string, unknown>).conversations as Conversation[]) || [];
 }
 
 /**
  * Get a specific conversation via API
  */
-export async function getConversation(page: Page, conversationId: string): Promise<Record<string, unknown>> {
+export async function getConversation(page: Page, conversationId: string): Promise<Conversation> {
   const response = await apiRequest(page, {
     method: 'GET',
     endpoint: `/conversations/${conversationId}`,
@@ -162,7 +203,7 @@ export async function getConversation(page: Page, conversationId: string): Promi
     throw new Error(`Failed to get conversation: ${response.status}`);
   }
 
-  return response.data;
+  return response.data as Conversation;
 }
 
 /**
@@ -208,7 +249,7 @@ export async function createNote(
 /**
  * Get notifications via API
  */
-export async function getNotifications(page: Page): Promise<Array<Record<string, unknown>>> {
+export async function getNotifications(page: Page): Promise<Notification[]> {
   const response = await apiRequest(page, {
     method: 'GET',
     endpoint: '/notifications',
@@ -218,8 +259,8 @@ export async function getNotifications(page: Page): Promise<Array<Record<string,
     throw new Error(`Failed to get notifications: ${response.status}`);
   }
 
-  const data = response.data as Record<string, unknown>;
-  return Array.isArray(data) ? data : data.notifications || [];
+  const data = response.data as Record<string, unknown> | Notification[];
+  return Array.isArray(data) ? data : ((data as Record<string, unknown>).notifications as Notification[]) || [];
 }
 
 /**
@@ -243,7 +284,7 @@ export async function markNotificationRead(page: Page, notificationId: string): 
 export async function getAuditLogs(
   page: Page,
   filters?: Record<string, string>
-): Promise<Array<Record<string, unknown>>> {
+): Promise<AuditLog[]> {
   let endpoint = '/audit-logs';
   if (filters && Object.keys(filters).length > 0) {
     const queryString = new URLSearchParams(filters).toString();
@@ -259,8 +300,19 @@ export async function getAuditLogs(
     throw new Error(`Failed to get audit logs: ${response.status}`);
   }
 
-  const data = response.data as Record<string, unknown>;
-  return Array.isArray(data) ? data : data.logs || [];
+  const data = response.data as Record<string, unknown> | AuditLog[];
+  if (Array.isArray(data)) {
+    return data;
+  }
+  // Handle paginated response with "items" field (current API spec)
+  if (data && 'items' in data && Array.isArray(data.items)) {
+    return data.items as AuditLog[];
+  }
+  // Fallback for legacy response shape with "logs" field
+  if (data && 'logs' in data && Array.isArray(data.logs)) {
+    return data.logs as AuditLog[];
+  }
+  return [];
 }
 
 /**
@@ -276,8 +328,8 @@ export async function getRoutingRules(page: Page): Promise<Array<Record<string, 
     throw new Error(`Failed to get routing rules: ${response.status}`);
   }
 
-  const data = response.data as Record<string, unknown>;
-  return Array.isArray(data) ? data : data.rules || [];
+  const data = response.data as Record<string, unknown> | Array<Record<string, unknown>>;
+  return Array.isArray(data) ? data : ((data as Record<string, unknown>).rules as Array<Record<string, unknown>>) || [];
 }
 
 /**
@@ -313,6 +365,23 @@ export async function createRoutingRule(
 }
 
 /**
+ * Bulk action failure item type
+ */
+export interface BulkActionFailure {
+  id: string;
+  reason: string;
+}
+
+/**
+ * Bulk action response type
+ */
+export interface BulkActionResponse {
+  successCount: number;
+  failureCount: number;
+  failures?: BulkActionFailure[];
+}
+
+/**
  * Perform bulk action via API
  */
 export async function bulkAction(
@@ -322,7 +391,7 @@ export async function bulkAction(
     action: 'assign' | 'tag' | 'priority' | 'status';
     value: unknown;
   }
-): Promise<{ successCount: number; failureCount: number; failures?: Array<any> }> {
+): Promise<BulkActionResponse> {
   const response = await apiRequest(page, {
     method: 'POST',
     endpoint: '/conversations/bulk',
@@ -336,5 +405,5 @@ export async function bulkAction(
     throw new Error(`Failed to perform bulk action: ${response.status}`);
   }
 
-  return response.data as Record<string, unknown>;
+  return response.data as BulkActionResponse;
 }

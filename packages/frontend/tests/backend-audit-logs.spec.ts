@@ -11,6 +11,19 @@ import { test, expect } from '@playwright/test';
 
 const API_BASE_URL = 'http://localhost:3000/api';
 
+/**
+ * Audit Log type for test assertions
+ */
+interface AuditLog {
+  id: string;
+  actorId: string;
+  action: string;
+  entityType?: string;
+  entityId: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
 test.describe('Backend API - Audit Log Endpoints', () => {
   let managerToken = '';
   let userToken = '';
@@ -141,7 +154,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       
       const body = await response.json();
       // All returned logs should have action="user_login"
-      body.items.forEach((log: any) => {
+      body.items.forEach((log: AuditLog) => {
         expect(log.action).toBe('user_login');
       });
     });
@@ -156,7 +169,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       expect(response.status()).toBe(200);
       
       const body = await response.json();
-      body.items.forEach((log: any) => {
+      body.items.forEach((log: AuditLog) => {
         if (log.entityType) {
           expect(log.entityType).toBe('user');
         }
@@ -278,7 +291,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
         expect(body.items).toBeDefined();
         
         // All logs should be for conversation ID 1
-        body.items.forEach((log: any) => {
+        body.items.forEach((log: AuditLog) => {
           if (log.entityType === 'conversation') {
             expect(log.entityId).toBe(1);
           }
@@ -426,7 +439,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       const body = await response.json();
       
       if (body.items.length > 0) {
-        body.items.forEach((log: any) => {
+        body.items.forEach((log: AuditLog) => {
           expect(log.actorId).toBeDefined();
           expect(typeof log.actorId).toBe('number');
         });
@@ -443,7 +456,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       const body = await response.json();
       
       if (body.items.length > 0) {
-        body.items.forEach((log: any) => {
+        body.items.forEach((log: AuditLog) => {
           // Metadata can be null or object
           if (log.metadata !== null) {
             expect(typeof log.metadata).toBe('object');
@@ -563,7 +576,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
 
       const body = await response.json();
       
-      body.items.forEach((log: any) => {
+      body.items.forEach((log: AuditLog) => {
         // Should not contain password or password hash
         const metadataStr = JSON.stringify(log.metadata || {}).toLowerCase();
         expect(metadataStr).not.toContain('password');

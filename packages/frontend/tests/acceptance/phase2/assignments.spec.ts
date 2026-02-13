@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { loginAs, logout, TEST_USERS } from '../../helpers/auth';
-import { assignConversation, getConversations, getConversation, getNotifications, getAuditLogs } from '../../helpers/api';
+import {
+  assignConversation,
+  getConversations,
+  getConversation,
+  getNotifications,
+  getAuditLogs,
+  type Conversation,
+  type Notification,
+  type AuditLog,
+} from '../../helpers/api';
 import { FIXTURE_IDS } from '../../helpers/fixtures';
 
 /**
@@ -15,7 +24,7 @@ test.describe('Assignments Feature - Complete Acceptance Tests', () => {
 
   test('HP-ASSIGN-001: Assign conversation to manager', async ({ page }) => {
     const conversations = await getConversations(page);
-    const unassigned = conversations.find((c: any) => !c.assignedUserId);
+    const unassigned = conversations.find((c: Conversation) => !c.assignedUserId);
     
     if (unassigned) {
       await assignConversation(page, unassigned.id, FIXTURE_IDS.users.manager);
@@ -37,7 +46,7 @@ test.describe('Assignments Feature - Complete Acceptance Tests', () => {
     await loginAs(page, TEST_USERS.manager);
     
     const myConversations = await getConversations(page, { assignedUserId: FIXTURE_IDS.users.manager });
-    const found = myConversations.some((c: any) => c.id === FIXTURE_IDS.conversations.irc);
+    const found = myConversations.some((c: Conversation) => c.id === FIXTURE_IDS.conversations.irc);
     expect(found).toBeTruthy();
   });
 
@@ -48,7 +57,7 @@ test.describe('Assignments Feature - Complete Acceptance Tests', () => {
     await loginAs(page, TEST_USERS.user);
     
     const notifications = await getNotifications(page);
-    const assignmentNotif = notifications.find((n: any) => n.type === 'assignment');
+    const assignmentNotif = notifications.find((n: Notification) => n.type === 'assignment');
     expect(assignmentNotif).toBeTruthy();
   });
 
@@ -91,7 +100,7 @@ test.describe('Assignments Feature - Complete Acceptance Tests', () => {
     await assignConversation(page, FIXTURE_IDS.conversations.telegram, FIXTURE_IDS.users.admin);
     
     const logs = await getAuditLogs(page, { action: 'conversation.assigned' });
-    const assignLog = logs.find((l: any) => l.entityId === FIXTURE_IDS.conversations.telegram);
+    const assignLog = logs.find((l: AuditLog) => l.entityId === FIXTURE_IDS.conversations.telegram);
     
     expect(assignLog).toBeTruthy();
     expect(assignLog?.metadata?.newAssignedUserId).toBe(FIXTURE_IDS.users.admin);
@@ -105,7 +114,7 @@ test.describe('Assignments Feature - Complete Acceptance Tests', () => {
     await assignConversation(page, FIXTURE_IDS.conversations.irc, newId);
     
     const logs = await getAuditLogs(page);
-    const reassignLog = logs.find((l: any) =>
+    const reassignLog = logs.find((l: AuditLog) =>
       l.action === 'conversation.assigned' && l.entityId === FIXTURE_IDS.conversations.irc
     );
     
@@ -119,11 +128,11 @@ test.describe('Assignments Feature - Complete Acceptance Tests', () => {
     await loginAs(page, TEST_USERS.user);
     
     const notifs1 = await getNotifications(page);
-    const assignmentCount1 = notifs1.filter((n: any) => n.type === 'assignment').length;
+    const assignmentCount1 = notifs1.filter((n: Notification) => n.type === 'assignment').length;
     
     await page.reload();
     const notifs2 = await getNotifications(page);
-    const assignmentCount2 = notifs2.filter((n: any) => n.type === 'assignment').length;
+    const assignmentCount2 = notifs2.filter((n: Notification) => n.type === 'assignment').length;
     
     expect(assignmentCount2).toBeGreaterThanOrEqual(assignmentCount1);
   });
