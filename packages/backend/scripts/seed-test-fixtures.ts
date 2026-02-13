@@ -400,6 +400,68 @@ async function seedTestFixtures() {
     void inbound;
     void latestInbound;
 
+    // === PHASE 1 ACCEPTANCE TESTING FIXTURES ===
+    console.log('🧪 Seeding Phase 1 fixtures (100 conversations for testing)...');
+
+    /**
+     * Create 100 Phase 1 test conversations for comprehensive acceptance testing
+     * - 60 Telegram conversations (various statuses and priorities)
+     * - 40 IRC conversations (various statuses and priorities)
+     * - Varied assignments (50% to manager, 50% unassigned)
+     * - Varied message counts and statuses
+     */
+    const phase1ConversationIds: string[] = [];
+    for (let i = 0; i < 100; i++) {
+      const channel = i < 60 ? 'telegram' : 'irc';
+      const status = ['open', 'pending', 'resolved'][i % 3] as 'open' | 'pending' | 'resolved';
+      const priority = ['low', 'normal', 'high', 'urgent'][(i % 4)] as 'low' | 'normal' | 'high' | 'urgent';
+      const assignedUserId = i % 2 === 0 ? FIXTURE.users.manager.id : null;
+      const conversationId = `10000000-0000-0000-0000-${String(i + 1).padStart(12, '0')}`;
+
+      phase1ConversationIds.push(conversationId);
+
+      const externalThreadId = channel === 'telegram' 
+        ? `tg-phase1-${i}` 
+        : `irc-#phase1-${i}`;
+
+      await dbClient
+        .insert(conversations)
+        .values({
+          id: conversationId,
+          channel: channel as 'telegram' | 'irc',
+          externalThreadId,
+          title: `${channel.toUpperCase()} ${status} conversation ${i + 1}`,
+          status,
+          priority,
+          assignedUserId,
+          createdAt: sql`now() - interval '${(100 - i) * 5} minutes'`,
+          updatedAt: sql`now() - interval '${(100 - i) * 2} minutes'`,
+          lastActivityAt: sql`now() - interval '${(100 - i) * 2} minutes'`,
+        })
+        .onConflictDoNothing();
+
+      // Add 2-5 messages per conversation with varied statuses
+      const messageCount = 2 + (i % 4);
+      for (let j = 0; j < messageCount; j++) {
+        const messageStatus = j < 2 ? 'sent' : (j === messageCount - 1 ? 'pending' : (Math.random() > 0.8 ? 'failed' : 'sent'));
+        
+        await dbClient
+          .insert(messages)
+          .values({
+            conversationId,
+            senderName: j % 2 === 0 ? `customer_${i}` : 'support',
+            body: `Phase 1 test message ${j + 1} for conversation ${i + 1}`,
+            status: messageStatus as 'sent' | 'pending' | 'failed',
+            direction: j % 2 === 0 ? 'inbound' : 'outbound',
+            createdAt: sql`now() - interval '${(messageCount - j) * 10} minutes'`,
+            updatedAt: sql`now() - interval '${(messageCount - j) * 10} minutes'`,
+          })
+          .onConflictDoNothing();
+      }
+    }
+
+    console.log(`✅ Phase 1 fixtures seeded: 100 conversations with ${phase1ConversationIds.length} total created`);
+
     // === PHASE 2 ACCEPTANCE TESTING FIXTURES ===
     console.log('🧪 Seeding Phase 2 fixtures...');
 
