@@ -424,6 +424,14 @@ async function seedTestFixtures() {
         ? `tg-phase1-${i}` 
         : `irc-#phase1-${i}`;
 
+      // Calculate timestamps using Date objects instead of SQL intervals
+      const now = new Date();
+      const minutesBackCreated = (100 - i) * 5;
+      const minutesBackUpdated = (100 - i) * 2;
+      
+      const createdDate = new Date(now.getTime() - minutesBackCreated * 60 * 1000);
+      const updatedDate = new Date(now.getTime() - minutesBackUpdated * 60 * 1000);
+
       await dbClient
         .insert(conversations)
         .values({
@@ -434,9 +442,9 @@ async function seedTestFixtures() {
           status,
           priority,
           assignedUserId,
-          createdAt: sql`now() - interval '${(100 - i) * 5} minutes'`,
-          updatedAt: sql`now() - interval '${(100 - i) * 2} minutes'`,
-          lastActivityAt: sql`now() - interval '${(100 - i) * 2} minutes'`,
+          createdAt: createdDate,
+          updatedAt: updatedDate,
+          lastActivityAt: updatedDate,
         })
         .onConflictDoNothing();
 
@@ -444,6 +452,9 @@ async function seedTestFixtures() {
       const messageCount = 2 + (i % 4);
       for (let j = 0; j < messageCount; j++) {
         const messageStatus = j < 2 ? 'sent' : (j === messageCount - 1 ? 'pending' : (Math.random() > 0.8 ? 'failed' : 'sent'));
+        const messageMinutesBack = (messageCount - j) * 10;
+        
+        const messageDate = new Date(now.getTime() - messageMinutesBack * 60 * 1000);
         
         await dbClient
           .insert(messages)
@@ -453,8 +464,8 @@ async function seedTestFixtures() {
             body: `Phase 1 test message ${j + 1} for conversation ${i + 1}`,
             status: messageStatus as 'sent' | 'pending' | 'failed',
             direction: j % 2 === 0 ? 'inbound' : 'outbound',
-            createdAt: sql`now() - interval '${(messageCount - j) * 10} minutes'`,
-            updatedAt: sql`now() - interval '${(messageCount - j) * 10} minutes'`,
+            createdAt: messageDate,
+            updatedAt: messageDate,
           })
           .onConflictDoNothing();
       }
