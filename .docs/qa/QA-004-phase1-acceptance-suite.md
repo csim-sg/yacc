@@ -79,10 +79,10 @@ packages/frontend/tests/acceptance/phase1/
 #### File: `auth.spec.ts`
 
 **Test Users**:
-- `superadmin@test.com` / password `Test@12345` (super_admin)
-- `admin@test.com` / password `Test@12345` (admin)
-- `manager@test.com` / password `Test@12345` (manager)
-- `user@test.com` / password `Test@12345` (user)
+- `admin@yacc.local` / password `admin123` (super_admin)
+- `admin2@yacc.local` / password `admin123` (admin)
+- `manager@yacc.local` / password `admin123` (manager)
+- `user@yacc.local` / password `admin123` (user)
 
 **Happy Path Tests (6)**:
 1. HP-AUTH-001: User can login with valid credentials

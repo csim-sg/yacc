@@ -129,7 +129,7 @@ export async function removeTag(
 export async function getConversations(
   page: Page,
   filters?: Record<string, string>
-): Promise<Array<any>> {
+): Promise<Array<Record<string, unknown>>> {
   let endpoint = '/conversations';
   if (filters && Object.keys(filters).length > 0) {
     const queryString = new URLSearchParams(filters).toString();
@@ -145,14 +145,14 @@ export async function getConversations(
     throw new Error(`Failed to get conversations: ${response.status}`);
   }
 
-  const data = response.data as any;
+  const data = response.data as Record<string, unknown>;
   return Array.isArray(data) ? data : data.conversations || [];
 }
 
 /**
  * Get a specific conversation via API
  */
-export async function getConversation(page: Page, conversationId: string): Promise<any> {
+export async function getConversation(page: Page, conversationId: string): Promise<Record<string, unknown>> {
   const response = await apiRequest(page, {
     method: 'GET',
     endpoint: `/conversations/${conversationId}`,
@@ -208,7 +208,7 @@ export async function createNote(
 /**
  * Get notifications via API
  */
-export async function getNotifications(page: Page): Promise<Array<any>> {
+export async function getNotifications(page: Page): Promise<Array<Record<string, unknown>>> {
   const response = await apiRequest(page, {
     method: 'GET',
     endpoint: '/notifications',
@@ -218,7 +218,7 @@ export async function getNotifications(page: Page): Promise<Array<any>> {
     throw new Error(`Failed to get notifications: ${response.status}`);
   }
 
-  const data = response.data as any;
+  const data = response.data as Record<string, unknown>;
   return Array.isArray(data) ? data : data.notifications || [];
 }
 
@@ -243,7 +243,7 @@ export async function markNotificationRead(page: Page, notificationId: string): 
 export async function getAuditLogs(
   page: Page,
   filters?: Record<string, string>
-): Promise<Array<any>> {
+): Promise<Array<Record<string, unknown>>> {
   let endpoint = '/audit-logs';
   if (filters && Object.keys(filters).length > 0) {
     const queryString = new URLSearchParams(filters).toString();
@@ -259,14 +259,14 @@ export async function getAuditLogs(
     throw new Error(`Failed to get audit logs: ${response.status}`);
   }
 
-  const data = response.data as any;
+  const data = response.data as Record<string, unknown>;
   return Array.isArray(data) ? data : data.logs || [];
 }
 
 /**
  * Get routing rules via API
  */
-export async function getRoutingRules(page: Page): Promise<Array<any>> {
+export async function getRoutingRules(page: Page): Promise<Array<Record<string, unknown>>> {
   const response = await apiRequest(page, {
     method: 'GET',
     endpoint: '/routing-rules',
@@ -276,7 +276,7 @@ export async function getRoutingRules(page: Page): Promise<Array<any>> {
     throw new Error(`Failed to get routing rules: ${response.status}`);
   }
 
-  const data = response.data as any;
+  const data = response.data as Record<string, unknown>;
   return Array.isArray(data) ? data : data.rules || [];
 }
 
@@ -336,5 +336,5 @@ export async function bulkAction(
     throw new Error(`Failed to perform bulk action: ${response.status}`);
   }
 
-  return response.data as any;
+  return response.data as Record<string, unknown>;
 }

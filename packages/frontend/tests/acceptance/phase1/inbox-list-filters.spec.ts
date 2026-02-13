@@ -199,9 +199,12 @@ test.describe('Phase 1: Inbox List & Filters - Complete Acceptance Tests', () =>
     });
 
     expect(response.status).toBe(200);
-    const data = response.data as { data: Array<{ assignedUserId: string }> };
+    const data = response.data as { data: Array<{ assignedUserId: string }>; total: number };
     
-    // User should only see conversations assigned to them
+    // User should have at least 1 assigned conversation (proves data filtering works)
+    expect(data.total).toBeGreaterThan(0);
+    
+    // All visible conversations should be assigned to this user
     data.data.forEach(conv => {
       expect(conv.assignedUserId).toBe(TEST_USERS.user.id);
     });

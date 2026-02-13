@@ -179,11 +179,11 @@ export const SELECTORS = {
  */
 export function getSelector(path: keyof typeof SELECTORS | string): string {
   const parts = path.toString().split('.');
-  let current: any = SELECTORS;
+  let current: unknown = SELECTORS;
 
   for (const part of parts) {
-    if (part in current) {
-      current = current[part];
+    if (typeof current === 'object' && current !== null && part in current) {
+      current = (current as Record<string, unknown>)[part];
     } else {
       throw new Error(`Selector not found: ${path}`);
     }
