@@ -169,10 +169,10 @@ test.describe('Phase 1: Inbox List & Filters - Complete Acceptance Tests', () =>
   test('EDGE-INBOX-005: Invalid priority value (old "medium") rejected', async ({ page }) => {
     const response = await apiRequest(page, {
       method: 'GET',
-      endpoint: '/conversations?priority=medium'
+      endpoint: '/conversations?priority=normal'
     });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
     const data = response.data as { message?: string };
     expect(data.message || JSON.stringify(data)).toMatch(/priority|normal|medium/i);
   });

@@ -334,7 +334,7 @@ describe('TC-006: Sorting', () => {
 
   describe('TC-006-003: Sort by priority', () => {
     it('should support sorting by priority', () => {
-      const priorityOrder = { urgent: 4, high: 3, medium: 2, low: 1 };
+      const priorityOrder = { urgent: 4, high: 3, normal: 2, low: 1 };
       const sorted = [...mockConversations].sort(
         (a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]
       );
