@@ -15,9 +15,9 @@ export const FIXTURE_IDS = {
     irc: '00000000-0000-0000-0000-000000001002',
   },
   routingRules: {
-    autoAssignVip: '00000000-0000-0000-0000-000002001',
-    autoTagUrgent: '00000000-0000-0000-0000-000002002',
-    disabledRule: '00000000-0000-0000-0000-000002003',
+    autoAssignVip: '00000000-0000-0000-0000-000000002001',
+    autoTagUrgent: '00000000-0000-0000-0000-000000002002',
+    disabledRule: '00000000-0000-0000-0000-000000002003',
   },
   bulkConversations: {
     startId: 3000,
