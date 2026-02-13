@@ -422,7 +422,7 @@ export class ConversationService {
    */
   async updateConversationPriority(
     id: string,
-    priority: 'low' | 'medium' | 'high' | 'urgent'
+    priority: 'low' | 'normal' | 'high' | 'urgent'
   ) {
     const result = await dbClient
       .update(conversations)
@@ -443,7 +443,7 @@ export class ConversationService {
   /**
    * Update priority (alias for controller)
    */
-  async updatePriority(id: string, priority: 'low' | 'medium' | 'high' | 'urgent') {
+  async updatePriority(id: string, priority: 'low' | 'normal' | 'high' | 'urgent') {
     const oldConvo = await dbClient
       .select()
       .from(conversations)

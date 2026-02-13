@@ -45,7 +45,7 @@ const mockConversations: TestConversation[] = [
     channel: 'irc',
     externalThreadId: 'irc-456',
     status: 'pending',
-    priority: 'medium',
+    priority: 'normal',
     assignedUserId: 'user-2',
     createdAt: new Date('2026-02-02'),
     lastActivityAt: new Date('2026-02-06T07:45:00Z'),

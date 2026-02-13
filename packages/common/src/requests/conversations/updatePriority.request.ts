@@ -5,6 +5,6 @@ import { IsEnum } from 'class-validator';
  * Body parameters for updating conversation priority
  */
 export class UpdatePriorityRequest {
-  @IsEnum(['low', 'medium', 'high', 'urgent'])
-  priority!: 'low' | 'medium' | 'high' | 'urgent';
+  @IsEnum(['low', 'normal', 'high', 'urgent'])
+  priority!: 'low' | 'normal' | 'high' | 'urgent';
 }
