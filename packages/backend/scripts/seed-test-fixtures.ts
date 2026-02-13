@@ -234,7 +234,7 @@ async function seedTestFixtures() {
         externalThreadId: FIXTURE.conversations.telegram.externalThreadId,
         title: FIXTURE.conversations.telegram.title,
         status: 'resolved',
-        priority: 'medium',
+        priority: 'normal',
         assignedUserId: FIXTURE.users.superAdmin.id,
         createdAt: sql`now() - interval '20 minutes'`,
         updatedAt: sql`now() - interval '15 minutes'`,
@@ -244,7 +244,7 @@ async function seedTestFixtures() {
         target: conversations.id,
         set: {
           status: 'resolved',
-          priority: 'medium',
+          priority: 'normal',
           assignedUserId: FIXTURE.users.superAdmin.id,
           updatedAt: sql`now() - interval '15 minutes'`,
           lastActivityAt: sql`now() - interval '15 minutes'`,
@@ -479,7 +479,7 @@ async function seedTestFixtures() {
           externalThreadId: `bulk-test-${i}`,
           title: `Bulk Test Conversation ${i + 1}`,
           status: 'open',
-          priority: 'medium',
+          priority: 'normal',
           assignedUserId: i % 3 === 0 ? FIXTURE.users.manager.id : null,
         })
         .onConflictDoNothing();
