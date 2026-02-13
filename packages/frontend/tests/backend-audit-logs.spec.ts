@@ -88,14 +88,11 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       expect(response.status()).toBe(200);
       
       const body = await response.json();
-      expect(body.success).toBe(true);
-      expect(body.data).toBeDefined();
-      expect(body.data.logs).toBeDefined();
-      expect(Array.isArray(body.data.logs)).toBe(true);
-      expect(body.data.total).toBeDefined();
-      expect(body.data.page).toBeDefined();
-      expect(body.data.limit).toBeDefined();
-      expect(body.data.totalPages).toBeDefined();
+      expect(body.items).toBeDefined();
+      expect(Array.isArray(body.items)).toBe(true);
+      expect(body.total).toBeDefined();
+      expect(body.page).toBeDefined();
+      expect(body.limit).toBeDefined();
     });
 
     test('should reject request without authentication', async ({ request }) => {
@@ -128,9 +125,9 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       expect(response.status()).toBe(200);
       
       const body = await response.json();
-      expect(body.data.page).toBe(1);
-      expect(body.data.limit).toBe(10);
-      expect(body.data.logs.length).toBeLessThanOrEqual(10);
+      expect(body.page).toBe(1);
+      expect(body.limit).toBe(10);
+      expect(body.items.length).toBeLessThanOrEqual(10);
     });
 
     test('should support filtering by action', async ({ request }) => {
@@ -144,7 +141,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       
       const body = await response.json();
       // All returned logs should have action="user_login"
-      body.data.logs.forEach((log: any) => {
+      body.items.forEach((log: any) => {
         expect(log.action).toBe('user_login');
       });
     });
@@ -159,7 +156,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       expect(response.status()).toBe(200);
       
       const body = await response.json();
-      body.data.logs.forEach((log: any) => {
+      body.items.forEach((log: any) => {
         if (log.entityType) {
           expect(log.entityType).toBe('user');
         }
@@ -182,7 +179,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       expect(response.status()).toBe(200);
       
       const body = await response.json();
-      expect(body.data.logs).toBeDefined();
+      expect(body.items).toBeDefined();
     });
 
     test('should include required audit log fields', async ({ request }) => {
@@ -194,8 +191,8 @@ test.describe('Backend API - Audit Log Endpoints', () => {
 
       const body = await response.json();
       
-      if (body.data.logs.length > 0) {
-        const log = body.data.logs[0];
+      if (body.items.length > 0) {
+        const log = body.items[0];
         expect(log.id).toBeDefined();
         expect(log.actorId).toBeDefined();
         expect(log.action).toBeDefined();
@@ -244,7 +241,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       expect(response.status()).toBe(200);
       
       const body = await response.json();
-      expect(body.data.limit).toBeLessThanOrEqual(100);
+      expect(body.limit).toBeLessThanOrEqual(100);
     });
   });
 
@@ -278,10 +275,10 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       
       if (response.status() === 200) {
         const body = await response.json();
-        expect(body.data.logs).toBeDefined();
+        expect(body.items).toBeDefined();
         
         // All logs should be for conversation ID 1
-        body.data.logs.forEach((log: any) => {
+        body.items.forEach((log: any) => {
           if (log.entityType === 'conversation') {
             expect(log.entityId).toBe(1);
           }
@@ -321,7 +318,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       
       if (response.status() === 200) {
         const body = await response.json();
-        expect(body.data.logs.length).toBeLessThanOrEqual(5);
+        expect(body.items.length).toBeLessThanOrEqual(5);
       }
     });
   });
@@ -393,8 +390,8 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       
       const body = await response.json();
       
-      if (body.data.logs.length > 0) {
-        const loginLog = body.data.logs[0];
+      if (body.items.length > 0) {
+        const loginLog = body.items[0];
         expect(loginLog.action).toBe('user_login');
         expect(loginLog.actorId).toBeDefined();
         expect(loginLog.entityType).toBe('user');
@@ -413,8 +410,8 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       
       const body = await response.json();
       
-      if (body.data.logs.length > 0) {
-        const logoutLog = body.data.logs[0];
+      if (body.items.length > 0) {
+        const logoutLog = body.items[0];
         expect(logoutLog.action).toBe('user_logout');
       }
     });
@@ -428,8 +425,8 @@ test.describe('Backend API - Audit Log Endpoints', () => {
 
       const body = await response.json();
       
-      if (body.data.logs.length > 0) {
-        body.data.logs.forEach((log: any) => {
+      if (body.items.length > 0) {
+        body.items.forEach((log: any) => {
           expect(log.actorId).toBeDefined();
           expect(typeof log.actorId).toBe('number');
         });
@@ -445,8 +442,8 @@ test.describe('Backend API - Audit Log Endpoints', () => {
 
       const body = await response.json();
       
-      if (body.data.logs.length > 0) {
-        body.data.logs.forEach((log: any) => {
+      if (body.items.length > 0) {
+        body.items.forEach((log: any) => {
           // Metadata can be null or object
           if (log.metadata !== null) {
             expect(typeof log.metadata).toBe('object');
@@ -465,19 +462,17 @@ test.describe('Backend API - Audit Log Endpoints', () => {
         },
       });
 
-      const body = await response.json();
-      expect(body.success).toBe(true);
-      expect(body.data).toBeDefined();
-      expect(body.data.logs).toBeDefined();
-      expect(body.data.total).toBeDefined();
-      expect(body.data.page).toBeDefined();
-      expect(body.data.limit).toBeDefined();
-      expect(body.data.totalPages).toBeDefined();
+       const body = await response.json();
+      expect(body.items).toBeDefined();
+      expect(Array.isArray(body.items)).toBe(true);
+      expect(body.total).toBeDefined();
+      expect(body.page).toBeDefined();
+      expect(body.limit).toBeDefined();
       
-      expect(typeof body.data.total).toBe('number');
-      expect(typeof body.data.page).toBe('number');
-      expect(typeof body.data.limit).toBe('number');
-      expect(typeof body.data.totalPages).toBe('number');
+      expect(typeof body.total).toBe('number');
+      expect(typeof body.page).toBe('number');
+      expect(typeof body.limit).toBe('number');
+      expect(typeof body.pages).toBe('number');
     });
 
     test('should calculate total pages correctly', async ({ request }) => {
@@ -488,8 +483,8 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       const body = await response.json();
-      const expectedPages = Math.ceil(body.data.total / body.data.limit);
-      expect(body.data.totalPages).toBe(expectedPages);
+      const expectedPages = Math.ceil(body.total / body.limit);
+      expect(body.pages).toBe(expectedPages);
     });
 
     test('should handle empty result sets', async ({ request }) => {
@@ -502,9 +497,9 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       expect(response.status()).toBe(200);
       
       const body = await response.json();
-      expect(body.data.logs).toBeDefined();
-      expect(body.data.logs.length).toBe(0);
-      expect(body.data.total).toBe(0);
+      expect(body.items).toBeDefined();
+      expect(body.items.length).toBe(0);
+      expect(body.total).toBe(0);
     });
   });
 
@@ -535,7 +530,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       expect(response.status()).toBe(200);
       
       const body = await response.json();
-      expect(body.data.logs.length).toBe(0);
+      expect(body.items.length).toBe(0);
     });
   });
 
@@ -568,7 +563,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
 
       const body = await response.json();
       
-      body.data.logs.forEach((log: any) => {
+      body.items.forEach((log: any) => {
         // Should not contain password or password hash
         const metadataStr = JSON.stringify(log.metadata || {}).toLowerCase();
         expect(metadataStr).not.toContain('password');
