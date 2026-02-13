@@ -93,7 +93,7 @@ export const ConversationSchema = z.object({
   channel: z.enum(['telegram', 'irc', 'whatsapp', 'wechat', 'meta', 'x']),
   externalThreadId: z.string(), // ID from external platform
   status: z.enum(['open', 'pending', 'resolved']),
-  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
   title: z.string().optional(), // Group/channel name
   assignedUserId: z.string().uuid().nullable().optional(),
   assignedUser: UserSchema.nullable().optional(),

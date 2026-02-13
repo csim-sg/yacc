@@ -67,9 +67,9 @@ test.describe('Regression Test Suite (UI)', () => {
     await expect(page.locator('button', { hasText: 'Status: resolved' })).toBeVisible();
     await expect(conversationTitle).toBeVisible();
 
-    const prioritySelect = page.locator('select').filter({ hasText: 'All Priorities' });
-    await prioritySelect.selectOption('medium');
-    await expect(page.locator('button', { hasText: 'Priority: medium' })).toBeVisible();
+     const prioritySelect = page.locator('select').filter({ hasText: 'All Priorities' });
+    await prioritySelect.selectOption('normal');
+    await expect(page.locator('button', { hasText: 'Priority: normal' })).toBeVisible();
     await expect(conversationTitle).toBeVisible();
 
     await page.locator('aside').getByRole('button', { name: 'Telegram' }).click();

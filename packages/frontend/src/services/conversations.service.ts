@@ -6,7 +6,7 @@
 import { api } from '../lib/apiClient';
 
 export type ConversationStatus = 'open' | 'pending' | 'resolved';
-export type ConversationPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type ConversationPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type ChannelType = 'telegram' | 'irc' | 'whatsapp' | 'wechat' | 'meta' | 'x' | 'email' | 'slack';
 export const PHASE1_CHANNELS = ['telegram', 'irc'] as const;
 export type Phase1ChannelType = (typeof PHASE1_CHANNELS)[number];

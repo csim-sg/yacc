@@ -27,7 +27,7 @@ const CHANNEL_LABELS: Record<Phase1ChannelType, string> = {
 
 const PRIORITY_BADGE: Record<ConversationPriority, string> = {
   low: 'badge-ghost',
-  medium: 'badge-info',
+  normal: 'badge-info',
   high: 'badge-warning',
   urgent: 'badge-error',
 };
@@ -39,7 +39,7 @@ const STATUS_BADGE: Record<ConversationStatus, string> = {
 };
 
 const STATUS_VALUES: ConversationStatus[] = ['open', 'pending', 'resolved'];
-const PRIORITY_VALUES: ConversationPriority[] = ['low', 'medium', 'high', 'urgent'];
+const PRIORITY_VALUES: ConversationPriority[] = ['low', 'normal', 'high', 'urgent'];
 const CHANNEL_VALUES: Phase1ChannelType[] = [...PHASE1_CHANNELS];
 
 export function InboxPage() {

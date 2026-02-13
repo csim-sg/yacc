@@ -37,7 +37,7 @@ export interface ConversationSummary {
   channel: 'telegram' | 'irc';
   externalThreadId: string;
   status: 'open' | 'pending' | 'resolved';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
   assignedUserId: string | null;
   assignedUserName: string | null;
   tags: Tag[];
@@ -127,7 +127,7 @@ export function createMockConversationSummary(
     channel: 'telegram',
     externalThreadId: `ext-${Math.random().toString(36).substr(2, 9)}`,
     status: 'open',
-    priority: 'medium',
+    priority: 'normal',
     assignedUserId: 'user-123',
     assignedUserName: 'John Doe',
     tags: [mockTags[0]],
@@ -150,7 +150,7 @@ export function createMockConversationDetail(
     channel: 'telegram',
     externalThreadId: `ext-${Math.random().toString(36).substr(2, 9)}`,
     status: 'open',
-    priority: 'medium',
+    priority: 'normal',
     assignedUserId: 'user-123',
     assignedUserName: 'John Doe',
     tags: [mockTags[0]],
@@ -205,7 +205,7 @@ export const mockConversationsList: ListConversationsResponse = {
       channel: 'irc',
       externalThreadId: 'irc-channel-2',
       status: 'pending',
-      priority: 'medium',
+      priority: 'normal',
       assignedUserName: 'Jane Smith',
       participants: [mockParticipants[1]],
       latestMessagePreview: 'Thank you for your help!',
@@ -345,9 +345,9 @@ export const mockFilteredResponses = {
       data: mockConversationsList.data.filter((c) => c.priority === 'high'),
       total: 8,
     },
-    medium: {
+    normal: {
       ...mockConversationsList,
-      data: mockConversationsList.data.filter((c) => c.priority === 'medium'),
+      data: mockConversationsList.data.filter((c) => c.priority === 'normal'),
       total: 20,
     },
     low: {

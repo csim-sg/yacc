@@ -307,8 +307,8 @@ test.describe('Backend API - Conversation Endpoints', () => {
       expect([400, 404]).toContain(response.status());
     });
 
-    test('should accept valid priority values (low, medium, high, urgent)', async ({ request }) => {
-      const validPriorities = ['low', 'medium', 'high', 'urgent'];
+    test('should accept valid priority values (low, normal, high, urgent)', async ({ request }) => {
+      const validPriorities = ['low', 'normal', 'high', 'urgent'];
       
       for (const priority of validPriorities) {
         const response = await request.patch(`${API_BASE_URL}/conversations/1/priority`, {
