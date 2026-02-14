@@ -73,7 +73,8 @@ Winston's architecture was not designed for high-performance, structured logging
 ```mermaid
 graph TB
     subgraph "HTTP Request Flow"
-        Request[HTTP Request] --> CorrID[Correlation ID Middleware]
+        Request[HTTP Request] --> BodyParser[Body Parser Middleware]
+        BodyParser --> CorrID[Correlation ID Middleware]
         CorrID --> ReqLog[Request Logging Middleware]
         ReqLog --> Auth[Auth Middleware]
         Auth --> RBAC[RBAC Middleware]
@@ -104,36 +105,58 @@ graph TB
         Output -->|Future| Cloud[Cloud Logging]
     end
     
+    style BodyParser fill:#e2e3ff,stroke:#383d7a
     style CorrID fill:#fff3cd,stroke:#856404
     style ReqLog fill:#d1ecf1,stroke:#0c5460
     style BaseLogger fill:#d4edda,stroke:#155724
     style AsyncStore fill:#f8d7da,stroke:#721c24
 ```
 
-### Middleware Order (CRITICAL)
+### Middleware Registration Order
+
+#### Current Implementation
+
+The backend registers middleware in the following order at the entrypoint:
+
+1. **Body Parser Middleware** (EXCEPTION - ADR-014)
+   - Registered via `app.use(bodyParserMiddleware)` **BEFORE** `useExpressServer()`
+   - Must run first to parse request body (required for BetterAuth delegated handlers)
+   - Only JSON parsing (no urlencoded)
+   - Location: `packages/backend/src/index.ts`
+   - See ADR-014 for rationale
+
+2. **Correlation ID + Request Logging** (NORMAL PATTERN)
+   - Registered via `useExpressServer(...middlewares: [correlationIdMiddleware, requestLoggingMiddleware])`
+   - Runs for all requests after routing-controllers initialization
+   - Location: `packages/backend/src/index.ts`
+
+#### Why This Order?
+
+Body parser must run first because:
+- BetterAuth requires parsed `req.body` for delegated handler/session validation
+- `req.body` must be available before routing-controllers processes the request
+- This is documented as an exception in ADR-014
+
+#### Code References
+
+See `packages/backend/src/index.ts` for actual implementation:
 
 ```typescript
 // packages/backend/src/index.ts
-import express from 'express';
-import { correlationIdMiddleware } from './middleware/correlationId.middleware';
-import { requestLoggingMiddleware } from './middleware/requestLogging.middleware';
-import { bodyParserMiddleware } from './middleware/bodyParser.middleware';
-
 const app = express();
 
-// ===== MIDDLEWARE ORDER (CRITICAL) =====
-app.use(correlationIdMiddleware);   // 1. FIRST - inject correlation ID
-app.use(requestLoggingMiddleware);  // 2. SECOND - log HTTP requests
-app.use(bodyParserMiddleware);       // 3. THIRD - body parsing (JSON-only; ADR-014 exception)
-// app.use(authMiddleware);          // 4. FOURTH - authentication
-// app.use(rbacMiddleware);          // 5. FIFTH - authorization
-// app.use(routes);                  // 6. LAST - route to controllers
-```
+// 1) Body parser (exception - ADR-014)
+app.use(bodyParserMiddleware);
 
-**Why this order matters:**
-1. Correlation ID must be injected **before** any logging
-2. Request logging must happen **after** correlation ID is available
-3. Auth/RBAC must happen **after** logging (so auth failures are logged)
+// 2) routing-controllers middleware chain (normal pattern)
+useExpressServer(app, {
+  // ...
+  middlewares: [
+    correlationIdMiddleware,
+    requestLoggingMiddleware,
+  ],
+});
+```
 
 ---
 

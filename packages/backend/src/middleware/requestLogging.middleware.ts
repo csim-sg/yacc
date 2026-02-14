@@ -2,20 +2,24 @@ import pinoHttp from 'pino-http';
 import { logger } from '../infrastructure/logger';
 
 /**
- * HTTP request/response logging middleware
- * 
- * Logs all HTTP requests with timing, status codes, and errors.
- * 
- * @order MUST be second middleware (after correlationIdMiddleware)
- * 
- * @example
- * // In index.ts:
- * app.use(correlationIdMiddleware);   // 1. FIRST - inject correlation ID
- * app.use(requestLoggingMiddleware);  // 2. SECOND - log HTTP requests
- * app.use(bodyParserMiddleware);       // 3. THIRD - body parsing (JSON-only; ADR-014 exception)
- * // app.use(routes);                  // LAST - route to controllers
- * 
- * @returns Express middleware function
+ * Request Logging Middleware
+ *
+ * Logs incoming HTTP requests with correlation ID, method, path, and status.
+ *
+ * Registration: This middleware is registered via the routing-controllers
+ * `middlewares` array in `useExpressServer()` configuration (normal pattern).
+ *
+ * Note: Body parser middleware (`bodyParserMiddleware`) runs BEFORE this middleware.
+ * See ADR-014 for the rationale of the body parser exception.
+ *
+ * Execution Order (at entrypoint):
+ * 1. `app.use(bodyParserMiddleware)` - exception to routing-controllers pattern
+ * 2. `useExpressServer(...middlewares: [correlationIdMiddleware, requestLoggingMiddleware])`
+ *
+ * See ADR-004 for logging strategy and ADR-014 for middleware exceptions.
+ *
+ * @see .docs/adr/ADR-004-logging-strategy.md
+ * @see .docs/adr/ADR-014-middleware-registration-exception.md
  */
 export const requestLoggingMiddleware = pinoHttp({
   logger,
