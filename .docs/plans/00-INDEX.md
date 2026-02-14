@@ -15,6 +15,7 @@
 - **[BE-206-phase4-integration-plan.md](./BE-206-phase4-integration-plan.md)** - ⏳ Phase 4 integration testing (10-12 hours)
 - **[PHASE-2-EXECUTION-PLAN.md](./PHASE-2-EXECUTION-PLAN.md)** - ✅ Phase 2 execution overview (MVP extension approved)
 - **[PHASE-2-COLLABORATION-RULES-HANDOFF.md](./PHASE-2-COLLABORATION-RULES-HANDOFF.md)** - ✅ Phase 2 handoff (blockers resolved, RBAC matrix added)
+ - **[PHASE-2-MVP-PLAN-2026-02-09.md](./PHASE-2-MVP-PLAN-2026-02-09.md)** - Phase 2 MVP planning snapshot (superseded by PHASE-2-EXECUTION-PLAN)
 
 ### Completed Work (Reference)
 

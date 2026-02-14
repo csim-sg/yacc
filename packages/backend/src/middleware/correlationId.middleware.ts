@@ -34,20 +34,24 @@ export const asyncLocalStorage = new AsyncLocalStorage<{
 const baseLogger = logger;
 
 /**
- * Correlation ID middleware
+ * Correlation ID Middleware
  *
  * Extracts or generates a correlation ID for request tracing.
  * Attaches a child logger (with correlation ID) to the request.
  * Sets X-Correlation-ID header in response.
  *
- * @order MUST be first middleware in chain
+ * Registration: This middleware is registered via the routing-controllers
+ * `middlewares` array in `useExpressServer()` configuration (normal pattern).
  *
- * @example
- * // In index.ts:
- * app.use(correlationIdMiddleware);   // FIRST - inject correlation ID
- * app.use(requestLoggingMiddleware);  // SECOND - log HTTP requests
+ * Note: Body parser middleware (`bodyParserMiddleware`) runs BEFORE this middleware.
+ * See ADR-014 for the rationale of the body parser exception.
  *
- * @returns Express middleware function
+ * Execution Order (at entrypoint):
+ * 1. `app.use(bodyParserMiddleware)` - exception to routing-controllers pattern
+ * 2. `useExpressServer(...middlewares: [correlationIdMiddleware, requestLoggingMiddleware])`
+ *
+ * @see .docs/adr/ADR-004-logging-strategy.md
+ * @see .docs/adr/ADR-014-middleware-registration-exception.md
  */
 export function correlationIdMiddleware(
   req: CorrelationRequest,

@@ -3,9 +3,9 @@
 **Date:** 2026-02-07  
 **PR:** #227 (feat: Week 1 complete, BE-007 tag filter, inbox tests, app in index)  
 **Architect:** Enterprise/Solution Architect  
-**Status:** Blocked → In Progress (v1.6 test determinism fix)  
-**Decision:** v1.1 captured initial approval intent; v1.2 identified regressions; v1.5 resolved auth/boundary typing; v1.6 implements test determinism and database/migrations fixes.  
-**Impacted:** `.docs/plans/00-INDEX.md`, `.docs/plans/06-tasks.md`, `packages/backend/src/index.ts`, `packages/backend/src/controllers/conversations.controller.ts`, `packages/backend/src/middleware/rateLimit.middleware.ts`, `packages/backend/tests/BE-007-inbox-api.spec.ts`  
+**Status:** ✅ MERGED (v1.7 post-merge addendum)  
+**Decision:** v1.1 captured initial approval intent; v1.2 identified regressions; v1.5 resolved auth/boundary typing; v1.6 implemented test determinism and database/migrations fixes; v1.7 records merge + governance verification.  
+**Impacted:** `.docs/plans/00-INDEX.md`, `.docs/06-tasks.md`, `packages/backend/src/index.ts`, `packages/backend/src/controllers/conversations.controller.ts`, `packages/backend/src/middleware/rateLimit.middleware.ts`, `packages/backend/tests/BE-007-inbox-api.spec.ts`  
 
 ---
 
@@ -110,13 +110,14 @@ Since v1.1, PR #227 expanded materially beyond Week-1 docs + BE-007 filter/tests
 
 **Compliance:** ❌ Current PR violates this; remediation required.
 
-#### Decision 5: Body Parsing Must Be Configured via routing-controllers
+#### Decision 5: Body Parsing Must Run Before routing-controllers (ADR-014 Exception)
 
-**What:** Request body parsing must be enabled via `useExpressServer` configuration (not `app.use(express.json())`).
+**What:** Request body parsing must be registered at the Express entrypoint boundary via `app.use(bodyParserMiddleware)` **before** calling `useExpressServer(...)` (see ADR-014).
 
 **Why:**
-1. Architecture standard: middleware registration through routing-controllers configuration.
-2. Prevents regressions where non-decorator handlers (e.g., BetterAuth passthrough) receive undefined body.
+1. BetterAuth delegated/passthrough handlers rely on `req.body` being available.
+2. Registering body parsing via routing-controllers `middlewares` config can run too late for this integration (observed in PR #227 / Issue #233).
+3. This is a documented exception; all other middleware remains registered via routing-controllers patterns.
 
 **Compliance:** ❌ Current PR regressed; remediation required.
 
@@ -132,7 +133,7 @@ sequenceDiagram
 
   C->>E: POST /auth/sign-in/email (JSON body)
   E->>RC: request
-  Note over RC: bodyParser enabled via useExpressServer config
+  Note over E: app.use(bodyParserMiddleware) runs before routing-controllers (ADR-014)
   RC->>BA: forward to BetterAuth handler
   BA-->>RC: JSON response
   RC-->>E: response
@@ -295,4 +296,42 @@ sequenceDiagram
 
 **Version:** 1.6  
 **Status:** Active  
-**Related:** PR #227, Issue #231, GOV-008, .docs/plans/00-INDEX.md
+**Related:** PR #227, Issue #231, GOV-008, `.docs/plans/00-INDEX.md`
+
+---
+
+## Addendum (v1.7) – Post-Merge Governance Sync (2026-02-08)
+
+**Merge Confirmation:**
+1. PR #227 merged to `dev` on **2026-02-08**
+2. Merge commit: `8a826935f735da133eb14ca578b65536e5768bcb`
+
+**Issue Closure:**
+1. ✅ Issue #231 closed on 2026-02-08 (deterministic BE-007 test suite)
+
+**Architecture Verification (11/11 constraints met):**
+1. ✅ No `any` types introduced (strict typing preserved)
+2. ✅ One definition per file maintained (no multi-class/service files)
+3. ✅ Flat folder structure maintained (no layered/nested domain folders)
+4. ✅ No barrel exports introduced; index aggregators only used for wiring
+5. ✅ Direct file imports preserved (no convenience barrels)
+6. ✅ routing-controllers integration preserved (controllers/middleware patterns remain compliant)
+7. ✅ No global `/api` prefix introduced (controller-level paths only)
+8. ✅ Config vs infrastructure separation maintained (ADR-005)
+9. ✅ Deterministic backend integration tests added/verified (BE-007)
+10. ✅ Secrets hygiene verified (no credentials committed)
+11. ✅ Governed artifacts updated (plans + governance log + ADR trail)
+
+**Noted Exception (Documented):**
+1. `app.use()` is used for request body parsing **only** as an external library boundary requirement for BetterAuth.
+2. Exception is formally documented in **ADR-014** to prevent middleware creep.
+
+**Phase 2 Readiness:**
+1. ✅ Week 1 backend deliverables are merged and auditable
+2. ✅ Phase 2 can start with WebSocket + messaging + FE integration execution
+
+---
+
+**Version:** 1.7  
+**Status:** ✅ MERGED / COMPLETE  
+**Related:** PR #227, Issue #231, Issue #238, ADR-014

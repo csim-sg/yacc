@@ -65,26 +65,18 @@ Both ADR-004 and GOV-008 have been reviewed against enterprise architecture stan
 
 #### 1. Middleware Order Clarification
 
-**Current Order:**
-```typescript
-app.use(correlationIdMiddleware);   // 1. FIRST
-app.use(requestLoggingMiddleware);  // 2. SECOND
-app.use(express.json());             // 3. THIRD
-```
+**Current Order (Verified)**
 
-**Potential Issue:** `pino-http` logs request before body parsing.
+Verified against `packages/backend/src/index.ts`:
 
-**Recommendation:** Document trade-off or swap order:
-```typescript
-app.use(correlationIdMiddleware);   // 1. FIRST (inject ID)
-app.use(express.json());             // 2. SECOND (parse body)
-app.use(requestLoggingMiddleware);  // 3. THIRD (log request)
-```
+1. **Body parser** via `app.use(bodyParserMiddleware)` at entrypoint boundary (ADR-014 exception)
+2. **Correlation ID + Request Logging** via routing-controllers `middlewares` array in `useExpressServer()` (normal pattern)
 
-**Rationale:** Allows logging request body if needed (be careful with sensitive data).
+**Potential Issues**
 
-**Action:** Document decision in ADR-004 (5 minutes)  
-**Priority:** P3 (informational)  
+The previously noted concern (request logging running before body parsing) is **resolved** in the current implementation because body parsing occurs before the routing-controllers middleware chain.
+
+**Action:** Keep ADR-004 and ADR-014 aligned with the entrypoint implementation (auditable reference: `packages/backend/src/index.ts`).
 
 ---
 
