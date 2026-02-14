@@ -12,7 +12,7 @@ import { logger } from '../infrastructure/logger';
  * // In index.ts:
  * app.use(correlationIdMiddleware);   // 1. FIRST - inject correlation ID
  * app.use(requestLoggingMiddleware);  // 2. SECOND - log HTTP requests
- * app.use(express.json());             // 3. THIRD - body parsing
+ * app.use(bodyParserMiddleware);       // 3. THIRD - body parsing (JSON-only; ADR-014 exception)
  * // app.use(routes);                  // LAST - route to controllers
  * 
  * @returns Express middleware function

@@ -69,7 +69,7 @@ Both ADR-004 and GOV-008 have been reviewed against enterprise architecture stan
 ```typescript
 app.use(correlationIdMiddleware);   // 1. FIRST
 app.use(requestLoggingMiddleware);  // 2. SECOND
-app.use(express.json());             // 3. THIRD
+app.use(bodyParserMiddleware);       // 3. THIRD (JSON-only; ADR-014 exception)
 ```
 
 **Potential Issue:** `pino-http` logs request before body parsing.
@@ -77,7 +77,7 @@ app.use(express.json());             // 3. THIRD
 **Recommendation:** Document trade-off or swap order:
 ```typescript
 app.use(correlationIdMiddleware);   // 1. FIRST (inject ID)
-app.use(express.json());             // 2. SECOND (parse body)
+app.use(bodyParserMiddleware);       // 2. SECOND (parse body)
 app.use(requestLoggingMiddleware);  // 3. THIRD (log request)
 ```
 

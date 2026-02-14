@@ -115,15 +115,16 @@ graph TB
 ```typescript
 // packages/backend/src/index.ts
 import express from 'express';
-import { correlationIdMiddleware } from './api/middleware/correlation-id.middleware.js';
-import { requestLoggingMiddleware } from './api/middleware/request-logging.middleware.js';
+import { correlationIdMiddleware } from './middleware/correlationId.middleware';
+import { requestLoggingMiddleware } from './middleware/requestLogging.middleware';
+import { bodyParserMiddleware } from './middleware/bodyParser.middleware';
 
 const app = express();
 
 // ===== MIDDLEWARE ORDER (CRITICAL) =====
 app.use(correlationIdMiddleware);   // 1. FIRST - inject correlation ID
 app.use(requestLoggingMiddleware);  // 2. SECOND - log HTTP requests
-app.use(express.json());             // 3. THIRD - body parsing
+app.use(bodyParserMiddleware);       // 3. THIRD - body parsing (JSON-only; ADR-014 exception)
 // app.use(authMiddleware);          // 4. FOURTH - authentication
 // app.use(rbacMiddleware);          // 5. FIFTH - authorization
 // app.use(routes);                  // 6. LAST - route to controllers

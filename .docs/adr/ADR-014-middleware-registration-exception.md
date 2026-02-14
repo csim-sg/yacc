@@ -13,10 +13,10 @@ Middleware Registration Exception: `app.use()` for Body Parsing vs routing-contr
 ## Context / Problem Statement
 Architecture guidance prefers registering middleware through `routing-controllers` integration (e.g. `useExpressServer(...)` options and decorators), not via ad-hoc `app.use(...)` registrations.
 
-PR #227 introduced global request body parsing via:
+PR #227 introduced request body parsing at the Express entrypoint boundary via:
 
-1. `app.use(express.json())`
-2. `app.use(express.urlencoded({ extended: true }))`
+1. `app.use(bodyParserMiddleware)`
+2. `bodyParserMiddleware = express.json()` (JSON-only)
 
 This is required because BetterAuth uses delegated/forwarded handlers that rely on `req.body` being present before routing-controllers processes controller routing. Routing-controllers middleware ordering (when registered via its config) can result in body parsing occurring too late for these passthrough handlers.
 
@@ -34,14 +34,23 @@ This is required because BetterAuth uses delegated/forwarded handlers that rely 
 ## Decision
 Accept a narrowly-scoped exception:
 
-1. Use `app.use()` for request body parsing **only** (JSON + URL-encoded) and **only** at the backend entrypoint boundary.
+1. Use `app.use()` for request body parsing **only** (JSON-only) and **only** at the backend entrypoint boundary.
 2. Register body parsing **before** `useExpressServer()` so BetterAuth delegated routes receive parsed bodies.
 3. Apply the same pattern in test app setup to keep supertest suites deterministic.
 
 **Allowed files (current scope):**
 1. `packages/backend/src/index.ts`
 2. `packages/backend/tests/test-helpers.ts`
-3. `packages/backend/src/middleware/bodyParser.middleware.ts` (implementation wrapper)
+3. `packages/backend/src/middleware/bodyParser.middleware.ts` (implementation)
+
+## Implementation (Auditable)
+This ADR is intentionally scoped to a single middleware:
+
+- `packages/backend/src/middleware/bodyParser.middleware.ts` exports `express.json()` as `bodyParserMiddleware`.
+- `packages/backend/src/index.ts` registers it via `app.use(bodyParserMiddleware)` **before** `useExpressServer(app, ...)`.
+- `packages/backend/tests/test-helpers.ts` registers the same middleware the same way to keep integration tests aligned with production ordering.
+
+No URL-encoded body parsing is enabled in the codebase. If URL-encoded parsing becomes a requirement, it must be proposed as an explicit change to this ADR (or a new ADR) with justification and test coverage.
 
 ## Consequences
 1. ✅ BetterAuth sign-up/sign-in endpoints reliably receive parsed request bodies.
@@ -51,8 +60,9 @@ Accept a narrowly-scoped exception:
 
 ## Guardrails (Non-Negotiable)
 1. `app.use()` is permitted for **body parsing only**.
-2. Any additional `app.use()` middleware requires a new ADR (or an addendum to this ADR) with explicit rationale.
-3. All middleware beyond body parsing remains registered via routing-controllers patterns.
+2. Body parsing in this exception is **JSON-only**.
+3. Any additional `app.use()` middleware requires a new ADR (or an addendum to this ADR) with explicit rationale.
+4. All middleware beyond body parsing remains registered via routing-controllers patterns.
 
 ## Trade-offs
 1. Option A (chosen): Works immediately, simplest operationally, minimal code.

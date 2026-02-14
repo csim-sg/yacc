@@ -110,13 +110,14 @@ Since v1.1, PR #227 expanded materially beyond Week-1 docs + BE-007 filter/tests
 
 **Compliance:** ❌ Current PR violates this; remediation required.
 
-#### Decision 5: Body Parsing Must Be Configured via routing-controllers
+#### Decision 5: Body Parsing Must Run Before routing-controllers (ADR-014 Exception)
 
-**What:** Request body parsing must be enabled via `useExpressServer` configuration (not `app.use(express.json())`).
+**What:** Request body parsing must be registered at the Express entrypoint boundary via `app.use(bodyParserMiddleware)` **before** calling `useExpressServer(...)` (see ADR-014).
 
 **Why:**
-1. Architecture standard: middleware registration through routing-controllers configuration.
-2. Prevents regressions where non-decorator handlers (e.g., BetterAuth passthrough) receive undefined body.
+1. BetterAuth delegated/passthrough handlers rely on `req.body` being available.
+2. Registering body parsing via routing-controllers `middlewares` config can run too late for this integration (observed in PR #227 / Issue #233).
+3. This is a documented exception; all other middleware remains registered via routing-controllers patterns.
 
 **Compliance:** ❌ Current PR regressed; remediation required.
 
@@ -132,7 +133,7 @@ sequenceDiagram
 
   C->>E: POST /auth/sign-in/email (JSON body)
   E->>RC: request
-  Note over RC: bodyParser enabled via useExpressServer config
+  Note over E: app.use(bodyParserMiddleware) runs before routing-controllers (ADR-014)
   RC->>BA: forward to BetterAuth handler
   BA-->>RC: JSON response
   RC-->>E: response
