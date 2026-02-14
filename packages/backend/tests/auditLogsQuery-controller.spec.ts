@@ -66,7 +66,7 @@ describe('Audit Logs Query Controller', () => {
         channel: 'telegram',
         externalThreadId: `audit-test-${Date.now()}`,
         status: 'open',
-        priority: 'medium',
+        priority: 'normal',
       })
       .returning();
 

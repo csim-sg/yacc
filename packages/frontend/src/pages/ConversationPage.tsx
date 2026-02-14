@@ -32,7 +32,7 @@ const CHANNEL_LABELS: Record<ChannelType, string> = {
 
 const PRIORITY_BADGE: Record<ConversationPriority, string> = {
   low: 'badge-ghost',
-  medium: 'badge-info',
+  normal: 'badge-info',
   high: 'badge-warning',
   urgent: 'badge-error',
 };

@@ -15,6 +15,9 @@ import { tags } from '../src/schemas/tag.schema.js';
 import { messages } from '../src/schemas/message.schema.js';
 import { notes } from '../src/schemas/note.schema.js';
 import { auditLogs } from '../src/schemas/auditLog.schema.js';
+import { routingRules } from '../src/schemas/routingRule.schema.js';
+import { routingRuleExecutions } from '../src/schemas/routingRuleExecution.schema.js';
+import { notifications } from '../src/schemas/notification.schema.js';
 
 const FIXTURE = {
   users: {
@@ -62,6 +65,58 @@ const FIXTURE = {
       name: 'VIP',
       color: '#2563EB',
     },
+    urgent: {
+      name: 'Urgent',
+      color: '#EF4444',
+    },
+    followUp: {
+      name: 'Follow-Up',
+      color: '#F97316',
+    },
+  },
+  routingRules: [
+    {
+      id: '00000000-0000-0000-0000-000000002001',
+      name: 'Auto-assign VIP to admin',
+      priority: 1,
+      status: 'active',
+      conditions: JSON.stringify({
+        tag: 'VIP',
+      }),
+      actions: JSON.stringify({
+        assignTo: '00000000-0000-0000-0000-000000000002', // admin user
+      }),
+    },
+    {
+      id: '00000000-0000-0000-0000-000000002002',
+      name: 'Auto-tag urgent keywords',
+      priority: 2,
+      status: 'active',
+      conditions: JSON.stringify({
+        keyword: ['urgent', 'critical', 'emergency'],
+      }),
+      actions: JSON.stringify({
+        addTag: 'Urgent',
+        setPriority: 'high',
+      }),
+    },
+    {
+      id: '00000000-0000-0000-0000-000000002003',
+      name: 'Disabled rule for testing',
+      priority: 3,
+      status: 'disabled',
+      conditions: JSON.stringify({
+        channel: 'telegram',
+      }),
+      actions: JSON.stringify({
+        addTag: 'Telegram',
+      }),
+    },
+  ],
+  bulkTestConversations: {
+    // Will create 105 conversations for bulk action testing (max 100 + overflow)
+    count: 105,
+    channels: ['telegram', 'irc'],
   },
 } as const;
 
@@ -179,7 +234,7 @@ async function seedTestFixtures() {
         externalThreadId: FIXTURE.conversations.telegram.externalThreadId,
         title: FIXTURE.conversations.telegram.title,
         status: 'resolved',
-        priority: 'medium',
+        priority: 'normal',
         assignedUserId: FIXTURE.users.superAdmin.id,
         createdAt: sql`now() - interval '20 minutes'`,
         updatedAt: sql`now() - interval '15 minutes'`,
@@ -189,7 +244,7 @@ async function seedTestFixtures() {
         target: conversations.id,
         set: {
           status: 'resolved',
-          priority: 'medium',
+          priority: 'normal',
           assignedUserId: FIXTURE.users.superAdmin.id,
           updatedAt: sql`now() - interval '15 minutes'`,
           lastActivityAt: sql`now() - interval '15 minutes'`,
@@ -345,6 +400,246 @@ async function seedTestFixtures() {
     void inbound;
     void latestInbound;
 
+    // === PHASE 1 ACCEPTANCE TESTING FIXTURES ===
+    console.log('🧪 Seeding Phase 1 fixtures (100 conversations for testing)...');
+
+    /**
+     * Create 100 Phase 1 test conversations for comprehensive acceptance testing
+     * - 60 Telegram conversations (various statuses and priorities)
+     * - 40 IRC conversations (various statuses and priorities)
+     * - Varied assignments (50% to manager, 50% unassigned)
+     * - Varied message counts and statuses
+     */
+    const phase1ConversationIds: string[] = [];
+    for (let i = 0; i < 100; i++) {
+      const channel = i < 60 ? 'telegram' : 'irc';
+      const status = ['open', 'pending', 'resolved'][i % 3] as 'open' | 'pending' | 'resolved';
+      const priority = ['low', 'normal', 'high', 'urgent'][(i % 4)] as 'low' | 'normal' | 'high' | 'urgent';
+      const assignedUserId = i % 2 === 0 ? FIXTURE.users.manager.id : null;
+      const conversationId = `10000000-0000-0000-0000-${String(i + 1).padStart(12, '0')}`;
+
+      phase1ConversationIds.push(conversationId);
+
+      const externalThreadId = channel === 'telegram' 
+        ? `tg-phase1-${i}` 
+        : `irc-#phase1-${i}`;
+
+      // Calculate timestamps using Date objects instead of SQL intervals
+      const now = new Date();
+      const minutesBackCreated = (100 - i) * 5;
+      const minutesBackUpdated = (100 - i) * 2;
+      
+      const createdDate = new Date(now.getTime() - minutesBackCreated * 60 * 1000);
+      const updatedDate = new Date(now.getTime() - minutesBackUpdated * 60 * 1000);
+
+      await dbClient
+        .insert(conversations)
+        .values({
+          id: conversationId,
+          channel: channel as 'telegram' | 'irc',
+          externalThreadId,
+          title: `${channel.toUpperCase()} ${status} conversation ${i + 1}`,
+          status,
+          priority,
+          assignedUserId,
+          createdAt: createdDate,
+          updatedAt: updatedDate,
+          lastActivityAt: updatedDate,
+        })
+        .onConflictDoNothing();
+
+      // Add 2-5 messages per conversation with varied statuses (deterministic)
+      const messageCount = 2 + (i % 4);
+      for (let j = 0; j < messageCount; j++) {
+        // Deterministic status pattern: first 2 sent, last pending, middle 20% failed
+        const isMidMessage = j > 1 && j < messageCount - 1;
+        const messageStatus = j < 2 ? 'sent' : (j === messageCount - 1 ? 'pending' : (isMidMessage && (i % 5 === 4) ? 'failed' : 'sent'));
+        const messageMinutesBack = (messageCount - j) * 10;
+        
+        const messageDate = new Date(now.getTime() - messageMinutesBack * 60 * 1000);
+        
+        await dbClient
+          .insert(messages)
+          .values({
+            conversationId,
+            senderName: j % 2 === 0 ? `customer_${i}` : 'support',
+            body: `Phase 1 test message ${j + 1} for conversation ${i + 1}`,
+            status: messageStatus as 'sent' | 'pending' | 'failed',
+            direction: j % 2 === 0 ? 'inbound' : 'outbound',
+            createdAt: messageDate,
+            updatedAt: messageDate,
+          })
+          .onConflictDoNothing();
+      }
+    }
+
+    console.log(`✅ Phase 1 fixtures seeded: 100 conversations with ${phase1ConversationIds.length} total created`);
+
+    // === PHASE 2 ACCEPTANCE TESTING FIXTURES ===
+    console.log('🧪 Seeding Phase 2 fixtures...');
+
+    // Create additional tags for phase 2 testing
+    const urgentTag = await dbClient
+      .insert(tags)
+      .values({
+        name: FIXTURE.tags.urgent.name,
+        color: FIXTURE.tags.urgent.color,
+        createdById: FIXTURE.users.superAdmin.id,
+      })
+      .onConflictDoUpdate({
+        target: [tags.name, tags.createdById],
+        set: {
+          color: FIXTURE.tags.urgent.color,
+        },
+      })
+      .returning({ id: tags.id })
+      .then(r => r[0]);
+
+    const followUpTag = await dbClient
+      .insert(tags)
+      .values({
+        name: FIXTURE.tags.followUp.name,
+        color: FIXTURE.tags.followUp.color,
+        createdById: FIXTURE.users.manager.id,
+      })
+      .onConflictDoUpdate({
+        target: [tags.name, tags.createdById],
+        set: {
+          color: FIXTURE.tags.followUp.color,
+        },
+      })
+      .returning({ id: tags.id })
+      .then(r => r[0]);
+
+    // Create routing rules for phase 2 testing
+    for (const rule of FIXTURE.routingRules) {
+      await dbClient
+        .insert(routingRules)
+        .values({
+          id: rule.id,
+          name: rule.name,
+          priority: rule.priority,
+          status: rule.status,
+          conditions: rule.conditions,
+          actions: rule.actions,
+          createdById: FIXTURE.users.superAdmin.id,
+        })
+        .onConflictDoUpdate({
+          target: routingRules.id,
+          set: {
+            name: rule.name,
+            priority: rule.priority,
+            status: rule.status,
+            conditions: rule.conditions,
+            actions: rule.actions,
+            updatedAt: sql`now()`,
+          },
+        });
+    }
+
+    // Create bulk test conversations (for testing max 100 limit + partial failure)
+    const bulkConversationIds: string[] = [];
+    for (let i = 0; i < FIXTURE.bulkTestConversations.count; i++) {
+      const channel = FIXTURE.bulkTestConversations.channels[i % 2];
+      // Generate proper UUID format: ensure 12 zero-padded digits in last section
+      const bulkNum = 3000 + i;
+      const conversationId = `00000000-0000-0000-0000-${String(bulkNum).padStart(12, '0')}`;
+      bulkConversationIds.push(conversationId);
+
+      await dbClient
+        .insert(conversations)
+        .values({
+          id: conversationId,
+          channel: channel as 'telegram' | 'irc',
+          externalThreadId: `bulk-test-${i}`,
+          title: `Bulk Test Conversation ${i + 1}`,
+          status: 'open',
+          priority: 'normal',
+          assignedUserId: i % 3 === 0 ? FIXTURE.users.manager.id : null,
+        })
+        .onConflictDoNothing();
+    }
+
+    // Create notifications for testing (assignment + mention triggers)
+    await dbClient
+      .insert(notifications)
+      .values({
+        userId: FIXTURE.users.manager.id,
+        type: 'assignment',
+        conversationId: FIXTURE.conversations.telegram.id,
+        actorId: FIXTURE.users.superAdmin.id,
+        message: 'You were assigned to Mock Support Thread',
+        isRead: false,
+        createdAt: sql`now() - interval '5 minutes'`,
+      })
+      .onConflictDoNothing();
+
+    await dbClient
+      .insert(notifications)
+      .values({
+        userId: FIXTURE.users.user.id,
+        type: 'mention',
+        conversationId: FIXTURE.conversations.irc.id,
+        actorId: FIXTURE.users.manager.id,
+        message: 'You were mentioned in IRC #support',
+        isRead: false,
+        createdAt: sql`now() - interval '2 minutes'`,
+      })
+      .onConflictDoNothing();
+
+    await dbClient
+      .insert(notifications)
+      .values({
+        userId: FIXTURE.users.admin.id,
+        type: 'assignment',
+        conversationId: FIXTURE.conversations.irc.id,
+        actorId: FIXTURE.users.superAdmin.id,
+        message: 'You were assigned to IRC #support',
+        isRead: true,
+        createdAt: sql`now() - interval '10 minutes'`,
+      })
+      .onConflictDoNothing();
+
+    // Add more audit logs for phase 2 audit testing
+    await dbClient.insert(auditLogs).values({
+      actorId: FIXTURE.users.manager.id,
+      action: 'bulk_action_applied',
+      entityType: 'conversation',
+      entityId: FIXTURE.conversations.irc.id,
+      metadata: {
+        operationType: 'assign',
+        count: 5,
+      },
+      createdAt: sql`now() - interval '3 minutes'`,
+    });
+
+    // Add rule execution logs for testing rule query APIs
+    // Note: Skip if routing rules not created yet (dependency)
+    try {
+      const ruleId = FIXTURE.routingRules[0].id;
+      const conversationId = FIXTURE.conversations.telegram.id;
+      const existingRule = await dbClient.query.routingRules.findFirst({
+        where: eq(routingRules.id, ruleId),
+      });
+
+      if (existingRule) {
+        await dbClient.insert(routingRuleExecutions).values({
+          ruleId,
+          conversationId,
+          matchedConditions: JSON.stringify({
+            tag: 'VIP',
+          }),
+          appliedActions: JSON.stringify({
+            assignTo: '00000000-0000-0000-0000-000000000002',
+          }),
+          createdAt: sql`now() - interval '1 minute'`,
+        });
+      }
+    } catch (err) {
+      console.warn('⚠️  Skipped rule execution log (rule may not exist yet)');
+    }
+
+    console.log(`✅ Phase 2 fixtures seeded successfully (${FIXTURE.bulkTestConversations.count} bulk conversations created)`);
     console.log('✅ Test fixtures seeded successfully');
     process.exit(0);
   } catch (error) {

@@ -36,10 +36,12 @@ export class AuditController {
       limit: query.limit,
     });
 
-    return {
-      success: true,
-      data: result.logs,
-      pagination: result.pagination,
-    };
+     return {
+       items: result.logs,
+       total: result.pagination.total,
+       page: result.pagination.page,
+       limit: result.pagination.limit,
+       pages: Math.ceil(result.pagination.total / result.pagination.limit),
+     };
   }
 }

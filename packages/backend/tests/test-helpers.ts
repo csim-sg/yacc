@@ -202,7 +202,7 @@ export async function seedTestConversations(
       externalThreadId: `test-${Date.now()}-${i}`,
       title: `Test conversation ${i}`,
       status: i % 3 === 0 ? 'open' : i % 3 === 1 ? 'pending' : 'resolved',
-      priority: (['low', 'medium', 'high', 'urgent'] as const)[i % 4],
+      priority: (['low', 'normal', 'high', 'urgent'] as const)[i % 4],
       assignedUserId: i % 5 === 0 ? null : userId,
     }).returning({ id: conversations.id });
 

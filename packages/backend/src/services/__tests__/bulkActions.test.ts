@@ -72,7 +72,7 @@ describe('Bulk Actions Service', () => {
           channel: 'telegram',
           externalThreadId: `bulk-test-1-${Date.now()}`,
           status: 'open',
-          priority: 'medium',
+          priority: 'normal',
         },
         {
           channel: 'telegram',

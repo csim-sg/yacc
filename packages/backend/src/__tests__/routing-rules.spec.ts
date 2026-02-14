@@ -46,7 +46,7 @@ describe('Routing Rules Service', () => {
         channel: 'telegram',
         externalThreadId: 'test-thread-' + Date.now(),
         status: 'open',
-        priority: 'medium',
+        priority: 'normal',
       })
       .returning();
     testConversationId = convResult[0].id;
@@ -342,7 +342,7 @@ describe('Rules Engine Service', () => {
         channel: 'telegram',
         externalThreadId: 'engine-test-thread-' + Date.now(),
         status: 'open',
-        priority: 'medium',
+        priority: 'normal',
       })
       .returning();
     testConversationId = convResult[0].id;

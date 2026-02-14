@@ -24,7 +24,7 @@ export const conversations = pgTable(
     externalThreadId: varchar('external_thread_id', { length: 255 }).notNull(),
     title: varchar('title', { length: 500 }),
     status: conversationStatusEnum('status').notNull().default('open'),
-    priority: conversationPriorityEnum('priority').notNull().default('medium'),
+    priority: conversationPriorityEnum('priority').notNull().default('normal'),
     assignedUserId: text('assigned_user_id').references(() => users.id, {
       onDelete: 'set null',
     }),

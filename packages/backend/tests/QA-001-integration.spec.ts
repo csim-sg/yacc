@@ -22,7 +22,7 @@ interface TestConversation {
   channel: 'telegram' | 'irc';
   externalThreadId: string;
   status: 'open' | 'pending' | 'resolved';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
   assignedUserId: string | null;
   createdAt: Date;
   lastActivityAt: Date;
@@ -45,7 +45,7 @@ const mockConversations: TestConversation[] = [
     channel: 'irc',
     externalThreadId: 'irc-456',
     status: 'pending',
-    priority: 'medium',
+    priority: 'normal',
     assignedUserId: 'user-2',
     createdAt: new Date('2026-02-02'),
     lastActivityAt: new Date('2026-02-06T07:45:00Z'),
@@ -111,7 +111,7 @@ describe('TC-001: Basic Listing', () => {
       expect(typeof conversation.id).toBe('string');
       expect(['telegram', 'irc']).toContain(conversation.channel);
       expect(['open', 'pending', 'resolved']).toContain(conversation.status);
-      expect(['low', 'medium', 'high', 'urgent']).toContain(conversation.priority);
+      expect(['low', 'normal', 'high', 'urgent']).toContain(conversation.priority);
     });
   });
 });
@@ -201,11 +201,11 @@ describe('TC-003: Filtering', () => {
   describe('TC-003-003: Filter by priority', () => {
     it('should filter conversations by priority', () => {
       const highOnly = mockConversations.filter(c => c.priority === 'high');
-      const mediumOnly = mockConversations.filter(c => c.priority === 'medium');
+      const mediumOnly = mockConversations.filter(c => c.priority === 'normal');
       const lowOnly = mockConversations.filter(c => c.priority === 'low');
 
       expect(highOnly.every(c => c.priority === 'high')).toBe(true);
-      expect(mediumOnly.every(c => c.priority === 'medium')).toBe(true);
+      expect(mediumOnly.every(c => c.priority === 'normal')).toBe(true);
       expect(lowOnly.every(c => c.priority === 'low')).toBe(true);
     });
   });
@@ -334,7 +334,7 @@ describe('TC-006: Sorting', () => {
 
   describe('TC-006-003: Sort by priority', () => {
     it('should support sorting by priority', () => {
-      const priorityOrder = { urgent: 4, high: 3, medium: 2, low: 1 };
+      const priorityOrder = { urgent: 4, high: 3, normal: 2, low: 1 };
       const sorted = [...mockConversations].sort(
         (a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]
       );

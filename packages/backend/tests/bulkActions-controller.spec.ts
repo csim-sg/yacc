@@ -55,7 +55,7 @@ describe('Bulk Actions Controller', () => {
           channel: 'telegram',
           externalThreadId: `bulk-ctrl-1-${Date.now()}`,
           status: 'open',
-          priority: 'medium',
+          priority: 'normal',
         },
         {
           channel: 'telegram',

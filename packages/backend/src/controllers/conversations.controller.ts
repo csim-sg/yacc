@@ -34,7 +34,7 @@ interface AuthenticatedRequest extends Request {
 
 const VALID_CHANNELS = ['telegram', 'irc'] as const;
 const VALID_STATUSES = ['open', 'pending', 'resolved'] as const;
-const VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const;
+const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
 const VALID_SORT_BY = ['lastActivity', 'created', 'priority'] as const;
 const VALID_SORT_ORDER = ['asc', 'desc'] as const;
 
@@ -95,7 +95,7 @@ function validateListConversationsQuery(query: Record<string, unknown>): ListCon
     limit,
     channel,
     status: status as 'open' | 'pending' | 'resolved' | undefined,
-    priority: priority as 'low' | 'medium' | 'high' | 'urgent' | undefined,
+    priority: priority as 'low' | 'normal' | 'high' | 'urgent' | undefined,
     assignedUserId: typeof query.assignedUserId === 'string' ? query.assignedUserId : undefined,
     tagId,
     search: typeof query.search === 'string' ? query.search : undefined,

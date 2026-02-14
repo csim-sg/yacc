@@ -7,7 +7,7 @@ interface ConversationSummary {
   id: string;
   channel: 'telegram' | 'irc';
   status: 'open' | 'pending' | 'resolved';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
   assignedUserId?: string;
   assignedUserName?: string;
   externalThreadId: string;

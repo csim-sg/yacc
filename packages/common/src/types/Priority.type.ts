@@ -1,1 +1,1 @@
-export type Priority = 'low' | 'medium' | 'high' | 'urgent';
+export type Priority = 'low' | 'normal' | 'high' | 'urgent';

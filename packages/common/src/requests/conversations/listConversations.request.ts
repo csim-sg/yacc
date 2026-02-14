@@ -26,8 +26,8 @@ export class ListConversationsRequest extends SearchableRequest {
   status?: 'open' | 'pending' | 'resolved';
 
   @IsOptional()
-  @IsEnum(['low', 'medium', 'high', 'urgent'])
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  @IsEnum(['low', 'normal', 'high', 'urgent'])
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
 
   @IsOptional()
   @IsUUID()
