@@ -17,6 +17,22 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - Phase 2: ✅ Complete
 - QA: ✅ Complete (MVP acceptance + regression executed)
 
+## Current Integration Task Status (Phase 1)
+
+### IRC Integration (INT-001-014)
+| Task | Status | Dependencies | Notes |
+|------|--------|--------------|-------|
+| **INT-001** (IRC Connector) | ✅ **COMPLETED** (Feb 15, 2026) | — | Code merged to dev; production-ready IRC server connection with proper handshake, event-driven reconnect, security hardening |
+| **INT-002** (IRC Ingestion) | ⏳ **READY** | INT-001 | Inbound messages → conversations/messages in DB |
+| **INT-003** (IRC Delivery) | ⏳ **READY** | INT-001 | Outbound messages → IRC channel |
+| **INT-004-014** (IRC Infra) | ⏳ **READY** | INT-003 | Connection status, config, auto-reconnect, environment management |
+
+### Test Coverage (INT-001)
+- **28/28 tests passing** (100% pass rate)
+- **100% type safety** (no `any` types)
+- **Security hardening** (CRLF injection prevention, message length limits)
+- **EA approved** ✅
+
 ## References (Authoritative)
 - Product scope & ACs: `.docs/01-product-specification.md`
 - API & data model: `.docs/02-api-and-data-model.md`
