@@ -18,7 +18,7 @@
 
 ## 1. System Architecture
 
-**Phase Scope Reference**: See `.docs/plans/00-INDEX.md` and `.docs/plans/PHASE-1-COMPLETION-SUMMARY.md` for current execution status and Phase 1 scope.
+**Execution Status Reference**: See `.docs/plans/00-INDEX.md` for the current project status.
 
 ### High-Level Overview
 

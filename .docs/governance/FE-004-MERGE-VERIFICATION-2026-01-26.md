@@ -82,20 +82,15 @@
     - 50+ code examples
     - Troubleshooting section
 
-15. ✅ `.docs/plans/fe-004-handoff.md` (907 lines)
-    - Complete handoff documentation
-
-16. ✅ `ARCHITECT_REVIEW_FE-004.md` (574 lines)
-    - Architect approval report
-
-17. ✅ `FE-004-FINAL-SUMMARY.md` (358 lines)
-    - Final completion summary
+15. 🗂️ FE-004 handoff + review artifacts
+    - Removed from repo HEAD post-MVP (ADR-015)
+    - Retrieve via git history if needed (search by filename: `ARCHITECT_REVIEW_FE-004.md`, `FE-004-FINAL-SUMMARY.md`, `FE-004-SESSION-SUMMARY.md`)
 
 ### Modified Files (7)
 - `packages/frontend/src/App.tsx` - Type fixes
 - `packages/frontend/src/pages/InboxPage.tsx` - Type fixes
 - `.docs/plans/00-INDEX.md` - Planning updates
-- FE-004-SESSION-SUMMARY.md - Session notes
+- FE-004 session notes removed post-MVP (ADR-015)
 - Plus 2 other documentation updates
 
 ---

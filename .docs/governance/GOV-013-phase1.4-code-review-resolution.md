@@ -265,8 +265,8 @@ PR #198 Code Review Summary:
 ## Artifacts & Documentation
 
 **In Repo**:
-- `PHASE-1.4-CODE-REVIEW-CHECKLIST.md` - Architecture verification checklist
-- `PHASE-1.4-COMPLETION-SUMMARY.md` - Detailed resolution summary
+- Phase 1.4 working artifacts removed from repo HEAD post-MVP (ADR-015)
+  - Retrieve via git history if needed (search by filename: `PHASE-1.4-CODE-REVIEW-CHECKLIST.md`, `PHASE-1.4-COMPLETION-SUMMARY.md`)
 - `.docs/qa/QA-001-integration-test-cases.md` - 31 integration tests
 
 **In This File**:
@@ -293,8 +293,7 @@ PR #198 Code Review Summary:
 ## Next Steps
 
 1. ✅ Merge to dev (commit 7f96d56)
-2. ✅ Update task tracking (06-tasks.md)
-3. 🚀 Begin Phase 1.5 (BE-011-019: Message Retry & WebSocket)
+2. ✅ Update task tracking (post-MVP: see `.docs/plans/00-INDEX.md`)
+3. 🚀 Begin Phase 1.5 (historical)
 
-See `PHASE-1.5-CONTINUATION-READY.md` for Phase 1.5 planning.
-
+Note: Phase planning artifacts are removed from repo HEAD post-MVP (ADR-015) and remain available via git history.

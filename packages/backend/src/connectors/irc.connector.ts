@@ -4,17 +4,19 @@ import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.i
 import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse.interface';
 import type { ValidationError } from '@yacc/common/types/validationError.interface';
 import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
+import type { IRCFrameworkMessage, IRCFrameworkError } from '../types/ircMessage.type';
+import IRC from 'irc-framework';
 
 /**
  * IRC Connector
  *
- * Handles all communication with IRC networks.
+ * Handles all communication with IRC networks using irc-framework library.
  * Supports:
- * - Sending messages to channels
- * - Receiving messages from IRC channels
+ * - Real IRC server connections
+ * - Sending and receiving messages
+ * - Channel management
  * - Connection management with auto-reconnect
  * - Error handling and retry logic
- * - Server configuration validation
  */
 
 type IRCConfig = ConnectorConfig<'irc'> & {
@@ -26,7 +28,7 @@ type IRCConfig = ConnectorConfig<'irc'> & {
 };
 
 export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
-  private socket: unknown = null;
+  private client: IRC | null = null;
   private messageQueue: Array<{ channel: string; message: string }> = [];
   private isConnecting: boolean = false;
 
@@ -61,42 +63,34 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         'Connecting to IRC server...'
       );
 
-      // Note: In a real implementation, this would use the `irc` or `irc-framework` npm package
-      // For now, we're providing the structure and error handling
-      // Example: const irc = require('irc');
-      // this.client = new irc.Client(...)
-
       // Validate connection parameters first
       const validationErrors = await this.validatePlatformConfig(this.config);
       if (validationErrors.length > 0) {
         throw new Error(`IRC validation error: ${validationErrors[0].message}`);
       }
 
-      // TODO: Implement actual IRC connection
-      // In production, use: https://www.npmjs.com/package/irc
-      // const irc = require('irc');
-      // this.client = new irc.Client(this.config.server, this.config.nick, {
-      //   port: this.config.port,
-      //   password: this.config.password,
-      //   autoRejoin: true,
-      //   channels: this.config.channels,
-      //   retryCount: 10,
-      //   retryDelay: 5000,
-      // });
-      //
-      // this.client.on('registered', () => {
-      //   this.setStatus('connected');
-      //   this.processMessageQueue();
-      // });
-      //
-      // this.client.on('message', (from, to, message) => {
-      //   this.emitMessageReceived({...}, dbMessageId);
-      // });
+      // Create IRC client instance
+      this.client = new IRC({
+        host: this.config.server,
+        port: this.config.port,
+        nick: this.config.nick,
+        username: this.config.nick,
+        realname: this.config.nick,
+        password: this.config.password,
+        auto_reconnect: true,
+        auto_reconnect_max_retries: this.maxReconnectAttempts,
+        auto_reconnect_wait: 4000,
+        channel_list_batch_size: 50,
+        ping_interval: 60,
+      });
 
-      // Mock connection for MVP
-      this.setStatus('connected');
+      // Set up event handlers
+      this.setupClientEventHandlers();
+
+      // Connect to IRC server
+      await this.client.connect();
+
       this.isConnecting = false;
-
       logger.info(
         {
           platform: 'irc',
@@ -143,16 +137,111 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
   }
 
   /**
+   * Set up IRC client event handlers
+   */
+  private setupClientEventHandlers(): void {
+    if (!this.client) return;
+
+    // Handle successful connection
+    this.client.on('registered', () => {
+      logger.info({ platform: 'irc' }, 'IRC client registered with server');
+      this.setStatus('connected');
+      this.reconnectAttempts = 0;
+
+      // Join channels after registration
+      if (this.config?.channels) {
+        for (const channel of this.config.channels) {
+          this.client?.raw(`JOIN ${channel}`);
+        }
+      }
+    });
+
+    // Handle incoming messages
+    this.client.on('message', (message: IRCFrameworkMessage) => {
+      logger.debug(
+        {
+          platform: 'irc',
+          nick: message.nick,
+          channel: message.target,
+          text: message.text,
+        },
+        'Received IRC message'
+      );
+      this.emit('message', message);
+    });
+
+    // Handle connection errors
+    this.client.on('error', (error: IRCFrameworkError) => {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(
+        {
+          error: errorMessage,
+          platform: 'irc',
+        },
+        'IRC client error'
+      );
+      this.setStatus('error', errorMessage);
+    });
+
+    // Handle disconnection
+    this.client.on('socket close', () => {
+      logger.warn({ platform: 'irc' }, 'IRC socket closed');
+      this.setStatus('disconnected');
+    });
+
+    // Handle connection closure
+    this.client.on('close', () => {
+      logger.info({ platform: 'irc' }, 'IRC connection closed');
+      this.setStatus('disconnected');
+    });
+
+    // Handle quit event
+    this.client.on('quit', (message: IRCFrameworkMessage) => {
+      logger.info(
+        {
+          platform: 'irc',
+          nick: message.nick,
+          message: message.text,
+        },
+        'IRC user quit'
+      );
+    });
+
+    // Handle join event
+    this.client.on('join', (message: IRCFrameworkMessage) => {
+      logger.debug(
+        {
+          platform: 'irc',
+          nick: message.nick,
+          channel: message.target,
+        },
+        'User joined IRC channel'
+      );
+    });
+
+    // Handle part event
+    this.client.on('part', (message: IRCFrameworkMessage) => {
+      logger.debug(
+        {
+          platform: 'irc',
+          nick: message.nick,
+          channel: message.target,
+        },
+        'User left IRC channel'
+      );
+    });
+  }
+
+  /**
    * Disconnect from IRC server
    */
   async disconnect(): Promise<void> {
     try {
       logger.info({ platform: 'irc' }, 'Disconnecting from IRC server');
 
-      if (this.socket) {
-        // TODO: Implement actual IRC disconnect
-        // this.client?.disconnect('Shutting down', () => { ... });
-        this.socket = null;
+      if (this.client) {
+        this.client.quit('YACC shutting down');
+        this.client = null;
       }
 
       this.messageQueue = [];
@@ -226,8 +315,13 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         };
       }
 
-      // TODO: Send actual message
-      // this.client?.say(channel, request.body);
+      // Send message using IRC client
+      if (!this.client) {
+        throw new Error('IRC client not initialized');
+      }
+
+      // Send the message to the channel
+      this.client.raw(`PRIVMSG ${channel} :${request.body}`);
 
       const messageId = `irc-${Date.now()}`;
 
@@ -353,8 +447,12 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
 
     for (const { channel, message } of queue) {
       try {
-        // TODO: Send message using actual IRC client
-        // this.client?.say(channel, message);
+        if (!this.client) {
+          throw new Error('IRC client not initialized');
+        }
+
+        // Send queued message
+        this.client.raw(`PRIVMSG ${channel} :${message}`);
         logger.debug(
           { channel, platform: 'irc' },
           'Queued message sent to IRC channel'
