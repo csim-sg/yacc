@@ -155,7 +155,7 @@ interface IRCErrorEvent {
 > "The connector architecture is architecturally sound and aligns with KISS / flat structure / type-safety constraints. Implementation correctly wraps synchronous `client.connect()` with proper handshake, sets status to 'connected' on `registered`, invokes event handlers before connection, guards against parallel reconnects, and prevents CRLF injection. All requirements met."
 
 **Conditions for Merge**:
-1. ✅ Split PR into code-only (already merged as PR #254) + docs (this PR #255)
+1. ✅ Split PR into code-only (already merged as PR #254) + docs (this PR #256)
 2. ✅ Library choice documented in completion summary
 
 **Note on ADR**: IRC integration is already scope-approved by ADR-003 (Phase 1: Telegram + IRC). The `irc-framework` library choice is a tactical implementation detail (not a strategic decision) that doesn't require a separate ADR. The architecture decisions are fully documented in this summary.
@@ -185,7 +185,7 @@ All downstream INT tasks are now **READY** and **UNBLOCKED**.
 ## References
 
 - **Code PR**: #254 (merged to dev @ commit `0ce6d1e`)
-- **Documentation PR**: #255
+- **Documentation PR**: #256
 - **Branch (code)**: Merged into dev
 - **Test Results**: 28/28 passing (100% pass rate)
 - **Build**: ✅ TypeScript compiles, no errors
