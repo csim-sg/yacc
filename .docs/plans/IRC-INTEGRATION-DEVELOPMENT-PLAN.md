@@ -1,9 +1,19 @@
 # IRC Integration Tasks Development Plan
 
-**Status**: Starting INT-001 through INT-014  
+**Status**: ✅ INT-001 COMPLETED & EA APPROVED (Feb 15, 2026)  
 **Created**: February 15, 2026  
 **Target**: Phase 1 MVP completion  
 **Focus**: Backend IRC connector implementation with full message lifecycle
+
+### INT-001 Completion Summary (Feb 15)
+- ✅ **Real IRC Connector**: Uses `irc-framework` library (not mock)
+- ✅ **Proper Handshake**: Synchronous `connect()` wrapped in Promise, waits for `registered` event
+- ✅ **Event-Driven Reconnect**: Triggered from `error`/`close`/`socket close` handlers, 30s timeout
+- ✅ **Message Queue**: Hard limit 1000, capacity checks, CRLF injection prevention
+- ✅ **Type Safety**: 100% type-safe, no `any` types, updated irc-framework type definitions
+- ✅ **Security**: Message sanitization (remove CRLF, max 400 chars), uses safe `say()` API
+- ✅ **Tests**: 28/28 passing (100%), comprehensive coverage
+- ✅ **EA Approved**: Architecturally sound, ready for merge (after PR split per governance)
 
 ---
 
@@ -70,19 +80,40 @@ INT-013, INT-014 (Tests)
 ### Phase 1: Core Connector (INT-001 to INT-005)
 
 #### INT-001: Create IRC Connector
-- **Description**: Implement real IRC connection using `irc` npm package
+- **Status**: ✅ **COMPLETED & EA APPROVED** (Feb 15, 2026)
+- **Description**: Implement real IRC connection using `irc-framework` npm package
+- **Implementation Details**:
+  - ✅ Uses `irc-framework` library for real IRC server connection
+  - ✅ Proper handshake: synchronous `connect()` wrapped in Promise, waits for `registered` event
+  - ✅ 30-second connection timeout with proper cleanup
+  - ✅ Event-driven reconnection from `error`/`close`/`socket close` handlers
+  - ✅ Exponential backoff (1s, 2s, 4s, 8s, 16s, 30s; max 10 attempts)
+  - ✅ Message queue with hard capacity limit (1000 messages)
+  - ✅ Status management (disconnected → reconnecting → connected)
+  - ✅ CRLF injection prevention via message sanitization
+  - ✅ Safe message transmission using `client.say()` instead of `raw()`
 - **Deliverables**:
-  - Replace mock implementation with actual IRC client
-  - Handlers for connection events (connected, disconnected, error)
+  - Real IRC connector with proper handshake and reconnection
+  - Handlers for connection events (registered, error, close, socket close)
   - Status management (connected/reconnecting/disconnected/error)
-  - Message queue for offline messages
+  - Message queue with capacity enforcement (max 1000)
+  - Type-safe implementation (no `any` types)
+  - 28 comprehensive tests (100% passing)
 - **Dependencies**: BE-001 (PostgreSQL), BE-002 (schema)
-- **Acceptance Criteria**:
-  - Connects to IRC server
-  - Authenticates with nick/password
-  - Joins configured channels
-  - Emits connection events
-  - Status tracked correctly
+- **Acceptance Criteria**: ✅ ALL MET
+  - ✅ Connects to IRC server with proper handshake
+  - ✅ Authenticates with nick/password/gecos
+  - ✅ Joins configured channels on successful connection
+  - ✅ Emits proper connection events
+  - ✅ Status transitions correctly (disconnected → reconnecting → connected)
+  - ✅ Reconnects on connection failure with exponential backoff
+  - ✅ Handles mid-connection errors
+  - ✅ Message queue bounded and safe
+  - ✅ 100% type-safe implementation
+  - ✅ 28/28 tests passing
+  - ✅ EA Architecture approved
+
+**PR Status**: Branch `task/INT-001-irc-connector` @ `d5be0c2` ready for merge (requires PR split per governance: connector-only vs docs/governance changes)
 
 #### INT-002: Message Ingestion
 - **Description**: Receive inbound IRC messages and store in database

@@ -233,7 +233,7 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| INT-001 | Create IRC connector (server connection, authentication, channel joins) | Not Started | P0 | Backend | BE-001 | Connects to IRC server, authenticates, joins configured channels | PVTI_lAHOAB4wV84BNGcwzgkHa_U | 128 |
+| INT-001 | Create IRC connector (server connection, authentication, channel joins) | Completed | P0 | Backend | BE-001 | ✅ Real IRC connector with irc-framework; proper handshake, event-driven reconnect, message queue (1000 cap), CRLF injection prevention, 28 tests (100% pass), EA approved | PVTI_lAHOAB4wV84BNGcwzgkHa_U | 128 |
 | INT-002 | Implement IRC message ingestion (inbound messages → inbox) | Not Started | P0 | Backend | BE-002, INT-001 | Inbound messages create conversations/messages in DB | PVTI_lAHOAB4wV84BNGcwzgkHbAU | 129 |
 | INT-003 | Implement IRC message delivery (outbound messages → IRC channel) | Not Started | P0 | Backend | BE-010, INT-001 | Messages sent to IRC channel, status updated to sent/failed | PVTI_lAHOAB4wV84BNGcwzgkHbB4 | 130 |
 | INT-004 | Implement IRC auto-reconnect with exponential backoff (1s → 60s max, 5 attempts) | Not Started | P0 | Backend | INT-001 | Disconnects trigger reconnect attempts with backoff | PVTI_lAHOAB4wV84BNGcwzgj_824 | 60 |
