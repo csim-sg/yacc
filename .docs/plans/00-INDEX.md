@@ -27,7 +27,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **INT-003** (IRC Delivery) | ⏳ **READY** | INT-001 | Outbound messages → IRC channel |
 | **INT-004-014** (IRC Infra) | ⏳ **READY** | INT-003 | Connection status, config, auto-reconnect, environment management |
 
-### Test Coverage (INT-001)
+### Test Results (INT-001)
 - **28/28 tests passing** (100% pass rate)
 - **100% type safety** (no `any` types)
 - **Security hardening** (CRLF injection prevention, message length limits)
