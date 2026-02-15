@@ -1,9 +1,9 @@
 # 06. Issues & User stories
 
-**Last Updated**: February 11, 2026  
-**Status**: ✅ Week 1 COMPLETE; ⏳ Phase 1.4 IN PROGRESS (Week 2); Phase 2 (Collaboration & Rules) PLANNED  
-**Current focus (per 00-INDEX)**: Week 2 delivery (messaging send/retry + WebSocket events + frontend real-time listeners)  
-**Governance**: ADR-003, GOV-006, GOV-007, GOV-012, ADR-014, GOV-015, GOV-016, GOV-017
+**Last Updated**: February 14, 2026  
+**Status**: ✅ Phase 1 COMPLETE; ✅ Phase 2 COMPLETE; ✅ MVP stage  
+**Current focus**: Post-MVP backlog / hardening (GitHub Project is source of truth)  
+**Governance**: ADR-003, ADR-014, ADR-015, GOV-026
 
 ---
 
@@ -148,27 +148,29 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | BE-003 | Implement BetterAuth for authentication (email/password, session/JWT) | **Done** | P0 | Backend | BE-002 | Login endpoint working, JWT/session management functional, rate limiting added, 194 tests passing | PVTI_lAHOAB4wV84BNGcwzgj_5rc | 18 |
 | BE-004 | Implement forgot password flow (reset token, email sending) | **Done** | P1 | Backend | BE-003 | POST /auth/forgot-password and /reset-password working | PVTI_lAHOAB4wV84BNGcwzgj_5sM | 19 |
 | BE-005 | Implement RBAC middleware (4 roles: Super Admin, Admin, Manager, User) | **Done** | P0 | Backend | BE-002, BE-003 | Permission checks working for all role-based endpoints | PVTI_lAHOAB4wV84BNGcwzgj_5rU | 20 |
-| BE-006 | Create user management endpoints (CRUD for users, roles) | Not Started | P1 | Backend | BE-005 | GET/POST/PUT/DELETE /users, /roles working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_5rk | 17 |
+| BE-006 | Create user management endpoints (CRUD for users, roles) | Deferred (Post-MVP) | P1 | Backend | BE-005 | GET/POST/PUT/DELETE /users, /roles working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_5rk | 17 |
 | BE-007 | Implement inbox API (GET /conversations with filters: channel, assignee, tag, status, priority) | **Done** (PR #227 merged) | P0 | Backend | BE-002, BE-005 | Filtering and pagination working ✅ | PVTI_lAHOAB4wV84BNGcwzgj_5sA | 14 |
 | BE-008 | Implement conversation detail endpoint (GET /conversations/:id) | **Done** (PR #227 merged) | P0 | Backend | BE-007 | Returns conversation with messages and metadata ✅ | PVTI_lAHOAB4wV84BNGcwzgj_5rM | 15 |
 | BE-009 | Implement message retrieval endpoint (GET /conversations/:id/messages) | **Done** (PR #240 merged) | P0 | Backend | BE-002, BE-008 | Returns paginated messages with direction (inbound/outbound) | PVTI_lAHOAB4wV84BNGcwzgj_5r4 | 10 |
 | BE-010 | Implement send message endpoint (POST /conversations/:id/messages) | **Done** (PR #240 merged) | P0 | Backend | BE-008 | Queues message for delivery, returns pending status | PVTI_lAHOAB4wV84BNGcwzgj_5ro | 11 |
 | BE-011 | Implement message status tracking (pending → sent/failed) | **Done** (PR #241) | P0 | Backend | BE-010 | Status updates working, database reflects delivery state | PVTI_lAHOAB4wV84BNGcwzgj_54c | 30 |
-| BE-012 | Implement message retry endpoint (POST /conversations/:id/messages/:msgId/retry) | Not Started | P1 | Backend | BE-011 | Requeues failed message, updates status to pending | PVTI_lAHOAB4wV84BNGcwzgj_54Q | 22 |
+| BE-012 | Implement message retry endpoint (implemented under queue controller) | **Done** (PR #242 merged) | P1 | Backend | BE-011 | Retry endpoint available, requeues failed message, status returns to pending | PVTI_lAHOAB4wV84BNGcwzgj_54Q | 22 |
 | BE-013 | Set up Redis + BullMQ for message retry queue | **Done** | P0 | Backend | - | Redis connection working, BullMQ jobs processing | PVTI_lAHOAB4wV84BNGcwzgj_55I | 23 |
-| BE-014 | Implement exponential backoff for retries (1m, 5m, 30m; 3 attempts max) | **Done** (PR #242 merged) | P0 | Backend | BE-013 | Failed messages retried with correct backoff schedule |  |  |
-| BE-014A | Fix retry queue removal and backoff schedule alignment | **Done** (PR #242 merged) | P0 | Backend | BE-013 | removeFromQueue uses supported job lookup; backoff is 1m/5m/30m |  |  |
-| BE-015 | Implement dead-letter queue (DLQ) for failed messages | **Done** (PR #242 merged) | P1 | Backend | BE-014 | Messages with 3 failed attempts moved to DLQ |  |  |
-| BE-016 | Set up Socket.io WebSocket server | Ready | P0 | Backend | - | WebSocket server running on configured port |  |  |
-| BE-017 | Implement message.received event (push on inbound message) | Not Started | P0 | Backend | BE-016 | Event emitted when inbound message received |  |  |
-| BE-018 | Implement message.sent event (push on successful delivery) | Not Started | P0 | Backend | BE-016 | Event emitted when message status → sent | PVTI_lAHOAB4wV84BNGcwzgj_54g | 31 |
-| BE-019 | Implement message.failed event (push on delivery failure) | Not Started | P0 | Backend | BE-016 | Event emitted when message status → failed |  |  |
-| BE-020 | Set up Cloudflare R2 storage for raw payloads and attachments | **Ready** | P0 | Backend | - | R2 connection working, upload/download functional | PVTI_lAHOAB4wV84BNGcwzgkAlho | 106 |
-| BE-021 | Implement raw payload storage (store inbound platform payloads, 7-day retention) | Not Started | P1 | Backend | BE-020 | Payloads stored, scheduled cleanup working | PVTI_lAHOAB4wV84BNGcwzgj_54I | 24 |
-| BE-022 | Implement raw payload retrieval endpoint (GET /messages/:id/raw-payload, manager+ only) | Not Started | P1 | Backend | BE-021, BE-005 | Endpoint working with RBAC, audit-logged | PVTI_lAHOAB4wV84BNGcwzgj_54U | 21 |
-| BE-023 | Implement attachment download and re-host (inbound files to R2, max 5 MB) | Not Started | P1 | Backend | BE-020 | Files downloaded from IRC, stored on R2, URLs returned |  |  |
-| BE-024 | Implement audit logging (all actions: assignments, tags, notes, status changes, rule executions, retries) | Not Started | P1 | Backend | BE-002 | All actions logged with actor, action, entity_type, entity_id, timestamp |  |  |
-| BE-025 | Set up email service (Nodemailer/SendGrid) | **Ready** | P2 | Backend | - | Email service configured, password reset emails functional | PVTI_lAHOAB4wV84BNGcwzgkAlhg | 105 |
+| BE-014 | Implement exponential backoff for retries (1m, 5m, 30m; 3 attempts max) | **Done** (PR #242 merged) | P0 | Backend | BE-013 | Failed messages retried with correct backoff schedule | PVTI_lAHOAB4wV84BNGcwzgj_55A | 26 |
+| BE-014A | Fix retry queue removal and backoff schedule alignment | **Done** (PR #242 merged) | P0 | Backend | BE-013 | removeFromQueue uses supported job lookup; backoff is 1m/5m/30m | PVTI_lAHOAB4wV84BNGcwzgldpko | 251 |
+| BE-015 | Implement dead-letter queue (DLQ) for failed messages | **Done** (PR #242 merged) | P1 | Backend | BE-014 | Messages with 3 failed attempts moved to DLQ | PVTI_lAHOAB4wV84BNGcwzgkHa9k | 127 |
+| BE-016 | Set up Socket.io WebSocket server | **Done** | P0 | Backend | - | WebSocket server running on configured port | PVTI_lAHOAB4wV84BNGcwzgkAl2c | 28 |
+| BE-017 | Implement message.received event (push on inbound message) | **Done** | P0 | Backend | BE-016 | Event emitted when inbound message received | PVTI_lAHOAB4wV84BNGcwzgj_54o | 27 |
+| BE-018 | Implement message.sent event (push on successful delivery) | **Done** | P0 | Backend | BE-016 | Event emitted when message status → sent | PVTI_lAHOAB4wV84BNGcwzgj_54g | 31 |
+| BE-019 | Implement message.failed event (push on delivery failure) | **Done** | P0 | Backend | BE-016 | Event emitted when message status → failed | PVTI_lAHOAB4wV84BNGcwzgj_55M | 29 |
+| BE-020 | Set up Cloudflare R2 storage for raw payloads and attachments | **Done** | P0 | Backend | - | R2 connection working, upload/download functional | PVTI_lAHOAB4wV84BNGcwzgkAlho | 106 |
+| BE-021 | Implement raw payload storage (store inbound platform payloads, 7-day retention) | Deferred (Post-MVP) | P1 | Backend | BE-020 | Payloads stored, scheduled cleanup working | PVTI_lAHOAB4wV84BNGcwzgj_54I | 24 |
+| BE-022 | Implement raw payload retrieval endpoint (GET /messages/:id/raw-payload, manager+ only) | Deferred (Post-MVP) | P1 | Backend | BE-021, BE-005 | Endpoint working with RBAC, audit-logged | PVTI_lAHOAB4wV84BNGcwzgj_54U | 21 |
+| BE-023 | Implement attachment download and re-host (inbound files to R2, max 5 MB) | Not Started | P1 | Backend | BE-020 | Files downloaded from IRC, stored on R2, URLs returned | PVTI_lAHOAB4wV84BNGcwzgj_548 | 25 |
+| BE-024 | Implement audit logging (all actions: assignments, tags, notes, status changes, rule executions, retries) | Not Started | P1 | Backend | BE-002 | All actions logged with actor, action, entity_type, entity_id, timestamp | PVTI_lAHOAB4wV84BNGcwzgj_54s | 33 |
+| BE-025 | Set up email service (MVP implementation) | **Done** | P2 | Backend | - | Password reset email integration wired for MVP | PVTI_lAHOAB4wV84BNGcwzgkAlhg | 105 |
+
+| BE-026 | Create environment configuration scaffolding | Not Started | P0 | Backend | - | Centralized env config with validation; app boots cleanly | PVTI_lAHOAB4wV84BNGcwzgkAlhs | 108 |
 
 ### Code Review Tasks (Phase 1.4)
 
@@ -178,92 +180,103 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | BE-204 | Enforce RBAC on all conversation endpoints (@Authorized decorators) | **Done** | P0 | Backend | BE-005, BE-007 | All endpoints require authentication, role-based access control enforced | PVTI_lAHOAB4wV84BNGcwzgj_5rU | 201 |
 | BE-205 | Verify type safety - remove 'any' types from conversation service | **Done** | P0 | Backend | BE-007-010 | Zero 'any' types, type guards implemented for null checks, full TypeScript safety | PVTI_lAHOAB4wV84BNGcwzgj_5sA | 202 |
 
+### Development Hygiene Tasks
+
+| ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
+|----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
+| DEV-001a | Fix config file duplicate exports (r2.ts, redis.ts, email.ts, logging.ts) | Not Started | P0 | Backend | - | No duplicate exports; TypeScript build and tests pass | PVTI_lAHOAB4wV84BNGcwzgldpQI | 173 |
+| DEV-001b | Fix messageRetryWorker.ts import paths and module references | Not Started | P0 | Backend | DEV-001a | Worker imports resolved; tests pass | PVTI_lAHOAB4wV84BNGcwzgldpQ4 | 174 |
+| DEV-001c | Fix TypeScript moduleResolution and tsconfig issues | Not Started | P0 | Backend | DEV-001a | TypeScript config consistent across packages; no resolution errors | PVTI_lAHOAB4wV84BNGcwzgldpRI | 175 |
+| DEV-001d | Standardize logger usage across backend config files | Not Started | P0 | Backend | DEV-001c | Logging uses approved patterns; no console logging in config/infrastructure | PVTI_lAHOAB4wV84BNGcwzgldpRU | 176 |
+
 ### Frontend Tasks
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| FE-001 | Set up TanStack Start project with React 18 | **Done** | P0 | Frontend | - | Project scaffold created, dev server running |  |  |
-| FE-002 | Configure Tailwind CSS with Williamstown SC brand colors | **Done** | P0 | Frontend | FE-001 | Tailwind working, brand colors defined |  |  |
-| FE-003 | Set up Zustand for client state management | **Done** | P0 | Frontend | FE-001 | Store configured, example state working |  |  |
+| FE-001 | Set up TanStack Start project with React 18 | **Done** | P0 | Frontend | - | Project scaffold created, dev server running | PVTI_lAHOAB4wV84BNGcwzgj_6Ek | 43 |
+| FE-002 | Configure Tailwind CSS with Williamstown SC brand colors | **Done** | P0 | Frontend | FE-001 | Tailwind working, brand colors defined | PVTI_lAHOAB4wV84BNGcwzgj_6Eg | 40 |
+| FE-003 | Set up Zustand for client state management | **Done** | P0 | Frontend | FE-001 | Store configured, example state working | PVTI_lAHOAB4wV84BNGcwzgj_6Ew | 37 |
 | FE-004 | Set up TanStack Query for API data fetching | **Done** | P0 | Frontend | FE-001 | Query client configured, API requests working | PVTI_lAHOAB4wV84BNGcwzgj_6E0 | 38 |
 | FE-005 | Implement login page (email/password form) | **Done** | P0 | Frontend | FE-002, BE-003 | Login functional, redirects on success, error handling working | PVTI_lAHOAB4wV84BNGcwzgj_6EI | 42 |
-| FE-006 | Implement forgot password page (email input form) | Not Started | P1 | Frontend | FE-002, BE-004 | Request reset working, confirmation message shown |  |  |
-| FE-007 | Implement password reset page (new password form) | Not Started | P1 | Frontend | FE-002, BE-004 | Password reset functional, login redirect on success |  |  |
-| FE-008 | Implement inbox list page (conversation cards with filters) | **Done** (PR #243 merged) | P0 | Frontend | FE-004, BE-007 | Filters: channel, assignee, tag, status, priority, search, date range |  |  |
+| FE-006 | Implement forgot password page (email input form) | Not Started | P1 | Frontend | FE-002, BE-004 | Request reset working, confirmation message shown | PVTI_lAHOAB4wV84BNGcwzgj_6EU | 45 |
+| FE-007 | Implement password reset page (new password form) | Not Started | P1 | Frontend | FE-002, BE-004 | Password reset functional, login redirect on success | PVTI_lAHOAB4wV84BNGcwzgj_6EM | 39 |
+| FE-008 | Implement inbox list page (conversation cards with filters) | **Done** (PR #243 merged) | P0 | Frontend | FE-004, BE-007 | Filters: channel, assignee, tag, status, priority, search, date range | PVTI_lAHOAB4wV84BNGcwzgj_6Eo | 35 |
 | FE-009 | Implement conversation detail page (messages timeline, reply composer) | **Done** (PR #243 merged) | P0 | Frontend | FE-004, BE-008 | Shows conversation with messages, reply form functional | PVTI_lAHOAB4wV84BNGcwzgj_6D0 | 41 |
-| FE-010 | Implement message reply composer (text input, attachment upload) | **Done** (PR #243 merged) | P0 | Frontend | FE-009, BE-010 | Send message working, attachment upload to R2 |  |  |
-| FE-011 | Implement message status display (pending/sent/failed with retry button) | Not Started | P0 | Frontend | FE-009, BE-011 | Status icons visible, retry button for failed messages |  |  |
-| FE-012 | Set up Socket.io client for WebSocket | **Done** (PR #244 merged) | P0 | Frontend | - | Socket.io client connected to server |  |  |
-| FE-013 | Implement message.received event listener (real-time inbox update) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-017 | New inbound messages appear in inbox without refresh |  |  |
-| FE-014 | Implement message.sent event listener (update message status in UI) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-018 | Message status changes to sent in real-time |  |  |
-| FE-015 | Implement message.failed event listener (show failed status) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-019 | Failed messages updated in UI, retry button appears |  |  |
-| FE-012A | Implement WebSocket client with one-definition-per-file structure | Deferred | P0 | Frontend | FE-012, GOV-005 | Follow GOV-005 guidance for constants, types, and service file structure. Blocked: WebSocket client not implemented yet |  |  |
-| FE-012B | Implement WebSocket client observability (metrics, traces, SLO) | Deferred | P0 | Frontend | FE-012, GOV-005 | Emit all required metrics per GOV-005; define SLOs in governance log. Blocked: WebSocket client not implemented yet |  |  |
-| FE-016 | Implement admin panel - IRC configuration (server, port, username, password inputs) | Not Started | P0 | Frontend | FE-002, BE-026 | Form to save IRC credentials, validation working |  |  |
-| FE-017 | Implement IRC connection test button (connects to server, shows success/error) | Not Started | P0 | Frontend | FE-016, BE-027 | Button triggers test, displays result message |  |  |
-| FE-018 | Implement IRC connection status display (connected/retrying/disconnected) | Not Started | P0 | Frontend | FE-016 | Status badge visible in admin panel, updates in real-time |  |  |
-| FE-019 | Implement admin panel - users list (table with email, role, status, edit/delete actions) | Not Started | P1 | Frontend | FE-002, BE-006 | Users table functional, CRUD operations working with RBAC |  |  |
-| FE-020 | Implement authentication guards (redirect to login if unauthenticated) | Not Started | P0 | Frontend | FE-005 | Protected pages redirect unauthenticated users |  |  |
-| FE-021 | Implement role-based UI (hide admin features from non-admin users) | Not Started | P1 | Frontend | FE-020 | Admin panel only visible to Super Admin/Admin |  |  |
+| FE-010 | Implement message reply composer (text input, attachment upload) | **Done** (PR #243 merged) | P0 | Frontend | FE-009, BE-010 | Send message working, attachment upload to R2 | PVTI_lAHOAB4wV84BNGcwzgj_6E8 | 46 |
+| FE-011 | Implement message status display (pending/sent/failed with retry button) | Not Started | P0 | Frontend | FE-009, BE-011 | Status icons visible, retry button for failed messages | PVTI_lAHOAB4wV84BNGcwzgj_6EY | 44 |
+| FE-012 | Set up Socket.io client for WebSocket | **Done** (PR #244 merged) | P0 | Frontend | - | Socket.io client connected to server | PVTI_lAHOAB4wV84BNGcwzgj_6EE | 36 |
+| FE-013 | Implement message.received event listener (real-time inbox update) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-017 | New inbound messages appear in inbox without refresh | PVTI_lAHOAB4wV84BNGcwzgj_9W0 | 51 |
+| FE-014 | Implement message.sent event listener (update message status in UI) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-018 | Message status changes to sent in real-time | PVTI_lAHOAB4wV84BNGcwzgj_6NU | 58 |
+| FE-015 | Implement message.failed event listener (show failed status) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-019 | Failed messages updated in UI, retry button appears | PVTI_lAHOAB4wV84BNGcwzgj_6MI | 49 |
+| FE-012A | Implement WebSocket client with one-definition-per-file structure | Deferred | P0 | Frontend | FE-012, GOV-005 | Follow GOV-005 guidance for constants, types, and service file structure. Blocked: WebSocket client not implemented yet | PVTI_lAHOAB4wV84BNGcwzgldplA | 252 |
+| FE-012B | Implement WebSocket client observability (metrics, traces, SLO) | Deferred | P0 | Frontend | FE-012, GOV-005 | Emit all required metrics per GOV-005; define SLOs in governance log. Blocked: WebSocket client not implemented yet | PVTI_lAHOAB4wV84BNGcwzgldplY | 253 |
+| FE-016 | Implement admin panel - IRC configuration (server, port, username, password inputs) | Not Started | P0 | Frontend | FE-002, BE-026 | Form to save IRC credentials, validation working | PVTI_lAHOAB4wV84BNGcwzgj_6No | 54 |
+| FE-017 | Implement IRC connection test button (connects to server, shows success/error) | Not Started | P0 | Frontend | FE-016, BE-027 | Button triggers test, displays result message | PVTI_lAHOAB4wV84BNGcwzgj_6Nk | 66 |
+| FE-018 | Implement IRC connection status display (connected/retrying/disconnected) | Not Started | P0 | Frontend | FE-016 | Status badge visible in admin panel, updates in real-time | PVTI_lAHOAB4wV84BNGcwzgj_6MA | 47 |
+| FE-019 | Implement admin panel - users list (table with email, role, status, edit/delete actions) | Not Started | P1 | Frontend | FE-002, BE-006 | Users table functional, CRUD operations working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_6L4 | 52 |
+| FE-020 | Implement authentication guards (redirect to login if unauthenticated) | Not Started | P0 | Frontend | FE-005 | Protected pages redirect unauthenticated users | PVTI_lAHOAB4wV84BNGcwzgj_6NM | 48 |
+| FE-021 | Implement role-based UI (hide admin features from non-admin users) | Not Started | P1 | Frontend | FE-020 | Admin panel only visible to Super Admin/Admin | PVTI_lAHOAB4wV84BNGcwzgj_6Ng | 56 |
 
 ### Shared Tasks
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| SH-001 | Define TypeScript types for core entities (User, Conversation, Message, Tag, Note, Notification, RoutingRule, AuditLog) | Not Started | P0 | Architect | BE-002 | All types defined in packages/common/src/types/ |  |  |
-| SH-002 | Define API request/response types (conversations, messages, auth, users, IRC config) | Not Started | P0 | Architect | SH-001 | All API types defined, imported by backend and frontend |  |  |
-| SH-003 | Define WebSocket event types (message.received, message.sent, message.failed) | Not Started | P0 | Architect | SH-001 | Event types defined with payloads |  |  |
-| SH-004 | Create Zod schemas for request validation (auth, conversations, messages, IRC config) | Not Started | P1 | Architect | SH-002 | All schemas created, export for backend validation |  |  |
-| SH-005 | Set up shared package exports in packages/common/src/index.ts | Not Started | P0 | Architect | SH-001, SH-002, SH-003 | All types and schemas exported correctly |  |  |
+| SH-001 | Define TypeScript types for core entities (User, Conversation, Message, Tag, Note, Notification, RoutingRule, AuditLog) | Not Started | P0 | Architect | BE-002 | All types defined in packages/common/src/types/ | PVTI_lAHOAB4wV84BNGcwzgj_8cg | 83 |
+| SH-002 | Define API request/response types (conversations, messages, auth, users, IRC config) | Not Started | P0 | Architect | SH-001 | All API types defined, imported by backend and frontend | PVTI_lAHOAB4wV84BNGcwzgj_83I | 74 |
+| SH-003 | Define WebSocket event types (message.received, message.sent, message.failed) | Not Started | P0 | Architect | SH-001 | Event types defined with payloads | PVTI_lAHOAB4wV84BNGcwzgj_6hE | 76 |
+| SH-004 | Create Zod schemas for request validation (auth, conversations, messages, IRC config) | Not Started | P1 | Architect | SH-002 | All schemas created, export for backend validation | PVTI_lAHOAB4wV84BNGcwzgj_6g8 | 78 |
+| SH-005 | Set up shared package exports in packages/common/src/index.ts | Not Started | P0 | Architect | SH-001, SH-002, SH-003 | All types and schemas exported correctly | PVTI_lAHOAB4wV84BNGcwzgj_6hA | 81 |
+
+| SH-006 | Organize DTOs by feature folders | Not Started | P1 | Architect | SH-001 | DTOs grouped by feature; no barrel export regressions | PVTI_lAHOAB4wV84BNGcwzgkHUZM | 126 |
 
 ### Integration Tasks (IRC)
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| INT-001 | Create IRC connector (server connection, authentication, channel joins) | Not Started | P0 | Backend | BE-001 | Connects to IRC server, authenticates, joins configured channels |  |  |
-| INT-002 | Implement IRC message ingestion (inbound messages → inbox) | Not Started | P0 | Backend | BE-002, INT-001 | Inbound messages create conversations/messages in DB |  |  |
-| INT-003 | Implement IRC message delivery (outbound messages → IRC channel) | Not Started | P0 | Backend | BE-010, INT-001 | Messages sent to IRC channel, status updated to sent/failed |  |  |
-| INT-004 | Implement IRC auto-reconnect with exponential backoff (1s → 60s max, 5 attempts) | Not Started | P0 | Backend | INT-001 | Disconnects trigger reconnect attempts with backoff |  |  |
-| INT-005 | Implement IRC connection status tracking (connected/retrying/disconnected) | Not Started | P0 | Backend | INT-004 | Status stored in DB, exposed via WebSocket |  |  |
-| INT-006 | Create IRC configuration endpoint (POST /integrations/irc/config) | Not Started | P0 | Backend | BE-005 | Saves server, port, username, password to env/db |  |  |
-| INT-007 | Create IRC connect endpoint (POST /integrations/irc/connect) | Not Started | P0 | Backend | INT-006 | Initiates IRC connection, returns connection status |  |  |
-| INT-008 | Create IRC connection test endpoint (POST /integrations/irc/test) | Not Started | P0 | Backend | INT-007 | Attempts connection, returns success/failure response |  |  |
-| INT-009 | Implement IRC connection status endpoint (GET /integrations/irc/status) | Not Started | P0 | Backend | INT-005 | Returns current connection status |  |  |
-| INT-010 | Implement IRC environment variable management (store credentials securely) | Not Started | P1 | Backend | INT-006 | Credentials loaded from env vars on startup |  |  |
-| INT-011 | Map IRC channels to conversations (one conversation per channel) | Not Started | P0 | Backend | INT-002, BE-002 | Channel joins create/update conversations, external_thread_id = channel name |  |  |
-| INT-012 | Handle IRC connection errors (logging, DLQ for failed messages) | Not Started | P1 | Backend | INT-001, BE-015 | Connection errors logged, failed messages moved to DLQ |  |  |
-| INT-013 | Write unit tests for IRC connector (connection, authentication, message handling) | Not Started | P1 | Backend | INT-003 | 90%+ coverage for IRC connector |  |  |
-| INT-014 | Write integration tests for IRC connector (mock IRC server) | Not Started | P1 | Backend | INT-003 | End-to-end message flow tested |  |  |
+| INT-001 | Create IRC connector (server connection, authentication, channel joins) | Not Started | P0 | Backend | BE-001 | Connects to IRC server, authenticates, joins configured channels | PVTI_lAHOAB4wV84BNGcwzgkHa_U | 128 |
+| INT-002 | Implement IRC message ingestion (inbound messages → inbox) | Not Started | P0 | Backend | BE-002, INT-001 | Inbound messages create conversations/messages in DB | PVTI_lAHOAB4wV84BNGcwzgkHbAU | 129 |
+| INT-003 | Implement IRC message delivery (outbound messages → IRC channel) | Not Started | P0 | Backend | BE-010, INT-001 | Messages sent to IRC channel, status updated to sent/failed | PVTI_lAHOAB4wV84BNGcwzgkHbB4 | 130 |
+| INT-004 | Implement IRC auto-reconnect with exponential backoff (1s → 60s max, 5 attempts) | Not Started | P0 | Backend | INT-001 | Disconnects trigger reconnect attempts with backoff | PVTI_lAHOAB4wV84BNGcwzgj_824 | 60 |
+| INT-005 | Implement IRC connection status tracking (connected/retrying/disconnected) | Not Started | P0 | Backend | INT-004 | Status stored in DB, exposed via WebSocket | PVTI_lAHOAB4wV84BNGcwzgj_6NE | 59 |
+| INT-006 | Create IRC configuration endpoint (POST /integrations/irc/config) | Not Started | P0 | Backend | BE-005 | Saves server, port, username, password to env/db | PVTI_lAHOAB4wV84BNGcwzgj_6MQ | 53 |
+| INT-007 | Create IRC connect endpoint (POST /integrations/irc/connect) | Not Started | P0 | Backend | INT-006 | Initiates IRC connection, returns connection status | PVTI_lAHOAB4wV84BNGcwzgj_6Mk | 50 |
+| INT-008 | Create IRC connection test endpoint (POST /integrations/irc/test) | Not Started | P0 | Backend | INT-007 | Attempts connection, returns success/failure response | PVTI_lAHOAB4wV84BNGcwzgj_6MY | 55 |
+| INT-009 | Implement IRC connection status endpoint (GET /integrations/irc/status) | Not Started | P0 | Backend | INT-005 | Returns current connection status | PVTI_lAHOAB4wV84BNGcwzgj_6Mc | 57 |
+| INT-010 | Implement IRC environment variable management (store credentials securely) | Not Started | P1 | Backend | INT-006 | Credentials loaded from env vars on startup | PVTI_lAHOAB4wV84BNGcwzgj_6Mo | 61 |
+| INT-011 | Map IRC channels to conversations (one conversation per channel) | Not Started | P0 | Backend | INT-002, BE-002 | Channel joins create/update conversations, external_thread_id = channel name | PVTI_lAHOAB4wV84BNGcwzgj_6M4 | 65 |
+| INT-012 | Handle IRC connection errors (logging, DLQ for failed messages) | Not Started | P1 | Backend | INT-001, BE-015 | Connection errors logged, failed messages moved to DLQ | PVTI_lAHOAB4wV84BNGcwzgj_6NY | 64 |
+| INT-013 | Write unit tests for IRC connector (connection, authentication, message handling) | Not Started | P1 | Backend | INT-003 | 90%+ coverage for IRC connector | PVTI_lAHOAB4wV84BNGcwzgj_6M0 | 62 |
+| INT-014 | Write integration tests for IRC connector (mock IRC server) | Not Started | P1 | Backend | INT-003 | End-to-end message flow tested | PVTI_lAHOAB4wV84BNGcwzgj_6Nw | 63 |
 
 ### QA Handoff Tasks
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| QA-001 | Create test cases for authentication (login, logout, forgot password, reset password) | Not Started | P1 | QA | BE-004 | All ACs from 01-product-specification.md covered |  |  |
-| QA-002 | Create test cases for RBAC (role permissions, access control) | Not Started | P1 | QA | BE-005 | All 4 roles tested, permission matrix validated |  |  |
-| QA-003 | Create test cases for inbox (filters, search, pagination, sorting) | Not Started | P1 | QA | BE-007 | All filter combinations tested |  |  |
-| QA-004 | Create test cases for messaging (send, receive, status tracking, retry) | Not Started | P1 | QA | BE-012 | Full message lifecycle tested |  |  |
-| QA-005 | Create test cases for IRC integration (connect, disconnect, inbound/outbound messages) | Not Started | P1 | QA | INT-004 | All IRC requirements tested |  |  |
-| QA-006 | Create test cases for WebSocket events (message.received, message.sent, message.failed) | Not Started | P1 | QA | BE-019 | Real-time updates verified |  |  |
-| QA-007 | Create test cases for message retry queue (backoff, DLQ, 3 attempts) | Not Started | P1 | QA | BE-015 | Retry behavior tested |  |  |
-| QA-008 | Create test cases for raw payload storage (manager+ access, 7-day retention) | Not Started | P1 | QA | BE-022 | RBAC and retention verified |  |  |
-| QA-009 | Create test cases for attachments (download/re-host, 5 MB limit, R2 storage) | Not Started | P1 | QA | BE-023 | File handling tested, size limit enforced |  |  |
-| QA-010 | Implement Playwright E2E tests for happy path (login → inbox → send message) | Not Started | P1 | QA | FE-010 | Automated test suite for core user flow |  |  |
-| QA-011 | Implement Playwright E2E tests for IRC admin panel (config, test connection, status) | Not Started | P1 | QA | FE-018 | Automated test suite for IRC configuration |  |  |
-| QA-012 | Create regression test suite (12 critical tests, run on every PR) | Not Started | P0 | QA | QA-010, QA-011 | Regression suite automated in CI/CD |  |  |
+| QA-001 | Create test cases for authentication (login, logout, forgot password, reset password) | Not Started | P1 | QA | BE-004 | All ACs from 01-product-specification.md covered | PVTI_lAHOAB4wV84BNGcwzgj_8jw | 84 |
+| QA-002 | Create test cases for RBAC (role permissions, access control) | Not Started | P1 | QA | BE-005 | All 4 roles tested, permission matrix validated | PVTI_lAHOAB4wV84BNGcwzgj_6gc | 79 |
+| QA-003 | Create test cases for inbox (filters, search, pagination, sorting) | Not Started | P1 | QA | BE-007 | All filter combinations tested | PVTI_lAHOAB4wV84BNGcwzgj_6gA | 75 |
+| QA-004 | Create test cases for messaging (send, receive, status tracking, retry) | Not Started | P1 | QA | BE-012 | Full message lifecycle tested | PVTI_lAHOAB4wV84BNGcwzgj_8Os | 70 |
+| QA-005 | Create test cases for IRC integration (connect, disconnect, inbound/outbound messages) | Not Started | P1 | QA | INT-004 | All IRC requirements tested | PVTI_lAHOAB4wV84BNGcwzgj_6hQ | 71 |
+| QA-006 | Create test cases for WebSocket events (message.received, message.sent, message.failed) | Not Started | P1 | QA | BE-019 | Real-time updates verified | PVTI_lAHOAB4wV84BNGcwzgj_8Ow | 68 |
+| QA-007 | Create test cases for message retry queue (backoff, DLQ, 3 attempts) | Not Started | P1 | QA | BE-015 | Retry behavior tested | PVTI_lAHOAB4wV84BNGcwzgj_6gw | 85 |
+| QA-008 | Create test cases for raw payload storage (manager+ access, 7-day retention) | Not Started | P1 | QA | BE-022 | RBAC and retention verified | PVTI_lAHOAB4wV84BNGcwzgj_6g0 | 73 |
+| QA-009 | Create test cases for attachments (download/re-host, 5 MB limit, R2 storage) | Not Started | P1 | QA | BE-023 | File handling tested, size limit enforced | PVTI_lAHOAB4wV84BNGcwzgj_6gQ | 82 |
+| QA-010 | Implement Playwright E2E tests for happy path (login → inbox → send message) | Not Started | P1 | QA | FE-010 | Automated test suite for core user flow | PVTI_lAHOAB4wV84BNGcwzgj_6g4 | 86 |
+| QA-011 | Implement Playwright E2E tests for IRC admin panel (config, test connection, status) | Not Started | P1 | QA | FE-018 | Automated test suite for IRC configuration | PVTI_lAHOAB4wV84BNGcwzgj_6f0 | 77 |
+| QA-012 | Create regression test suite (12 critical tests, run on every PR) | Not Started | P0 | QA | QA-010, QA-011 | Regression suite automated in CI/CD | PVTI_lAHOAB4wV84BNGcwzgj_6gI | 80 |
 
 ### Documentation Tasks
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| DOC-001 | Update Phase 1 scope (Telegram + IRC; Phase 2 = WhatsApp/WeChat/Meta/X) | Completed | P0 | Product Owner | SV-001 | Phase 1 scope aligned; Architect review approved |  |  |
-| DOC-002 | Update 02-api-and-data-model.md with IRC-specific endpoints | Not Started | P1 | Backend | INT-009 | IRC endpoints documented with request/response examples |  |  |
-| DOC-003 | Update 03-implementation-guide.md with IRC connector architecture | Not Started | P1 | Backend | INT-001 | IRC integration documented in architecture section |  |  |
-| DOC-004 | Create IRC integration guide (setup, configuration, troubleshooting) | Not Started | P1 | Backend | INT-004 | Step-by-step guide for connecting IRC to YACC |  |  |
-| DOC-005 | Update 05-quick-reference.md with Phase 1 endpoint list | Not Started | P1 | Product Owner | BE-025 | All Phase 1 endpoints listed in quick reference |  |  |
-| DOC-006 | Create API documentation (OpenAPI/Swagger for all Phase 1 endpoints) | Not Started | P2 | Backend | BE-025 | API docs generated, hosted |  |  |
-| DOC-007 | Create environment variables reference (IRC, R2, Redis, DB) | Not Started | P1 | Backend | INT-010 | All env vars documented with descriptions |  |  |
-| DOC-008 | Create deployment guide for Phase 1 (Docker setup, env vars, migrations) | Not Started | P1 | Backend | BE-025 | Step-by-step deployment instructions |  |  |
+| DOC-001 | Update Phase 1 scope (Telegram + IRC; Phase 2 = WhatsApp/WeChat/Meta/X) | Completed | P0 | Product Owner | SV-001 | Phase 1 scope aligned; Architect review approved | PVTI_lAHOAB4wV84BNGcwzgj_6gY | 69 |
+| DOC-002 | Update 02-api-and-data-model.md with IRC-specific endpoints | Not Started | P1 | Backend | INT-009 | IRC endpoints documented with request/response examples | PVTI_lAHOAB4wV84BNGcwzgj_6f8 | 72 |
+| DOC-003 | Update 03-implementation-guide.md with IRC connector architecture | Not Started | P1 | Backend | INT-001 | IRC integration documented in architecture section | PVTI_lAHOAB4wV84BNGcwzgj_9kw | 67 |
+| DOC-004 | Create IRC integration guide (setup, configuration, troubleshooting) | Not Started | P1 | Backend | INT-004 | Step-by-step guide for connecting IRC to YACC | PVTI_lAHOAB4wV84BNGcwzgj_6hc | 87 |
+| DOC-005 | Update 05-quick-reference.md with Phase 1 endpoint list | Not Started | P1 | Product Owner | BE-025 | All Phase 1 endpoints listed in quick reference | PVTI_lAHOAB4wV84BNGcwzgj_7Ew | 98 |
+| DOC-006 | Create API documentation (OpenAPI/Swagger for all Phase 1 endpoints) | Not Started | P2 | Backend | BE-025 | API docs generated, hosted | PVTI_lAHOAB4wV84BNGcwzgj_7Eo | 93 |
+| DOC-007 | Create environment variables reference (IRC, R2, Redis, DB) | Not Started | P1 | Backend | INT-010 | All env vars documented with descriptions | PVTI_lAHOAB4wV84BNGcwzgj_7Ek | 91 |
+| DOC-008 | Create deployment guide for Phase 1 (Docker setup, env vars, migrations) | Not Started | P1 | Backend | BE-025 | Step-by-step deployment instructions | PVTI_lAHOAB4wV84BNGcwzgj_7Es | 102 |
 | DOC-009 | Add governance log entry for PR #131 blocker fixes | Completed | P0 | Architect | DEV-131-03, DEV-131-04 | GOV-004 created with compliance checklist and Mermaid diagram |  |  |
 | DOC-010 | Create WebSocket client implementation guidance (GOV-005) | Completed | P0 | Architect | DEV-131-05, DEV-131-06 | GOV-005 created with one-definition-per-file rules and observability requirements |  |  |
 
@@ -271,18 +284,62 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| HD-001 | Create Docker Compose configuration (PostgreSQL, Redis, R2 local/minio) | Not Started | P0 | Backend | BE-001, BE-013, BE-020 | All services running via docker compose up |  |  |
-| HD-002 | Create production Docker image for backend (multi-stage build) | Not Started | P0 | Backend | BE-025 | Docker image builds and runs correctly |  |  |
-| HD-003 | Create production Docker image for frontend (static build for S3) | Not Started | P0 | Frontend | FE-021 | Docker image generates static build |  |  |
-| HD-004 | Create database migration scripts (Drizzle migrations) | Not Started | P0 | Backend | BE-002 | Migrations tested, reversible |  |  |
-| HD-005 | Set up CI/CD pipeline (GitHub Actions for tests, lint, build) | Not Started | P1 | Architect | QA-012 | Automated pipeline passing on PRs |  |  |
-| HD-006 | Create production environment template (env.example with all variables) | Not Started | P0 | Backend | DOC-007 | Template includes IRC, R2, Redis, DB variables |  |  |
-| HD-007 | Perform security review (env vars, RBAC, input validation) | Not Started | P1 | Architect | BE-005 | No critical vulnerabilities found |  |  |
-| HD-008 | Deploy Phase 1 to staging environment | Not Started | P0 | Backend | HD-001, HD-002 | Staging environment functional |  |  |
-| HD-009 | Run QA regression suite on staging environment | Not Started | P0 | QA | HD-008 | All regression tests passing |  |  |
-| HD-010 | Create Phase 1 handoff notes (known issues, next steps, dependencies) | Not Started | P1 | Product Owner | HD-009 | Handoff document created, reviewed by team |  |  |
-| HD-011 | Schedule Phase 2 planning meeting (Telegram integration, search, attachments) | Not Started | P1 | Product Owner | HD-010 | Meeting scheduled, agenda prepared |  |  |
-| HD-012 | Archive Phase 1 artifacts (specs, test results, deployment logs) | Not Started | P2 | Product Owner | HD-011 | All artifacts archived in project repository |  |  |
+| HD-001 | Create Docker Compose configuration (PostgreSQL, Redis, R2 local/minio) | Not Started | P0 | Backend | BE-001, BE-013, BE-020 | All services running via docker compose up | PVTI_lAHOAB4wV84BNGcwzgj_7D0 | 103 |
+| HD-002 | Create production Docker image for backend (multi-stage build) | Not Started | P0 | Backend | BE-025 | Docker image builds and runs correctly | PVTI_lAHOAB4wV84BNGcwzgj_8js | 88 |
+| HD-003 | Create production Docker image for frontend (static build for S3) | Not Started | P0 | Frontend | FE-021 | Docker image generates static build | PVTI_lAHOAB4wV84BNGcwzgj_7EA | 99 |
+| HD-004 | Create database migration scripts (Drizzle migrations) | Not Started | P0 | Backend | BE-002 | Migrations tested, reversible | PVTI_lAHOAB4wV84BNGcwzgj_8O8 | 101 |
+| HD-005 | Set up CI/CD pipeline (GitHub Actions for tests, lint, build) | Not Started | P1 | Architect | QA-012 | Automated pipeline passing on PRs | PVTI_lAHOAB4wV84BNGcwzgj_7D4 | 94 |
+| HD-006 | Create production environment template (env.example with all variables) | Not Started | P0 | Backend | DOC-007 | Template includes IRC, R2, Redis, DB variables | PVTI_lAHOAB4wV84BNGcwzgj_7EU | 96 |
+| HD-007 | Perform security review (env vars, RBAC, input validation) | Not Started | P1 | Architect | BE-005 | No critical vulnerabilities found | PVTI_lAHOAB4wV84BNGcwzgj_7Dc | 95 |
+| HD-008 | Deploy Phase 1 to staging environment | Not Started | P0 | Backend | HD-001, HD-002 | Staging environment functional | PVTI_lAHOAB4wV84BNGcwzgj_7EI | 97 |
+| HD-009 | Run QA regression suite on staging environment | Not Started | P0 | QA | HD-008 | All regression tests passing | PVTI_lAHOAB4wV84BNGcwzgj_8Pk | 90 |
+| HD-010 | Create Phase 1 handoff notes (known issues, next steps, dependencies) | Not Started | P1 | Product Owner | HD-009 | Handoff document created, reviewed by team | PVTI_lAHOAB4wV84BNGcwzgj_8Ps | 92 |
+| HD-011 | Schedule Phase 2 planning meeting (Telegram integration, search, attachments) | Not Started | P1 | Product Owner | HD-010 | Meeting scheduled, agenda prepared | PVTI_lAHOAB4wV84BNGcwzgj_7EY | 100 |
+| HD-012 | Archive Phase 1 artifacts (specs, test results, deployment logs) | Not Started | P2 | Product Owner | HD-011 | All artifacts archived in project repository | PVTI_lAHOAB4wV84BNGcwzgj_7Dk | 89 |
+
+### Execution Tracking (Historical)
+
+| ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
+|----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
+| WEEK-1 | Phase 1 Week 1: Foundation (Days 1-5) | Open (cleanup) | P2 | Product Owner | - | Historical tracking issue closed or superseded | PVTI_lAHOAB4wV84BNGcwzgkAsF4 | 110 |
+
+### GitHub Backlog Items (GH)
+
+| ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
+|----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
+| GH-032 | Implement health check endpoint (legacy numbering mismatch) | Not Started | P2 | Backend | - | Health endpoint exists; smoke tests pass | PVTI_lAHOAB4wV84BNGcwzgj_54k | 32 |
+| GH-034 | Label setup required | Not Started | P2 | Architect | - | Repo labels defined and consistent | PVTI_lAHOAB4wV84BNGcwzgj_59g | 34 |
+| GH-112 | UUID refactor incomplete for tags/raw_payloads/routing_rule_executions | Not Started | P1 | Backend | - | UUID refactor complete; schema + migrations consistent | PVTI_lAHOAB4wV84BNGcwzgkERi0 | 112 |
+| GH-117 | Audit logs entity_id must accept non-UUID IDs | Not Started | P1 | Backend | - | Audit logs handle non-UUID entity IDs | PVTI_lAHOAB4wV84BNGcwzgkEbhI | 117 |
+| GH-118 | Clarify audit_logs scope to conversation-only | Not Started | P2 | Architect | - | Scope decision recorded; docs updated | PVTI_lAHOAB4wV84BNGcwzgkEc-Y | 118 |
+| GH-119 | Align audit logs to conversation-only scope | Not Started | P2 | Backend | GH-118 | Implementation matches scope decision | PVTI_lAHOAB4wV84BNGcwzgkEeHw | 119 |
+| GH-120 | Align audit log scope to conversations | Not Started | P2 | Backend | GH-118 | Implementation matches scope decision | PVTI_lAHOAB4wV84BNGcwzgkEefE | 120 |
+| GH-137 | PR 131 missing blocker fixes | Not Started | P2 | Architect | - | Blockers resolved or issue closed | PVTI_lAHOAB4wV84BNGcwzgldpzQ | 137 |
+| GH-138 | Split ADR-003 refactor moves out of PR #131 | Not Started | P2 | Architect | - | Refactor split or issue closed | PVTI_lAHOAB4wV84BNGcwzgldpzY | 138 |
+| GH-139 | FE-012: WebSocket constants violate one-definition-per-file rule | Not Started | P2 | Frontend | - | Constants refactored to comply | PVTI_lAHOAB4wV84BNGcwzgldpzk | 139 |
+| GH-140 | FE-012: PR #131 missing required fixes and governance artifacts | Not Started | P2 | Architect | - | Governance artifacts complete or issue closed | PVTI_lAHOAB4wV84BNGcwzgldpzw | 140 |
+| GH-141 | FE-012: Unrelated changes detected in PR #131 | Not Started | P2 | Architect | - | Unrelated changes removed or issue closed | PVTI_lAHOAB4wV84BNGcwzgldpz8 | 141 |
+| GH-164 | P0: Fix @yacc/common type-check failures (schema filename casing duplicates) | Not Started | P0 | Backend | - | Type-check passes; casing duplicates eliminated | PVTI_lAHOAB4wV84BNGcwzgldp0M | 164 |
+| GH-165 | P0: Backend architecture alignment (remove wrapper/DI patterns, fix logger + auth wiring) | Not Started | P0 | Backend | - | Backend matches architecture constraints | PVTI_lAHOAB4wV84BNGcwzgldp0U | 165 |
+| GH-166 | P0: Eliminate 'any' usage in backend (enforce no-any standard) | Not Started | P0 | Backend | - | No `any` in backend; lint/type checks enforce | PVTI_lAHOAB4wV84BNGcwzgldp0c | 166 |
+| GH-167 | P0: Eliminate 'any' usage in frontend (enforce no-any standard) | Not Started | P0 | Frontend | - | No `any` in frontend; lint/type checks enforce | PVTI_lAHOAB4wV84BNGcwzgldp0s | 167 |
+| GH-168 | P0: Remove barrel exports (index.ts) and enforce direct file imports | Not Started | P0 | Backend | - | Barrel exports removed; import rules enforced | PVTI_lAHOAB4wV84BNGcwzgldp1A | 168 |
+| GH-169 | P1: Remove package-lock.json (pnpm is the only supported package manager) | Not Started | P1 | Architect | - | package-lock removed; docs enforce pnpm only | PVTI_lAHOAB4wV84BNGcwzgldp1Q | 169 |
+| GH-170 | P1: Stop tracking test env secrets file (packages/backend/.env.test) | Not Started | P1 | Backend | - | Secrets removed from git; docs updated | PVTI_lAHOAB4wV84BNGcwzgldp1w | 170 |
+| GH-171 | P1: Replace console logging with pino + redact PII | Not Started | P1 | Backend | - | Console logs removed; PII redaction enabled | PVTI_lAHOAB4wV84BNGcwzgldp2E | 171 |
+| GH-172 | P2/ADR: Decide frontend auth token storage strategy (localStorage vs HttpOnly cookie) | Not Started | P2 | Architect | - | ADR created; implementation aligned | PVTI_lAHOAB4wV84BNGcwzgldp2U | 172 |
+| GH-180 | PR 179: Documentation status mismatch and missing governance log | Not Started | P2 | Architect | - | Governance correct or issue closed | PVTI_lAHOAB4wV84BNGcwzgldp2Y | 180 |
+| GH-181 | PR 179: Mandatory planning index deleted | Not Started | P2 | Architect | - | Planning index restored or issue closed | PVTI_lAHOAB4wV84BNGcwzgldp2w | 181 |
+| GH-182 | PR 179: routing-controllers middleware registered via app.use | Not Started | P2 | Backend | - | Middleware registration aligns with ADRs | PVTI_lAHOAB4wV84BNGcwzgldp28 | 182 |
+| GH-195 | QA-001: Integration Tests for BE-007-010 | Not Started | P1 | QA | - | Integration tests implemented and passing | PVTI_lAHOAB4wV84BNGcwzglA41c | 195 |
+| GH-196 | QA-002: E2E Tests for FE-008-011 (Inbox & Messaging) | Not Started | P1 | QA | - | E2E tests implemented and passing | PVTI_lAHOAB4wV84BNGcwzglA41o | 196 |
+| GH-197 | QA-003: Real-Time Integration Tests (WebSocket) | Not Started | P1 | QA | - | Real-time tests implemented and passing | PVTI_lAHOAB4wV84BNGcwzglA41w | 197 |
+| GH-199 | BE-007 PR: Align /conversations response contract between backend and frontend | Not Started | P2 | Backend | - | Contract consistent between FE/BE | PVTI_lAHOAB4wV84BNGcwzgldp3E | 199 |
+| GH-203 | BE-007 PR: Add observability (logs/metrics/traces) for new conversation endpoints | Not Started | P2 | Backend | - | Observability meets ADR-004 | PVTI_lAHOAB4wV84BNGcwzgldp3g | 203 |
+| GH-204 | BE-007 PR: Use explicit HTTP errors for validation in sendMessage | Not Started | P2 | Backend | - | Validation errors return explicit HTTP errors | PVTI_lAHOAB4wV84BNGcwzgldp30 | 204 |
+| GH-205 | Migrate websocket connectors to socket-controllers | Not Started | P2 | Backend | - | Connectors use socket-controllers pattern | PVTI_lAHOAB4wV84BNGcwzgldp4E | 205 |
+| GH-206 | Clarify auth endpoint prefix decision (BetterAuth) | Not Started | P2 | Architect | - | Prefix decision recorded; docs aligned | PVTI_lAHOAB4wV84BNGcwzgldp4Y | 206 |
+| GH-207 | Enforce /api prefix on all REST endpoints (health excluded) | Not Started | P2 | Architect | - | Decision recorded; implementation consistent | PVTI_lAHOAB4wV84BNGcwzgldp40 | 207 |
 
 ### Success Criteria & Next Steps
 

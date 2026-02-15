@@ -28,12 +28,10 @@
 **QA/Testers:**
 - `04-qa-and-testing.md` - Test cases & regression suite
 - `01-product-specification.md` - User stories & acceptance criteria
-- `06-phase1-execution-guide.md` - Phase 1 execution plan
 
 **Product Owners & Designers:**
 - `01-product-specification.md` - Complete product scope
 - `05-quick-reference.md` - Features checklist
-- `06-phase1-execution-guide.md` - Phase 1 deliverables
 
 **Tech Leads & Architects:**
 - `03-implementation-guide.md` - Complete system architecture
@@ -129,25 +127,6 @@
 
 ---
 
-### 🔹 06-phase1-execution-guide.md
-**Phase 1 execution plan with complete scope and acceptance criteria**
-
-- Phase 1 scope (Telegram + IRC integration)
-- 22 P0 Backend issues with dependencies
-- Complete dependency graph (Mermaid diagram)
-- 3-week execution timeline
-- Week-by-week breakdown with daily tasks
-- Technical clarifications for all issues
-- Risk mitigation strategies
-- Environment variables reference
-- Testing strategy (unit, integration, E2E)
-- Handoff checklist
-
-**When to use:** Starting Phase 1, sprint planning, tracking progress  
-**Audience:** Backend developers, tech leads, architects
-
----
-
 ## 📋 Architecture Artifacts
 
 ### 📁 architecture/ (Architect Reviews)
@@ -157,6 +136,7 @@ Official architecture review documents and guidance.
 **Current Files:**
 - **INDEX-TS-RULE-CLARIFICATION.md** - Explains no barrel exports rule with exceptions
 - **ARCHITECT-REVIEW-BE006-PR177.md** - Review of BE-006 WebSocket infrastructure
+ - **00-INDEX.md** - Architecture document set index (Technology/Application/Data)
 
 **When to use:** Understanding architecture patterns and decisions  
 **Audience:** Architects, developers making design decisions
@@ -203,7 +183,9 @@ Development planning documents, task tracking, and sprint planning.
 
 **Key Files:**
 - **00-INDEX.md**: Master planning index with task status
-- **BE-006-websocket-quick-start.md**: Quick start guide for WebSocket implementation
+ - **06-tasks.md**: Task + GitHub issue mapping (kept current)
+
+**MVP Note:** At MVP stage, `.docs/plans/` should contain only currently-active execution material (if any). Historical working docs are retrieved from git history.
 
 **When to use:** Daily task tracking, sprint planning  
 **Audience:** Developers, tech leads, project managers
@@ -234,7 +216,8 @@ Development planning documents, task tracking, and sprint planning.
 ---
 
 ## 📊 Documentation Stats
-- ✅ **6 core product documents** (01-06)
+- ✅ **5 core product documents** (01-05)
+- ✅ **1 execution tracker** (`06-tasks.md`)
 - ✅ **8 active ADRs** (architecture decisions)
 - ✅ **10 governance logs** (approval audit trail)
 - ✅ **Multiple planning documents** (task tracking)
@@ -266,13 +249,13 @@ Development planning documents, task tracking, and sprint planning.
 
 ---
 
-## ✅ Updated: 2026-02-11
+## ✅ Updated: 2026-02-14
 
-**Status:** ✅ Clean structure, ready for development  
+**Status:** ✅ MVP stage (Phase 1 + Phase 2 complete)  
 **Total Files:** 53 (down from 93)  
 **Total Size:** 1.1MB (down from 1.7MB)  
 **Organization:** Core docs + ADR + Governance + Plans  
-**Latest:** BE-206 Socket-Controllers migration complete, BE-007-010 Phase 1.4 MVP ready
+**Latest:** MVP documentation cleanup + post-MVP doc lifecycle ADR
 
 ---
 

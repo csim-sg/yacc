@@ -16,7 +16,7 @@
 
 ## 1. Testing Overview
 
-**Phase Scope Reference**: See `.docs/06-phase1-execution-guide.md` for authoritative Phase 1 scope and acceptance criteria.
+**Scope Reference**: See `.docs/01-product-specification.md` for authoritative MVP scope and acceptance criteria.
 
 ### Test Types
 

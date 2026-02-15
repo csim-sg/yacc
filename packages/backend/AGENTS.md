@@ -1,6 +1,6 @@
 # YACC Backend - Agent Guide
 
-This is the **backend package** for YACC. This guide provides essentials summaries with links to detailed guides in `.docs/agents/`.
+This is the **backend package** for YACC. This guide provides the essentials and points to the current authoritative docs.
 
 ---
 
@@ -32,7 +32,7 @@ This is the **backend package** for YACC. This guide provides essentials summari
 - **Cloudflare R2**: File storage
 - **Pino**: Structured logging
 
-📚 **For detailed overview**: See `.docs/agents/01-PROJECT-OVERVIEW.md`
+📚 **For detailed overview**: See `.docs/03-implementation-guide.md`
 
 ---
 
@@ -63,7 +63,7 @@ pnpm db:migrate        # Run migrations
 pnpm db:studio         # Open Drizzle Studio
 ```
 
-📚 **For detailed build commands**: See `.docs/agents/02-BUILD-COMMANDS.md`
+📚 **For detailed build commands**: See `../README.md` and `../../README.md`
 
 ---
 
@@ -166,7 +166,7 @@ new SocketControllers({
 - ✅ **Centralized registration** (all controllers/socket-controllers in const for easy maintenance)
 - ✅ **Flat structure** (no nested api/, domain/, infrastructure/ folders)
 
-📚 **For detailed folder structure**: See `.docs/agents/03-FOLDER-STRUCTURE.md`
+📚 **For detailed folder structure**: See `AGENTS.md` (this file) and `DEVELOPER-AGENT-SYSTEM-PROMPT.md`
 
 ---
 
@@ -211,7 +211,7 @@ new SocketControllers({
 - **Formatter**: Prettier (optional)
 - **Type Checker**: TypeScript strict mode
 
-📚 **For detailed code style**: See `.docs/agents/04-CODE-STYLE-GUIDELINES.md` + `DEVELOPER-AGENT-SYSTEM-PROMPT.md`
+📚 **For detailed code style**: See `DEVELOPER-AGENT-SYSTEM-PROMPT.md`
 
 ---
 
@@ -240,7 +240,7 @@ describe('ConversationService', () => {
 });
 ```
 
-📚 **For detailed testing**: See `.docs/agents/05-TESTING-INSTRUCTIONS.md`
+📚 **For detailed testing**: See `.docs/04-qa-and-testing.md` and `tests/README.md`
 
 ---
 
@@ -286,7 +286,7 @@ describe('ConversationService', () => {
 - [ ] SQL queries use Drizzle (no raw SQL)
 - [ ] Error messages are generic (no info leakage)
 
-📚 **For detailed security**: See `.docs/agents/06-SECURITY-GUIDELINES.md`
+📚 **For detailed security**: See `.docs/01-product-specification.md` (security + RBAC) and `.docs/adr/`
 
 ---
 
@@ -312,7 +312,7 @@ describe('ConversationService', () => {
 - [ ] `.docs/` files updated
 - [ ] ADR referenced (if architectural change)
 
-📚 **For detailed workflow**: See `.docs/agents/07-DEVELOPMENT-WORKFLOW.md`
+📚 **For detailed workflow**: See `../../AGENTS.md`
 
 ---
 
@@ -340,7 +340,7 @@ describe('ConversationService', () => {
 - `src/infrastructure/queue.client.ts` — BullMQ setup
 - `src/workers/` — Job processors
 
-📚 **For detailed patterns**: See `.docs/agents/08-KEY-PATTERNS.md`
+📚 **For detailed patterns**: See `DEVELOPER-AGENT-SYSTEM-PROMPT.md`
 
 ---
 
@@ -365,7 +365,7 @@ describe('ConversationService', () => {
 3. Register in `index.ts`
 4. Write tests
 
-📚 **For detailed task guides**: See `.docs/agents/09-COMMON-TASKS.md`
+📚 **For detailed task guides**: See `../../AGENTS.md` and `.docs/06-tasks.md`
 
 ---
 
@@ -373,16 +373,12 @@ describe('ConversationService', () => {
 
 | Topic | Location | Purpose |
 |-------|----------|---------|
-| **Project Overview** | `.docs/agents/01-PROJECT-OVERVIEW.md` | Detailed project context, goals, architecture |
-| **Build Commands** | `.docs/agents/02-BUILD-COMMANDS.md` | All build, test, debug, deploy commands |
-| **Folder Structure** | `.docs/agents/03-FOLDER-STRUCTURE.md` | Detailed folder organization & examples |
-| **Code Style** | `.docs/agents/04-CODE-STYLE-GUIDELINES.md` | Naming, formatting, patterns, examples |
-| **Testing** | `.docs/agents/05-TESTING-INSTRUCTIONS.md` | Mocking, fixtures, integration tests |
-| **Security** | `.docs/agents/06-SECURITY-GUIDELINES.md` | Validation, auth, secrets, logging |
-| **Workflow** | `.docs/agents/07-DEVELOPMENT-WORKFLOW.md` | Git flow, PR process, collaboration |
-| **Patterns** | `.docs/agents/08-KEY-PATTERNS.md` | Real-world code examples |
-| **Tasks** | `.docs/agents/09-COMMON-TASKS.md` | Step-by-step task guides |
-| **System Prompt** | `DEVELOPER-AGENT-SYSTEM-PROMPT.md` | 10 code patterns + 11 boilerplate patterns |
+| **Project Overview** | `.docs/03-implementation-guide.md` | Architecture + technical decisions |
+| **API Contract** | `.docs/02-api-and-data-model.md` | Endpoints + schemas |
+| **Product Scope** | `.docs/01-product-specification.md` | Features + acceptance criteria |
+| **Testing Strategy** | `.docs/04-qa-and-testing.md` | Test plan + regression suite |
+| **Task/Issue Map** | `.docs/06-tasks.md` | Task IDs ↔ GitHub issues |
+| **Backend Patterns** | `DEVELOPER-AGENT-SYSTEM-PROMPT.md` | Coding patterns + anti-patterns |
 
 ---
 
@@ -395,10 +391,7 @@ describe('ConversationService', () => {
 - 6 critical rules (non-negotiable)
 - Pre-commit checklist
 
-**Secondary Reference**: `.docs/agents/` (detailed guides)
-- Use for deep dives on specific topics
-- Reference when patterns need clarification
-- Examples for implementation details
+**Secondary Reference**: `DEVELOPER-AGENT-SYSTEM-PROMPT.md`
 
 ---
 
@@ -422,7 +415,7 @@ describe('ConversationService', () => {
 - **Database schema** → Ask architect
 - **Testing strategy** → Ask QA
 - **Code style questions** → See DEVELOPER-AGENT-SYSTEM-PROMPT.md
-- **Security concerns** → See `.docs/agents/06-SECURITY-GUIDELINES.md`
+- **Security concerns** → See `.docs/adr/` and `.docs/01-product-specification.md`
 
 ---
 
@@ -442,4 +435,4 @@ describe('ConversationService', () => {
 **Last Updated**: January 29, 2026  
 **Maintained By**: Enterprise Architect  
 **Status**: Active  
-**Related**: DEVELOPER-AGENT-SYSTEM-PROMPT.md, `.docs/agents/` guides
+**Related**: `DEVELOPER-AGENT-SYSTEM-PROMPT.md`, `../../AGENTS.md`
