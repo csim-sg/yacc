@@ -36,6 +36,23 @@ interface QueuedMessage {
 
 const MESSAGE_QUEUE_MAX_SIZE = 1000;
 const CONNECT_TIMEOUT_MS = 30000;
+const MAX_MESSAGE_LENGTH = 400; // IRC limit is 512 total, leave room for protocol overhead
+
+/**
+ * Sanitize message for IRC transmission
+ * Prevents CRLF injection and excessive length
+ */
+function sanitizeMessage(message: string): string {
+  // Remove CRLF characters that could break IRC protocol
+  let sanitized = message.replace(/[\r\n]/g, ' ');
+  
+  // Truncate if too long
+  if (sanitized.length > MAX_MESSAGE_LENGTH) {
+    sanitized = sanitized.substring(0, MAX_MESSAGE_LENGTH);
+  }
+  
+  return sanitized;
+}
 
 export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
   private client: IRCClient | null = null;
@@ -290,7 +307,17 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
     this.reconnectAttempts++;
     this.reconnectTimeoutId = setTimeout(() => {
       this.reconnectTimeoutId = null;
-      this.connect();
+      this.connect().catch((err) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        logger.error(
+          {
+            platform: 'irc',
+            correlationId: this.correlationId,
+            error: errMsg,
+          },
+          'Error during scheduled reconnect'
+        );
+      });
     }, backoffMs);
   }
 
@@ -531,8 +558,12 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         throw new Error('IRC client not initialized');
       }
 
-      // Send the message to the channel
-      this.client.raw(`PRIVMSG ${channel} :${request.body}`);
+      // Sanitize message to prevent CRLF injection and length violations
+      const sanitizedMessage = sanitizeMessage(request.body);
+      
+      // Use say() instead of raw() for safer message transmission
+      // say() handles the IRC protocol details and prevents injection
+      this.client.say(channel, sanitizedMessage);
 
       const platformMessageId = `irc-${Date.now()}`;
 
@@ -668,8 +699,11 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
           throw new Error('IRC client not initialized');
         }
 
-        // Send queued message
-        this.client.raw(`PRIVMSG ${channel} :${message}`);
+        // Sanitize message to prevent CRLF injection
+        const sanitizedMessage = sanitizeMessage(message);
+        
+        // Use say() for safer transmission instead of raw()
+        this.client.say(channel, sanitizedMessage);
         logger.debug(
           { channel, platform: 'irc', correlationId: queueCorrelationId },
           'Queued message sent to IRC channel'
