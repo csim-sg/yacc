@@ -194,9 +194,10 @@ function sanitizeMessage(message: string): string {
 
 **Conditions for Merge**:
 1. Split PR into 2 separate pull requests:
-   - INT-001 code-only PR (connector files + types + tests)
-   - Separate docs/governance PR (ADR/GOV changes)
-2. Include ADR documenting `irc-framework` library choice
+   - INT-001 code-only PR (connector files + types + tests) ✅ **DONE** (merged)
+   - Separate docs/governance PR (planning + completion summary) ⏳ **IN PROGRESS**
+
+**Note on ADR**: IRC integration is already scope-approved by ADR-003 (Phase 1: Telegram + IRC). The `irc-framework` library choice is a tactical implementation detail (not a strategic decision) that doesn't require a separate ADR. The architecture decisions are documented in this completion summary.
 
 ---
 
