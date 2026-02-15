@@ -1,6 +1,7 @@
 /**
  * Type declarations for irc-framework library
  * Provides minimal TypeScript types for IRC client operations
+ * Ref: https://github.com/kiwiirc/irc-framework/blob/master/docs/clientapi.md
  */
 
 declare module 'irc-framework' {
@@ -21,34 +22,35 @@ declare module 'irc-framework' {
     [key: string]: unknown;
   }
 
-  interface IRCMessage {
+  interface IRCMessageEvent {
     nick: string;
     ident: string;
     hostname: string;
     target: string;
-    text: string;
+    message: string;
     time?: Date;
     type?: string;
-    channel?: string;
-    message?: string;
+    reply(message: string): void;
   }
 
-  class IRC extends EventEmitter {
-    constructor(options: IRCClientOptions);
-    connect(): Promise<void>;
+  class Client extends EventEmitter {
+    constructor();
+    connect(options: IRCClientOptions): Promise<void>;
     disconnect(message?: string, fn?: () => void): void;
     quit(message?: string): void;
+    say(target: string, message: string): void;
     raw(rawString: string): void;
+    join(channel: string): void;
     on(event: string, handler: (data: unknown) => void): this;
     on(event: 'registered', handler: () => void): this;
-    on(event: 'message', handler: (message: IRCMessage) => void): this;
+    on(event: 'message', handler: (message: IRCMessageEvent) => void): this;
     on(event: 'error', handler: (error: Error) => void): this;
     on(event: 'socket close', handler: () => void): this;
     on(event: 'close', handler: () => void): this;
-    on(event: 'quit', handler: (message: IRCMessage) => void): this;
-    on(event: 'join', handler: (message: IRCMessage) => void): this;
-    on(event: 'part', handler: (message: IRCMessage) => void): this;
+    on(event: 'quit', handler: (message: IRCMessageEvent) => void): this;
+    on(event: 'join', handler: (message: IRCMessageEvent) => void): this;
+    on(event: 'part', handler: (message: IRCMessageEvent) => void): this;
   }
 
-  export default IRC;
+  export { Client };
 }

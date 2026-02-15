@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { BaseConnector } from './base/baseConnector';
 import { logger } from '../infrastructure/logger';
 import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
@@ -5,7 +6,7 @@ import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse
 import type { ValidationError } from '@yacc/common/types/validationError.interface';
 import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
 import type { IRCFrameworkMessage, IRCFrameworkError } from '../types/ircMessage.type';
-import IRC from 'irc-framework';
+import { Client as IRCClient } from 'irc-framework';
 
 /**
  * IRC Connector
@@ -28,9 +29,11 @@ type IRCConfig = ConnectorConfig<'irc'> & {
 };
 
 export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
-  private client: IRC | null = null;
+  private client: IRCClient | null = null;
   private messageQueue: Array<{ channel: string; message: string }> = [];
   private isConnecting: boolean = false;
+  private reconnectTimeoutId: NodeJS.Timeout | null = null;
+  private correlationId: string = '';
 
   constructor() {
     super('irc');
@@ -45,8 +48,14 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         throw new Error('Configuration not set. Call setConfig first.');
       }
 
+      // Generate correlation ID for this connection attempt
+      this.correlationId = randomUUID();
+
       if (this.isConnecting) {
-        logger.warn({ platform: 'irc' }, 'Connection already in progress');
+        logger.warn(
+          { platform: 'irc', correlationId: this.correlationId },
+          'Connection already in progress'
+        );
         return;
       }
 
@@ -56,6 +65,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       logger.info(
         {
           platform: 'irc',
+          correlationId: this.correlationId,
           server: this.config.server,
           port: this.config.port,
           nick: this.config.nick,
@@ -70,30 +80,28 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       }
 
       // Create IRC client instance
-      this.client = new IRC({
+      this.client = new IRCClient();
+
+      // Set up event handlers BEFORE connecting
+      this.setupClientEventHandlers();
+
+      // Connect to IRC server with options
+      await this.client.connect({
         host: this.config.server,
         port: this.config.port,
         nick: this.config.nick,
         username: this.config.nick,
         realname: this.config.nick,
         password: this.config.password,
-        auto_reconnect: true,
-        auto_reconnect_max_retries: this.maxReconnectAttempts,
-        auto_reconnect_wait: 4000,
-        channel_list_batch_size: 50,
+        auto_reconnect: false, // We manage reconnect ourselves
         ping_interval: 60,
       });
-
-      // Set up event handlers
-      this.setupClientEventHandlers();
-
-      // Connect to IRC server
-      await this.client.connect();
 
       this.isConnecting = false;
       logger.info(
         {
           platform: 'irc',
+          correlationId: this.correlationId,
           server: this.config.server,
           channels: this.config.channels,
         },
@@ -111,6 +119,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         {
           error: errorMessage,
           platform: 'irc',
+          correlationId: this.correlationId,
           server: this.config?.server,
         },
         'Failed to connect to IRC server'
@@ -122,6 +131,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         logger.info(
           {
             platform: 'irc',
+            correlationId: this.correlationId,
             attempt: this.reconnectAttempts + 1,
             backoffMs,
           },
@@ -129,7 +139,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         );
 
         this.reconnectAttempts++;
-        setTimeout(() => this.connect(), backoffMs);
+        this.reconnectTimeoutId = setTimeout(() => this.connect(), backoffMs);
       }
 
       throw error;
@@ -144,39 +154,48 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
 
     // Handle successful connection
     this.client.on('registered', () => {
-      logger.info({ platform: 'irc' }, 'IRC client registered with server');
+      logger.info(
+        { platform: 'irc', correlationId: this.correlationId },
+        'IRC client registered with server'
+      );
       this.setStatus('connected');
       this.reconnectAttempts = 0;
 
       // Join channels after registration
       if (this.config?.channels) {
         for (const channel of this.config.channels) {
+          logger.debug(
+            { platform: 'irc', correlationId: this.correlationId, channel },
+            'Joining IRC channel'
+          );
           this.client?.raw(`JOIN ${channel}`);
         }
       }
     });
 
-    // Handle incoming messages
-    this.client.on('message', (message: IRCFrameworkMessage) => {
+    // Handle incoming messages (use correct field name 'message' not 'text')
+    this.client.on('message', (evt: any) => {
       logger.debug(
         {
           platform: 'irc',
-          nick: message.nick,
-          channel: message.target,
-          text: message.text,
+          correlationId: this.correlationId,
+          nick: evt.nick,
+          channel: evt.target,
+          messageLength: evt.message?.length || 0,
         },
         'Received IRC message'
       );
-      this.emit('message', message);
+      this.emit('message', evt);
     });
 
     // Handle connection errors
-    this.client.on('error', (error: IRCFrameworkError) => {
+    this.client.on('error', (error: any) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(
         {
           error: errorMessage,
           platform: 'irc',
+          correlationId: this.correlationId,
         },
         'IRC client error'
       );
@@ -185,47 +204,56 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
 
     // Handle disconnection
     this.client.on('socket close', () => {
-      logger.warn({ platform: 'irc' }, 'IRC socket closed');
+      logger.warn(
+        { platform: 'irc', correlationId: this.correlationId },
+        'IRC socket closed'
+      );
       this.setStatus('disconnected');
     });
 
     // Handle connection closure
     this.client.on('close', () => {
-      logger.info({ platform: 'irc' }, 'IRC connection closed');
+      logger.info(
+        { platform: 'irc', correlationId: this.correlationId },
+        'IRC connection closed'
+      );
       this.setStatus('disconnected');
     });
 
     // Handle quit event
-    this.client.on('quit', (message: IRCFrameworkMessage) => {
+    this.client.on('quit', (evt: any) => {
       logger.info(
         {
           platform: 'irc',
-          nick: message.nick,
-          message: message.text,
+          correlationId: this.correlationId,
+          nick: evt.nick,
+          message: evt.message,
         },
         'IRC user quit'
       );
     });
 
     // Handle join event
-    this.client.on('join', (message: IRCFrameworkMessage) => {
+    this.client.on('join', (evt: any) => {
       logger.debug(
         {
           platform: 'irc',
-          nick: message.nick,
-          channel: message.target,
+          correlationId: this.correlationId,
+          nick: evt.nick,
+          channel: evt.target,
         },
         'User joined IRC channel'
       );
     });
 
     // Handle part event
-    this.client.on('part', (message: IRCFrameworkMessage) => {
+    this.client.on('part', (evt: any) => {
       logger.debug(
         {
           platform: 'irc',
-          nick: message.nick,
-          channel: message.target,
+          correlationId: this.correlationId,
+          nick: evt.nick,
+          channel: evt.target,
         },
         'User left IRC channel'
       );
@@ -237,7 +265,20 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
    */
   async disconnect(): Promise<void> {
     try {
-      logger.info({ platform: 'irc' }, 'Disconnecting from IRC server');
+      logger.info(
+        { platform: 'irc', correlationId: this.correlationId },
+        'Disconnecting from IRC server'
+      );
+
+      // Clear pending reconnect timeout if any
+      if (this.reconnectTimeoutId) {
+        clearTimeout(this.reconnectTimeoutId);
+        this.reconnectTimeoutId = null;
+        logger.debug(
+          { platform: 'irc', correlationId: this.correlationId },
+          'Cleared pending reconnect timeout'
+        );
+      }
 
       if (this.client) {
         this.client.quit('YACC shutting down');
@@ -248,10 +289,14 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       this.setStatus('disconnected');
       await this.destroy();
 
-      logger.info({ platform: 'irc' }, 'Successfully disconnected from IRC');
+      logger.info(
+        { platform: 'irc', correlationId: this.correlationId },
+        'Successfully disconnected from IRC'
+      );
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(
-        { error, platform: 'irc' },
+        { error: errorMessage, platform: 'irc', correlationId: this.correlationId },
         'Error during IRC disconnection'
       );
       throw error;
@@ -262,6 +307,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
    * Send message to IRC channel
    */
   async sendMessage(request: SendMessageRequest): Promise<SendMessageResponse> {
+    const messageCorrelationId = randomUUID();
     try {
       if (!this.config) {
         throw new Error('Configuration not set');
@@ -276,8 +322,10 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       logger.debug(
         {
           conversationId: request.conversationId,
+          messageId: request.messageId,
           channel,
           platform: 'irc',
+          correlationId: messageCorrelationId,
         },
         'Sending message to IRC channel'
       );
@@ -287,8 +335,10 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         logger.info(
           {
             conversationId: request.conversationId,
+            messageId: request.messageId,
             channel,
             platform: 'irc',
+            correlationId: messageCorrelationId,
           },
           'IRC not connected, queueing message'
         );
@@ -301,8 +351,9 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         // Try to reconnect
         if (this.connectionStatus === 'disconnected') {
           this.connect().catch((err) => {
+            const errMsg = err instanceof Error ? err.message : String(err);
             logger.error(
-              { error: err, platform: 'irc' },
+              { error: errMsg, platform: 'irc', correlationId: messageCorrelationId },
               'Failed to reconnect after message queue'
             );
           });
@@ -323,21 +374,23 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       // Send the message to the channel
       this.client.raw(`PRIVMSG ${channel} :${request.body}`);
 
-      const messageId = `irc-${Date.now()}`;
+      const platformMessageId = `irc-${Date.now()}`;
 
       logger.info(
         {
           conversationId: request.conversationId,
+          messageId: request.messageId,
           channel,
-          messageId,
+          platformMessageId,
           platform: 'irc',
+          correlationId: messageCorrelationId,
         },
         'Message sent successfully to IRC channel'
       );
 
       return {
         success: true,
-        platformMessageId: messageId,
+        platformMessageId,
         sentAt: new Date().toISOString(),
       };
     } catch (error) {
@@ -347,7 +400,9 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         {
           error: errorMessage,
           conversationId: request.conversationId,
+          messageId: request.messageId,
           platform: 'irc',
+          correlationId: messageCorrelationId,
         },
         'Error sending message to IRC'
       );
@@ -434,9 +489,11 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       return;
     }
 
+    const queueCorrelationId = randomUUID();
     logger.info(
       {
         platform: 'irc',
+        correlationId: queueCorrelationId,
         queuedMessages: this.messageQueue.length,
       },
       'Processing queued IRC messages'
@@ -454,15 +511,17 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         // Send queued message
         this.client.raw(`PRIVMSG ${channel} :${message}`);
         logger.debug(
-          { channel, platform: 'irc' },
+          { channel, platform: 'irc', correlationId: queueCorrelationId },
           'Queued message sent to IRC channel'
         );
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         logger.error(
           {
-            error,
+            error: errorMessage,
             channel,
             platform: 'irc',
+            correlationId: queueCorrelationId,
           },
           'Error sending queued message'
         );
