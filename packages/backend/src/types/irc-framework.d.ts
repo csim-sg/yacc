@@ -1,7 +1,9 @@
 /**
  * Type declarations for irc-framework library
  * Provides minimal TypeScript types for IRC client operations
- * Ref: https://github.com/kiwiirc/irc-framework/blob/master/docs/clientapi.md
+ * NOTE: connect() is synchronous and returns void (undefined)
+ * Connection is event-driven: listen for 'registered' for successful connection
+ * Ref: https://github.com/kiwiirc/irc-framework
  */
 
 declare module 'irc-framework' {
@@ -13,6 +15,7 @@ declare module 'irc-framework' {
     nick: string;
     username?: string;
     realname?: string;
+    gecos?: string;
     password?: string;
     auto_reconnect?: boolean;
     auto_reconnect_max_retries?: number;
@@ -30,21 +33,28 @@ declare module 'irc-framework' {
     message: string;
     time?: Date;
     type?: string;
-    reply(message: string): void;
+    reply?(message: string): void;
+  }
+
+  interface IRCErrorEvent extends Error {
+    message: string;
   }
 
   class Client extends EventEmitter {
     constructor();
-    connect(options: IRCClientOptions): Promise<void>;
+    // connect() is synchronous and returns undefined
+    // Connection success is indicated by 'registered' event
+    // Connection failure is indicated by 'error' or 'close' event
+    connect(options: IRCClientOptions): void;
     disconnect(message?: string, fn?: () => void): void;
     quit(message?: string): void;
     say(target: string, message: string): void;
     raw(rawString: string): void;
     join(channel: string): void;
-    on(event: string, handler: (data: unknown) => void): this;
+    on(event: string, handler: (...args: unknown[]) => void): this;
     on(event: 'registered', handler: () => void): this;
     on(event: 'message', handler: (message: IRCMessageEvent) => void): this;
-    on(event: 'error', handler: (error: Error) => void): this;
+    on(event: 'error', handler: (error: IRCErrorEvent) => void): this;
     on(event: 'socket close', handler: () => void): this;
     on(event: 'close', handler: () => void): this;
     on(event: 'quit', handler: (message: IRCMessageEvent) => void): this;
@@ -52,5 +62,5 @@ declare module 'irc-framework' {
     on(event: 'part', handler: (message: IRCMessageEvent) => void): this;
   }
 
-  export { Client };
+  export { Client, IRCMessageEvent, IRCErrorEvent };
 }

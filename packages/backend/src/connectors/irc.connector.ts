@@ -5,19 +5,19 @@ import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.i
 import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse.interface';
 import type { ValidationError } from '@yacc/common/types/validationError.interface';
 import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
-import type { IRCFrameworkMessage, IRCFrameworkError } from '../types/ircMessage.type';
 import { Client as IRCClient } from 'irc-framework';
+import type { IRCMessageEvent, IRCErrorEvent } from 'irc-framework';
 
 /**
  * IRC Connector
  *
  * Handles all communication with IRC networks using irc-framework library.
  * Supports:
- * - Real IRC server connections
+ * - Real IRC server connections with proper handshake
  * - Sending and receiving messages
  * - Channel management
- * - Connection management with auto-reconnect
- * - Error handling and retry logic
+ * - Event-driven reconnection with exponential backoff
+ * - Message queue with capacity limits
  */
 
 type IRCConfig = ConnectorConfig<'irc'> & {
@@ -28,11 +28,21 @@ type IRCConfig = ConnectorConfig<'irc'> & {
   channels: string[];
 };
 
+// Message queue with hard capacity limit
+interface QueuedMessage {
+  channel: string;
+  message: string;
+}
+
+const MESSAGE_QUEUE_MAX_SIZE = 1000;
+const CONNECT_TIMEOUT_MS = 30000;
+
 export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
   private client: IRCClient | null = null;
-  private messageQueue: Array<{ channel: string; message: string }> = [];
+  private messageQueue: QueuedMessage[] = [];
   private isConnecting: boolean = false;
   private reconnectTimeoutId: NodeJS.Timeout | null = null;
+  private connectTimeoutId: NodeJS.Timeout | null = null;
   private correlationId: string = '';
 
   constructor() {
@@ -40,39 +50,41 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
   }
 
   /**
-   * Connect to IRC server
+   * Connect to IRC server with proper handshake
+   * Waits for 'registered' event (connection complete)
+   * or times out/fails on error/close events
    */
   async connect(): Promise<void> {
-    try {
-      if (!this.config) {
-        throw new Error('Configuration not set. Call setConfig first.');
-      }
+    if (!this.config) {
+      throw new Error('Configuration not set. Call setConfig first.');
+    }
 
-      // Generate correlation ID for this connection attempt
-      this.correlationId = randomUUID();
+    // Generate correlation ID for this connection attempt
+    this.correlationId = randomUUID();
 
-      if (this.isConnecting) {
-        logger.warn(
-          { platform: 'irc', correlationId: this.correlationId },
-          'Connection already in progress'
-        );
-        return;
-      }
-
-      this.isConnecting = true;
-      this.setStatus('reconnecting');
-
-      logger.info(
-        {
-          platform: 'irc',
-          correlationId: this.correlationId,
-          server: this.config.server,
-          port: this.config.port,
-          nick: this.config.nick,
-        },
-        'Connecting to IRC server...'
+    if (this.isConnecting) {
+      logger.warn(
+        { platform: 'irc', correlationId: this.correlationId },
+        'Connection already in progress'
       );
+      return;
+    }
 
+    this.isConnecting = true;
+    this.setStatus('reconnecting');
+
+    logger.info(
+      {
+        platform: 'irc',
+        correlationId: this.correlationId,
+        server: this.config.server,
+        port: this.config.port,
+        nick: this.config.nick,
+      },
+      'Connecting to IRC server...'
+    );
+
+    try {
       // Validate connection parameters first
       const validationErrors = await this.validatePlatformConfig(this.config);
       if (validationErrors.length > 0) {
@@ -82,20 +94,9 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       // Create IRC client instance
       this.client = new IRCClient();
 
-      // Set up event handlers BEFORE connecting
-      this.setupClientEventHandlers();
-
-      // Connect to IRC server with options
-      await this.client.connect({
-        host: this.config.server,
-        port: this.config.port,
-        nick: this.config.nick,
-        username: this.config.nick,
-        realname: this.config.nick,
-        password: this.config.password,
-        auto_reconnect: false, // We manage reconnect ourselves
-        ping_interval: 60,
-      });
+      // Implement handshake with proper Promise wrapping
+      // connect() is synchronous but we need to wait for 'registered' event
+      await this.performHandshake();
 
       this.isConnecting = false;
       logger.info(
@@ -125,71 +126,175 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         'Failed to connect to IRC server'
       );
 
-      // Implement exponential backoff for reconnection
-      if (this.reconnectAttempts < this.maxReconnectAttempts) {
-        const backoffMs = this.reconnectBackoffMs[this.reconnectAttempts] || 30000;
-        logger.info(
-          {
-            platform: 'irc',
-            correlationId: this.correlationId,
-            attempt: this.reconnectAttempts + 1,
-            backoffMs,
-          },
-          'Scheduling IRC reconnection'
-        );
-
-        this.reconnectAttempts++;
-        this.reconnectTimeoutId = setTimeout(() => this.connect(), backoffMs);
-      }
-
+      // Schedule reconnection with exponential backoff
+      this.scheduleReconnect();
       throw error;
     }
   }
 
   /**
-   * Set up IRC client event handlers
+   * Perform IRC handshake: wait for 'registered' event
+   * Returns a Promise that resolves on 'registered' or rejects on error/close/timeout
+   */
+  private performHandshake(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.client) {
+        return reject(new Error('IRC client not initialized'));
+      }
+
+      const client = this.client;
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('Connection timeout: did not receive registered event'));
+      }, CONNECT_TIMEOUT_MS);
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        client.removeListener('registered', onRegistered);
+        client.removeListener('error', onError);
+        client.removeListener('close', onClose);
+        client.removeListener('socket close', onSocketClose);
+      };
+
+      const onRegistered = () => {
+        logger.debug(
+          { platform: 'irc', correlationId: this.correlationId },
+          'IRC registered event received'
+        );
+        cleanup();
+        // Join channels after successful registration
+        if (this.config?.channels) {
+          for (const channel of this.config.channels) {
+            logger.debug(
+              { platform: 'irc', correlationId: this.correlationId, channel },
+              'Joining IRC channel'
+            );
+            client.join(channel);
+          }
+        }
+        resolve();
+      };
+
+      const onError = (error: IRCErrorEvent) => {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        logger.error(
+          {
+            error: errorMsg,
+            platform: 'irc',
+            correlationId: this.correlationId,
+          },
+          'IRC client error during handshake'
+        );
+        cleanup();
+        reject(error);
+      };
+
+      const onClose = () => {
+        logger.warn(
+          { platform: 'irc', correlationId: this.correlationId },
+          'IRC connection closed during handshake'
+        );
+        cleanup();
+        reject(new Error('Connection closed by server'));
+      };
+
+      const onSocketClose = () => {
+        logger.warn(
+          { platform: 'irc', correlationId: this.correlationId },
+          'IRC socket closed during handshake'
+        );
+        cleanup();
+        reject(new Error('Socket closed'));
+      };
+
+      // Register handlers for connection lifecycle
+      client.on('registered', onRegistered);
+      client.on('error', onError);
+      client.on('close', onClose);
+      client.on('socket close', onSocketClose);
+
+      // Now initiate the actual connection
+      // Note: connect() is synchronous and returns undefined
+      try {
+        const config = this.config;
+        if (!config) {
+          cleanup();
+          return reject(new Error('Configuration lost'));
+        }
+        client.connect({
+          host: config.server,
+          port: config.port,
+          nick: config.nick,
+          username: config.nick,
+          gecos: config.nick,
+          password: config.password,
+          auto_reconnect: false, // We manage reconnect ourselves
+          ping_interval: 60,
+        });
+      } catch (connectError) {
+        cleanup();
+        reject(connectError);
+      }
+    });
+  }
+
+  /**
+   * Schedule reconnection with exponential backoff
+   */
+  private scheduleReconnect(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      logger.error(
+        {
+          platform: 'irc',
+          correlationId: this.correlationId,
+          maxAttempts: this.maxReconnectAttempts,
+        },
+        'Max reconnection attempts reached'
+      );
+      return;
+    }
+
+    const backoffMs = this.reconnectBackoffMs[this.reconnectAttempts] || 30000;
+    logger.info(
+      {
+        platform: 'irc',
+        correlationId: this.correlationId,
+        attempt: this.reconnectAttempts + 1,
+        backoffMs,
+      },
+      'Scheduling IRC reconnection'
+    );
+
+    this.reconnectAttempts++;
+    this.reconnectTimeoutId = setTimeout(() => this.connect(), backoffMs);
+  }
+
+  /**
+   * Set up IRC client event handlers for message events
+   * Note: Connection lifecycle is handled in performHandshake()
    */
   private setupClientEventHandlers(): void {
     if (!this.client) return;
 
-    // Handle successful connection
-    this.client.on('registered', () => {
-      logger.info(
-        { platform: 'irc', correlationId: this.correlationId },
-        'IRC client registered with server'
-      );
-      this.setStatus('connected');
-      this.reconnectAttempts = 0;
+    const client = this.client;
 
-      // Join channels after registration
-      if (this.config?.channels) {
-        for (const channel of this.config.channels) {
-          logger.debug(
-            { platform: 'irc', correlationId: this.correlationId, channel },
-            'Joining IRC channel'
-          );
-          this.client?.raw(`JOIN ${channel}`);
-        }
-      }
-    });
-
-    // Handle incoming messages (use correct field name 'message' not 'text')
-    this.client.on('message', (evt: any) => {
+    // Handle incoming messages
+    client.on('message', (evt: IRCMessageEvent) => {
       logger.debug(
         {
           platform: 'irc',
           correlationId: this.correlationId,
           nick: evt.nick,
           channel: evt.target,
-          messageLength: evt.message?.length || 0,
+          messageLength: evt.message.length,
         },
         'Received IRC message'
       );
       this.emit('message', evt);
     });
 
-    // Handle connection errors
-    this.client.on('error', (error: any) => {
+    // Handle mid-connection errors (not connection errors which are handled in handshake)
+    client.on('error', (error: IRCErrorEvent) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(
         {
@@ -200,28 +305,39 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         'IRC client error'
       );
       this.setStatus('error', errorMessage);
+      // Trigger reconnect for errors after successful connection
+      if (this.connectionStatus === 'connected') {
+        this.setStatus('disconnected');
+        this.scheduleReconnect();
+      }
     });
 
-    // Handle disconnection
-    this.client.on('socket close', () => {
+    // Handle socket close (disconnection during operation)
+    client.on('socket close', () => {
       logger.warn(
         { platform: 'irc', correlationId: this.correlationId },
         'IRC socket closed'
       );
       this.setStatus('disconnected');
+      if (this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.scheduleReconnect();
+      }
     });
 
-    // Handle connection closure
-    this.client.on('close', () => {
+    // Handle connection closure (disconnection during operation)
+    client.on('close', () => {
       logger.info(
         { platform: 'irc', correlationId: this.correlationId },
         'IRC connection closed'
       );
       this.setStatus('disconnected');
+      if (this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.scheduleReconnect();
+      }
     });
 
     // Handle quit event
-    this.client.on('quit', (evt: any) => {
+    client.on('quit', (evt: IRCMessageEvent) => {
       logger.info(
         {
           platform: 'irc',
@@ -234,7 +350,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
     });
 
     // Handle join event
-    this.client.on('join', (evt: any) => {
+    client.on('join', (evt: IRCMessageEvent) => {
       logger.debug(
         {
           platform: 'irc',
@@ -247,7 +363,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
     });
 
     // Handle part event
-    this.client.on('part', (evt: any) => {
+    client.on('part', (evt: IRCMessageEvent) => {
       logger.debug(
         {
           platform: 'irc',
@@ -264,43 +380,40 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
    * Disconnect from IRC server
    */
   async disconnect(): Promise<void> {
-    try {
-      logger.info(
+    logger.info(
+      { platform: 'irc', correlationId: this.correlationId },
+      'Disconnecting from IRC server'
+    );
+
+    // Clear pending reconnect timeout if any
+    if (this.reconnectTimeoutId) {
+      clearTimeout(this.reconnectTimeoutId);
+      this.reconnectTimeoutId = null;
+      logger.debug(
         { platform: 'irc', correlationId: this.correlationId },
-        'Disconnecting from IRC server'
+        'Cleared pending reconnect timeout'
       );
-
-      // Clear pending reconnect timeout if any
-      if (this.reconnectTimeoutId) {
-        clearTimeout(this.reconnectTimeoutId);
-        this.reconnectTimeoutId = null;
-        logger.debug(
-          { platform: 'irc', correlationId: this.correlationId },
-          'Cleared pending reconnect timeout'
-        );
-      }
-
-      if (this.client) {
-        this.client.quit('YACC shutting down');
-        this.client = null;
-      }
-
-      this.messageQueue = [];
-      this.setStatus('disconnected');
-      await this.destroy();
-
-      logger.info(
-        { platform: 'irc', correlationId: this.correlationId },
-        'Successfully disconnected from IRC'
-      );
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(
-        { error: errorMessage, platform: 'irc', correlationId: this.correlationId },
-        'Error during IRC disconnection'
-      );
-      throw error;
     }
+
+    // Clear pending connect timeout if any
+    if (this.connectTimeoutId) {
+      clearTimeout(this.connectTimeoutId);
+      this.connectTimeoutId = null;
+    }
+
+    if (this.client) {
+      this.client.quit('YACC shutting down');
+      this.client = null;
+    }
+
+    this.messageQueue = [];
+    this.setStatus('disconnected');
+    await this.destroy();
+
+    logger.info(
+      { platform: 'irc', correlationId: this.correlationId },
+      'Successfully disconnected from IRC'
+    );
   }
 
   /**
@@ -330,8 +443,29 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         'Sending message to IRC channel'
       );
 
-      // If not connected, queue the message
+      // If not connected, queue the message (with capacity check)
       if (!this.isConnected()) {
+        // Check queue capacity
+        if (this.messageQueue.length >= MESSAGE_QUEUE_MAX_SIZE) {
+          const errorMsg = `Message queue full (max ${MESSAGE_QUEUE_MAX_SIZE}). Message dropped.`;
+          logger.warn(
+            {
+              conversationId: request.conversationId,
+              messageId: request.messageId,
+              channel,
+              platform: 'irc',
+              correlationId: messageCorrelationId,
+              queueSize: this.messageQueue.length,
+            },
+            errorMsg
+          );
+          return {
+            success: false,
+            error: errorMsg,
+            sentAt: new Date().toISOString(),
+          };
+        }
+
         logger.info(
           {
             conversationId: request.conversationId,
@@ -339,6 +473,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
             channel,
             platform: 'irc',
             correlationId: messageCorrelationId,
+            queueSize: this.messageQueue.length + 1,
           },
           'IRC not connected, queueing message'
         );
@@ -348,8 +483,8 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
           message: request.body,
         });
 
-        // Try to reconnect
-        if (this.connectionStatus === 'disconnected') {
+        // Try to reconnect if not already attempting
+        if (this.connectionStatus === 'disconnected' && !this.isConnecting) {
           this.connect().catch((err) => {
             const errMsg = err instanceof Error ? err.message : String(err);
             logger.error(
