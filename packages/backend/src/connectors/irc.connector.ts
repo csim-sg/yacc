@@ -94,6 +94,10 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       // Create IRC client instance
       this.client = new IRCClient();
 
+      // Set up event handlers BEFORE performing handshake
+      // This ensures message events and mid-connection errors are properly handled
+      this.setupClientEventHandlers();
+
       // Implement handshake with proper Promise wrapping
       // connect() is synchronous but we need to wait for 'registered' event
       await this.performHandshake();
@@ -162,6 +166,11 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
           'IRC registered event received'
         );
         cleanup();
+        
+        // Set status to connected BEFORE joining channels
+        this.setStatus('connected');
+        this.reconnectAttempts = 0;
+        
         // Join channels after successful registration
         if (this.config?.channels) {
           for (const channel of this.config.channels) {
@@ -240,8 +249,21 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
 
   /**
    * Schedule reconnection with exponential backoff
+   * Guards against multiple parallel reconnect timeouts
    */
   private scheduleReconnect(): void {
+    // Guard: don't schedule if already scheduled
+    if (this.reconnectTimeoutId) {
+      logger.debug(
+        {
+          platform: 'irc',
+          correlationId: this.correlationId,
+        },
+        'Reconnect already scheduled, ignoring duplicate request'
+      );
+      return;
+    }
+
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       logger.error(
         {
@@ -266,7 +288,10 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
     );
 
     this.reconnectAttempts++;
-    this.reconnectTimeoutId = setTimeout(() => this.connect(), backoffMs);
+    this.reconnectTimeoutId = setTimeout(() => {
+      this.reconnectTimeoutId = null;
+      this.connect();
+    }, backoffMs);
   }
 
   /**
