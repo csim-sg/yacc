@@ -290,25 +290,27 @@ export class IRCIngestionService {
       // Step 7: Trigger routing rules (best-effort, deferred to Phase 2)
       await this.evaluateRoutingRules(conversationId);
 
-      // Step 8: Log ingestion event (best-effort)
-      await auditService.logAction({
-        actorId: undefined, // System actor
-        action: 'message.ingested',
-        entityType: 'message',
-        entityId: message.id,
-        metadata: {
-          conversationId,
-          channel,
-          senderNick: nick,
-          trigger: 'irc_connector',
-        },
-      }).catch((err) => {
-        logger.warn(
-          { messageId: message.id, error: err instanceof Error ? err.message : String(err) },
-          'Failed to log message ingestion audit event'
-        );
-        // Don't throw
-      });
+       // Step 8: Log ingestion event (best-effort)
+       try {
+         await auditService.logAction({
+           actorId: undefined, // System actor
+           action: 'message.ingested',
+           entityType: 'message',
+           entityId: message.id,
+           metadata: {
+             conversationId,
+             channel,
+             senderNick: nick,
+             trigger: 'irc_connector',
+           },
+         });
+       } catch (auditError) {
+         logger.warn(
+           { messageId: message.id, error: auditError instanceof Error ? auditError.message : String(auditError) },
+           'Failed to log message ingestion audit event'
+         );
+         // Don't throw - audit failures shouldn't block ingestion
+       }
 
       logger.info(
         { conversationId, messageId: message.id, channel, nick },
