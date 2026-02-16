@@ -38,6 +38,7 @@
       "description": "Fullstack developer specialist for YACC project. Implements features across backend (Node.js/Express) and frontend (React/TanStack Start) following project standards. Performs impact analysis before starting, delegates to QA after completion, follows detailed PR workflow. Use proactively for feature implementation, bug fixes, and refactoring tasks.",
       "mode": "primary",
       "prompt": "{file:./.opencode/prompts/fullstack-developer.md}",
+      "model": "anthropic/claude-haiku-4-5-20251001",
       "tools": {
         "write": true,
         "edit": true,
@@ -66,7 +67,7 @@
       "description": "Product owner of this project, maintain biz requirement and biz documents. Analyze requirement with users & architect on any new request. Help answer any biz related issues from developers and architect.",
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/product-owner.md}",
-      // "model": "openai/gpt-5.2-codex",
+      "model": "openai/gpt-5.2",
       "tools": {
         "write": true,
         "edit": true,
@@ -95,9 +96,12 @@
         },
         "bash": {
           "rm .docs/*": "allow",
-         "gh *":"allow",
+          "gh *":"allow",
           "gh issue *":"deny",
-          "gh project close *": "deny"
+          "gh project close *": "deny",
+          "rm -Rf /*": "deny",
+          "rm -Rf /": "deny",
+          "*": "allow"
         },
         "github_*": {
           "*": "allow",
@@ -134,12 +138,12 @@
         "read": {
           ".docs/*.md": "allow",
         },
-        "bash": {
-          "rm .docs/*": "allow",
-          "gh *":"allow",
+        "bash": {          
           "gh issue *":"deny",
           "gh project close *": "deny",
-          "*": "ask"
+          "rm -Rf /*": "deny",
+          "rm -Rf /": "deny",
+          "*": "allow"
         },
         "github_*": {
           "*": "allow",
