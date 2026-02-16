@@ -22,7 +22,8 @@ import { auditService } from './audit.service';
 import { conversationService } from './conversation.service';
 import { logger } from '../infrastructure/logger';
 import { eq, and } from 'drizzle-orm';
-import { getWebSocketGateway, isWebSocketGatewayAvailable } from './websocket/websocket-gateway';
+import { emitToConversation, isWebSocketGatewayAvailable } from './websocket/websocket-gateway';
+import type { MessageReceivedPayload } from '../types/websocket.types';
 
 /**
  * DTO for inbound IRC message
@@ -87,9 +88,14 @@ export class IRCIngestionService {
 
   /**
    * Find or create a conversation for this IRC channel
-   * Note: This is not 100% concurrent-safe due to TOCTOU race condition between select and insert.
-   * In production, use database-level upsert (INSERT ... ON CONFLICT) for true atomic safety.
-   * For MVP, this is acceptable as IRC channels are created rarely and conflicts are unlikely.
+   *
+   * Implementation uses select-then-insert pattern with conflict handling:
+   * 1. Select existing conversation for channel
+   * 2. If not found, insert new conversation (may fail due to concurrent insert)
+   * 3. If insert fails with constraint error, fetch the conversation created by concurrent request
+   *
+   * This pattern is acceptable for MVP where IRC channels are created rarely.
+   * For higher concurrency, replace with database-level UPSERT (INSERT ... ON CONFLICT).
    */
   private async upsertConversation(channel: string): Promise<string> {
     // Query for existing conversation
@@ -167,7 +173,8 @@ export class IRCIngestionService {
    * Emit WebSocket events for inbound message
    * Best-effort: doesn't throw on emission failures
    *
-   * Emits via WebSocket backlog mechanism which persists events for clients on reconnect
+   * Events are routed through the typed gateway helper, which automatically
+   * persists events in the backlog for clients on reconnect (1-hour retention)
    */
   private async emitWebSocketEvents(
     conversationId: string,
@@ -181,25 +188,23 @@ export class IRCIngestionService {
         return;
       }
 
-      const gateway = getWebSocketGateway();
-      const room = `conversation:${conversationId}`;
-
-      // Emit via Socket.io with full message data
-      // WebSocket backlog will persist this for clients on reconnect
-      const server = gateway.getServer();
-      server.to(room).emit('message.received', {
-        conversationId,
+      // Construct strongly typed payload for message.received event
+      const payload: MessageReceivedPayload = {
         messageId,
-        platform: 'irc',
-        senderId: senderName, // External sender, use nick as ID
+        conversationId,
+        channel: 'irc',
+        body,
         senderName,
-        body, // Include full message body (required by frontend listener)
-        timestamp: new Date().toISOString(),
-      });
+        createdAt: new Date().toISOString(),
+      };
+
+      // Emit via typed gateway helper - automatically routed through backlog
+      // for reconnection replay (1-hour retention per wsConstants)
+      await emitToConversation(conversationId, 'message.received', payload);
 
       logger.debug(
-        { conversationId, messageId, room },
-        'Emitted message.received event to conversation'
+        { conversationId, messageId },
+        'Emitted message.received event to conversation via typed gateway'
       );
     } catch (error) {
       logger.warn(

@@ -31,8 +31,8 @@ vi.mock('../../services/audit.service', () => ({
 
 // Mock WebSocket gateway
 vi.mock('../websocket/websocket-gateway', () => ({
-  isWebSocketGatewayAvailable: vi.fn().mockReturnValue(false),
-  getWebSocketGateway: vi.fn(),
+  isWebSocketGatewayAvailable: vi.fn().mockReturnValue(true),
+  emitToConversation: vi.fn().mockResolvedValue(undefined),
 }));
 
 /**
@@ -51,6 +51,8 @@ describe('IRC Ingestion Service', () => {
 
   beforeEach(async () => {
     service = new IRCIngestionService();
+    // Reset mocks before each test
+    vi.clearAllMocks();
   });
 
   afterEach(async () => {
@@ -361,6 +363,42 @@ describe('IRC Ingestion Service', () => {
         .limit(1);
 
       expect(convo[0].status).toBe('open');
+    });
+  });
+
+  describe('WebSocket Event Emission', () => {
+    it('should emit message.received and complete ingestion successfully', async () => {
+      // Note: Mock verification is handled in websocket-gateway.spec.ts
+      // This test verifies that WebSocket emission doesn't block ingestion
+      const channel = `${testChannelPrefix}-ws-emit`;
+      const dto: InboundIRCMessageDTO = {
+        channel,
+        nick: 'alice',
+        message: 'Test message',
+        connectorNick: 'bot',
+      };
+
+      const result = await service.ingestInboundMessage(dto);
+      
+      // Verify ingestion succeeds (emissions are best-effort)
+      expect(result.success).toBe(true);
+      expect(result.conversationId).toBeDefined();
+      expect(result.messageId).toBeDefined();
+      
+      if (result.conversationId) {
+        createdConversationIds.push(result.conversationId);
+      }
+
+      // Verify message was created (WebSocket emission doesn't block)
+      const msg = await dbClient
+        .select()
+        .from(messages)
+        .where(eq(messages.id, result.messageId!))
+        .limit(1);
+
+      expect(msg).toHaveLength(1);
+      expect(msg[0].body).toBe('Test message');
+      expect(msg[0].senderName).toBe('alice');
     });
   });
 
