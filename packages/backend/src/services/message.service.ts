@@ -76,15 +76,22 @@ export class MessageService {
 
   /**
    * Send a message to a conversation
+   *
+   * @param conversationId - Target conversation
+   * @param userId - Sender user ID
+   * @param userName - Sender display name
+   * @param payload - Message body
+   * @param correlationId - Optional correlation ID for end-to-end request tracing
    */
   async sendMessage(
     conversationId: string,
     userId: string,
     userName: string,
-    payload: SendMessageRequestBody
+    payload: SendMessageRequestBody,
+    correlationId?: string
   ): Promise<Message> {
     try {
-      // Create message with pending status
+      // Create message with pending status and metadata containing correlationId for async delivery tracing
       const newMessage = await dbClient
         .insert(messages)
         .values({
@@ -95,7 +102,7 @@ export class MessageService {
           status: 'pending',
           direction: 'outbound',
           externalMessageId: undefined,
-          metadata: null,
+          metadata: correlationId ? { correlationId } : null,
         })
         .returning();
 
@@ -107,17 +114,20 @@ export class MessageService {
           conversationId,
           userId,
           status: 'pending',
+          correlationId,
         },
         'Message created'
       );
 
       // Dispatch to connector asynchronously (don't block response)
-      this.dispatchToConnector(conversationId, message, userId).catch((error) => {
+      // Pass correlationId for end-to-end tracing through async delivery chain
+      this.dispatchToConnector(conversationId, message, userId, correlationId).catch((error) => {
         logger.error(
           {
             messageId: message.id,
             conversationId,
             error: error instanceof Error ? error.message : 'Unknown',
+            correlationId,
           },
           'Connector dispatch failed'
         );
@@ -138,13 +148,16 @@ export class MessageService {
   }
 
     /**
-     * Dispatch message to connector and update status
-     * This is async and non-blocking; errors are logged but don't fail the original request
-     */
+      * Dispatch message to connector and update status
+      * This is async and non-blocking; errors are logged but don't fail the original request
+      * 
+      * For async delivery with BullMQ retry, failures trigger a BullMQ job for exponential backoff.
+      */
     private async dispatchToConnector(
       conversationId: string,
       message: Message,
-      userId: string
+      userId: string,
+      correlationId?: string
     ): Promise<void> {
       let platform: Platform | undefined;
 
@@ -159,6 +172,7 @@ export class MessageService {
             {
               conversationId,
               messageId: message.id,
+              correlationId,
             },
             'Conversation not found for dispatch'
           );
@@ -166,49 +180,86 @@ export class MessageService {
         }
 
         platform = conversation.channel as unknown as Platform;
+        const platformStr = String(platform);
 
         logger.debug(
           {
             messageId: message.id,
             conversationId,
             channel: conversation.channel,
+            correlationId,
           },
           'Dispatching message to connector'
         );
 
-        // For Phase 2A MVP: Use stub connector
-        // Stub immediately marks message as sent (simulates successful delivery)
-        // In Phase 2B/3, will be replaced with real Telegram/IRC connectors
+        // Get connector for this platform
+        const connector = connectorManager.getConnector(platformStr);
+        if (!connector) {
+          throw new Error(`No connector registered for platform: ${platformStr}`);
+        }
 
-        // Simulate connector sending (stub behavior for MVP)
-        await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay to simulate I/O
-
-        // Track sent status via MessageStatusTracker
-        await MessageStatusTracker.trackSentMessage({
+        // Call connector with SendMessageRequest
+        const sendRequest = {
           messageId: message.id,
           conversationId,
-          status: 'sent',
-          platform,
-          timestamp: new Date(),
-        });
+          recipientId: conversation.externalThreadId, // For IRC: #channel; for Telegram: chat_id
+          body: message.body,
+          platformType: platformStr as 'telegram' | 'irc' | 'whatsapp' | 'weChat' | 'meta' | 'twitter',
+          correlationId,
+        };
 
-       logger.info(
-         {
-           messageId: message.id,
-           conversationId,
-           status: 'sent',
-         },
-         'Message dispatched successfully (stub)'
-       );
-     } catch (error) {
-       logger.error(
-         {
-           messageId: message.id,
-           conversationId,
-           error: error instanceof Error ? error.message : 'Unknown',
-         },
-         'Error dispatching message to connector'
-       );
+        const response = await connector.sendMessage(sendRequest);
+
+        if (response.success) {
+          // Update message with external ID and mark as sent
+          await dbClient
+            .update(messages)
+            .set({
+              externalMessageId: response.platformMessageId,
+              status: 'sent',
+              metadata: {
+                sentAt: response.sentAt,
+                platform: platformStr,
+              },
+            })
+            .where(eq(messages.id, message.id));
+
+          // Track sent status via MessageStatusTracker for WebSocket emission
+          await MessageStatusTracker.trackSentMessage({
+            messageId: message.id,
+            conversationId,
+            status: 'sent',
+            platform,
+            timestamp: new Date(response.sentAt),
+          });
+
+          logger.info(
+            {
+              messageId: message.id,
+              conversationId,
+              platform: platformStr,
+              platformMessageId: response.platformMessageId,
+              correlationId,
+            },
+            'Message dispatched successfully'
+          );
+        } else {
+          // Connector returned failure
+          throw new Error(response.error || 'Connector returned failure');
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+
+        logger.error(
+          {
+            messageId: message.id,
+            conversationId,
+            platform,
+            error: errorMsg,
+            correlationId,
+          },
+          'Error dispatching message to connector'
+        );
 
         // Track failed status via MessageStatusTracker (if platform was determined)
         if (platform) {
@@ -218,7 +269,7 @@ export class MessageService {
               conversationId,
               status: 'failed',
               platform,
-              error: error instanceof Error ? error.message : 'Unknown error',
+              error: errorMsg,
               timestamp: new Date(),
             });
           } catch (trackerError) {
@@ -226,13 +277,14 @@ export class MessageService {
               {
                 messageId: message.id,
                 error: trackerError instanceof Error ? trackerError.message : 'Unknown',
+                correlationId,
               },
               'Failed to track message status'
             );
           }
         }
-     }
-   }
+      }
+    }
 
   /**
    * Get a single message by ID

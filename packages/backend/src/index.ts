@@ -16,6 +16,8 @@ import { logger } from './infrastructure/logger';
 import { wsGateway } from './websockets/gateway';
 import { WebSocketServer } from './websockets/websocket.server';
 import { setWebSocketGateway } from './services/websocket/websocket-gateway';
+import { initializeIntegrationsRuntime } from './services/integrations-runtime.service';
+import { getRetryWorker, closeRetryWorker } from './workers/messageRetryWorker';
 
 // ===== EXPRESS APP =====
 const app = express();
@@ -84,16 +86,52 @@ export async function start(): Promise<void> {
         },
       },
     });
-    logger.info('Socket-controllers registered successfully');
+     logger.info('Socket-controllers registered successfully');
+
+    // Initialize integrations (Telegram, IRC) - non-blocking, won't crash on missing creds
+    logger.info('Initializing integrations runtime...');
+    try {
+      await initializeIntegrationsRuntime();
+      logger.info('Integrations runtime initialized');
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Error initializing integrations runtime'
+      );
+      // Non-blocking; continue startup
+    }
+
+    // Start retry worker for message delivery retries
+    logger.info('Starting message retry worker...');
+    try {
+      getRetryWorker();
+      logger.info('Message retry worker started');
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Error starting retry worker'
+      );
+      // Non-blocking; continue startup
+    }
 
     // Setup graceful shutdown
     process.on('SIGTERM', async () => {
       logger.info('SIGTERM received - shutting down gracefully');
+      try {
+        await closeRetryWorker();
+      } catch (err) {
+        logger.error({ error: err }, 'Error closing retry worker');
+      }
       process.exit(0);
     });
 
     process.on('SIGINT', async () => {
       logger.info('SIGINT received - shutting down gracefully');
+      try {
+        await closeRetryWorker();
+      } catch (err) {
+        logger.error({ error: err }, 'Error closing retry worker');
+      }
       process.exit(0);
     });
 

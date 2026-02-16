@@ -32,6 +32,7 @@ export const envSchema = z.object({
   IRC_PORT: z.coerce.number().default(6667),
   IRC_USERNAME: z.string().optional(),
   IRC_PASSWORD: z.string().optional(),
+  IRC_CHANNELS: z.string().optional(),
 
   SENDGRID_API_KEY: z.string().optional(),
   SENDGRID_FROM_EMAIL: z.string().email().optional(),

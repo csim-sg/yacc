@@ -855,6 +855,7 @@ IRC_SERVER=irc.example.com
 IRC_PORT=6667
 IRC_USERNAME=botname
 IRC_PASSWORD=bot-password
+IRC_CHANNELS=#support,#general
 
 # Retention
 RAW_PAYLOAD_RETENTION_DAYS=7

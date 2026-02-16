@@ -228,8 +228,14 @@ export class MessageController {
       // Get user's display name
       const userName = await messageService.getUserName(userId);
 
-      // Send message
-      const message = await messageService.sendMessage(conversationId, userId, userName, validationResult.data);
+      // Send message (pass correlationId for tracing through async delivery chain)
+      const message = await messageService.sendMessage(
+        conversationId,
+        userId,
+        userName,
+        validationResult.data,
+        correlationId
+      );
 
       logger.info(
         {

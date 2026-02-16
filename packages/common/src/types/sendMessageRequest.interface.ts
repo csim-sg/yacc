@@ -11,4 +11,6 @@ export interface SendMessageRequest {
   body: string;
   externalThreadId?: string;
   metadata?: Record<string, unknown>;
+  platformType?: 'telegram' | 'irc' | 'whatsapp' | 'weChat' | 'meta' | 'twitter';
+  correlationId?: string; // Request correlation ID for end-to-end tracing
 }

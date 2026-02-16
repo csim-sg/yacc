@@ -199,7 +199,7 @@ INT-013, INT-014 (Tests)
 #### INT-010: Environment Variables
 - **Description**: Load IRC credentials from environment
 - **Deliverables**:
-  - Create IRC configuration in `.env`
+  - Create IRC configuration in `.env` (IRC_SERVER, IRC_PORT, IRC_USERNAME, IRC_PASSWORD, IRC_CHANNELS)
   - Load on application startup
   - Validate required fields
   - Fallback to manual config if not set
@@ -375,4 +375,3 @@ INT-013, INT-014 (Tests)
 **Last Updated**: February 15, 2026  
 **Status**: Ready for Implementation  
 **Owner**: Backend Team
-
