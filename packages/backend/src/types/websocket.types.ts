@@ -36,6 +36,30 @@ export const MessageSentPayloadSchema = z.object({
 export type MessageSentPayload = z.infer<typeof MessageSentPayloadSchema>;
 
 /**
+ * message.received event
+ * Emitted when: inbound message arrives from platform (Telegram, IRC, etc.)
+ */
+export const MessageReceivedPayloadSchema = z.object({
+  messageId: z.string().uuid('Invalid message ID'),
+  conversationId: z.string().uuid('Invalid conversation ID'),
+  platform: z.enum(['telegram', 'irc']).describe('Source platform ("telegram" or "irc")'),
+  senderId: z.string().min(1, 'Sender ID required').describe('Platform sender identifier (e.g., Telegram user ID or IRC nick)'),
+  body: z.string().min(1, 'Message body required'),
+  senderName: z.string().min(1, 'Sender name required'),
+  timestamp: z.string().datetime('Invalid timestamp'),
+  attachments: z
+    .array(
+      z.object({
+        url: z.string().url('Invalid attachment URL'),
+        type: z.string().min(1, 'Attachment type required'),
+        name: z.string().min(1, 'Attachment name required'),
+      })
+    )
+    .optional(),
+});
+export type MessageReceivedPayload = z.infer<typeof MessageReceivedPayloadSchema>;
+
+/**
  * message.failed event
  * Emitted when: message delivery fails (will retry)
  */
@@ -115,6 +139,7 @@ export type ReactionRemovedPayload = z.infer<typeof ReactionRemovedPayloadSchema
  */
 export type WebSocketEventPayload =
   | ConversationUpdatedPayload
+  | MessageReceivedPayload
   | MessageSentPayload
   | MessageFailedPayload
   | TypingStartedPayload
@@ -128,6 +153,7 @@ export type WebSocketEventPayload =
  */
 export type WebSocketEventMap = {
   'conversation.updated': ConversationUpdatedPayload;
+  'message.received': MessageReceivedPayload;
   'message.sent': MessageSentPayload;
   'message.failed': MessageFailedPayload;
   'typing.started': TypingStartedPayload;

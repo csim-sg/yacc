@@ -15,6 +15,13 @@
       "when": 1770622403202,
       "tag": "0001_clumsy_hiroim",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771241075535,
+      "tag": "0002_fix_priority_enum",
+      "breakpoints": true
     }
   ]
 }

@@ -1,30 +1,14 @@
--- Fix conversation_priority enum: change 'medium' to 'normal'
--- This migration ensures all environments (fresh + existing) use correct enum values
--- WARNING: Only drop old enum type if no other dependent objects reference it
-
--- Step 1: Create new enum type with correct values
-CREATE TYPE conversation_priority_new AS ENUM ('low', 'normal', 'high', 'urgent');
-
--- Step 2: Update conversations table to use new enum type
--- This USING clause converts old enum values to new ones
-ALTER TABLE conversations 
-  ALTER COLUMN priority DROP DEFAULT,
-  ALTER COLUMN priority TYPE conversation_priority_new USING 
-    CASE 
-      WHEN priority::text = 'low' THEN 'low'::conversation_priority_new
-      WHEN priority::text = 'medium' THEN 'normal'::conversation_priority_new
-      WHEN priority::text = 'high' THEN 'high'::conversation_priority_new
-      WHEN priority::text = 'urgent' THEN 'urgent'::conversation_priority_new
-      ELSE 'normal'::conversation_priority_new
-    END;
-
--- Step 3: Set default back to 'normal'
-ALTER TABLE conversations 
-  ALTER COLUMN priority SET DEFAULT 'normal'::conversation_priority_new;
-
--- Step 4: Drop old enum type (without CASCADE to prevent accidental deletion of dependent objects)
--- If this fails, check that no other columns or types depend on conversation_priority
-DROP TYPE conversation_priority;
-
--- Step 5: Rename new enum back to original name
-ALTER TYPE conversation_priority_new RENAME TO conversation_priority;
+ALTER TABLE "routing_rules" DROP CONSTRAINT "routing_rules_created_by_id_users_id_fk";
+--> statement-breakpoint
+ALTER TABLE "conversations" ALTER COLUMN "priority" DROP DEFAULT;--> statement-breakpoint
+ALTER TABLE "conversations" ALTER COLUMN "priority" SET DATA TYPE text;--> statement-breakpoint
+DROP TYPE "public"."conversation_priority";--> statement-breakpoint
+CREATE TYPE "public"."conversation_priority" AS ENUM('low', 'normal', 'high', 'urgent');--> statement-breakpoint
+ALTER TABLE "conversations" ALTER COLUMN "priority" SET DATA TYPE "public"."conversation_priority" USING 
+  CASE 
+    WHEN "priority" = 'medium' THEN 'normal'::"public"."conversation_priority"
+    ELSE "priority"::"public"."conversation_priority"
+  END;--> statement-breakpoint
+ALTER TABLE "conversations" ALTER COLUMN "priority" SET DEFAULT 'normal'::"public"."conversation_priority";--> statement-breakpoint
+ALTER TABLE "routing_rules" ADD CONSTRAINT "routing_rules_created_by_id_users_id_fk" FOREIGN KEY ("created_by_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "notifications_dedup_idx" ON "notifications" USING btree ("user_id","conversation_id","type");

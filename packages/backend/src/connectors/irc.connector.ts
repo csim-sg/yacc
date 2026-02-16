@@ -7,6 +7,7 @@ import type { ValidationError } from '@yacc/common/types/validationError.interfa
 import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
 import { Client as IRCClient } from 'irc-framework';
 import type { IRCMessageEvent, IRCErrorEvent } from 'irc-framework';
+import { ircIngestionService } from '../services/irc-ingestion.service';
 
 /**
  * IRC Connector
@@ -342,6 +343,28 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         },
         'Received IRC message'
       );
+
+      // Process inbound message via ingestion service (async, non-blocking)
+      if (this.config) {
+        ircIngestionService.ingestInboundMessage({
+          channel: evt.target,
+          nick: evt.nick,
+          message: evt.message,
+          connectorNick: this.config.nick,
+        }).catch((error) => {
+          logger.error(
+            {
+              platform: 'irc',
+              nick: evt.nick,
+              channel: evt.target,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'Error ingesting IRC message'
+          );
+          // Don't rethrow - ingestion errors shouldn't break connector
+        });
+      }
+
       this.emit('message', evt);
     });
 

@@ -86,18 +86,20 @@ INT-013, INT-014 (Tests)
 
 #### INT-002: Message Ingestion
 - **Description**: Receive inbound IRC messages and store in database
-- **Deliverables**:
-  - Hook IRC `message` event handler
-  - Create conversation if channel doesn't exist
-  - Create message record in database
-  - Emit WebSocket `message.received` event
-  - Apply routing rules
-- **Dependencies**: INT-001, BE-002, BE-008
+- **Deliverables** (Phase 1 MVP):
+  - ✅ Hook IRC `message` event handler
+  - ✅ Create conversation if channel doesn't exist (atomic upsert)
+  - ✅ Create message record in database (via ConversationService.createMessage)
+  - ✅ Emit WebSocket `message.received` event with message body
+  - ✅ Auto-reopen resolved conversations on new inbound message
+  - ✅ Update conversation.lastActivityAt on message receipt
+  - ⏳ Apply routing rules (deferred to Phase 2, BE-008)
+- **Dependencies**: INT-001, BE-002, BE-008 (deferred)
 - **Acceptance Criteria**:
-  - Inbound messages create database records
-  - Conversations created per channel
-  - WebSocket events pushed to frontend
-  - Search index updated
+  - ✅ Inbound messages create database records
+  - ✅ Conversations created per channel with atomic safety
+  - ✅ WebSocket events pushed to frontend
+  - ⏳ Search index updated (Phase 2)
 
 #### INT-003: Message Delivery
 - **Description**: Send outbound messages to IRC
