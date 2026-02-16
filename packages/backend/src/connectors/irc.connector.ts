@@ -495,7 +495,9 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
    * Send message to IRC channel
    */
   async sendMessage(request: SendMessageRequest): Promise<SendMessageResponse> {
-    const messageCorrelationId = randomUUID();
+    // Use request correlationId for tracing if provided, otherwise generate one for this send attempt
+    const traceCorrelationId = request.correlationId || randomUUID();
+
     try {
       if (!this.config) {
         throw new Error('Configuration not set');
@@ -513,65 +515,29 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
           messageId: request.messageId,
           channel,
           platform: 'irc',
-          correlationId: messageCorrelationId,
+          correlationId: traceCorrelationId,
         },
         'Sending message to IRC channel'
       );
 
-      // If not connected, queue the message (with capacity check)
+      // If not connected, fail fast - BullMQ is the only retry mechanism for outbound delivery
+      // This prevents double-send risk from internal connector queue + BullMQ retry queue
       if (!this.isConnected()) {
-        // Check queue capacity
-        if (this.messageQueue.length >= MESSAGE_QUEUE_MAX_SIZE) {
-          const errorMsg = `Message queue full (max ${MESSAGE_QUEUE_MAX_SIZE}). Message dropped.`;
-          logger.warn(
-            {
-              conversationId: request.conversationId,
-              messageId: request.messageId,
-              channel,
-              platform: 'irc',
-              correlationId: messageCorrelationId,
-              queueSize: this.messageQueue.length,
-            },
-            errorMsg
-          );
-          return {
-            success: false,
-            error: errorMsg,
-            sentAt: new Date().toISOString(),
-          };
-        }
-
-        logger.info(
+        const errorMsg = 'IRC not connected. Message will be retried via BullMQ.';
+        logger.warn(
           {
             conversationId: request.conversationId,
             messageId: request.messageId,
             channel,
             platform: 'irc',
-            correlationId: messageCorrelationId,
-            queueSize: this.messageQueue.length + 1,
+            correlationId: traceCorrelationId,
+            connectionStatus: this.connectionStatus,
           },
-          'IRC not connected, queueing message'
+          errorMsg
         );
-
-        this.messageQueue.push({
-          channel,
-          message: request.body,
-        });
-
-        // Try to reconnect if not already attempting
-        if (this.connectionStatus === 'disconnected' && !this.isConnecting) {
-          this.connect().catch((err) => {
-            const errMsg = err instanceof Error ? err.message : String(err);
-            logger.error(
-              { error: errMsg, platform: 'irc', correlationId: messageCorrelationId },
-              'Failed to reconnect after message queue'
-            );
-          });
-        }
-
         return {
           success: false,
-          error: 'IRC not connected, message queued for later delivery',
+          error: errorMsg,
           sentAt: new Date().toISOString(),
         };
       }
@@ -597,7 +563,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
           channel,
           platformMessageId,
           platform: 'irc',
-          correlationId: messageCorrelationId,
+          correlationId: traceCorrelationId,
         },
         'Message sent successfully to IRC channel'
       );
@@ -616,7 +582,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
           conversationId: request.conversationId,
           messageId: request.messageId,
           platform: 'irc',
-          correlationId: messageCorrelationId,
+          correlationId: traceCorrelationId,
         },
         'Error sending message to IRC'
       );

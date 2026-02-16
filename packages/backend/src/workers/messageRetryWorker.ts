@@ -119,6 +119,7 @@ export async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<
   );
 
   let platform: Platform | undefined;
+  let traceCorrelationId: string | undefined;
 
   try {
     // Fetch message from database to get current state
@@ -164,6 +165,13 @@ export async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<
       throw new Error(`No connector registered for platform: ${platformType}`);
     }
 
+    // Use correlationId from payload or fall back to stored value in message.metadata
+    // This ensures correlationId is propagated end-to-end even for retries
+    const messageMetadata = typeof message.metadata === 'object' && message.metadata !== null
+      ? (message.metadata as Record<string, unknown>)
+      : {};
+    traceCorrelationId = correlationId || (messageMetadata.correlationId as string | undefined);
+
     // Call connector to send message
     const sendRequest = {
       messageId,
@@ -171,7 +179,7 @@ export async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<
       recipientId,
       body,
       platformType: platformType as 'telegram' | 'irc' | 'whatsapp' | 'weChat' | 'meta' | 'twitter',
-      correlationId,
+      correlationId: traceCorrelationId,
     };
 
     const response = await connector.sendMessage(sendRequest);
@@ -206,7 +214,7 @@ export async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<
           retryCount,
           platformType,
           platformMessageId: response.platformMessageId,
-          correlationId,
+          correlationId: traceCorrelationId,
         },
         'Message retry succeeded'
       );
@@ -224,7 +232,7 @@ export async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<
         retryCount,
         platformType,
         error: errorMsg,
-        correlationId,
+        correlationId: traceCorrelationId,
       },
       'Retry job failed'
     );

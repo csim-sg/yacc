@@ -76,15 +76,22 @@ export class MessageService {
 
   /**
    * Send a message to a conversation
+   *
+   * @param conversationId - Target conversation
+   * @param userId - Sender user ID
+   * @param userName - Sender display name
+   * @param payload - Message body
+   * @param correlationId - Optional correlation ID for end-to-end request tracing
    */
   async sendMessage(
     conversationId: string,
     userId: string,
     userName: string,
-    payload: SendMessageRequestBody
+    payload: SendMessageRequestBody,
+    correlationId?: string
   ): Promise<Message> {
     try {
-      // Create message with pending status
+      // Create message with pending status and metadata containing correlationId for async delivery tracing
       const newMessage = await dbClient
         .insert(messages)
         .values({
@@ -95,7 +102,7 @@ export class MessageService {
           status: 'pending',
           direction: 'outbound',
           externalMessageId: undefined,
-          metadata: null,
+          metadata: correlationId ? { correlationId } : null,
         })
         .returning();
 
@@ -107,17 +114,20 @@ export class MessageService {
           conversationId,
           userId,
           status: 'pending',
+          correlationId,
         },
         'Message created'
       );
 
       // Dispatch to connector asynchronously (don't block response)
-      this.dispatchToConnector(conversationId, message, userId).catch((error) => {
+      // Pass correlationId for end-to-end tracing through async delivery chain
+      this.dispatchToConnector(conversationId, message, userId, correlationId).catch((error) => {
         logger.error(
           {
             messageId: message.id,
             conversationId,
             error: error instanceof Error ? error.message : 'Unknown',
+            correlationId,
           },
           'Connector dispatch failed'
         );
