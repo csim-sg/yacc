@@ -77,7 +77,7 @@ const isProduction = appConfig.APP_ENV === 'production';
 | **Redis** | REDIS_HOST, REDIS_PORT, REDIS_PASSWORD |
 | **Logging** | LOG_LEVEL, LOG_FORMAT, LOG_FILE_PATH, AUDIT_LOG_PATH |
 | **Email** | SENDGRID_API_KEY, SMTP_HOST, SMTP_PORT (with defaults) |
-| **Integrations** | TELEGRAM_BOT_TOKEN, IRC_SERVER, IRC_PORT |
+| **Integrations** | TELEGRAM_BOT_TOKEN, IRC_SERVER, IRC_PORT, IRC_USERNAME, IRC_PASSWORD, IRC_CHANNELS |
 | **WebSocket** | WS_HEARTBEAT_INTERVAL_SEC, WS_BACKLOG_RETENTION_HOURS |
 
 ---
