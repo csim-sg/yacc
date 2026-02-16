@@ -11,6 +11,7 @@ import { dbClient } from '../infrastructure/db.client.js';
 import { enqueueRetry } from '../infrastructure/queues.client.js';
 import { logger } from '../infrastructure/logger.js';
 import { messages } from '../schemas/message.schema.js';
+import { conversations } from '../schemas/conversation.schema.js';
 import { dlqService } from './dlq.service.js';
 import type { SendMessageJobPayload } from '../types/message-queue.types.js';
 import { MessageEvents } from '../websockets/wsConstants.js';
@@ -330,17 +331,22 @@ class MessageStatusTrackerService {
            return;
          }
 
-         // Create payload for DLQ
-         const dlqPayload: SendMessageJobPayload = {
-           messageId: update.messageId,
-           conversationId: update.conversationId,
-           recipientId: update.conversationId, // Fallback to conversationId
-           body: message.body,
-           direction: message.direction as 'inbound' | 'outbound',
-           platformType: update.platform,
-           retryCount: MAX_ATTEMPTS,
-           lastError: update.error,
-         };
+          // Fetch conversation to get recipient ID for DLQ
+          const dlqConversation = await dbClient.query.conversations.findFirst({
+            where: eq(conversations.id, update.conversationId),
+          });
+
+          // Create payload for DLQ
+          const dlqPayload: SendMessageJobPayload = {
+            messageId: update.messageId,
+            conversationId: update.conversationId,
+            recipientId: dlqConversation?.externalThreadId || update.conversationId, // IRC: #channel, Telegram: chat_id
+            body: message.body,
+            direction: message.direction as 'inbound' | 'outbound',
+            platformType: update.platform,
+            retryCount: MAX_ATTEMPTS,
+            lastError: update.error,
+          };
 
          // Move to DLQ
          await dlqService.moveToDLQ(
@@ -362,32 +368,53 @@ class MessageStatusTrackerService {
          return;
        }
 
-       // Enqueue for retry (if under max attempts)
-       const message = await dbClient.query.messages.findFirst({
-         where: eq(messages.id, update.messageId),
-       });
+        // Enqueue for retry (if under max attempts)
+        const message = await dbClient.query.messages.findFirst({
+          where: eq(messages.id, update.messageId),
+        });
 
-       if (!message) {
-         logger.warn(
-           {
-             messageId: update.messageId,
-           },
-           'Message not found for retry'
-         );
-         return;
-       }
+        if (!message) {
+          logger.warn(
+            {
+              messageId: update.messageId,
+            },
+            'Message not found for retry'
+          );
+          return;
+        }
 
-       // Create retry job payload
-       const retryPayload: SendMessageJobPayload = {
-         messageId: update.messageId,
-         conversationId: update.conversationId,
-         recipientId: update.conversationId, // Fallback to conversationId
-         body: message.body,
-         direction: message.direction as 'inbound' | 'outbound',
-         platformType: update.platform,
-         retryCount: retryCount + 1,
-         lastError: update.error,
-       };
+        // Fetch conversation to get recipient ID (IRC channel name or Telegram chat ID)
+        const conversation = await dbClient.query.conversations.findFirst({
+          where: eq(conversations.id, update.conversationId),
+        });
+
+        if (!conversation?.externalThreadId) {
+          logger.warn(
+            {
+              messageId: update.messageId,
+              conversationId: update.conversationId,
+            },
+            'Conversation external thread ID not found for retry'
+          );
+          return;
+        }
+
+        // Create retry job payload with correct recipient ID (IRC channel or Telegram chat ID)
+        const metadata = typeof message.metadata === 'object' && message.metadata !== null 
+          ? (message.metadata as Record<string, unknown>) 
+          : {};
+        
+        const retryPayload: SendMessageJobPayload = {
+          messageId: update.messageId,
+          conversationId: update.conversationId,
+          recipientId: conversation.externalThreadId, // IRC: #channel, Telegram: chat_id
+          body: message.body,
+          direction: message.direction as 'inbound' | 'outbound',
+          platformType: update.platform,
+          retryCount: retryCount + 1,
+          lastError: update.error,
+          correlationId: metadata.correlationId as string | undefined, // Propagate correlation ID if available
+        };
 
        // Enqueue to retry queue
        const jobId = await enqueueRetry(retryPayload);
