@@ -23,7 +23,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | Task | Status | Dependencies | Notes |
 |------|--------|--------------|-------|
 | **INT-001** (IRC Connector) | ✅ **COMPLETED** (Feb 15, 2026) | — | Code merged to dev; production-ready IRC server connection with proper handshake, event-driven reconnect, security hardening |
-| **INT-002** (IRC Ingestion) | ⏳ **IN REVIEW** (PR #257) | INT-001 | Inbound messages → conversations/messages in DB; atomic upsert, auto-reopen resolved conversations, WebSocket events |
+| **INT-002** (IRC Ingestion) | ✅ **COMPLETED** (PR #257 merged) | INT-001 | Inbound messages → conversations/messages in DB; atomic upsert, auto-reopen resolved conversations, WebSocket events (backlog-aware) |
 | **INT-003** (IRC Delivery) | ⏳ **READY** | INT-001 | Outbound messages → IRC channel |
 | **INT-004-014** (IRC Infra) | ⏳ **READY** | INT-003 | Connection status, config, auto-reconnect, environment management |
 
