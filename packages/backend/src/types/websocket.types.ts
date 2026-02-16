@@ -42,10 +42,20 @@ export type MessageSentPayload = z.infer<typeof MessageSentPayloadSchema>;
 export const MessageReceivedPayloadSchema = z.object({
   messageId: z.string().uuid('Invalid message ID'),
   conversationId: z.string().uuid('Invalid conversation ID'),
-  channel: z.string().min(1, 'Channel required').describe('Platform channel (e.g., "irc" or "telegram")'),
+  platform: z.enum(['telegram', 'irc']).describe('Source platform ("telegram" or "irc")'),
+  senderId: z.string().min(1, 'Sender ID required').describe('Platform sender identifier (e.g., Telegram user ID or IRC nick)'),
   body: z.string().min(1, 'Message body required'),
   senderName: z.string().min(1, 'Sender name required'),
-  createdAt: z.string().datetime('Invalid timestamp'),
+  timestamp: z.string().datetime('Invalid timestamp'),
+  attachments: z
+    .array(
+      z.object({
+        url: z.string().url('Invalid attachment URL'),
+        type: z.string().min(1, 'Attachment type required'),
+        name: z.string().min(1, 'Attachment name required'),
+      })
+    )
+    .optional(),
 });
 export type MessageReceivedPayload = z.infer<typeof MessageReceivedPayloadSchema>;
 

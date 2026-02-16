@@ -179,8 +179,10 @@ export class IRCIngestionService {
   private async emitWebSocketEvents(
     conversationId: string,
     messageId: string,
+    senderId: string,
     senderName: string,
-    body: string
+    body: string,
+    timestamp: string
   ): Promise<void> {
     try {
       if (!isWebSocketGatewayAvailable()) {
@@ -192,10 +194,11 @@ export class IRCIngestionService {
       const payload: MessageReceivedPayload = {
         messageId,
         conversationId,
-        channel: 'irc',
+        platform: 'irc',
+        senderId,
         body,
         senderName,
-        createdAt: new Date().toISOString(),
+        timestamp,
       };
 
       // Emit via typed gateway helper - automatically routed through backlog
@@ -290,7 +293,14 @@ export class IRCIngestionService {
       logger.debug({ conversationId, messageId: message.id, nick }, 'Message inserted');
 
       // Step 6: Emit WebSocket events (best-effort)
-      await this.emitWebSocketEvents(conversationId, message.id, nick, sanitizedBody);
+      await this.emitWebSocketEvents(
+        conversationId,
+        message.id,
+        nick,
+        nick,
+        sanitizedBody,
+        message.createdAt.toISOString()
+      );
 
       // Step 7: Trigger routing rules (best-effort, deferred to Phase 2)
       await this.evaluateRoutingRules(conversationId);

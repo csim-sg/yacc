@@ -35,15 +35,6 @@ vi.mock('../websocket/websocket-gateway', () => ({
   emitToConversation: vi.fn().mockResolvedValue(undefined),
 }));
 
-/**
- * NOTE: Due to database migration timing issues in test environment,
- * some tests have been disabled temporarily. The service logic is correct
- * and has been verified through integration tests and code review.
- * 
- * TODO: Fix database migration setup in vitest globalSetup to ensure
- * all enums are properly initialized before tests run.
- */
-
 describe('IRC Ingestion Service', () => {
   let service: IRCIngestionService;
   const testChannelPrefix = `#test-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -53,6 +44,18 @@ describe('IRC Ingestion Service', () => {
     service = new IRCIngestionService();
     // Reset mocks before each test
     vi.clearAllMocks();
+
+    // Ensure gateway mocks keep their intended behavior after clearAllMocks
+    (
+      wsGateway.isWebSocketGatewayAvailable as unknown as {
+        mockReturnValue: (value: boolean) => void;
+      }
+    ).mockReturnValue(true);
+    (
+      wsGateway.emitToConversation as unknown as {
+        mockResolvedValue: (value: undefined) => void;
+      }
+    ).mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -368,8 +371,6 @@ describe('IRC Ingestion Service', () => {
 
   describe('WebSocket Event Emission', () => {
     it('should emit message.received and complete ingestion successfully', async () => {
-      // Note: Mock verification is handled in websocket-gateway.spec.ts
-      // This test verifies that WebSocket emission doesn't block ingestion
       const channel = `${testChannelPrefix}-ws-emit`;
       const dto: InboundIRCMessageDTO = {
         channel,
@@ -399,6 +400,22 @@ describe('IRC Ingestion Service', () => {
       expect(msg).toHaveLength(1);
       expect(msg[0].body).toBe('Test message');
       expect(msg[0].senderName).toBe('alice');
+
+      // Verify WebSocket emission called with contract-aligned payload
+      expect(wsGateway.emitToConversation).toHaveBeenCalledTimes(1);
+      expect(wsGateway.emitToConversation).toHaveBeenCalledWith(
+        result.conversationId!,
+        'message.received',
+        expect.objectContaining({
+          conversationId: result.conversationId!,
+          messageId: result.messageId!,
+          platform: 'irc',
+          senderId: 'alice',
+          senderName: 'alice',
+          body: 'Test message',
+          timestamp: msg[0].createdAt.toISOString(),
+        })
+      );
     });
   });
 
