@@ -14,6 +14,7 @@ import { redisClient } from '../infrastructure/redis.client.js';
 import { conversations } from '../schemas/conversation.schema.js';
 import { messages } from '../schemas/message.schema.js';
 import { MessageStatusTracker } from '../services/messageStatusTracker.js';
+import { connectorManager } from '../services/connector-manager.js';
 import type { SendMessageJobPayload } from '../types/message-queue.types.js';
 
 // ============================================
@@ -92,13 +93,18 @@ export function getRetryWorker(): Worker<SendMessageJobPayload> {
  *
  * Fetches message from DB, attempts to resend via connector,
  * and updates status or moves to DLQ based on result
+ *
+ * Export for testing purposes
  */
-async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<void> {
+export async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<void> {
   const {
     messageId,
     conversationId,
+    recipientId,
+    body,
     retryCount = 0,
     platformType,
+    correlationId,
   } = job.data;
 
   logger.debug(
@@ -107,9 +113,12 @@ async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<void> {
       conversationId,
       retryCount,
       platformType,
+      correlationId,
     },
     'Processing retry job'
   );
+
+  let platform: Platform | undefined;
 
   try {
     // Fetch message from database to get current state
@@ -122,6 +131,7 @@ async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<void> {
         {
           messageId,
           conversationId,
+          correlationId,
         },
         'Message not found for retry'
       );
@@ -129,7 +139,7 @@ async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<void> {
       return;
     }
 
-    // Fetch conversation for channel info
+    // Fetch conversation for additional context
     const conversation = await dbClient.query.conversations.findFirst({
       where: eq(conversations.id, conversationId),
     });
@@ -139,64 +149,107 @@ async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<void> {
         {
           conversationId,
           messageId,
+          correlationId,
         },
         'Conversation not found for retry'
       );
       return;
     }
 
-    // For Phase 2A MVP: Stub connector (always succeeds)
-    // In Phase 2B/3, will call real connectors (Telegram, IRC)
-    await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate I/O
+    platform = platformType as unknown as Platform;
 
-    // Mark as sent (stub always succeeds)
-    await MessageStatusTracker.trackSentMessage({
+    // Get connector for this platform
+    const connector = connectorManager.getConnector(platformType);
+    if (!connector) {
+      throw new Error(`No connector registered for platform: ${platformType}`);
+    }
+
+    // Call connector to send message
+    const sendRequest = {
       messageId,
       conversationId,
-      status: 'sent',
-      platform: platformType as unknown as Platform,
-      timestamp: new Date(),
-    });
+      recipientId,
+      body,
+      platformType: platformType as 'telegram' | 'irc' | 'whatsapp' | 'weChat' | 'meta' | 'twitter',
+      correlationId,
+    };
 
-    logger.info(
-      {
+    const response = await connector.sendMessage(sendRequest);
+
+    if (response.success) {
+      // Update message with external ID and mark as sent
+      await dbClient
+        .update(messages)
+        .set({
+          externalMessageId: response.platformMessageId,
+          status: 'sent',
+          metadata: {
+            sentAt: response.sentAt,
+            platform: platformType,
+          },
+        })
+        .where(eq(messages.id, messageId));
+
+      // Track sent status via MessageStatusTracker for WebSocket emission
+      await MessageStatusTracker.trackSentMessage({
         messageId,
         conversationId,
-        retryCount,
-        platformType,
-      },
-      'Message retry succeeded (stub)'
-    );
+        status: 'sent',
+        platform,
+        timestamp: new Date(response.sentAt),
+      });
+
+      logger.info(
+        {
+          messageId,
+          conversationId,
+          retryCount,
+          platformType,
+          platformMessageId: response.platformMessageId,
+          correlationId,
+        },
+        'Message retry succeeded'
+      );
+    } else {
+      // Connector returned failure
+      throw new Error(response.error || 'Connector returned failure');
+    }
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+
     logger.error(
       {
         messageId,
         conversationId,
         retryCount,
         platformType,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: errorMsg,
+        correlationId,
       },
       'Retry job failed'
     );
 
-     // Track as failed
-     try {
-       await MessageStatusTracker.trackFailedMessage({
-         messageId,
-         conversationId,
-         status: 'failed',
-         platform: platformType as unknown as Platform,
-         error: error instanceof Error ? error.message : 'Unknown error',
-         timestamp: new Date(),
-       });
-    } catch (trackerError) {
-      logger.error(
-        {
+    // Track as failed
+    if (platform) {
+      try {
+        await MessageStatusTracker.trackFailedMessage({
           messageId,
-          error: trackerError instanceof Error ? trackerError.message : 'Unknown',
-        },
-        'Failed to track retry failure'
-      );
+          conversationId,
+          status: 'failed',
+          platform,
+          error: errorMsg,
+          timestamp: new Date(),
+        });
+      } catch (trackerError) {
+        logger.error(
+          {
+            messageId,
+            error: trackerError instanceof Error ? trackerError.message : 'Unknown',
+            correlationId,
+          },
+          'Failed to track retry failure'
+        );
+      }
     }
 
     // Rethrow to trigger BullMQ retry logic

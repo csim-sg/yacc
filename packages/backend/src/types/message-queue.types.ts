@@ -13,15 +13,21 @@ import { z } from 'zod';
 
 /**
  * Message job payload for retry queue
+ *
+ * Platform-specific recipient identifier:
+ * - Telegram: numeric chat ID (e.g., "-12345" or "12345")
+ * - IRC: channel name (e.g., "#channel")
+ * - Future platforms may have their own format
  */
 export const SendMessageJobPayloadSchema = z.object({
   messageId: z.string().uuid('Invalid message ID'),
   conversationId: z.string().uuid('Invalid conversation ID'),
-  recipientId: z.string().uuid('Invalid recipient ID'),
+  recipientId: z.string().min(1, 'Recipient ID required (platform-specific format)'),
   body: z.string().min(1, 'Message body required'),
   direction: z.enum(['inbound', 'outbound']),
   platformType: z.enum(['telegram', 'irc', 'whatsapp', 'weChat', 'meta', 'twitter']),
   retryCount: z.number().int().min(0).max(3, 'Retry count cannot exceed 3'),
+  correlationId: z.string().optional().describe('Request correlation ID for tracing async delivery'),
   lastError: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
