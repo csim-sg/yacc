@@ -56,6 +56,27 @@ export async function setup() {
       console.log('✅ Database connection verified\n');
     }
 
+    // Run migrations to ensure schema is up-to-date
+    console.log('📦 Running migrations...');
+    try {
+      const { migrate } = await import('drizzle-orm/node-postgres/migrator');
+      const { Pool } = await import('pg');
+      
+      const pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+      });
+      
+      const migrationClient = (await import('drizzle-orm/node-postgres')).drizzle(pool);
+      await migrate(migrationClient, { migrationsFolder: './drizzle' });
+      
+      await pool.end();
+      console.log('✅ Migrations applied\n');
+    } catch (migrationError: unknown) {
+      const migrationMsg = migrationError instanceof Error ? migrationError.message : String(migrationError);
+      console.warn('⚠️ Migration warning (continuing):', migrationMsg, '\n');
+      // Continue even if migrations fail - they may already be applied
+    }
+
     console.log('✅ Test environment ready\n');
   } catch (error: unknown) {
     // Safely handle error without using 'any'

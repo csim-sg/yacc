@@ -19,9 +19,9 @@ import { dbClient } from '../infrastructure/db.client';
 import { conversations } from '../schemas/conversation.schema';
 import { messages } from '../schemas/message.schema';
 import { auditService } from './audit.service';
+import { conversationService } from './conversation.service';
 import { logger } from '../infrastructure/logger';
 import { eq, and } from 'drizzle-orm';
-import type { IRCMessageEvent } from 'irc-framework';
 import { getWebSocketGateway, isWebSocketGatewayAvailable } from './websocket/websocket-gateway';
 
 /**
@@ -50,16 +50,21 @@ export interface IngestionResult {
 export class IRCIngestionService {
   /**
    * Sanitize inbound message body
-   * Removes excessive whitespace and control characters
+   * Removes leading/trailing whitespace, collapses consecutive whitespace,
+   * and removes control characters
    */
   private sanitizeMessageBody(body: string): string {
     // Remove leading/trailing whitespace
     let sanitized = body.trim();
 
-    // Replace excessive whitespace with single space
+    // Collapse consecutive whitespace characters (including newlines) to single space
     sanitized = sanitized.replace(/\s+/g, ' ');
 
-    // Remove control characters (except newlines for multi-line support)
+    // Remove control characters
+    // [\x00-\x08] = null to backspace
+    // [\x0B-\x0C] = vertical tab, form feed
+    // [\x0E-\x1F] = shift out to unit separator
+    // [\x7F] = delete
     sanitized = sanitized.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
 
     return sanitized;
@@ -82,6 +87,9 @@ export class IRCIngestionService {
 
   /**
    * Find or create a conversation for this IRC channel
+   * Note: This is not 100% concurrent-safe due to TOCTOU race condition between select and insert.
+   * In production, use database-level upsert (INSERT ... ON CONFLICT) for true atomic safety.
+   * For MVP, this is acceptable as IRC channels are created rarely and conflicts are unlikely.
    */
   private async upsertConversation(channel: string): Promise<string> {
     // Query for existing conversation
@@ -100,113 +108,72 @@ export class IRCIngestionService {
       return existing[0].id;
     }
 
-    // Create new conversation
-    const result = await dbClient
-      .insert(conversations)
-      .values({
-        channel: 'irc' as const,
-        externalThreadId: channel,
-        title: channel, // Use channel name as title
-        status: 'open' as const,
-        priority: 'normal' as const,
-        metadata: { source: 'irc_connector' },
-      })
-      .returning({ id: conversations.id });
+    // Create new conversation (may fail if concurrent request created it)
+    try {
+      const result = await dbClient
+        .insert(conversations)
+        .values({
+          channel: 'irc' as const,
+          externalThreadId: channel,
+          title: channel, // Use channel name as title
+          status: 'open' as const,
+          priority: 'normal' as const,
+          metadata: { source: 'irc_connector' },
+        })
+        .returning({ id: conversations.id });
 
-    if (!result[0]) {
-      throw new Error(`Failed to create conversation for channel ${channel}`);
-    }
+      if (!result[0]) {
+        throw new Error(`Failed to create conversation for channel ${channel}`);
+      }
 
-    return result[0].id;
-  }
+      return result[0].id;
+    } catch (insertError) {
+      // If insert failed due to unique constraint (race condition with concurrent request),
+      // fetch the newly created conversation
+      const errorMsg = insertError instanceof Error ? insertError.message : String(insertError);
+      if (!errorMsg.includes('unique') && !errorMsg.includes('duplicate') && !errorMsg.includes('conflict')) {
+        // Re-throw if it's not a unique constraint error
+        throw insertError;
+      }
 
-  /**
-   * Auto-reopen a resolved conversation to 'open'
-   * Returns true if conversation was reopened, false if already open
-   */
-  private async autoReopenConversation(conversationId: string): Promise<boolean> {
-    const existing = await dbClient
-      .select({ status: conversations.status })
-      .from(conversations)
-      .where(eq(conversations.id, conversationId))
-      .limit(1);
-
-    if (!existing[0]) {
-      logger.warn({ conversationId }, 'Conversation not found for auto-reopen check');
-      return false;
-    }
-
-    if (existing[0].status !== 'resolved') {
-      return false; // Already open or pending, no reopen needed
-    }
-
-    // Update to open
-    await dbClient
-      .update(conversations)
-      .set({ status: 'open' as const, updatedAt: new Date() })
-      .where(eq(conversations.id, conversationId));
-
-    // Log auto-reopen in audit trail (system actor)
-    await auditService.logAction({
-      actorId: undefined, // System actor
-      action: 'conversation.reopened',
-      entityType: 'conversation',
-      entityId: conversationId,
-      metadata: {
-        reason: 'inbound_message_received',
-        trigger: 'irc_connector',
-      },
-    }).catch((err) => {
-      logger.warn(
-        { conversationId, error: err instanceof Error ? err.message : String(err) },
-        'Failed to log auto-reopen audit event'
+      logger.debug(
+        { channel },
+        'Conversation created by concurrent request, fetching it'
       );
-      // Don't throw - audit failure shouldn't stop ingestion
-    });
 
-    return true;
-  }
+      // Fetch the existing conversation (created by concurrent request)
+      const concurrent = await dbClient
+        .select({ id: conversations.id })
+        .from(conversations)
+        .where(
+          and(
+            eq(conversations.channel, 'irc'),
+            eq(conversations.externalThreadId, channel)
+          )
+        )
+        .limit(1);
 
-  /**
-   * Insert inbound message
-   */
-  private async insertMessage(
-    conversationId: string,
-    senderName: string,
-    body: string
-  ): Promise<string> {
-    const result = await dbClient
-      .insert(messages)
-      .values({
-        conversationId,
-        senderId: null, // External sender, no user account
-        senderName,
-        body,
-        status: 'sent', // Inbound messages are already "sent" (delivered)
-        direction: 'inbound',
-        externalMessageId: undefined,
-        metadata: { source: 'irc_connector' },
-      })
-      .returning({ id: messages.id });
+      if (!concurrent[0]) {
+        throw new Error(`Failed to find conversation for channel ${channel} after race condition`);
+      }
 
-    if (!result[0]) {
-      throw new Error('Failed to insert message');
+      return concurrent[0].id;
     }
-
-    return result[0].id;
   }
+
+
 
   /**
    * Emit WebSocket events for inbound message
    * Best-effort: doesn't throw on emission failures
    *
-   * Note: Currently emits via raw Socket.io since message.received is not in typed gateway
-   * This matches the pattern used by ConnectorController
+   * Emits via WebSocket backlog mechanism which persists events for clients on reconnect
    */
   private async emitWebSocketEvents(
     conversationId: string,
     messageId: string,
-    senderName: string
+    senderName: string,
+    body: string
   ): Promise<void> {
     try {
       if (!isWebSocketGatewayAvailable()) {
@@ -217,18 +184,16 @@ export class IRCIngestionService {
       const gateway = getWebSocketGateway();
       const room = `conversation:${conversationId}`;
 
-      // Get Socket.io server instance for raw event emission
+      // Emit via Socket.io with full message data
+      // WebSocket backlog will persist this for clients on reconnect
       const server = gateway.getServer();
-
-      // Emit message.received event (matches frontend listener)
-      // Note: Using raw Socket.io emission for now; typed gateway will be updated in future
       server.to(room).emit('message.received', {
         conversationId,
         messageId,
         platform: 'irc',
         senderId: senderName, // External sender, use nick as ID
         senderName,
-        body: '', // Body is in the message record, not WebSocket event
+        body, // Include full message body (required by frontend listener)
         timestamp: new Date().toISOString(),
       });
 
@@ -303,28 +268,34 @@ export class IRCIngestionService {
       const conversationId = await this.upsertConversation(channel);
       logger.debug({ conversationId, channel }, 'Conversation upserted');
 
-      // Step 5: Auto-reopen if resolved
-      const wasReopened = await this.autoReopenConversation(conversationId);
-      if (wasReopened) {
+      // Step 5: Insert message and handle auto-reopen (uses ConversationService)
+      // This also updates lastActivityAt and handles conversation reopening
+      const { message, reopened } = await conversationService.createMessage({
+        conversationId,
+        senderName: nick,
+        body: sanitizedBody,
+        direction: 'inbound',
+        status: 'sent', // Inbound messages are already "sent" (delivered)
+      });
+
+      if (reopened) {
         logger.info({ conversationId, channel }, 'Conversation auto-reopened');
       }
 
-      // Step 6: Insert message
-      const messageId = await this.insertMessage(conversationId, nick, sanitizedBody);
-      logger.debug({ conversationId, messageId, nick }, 'Message inserted');
+      logger.debug({ conversationId, messageId: message.id, nick }, 'Message inserted');
 
-      // Step 7: Emit WebSocket events (best-effort)
-      await this.emitWebSocketEvents(conversationId, messageId, nick);
+      // Step 6: Emit WebSocket events (best-effort)
+      await this.emitWebSocketEvents(conversationId, message.id, nick, sanitizedBody);
 
-      // Step 8: Trigger routing rules (best-effort, deferred)
+      // Step 7: Trigger routing rules (best-effort, deferred to Phase 2)
       await this.evaluateRoutingRules(conversationId);
 
-      // Step 9: Log ingestion event (best-effort)
+      // Step 8: Log ingestion event (best-effort)
       await auditService.logAction({
         actorId: undefined, // System actor
         action: 'message.ingested',
         entityType: 'message',
-        entityId: messageId,
+        entityId: message.id,
         metadata: {
           conversationId,
           channel,
@@ -333,21 +304,21 @@ export class IRCIngestionService {
         },
       }).catch((err) => {
         logger.warn(
-          { messageId, error: err instanceof Error ? err.message : String(err) },
+          { messageId: message.id, error: err instanceof Error ? err.message : String(err) },
           'Failed to log message ingestion audit event'
         );
         // Don't throw
       });
 
       logger.info(
-        { conversationId, messageId, channel, nick },
+        { conversationId, messageId: message.id, channel, nick },
         'Inbound IRC message ingested successfully'
       );
 
       return {
         success: true,
         conversationId,
-        messageId,
+        messageId: message.id,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

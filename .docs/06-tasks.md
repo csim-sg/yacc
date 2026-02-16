@@ -234,8 +234,8 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
 | INT-001 | Create IRC connector (server connection, authentication, channel joins) | Not Started | P0 | Backend | BE-001 | Connects to IRC server, authenticates, joins configured channels | PVTI_lAHOAB4wV84BNGcwzgkHa_U | 128 |
-| INT-002 | Implement IRC message ingestion (inbound messages → inbox) | Not Started | P0 | Backend | BE-002, INT-001 | Inbound messages create conversations/messages in DB | PVTI_lAHOAB4wV84BNGcwzgkHbAU | 129 |
-| INT-003 | Implement IRC message delivery (outbound messages → IRC channel) | Not Started | P0 | Backend | BE-010, INT-001 | Messages sent to IRC channel, status updated to sent/failed | PVTI_lAHOAB4wV84BNGcwzgkHbB4 | 130 |
+| INT-002 | Implement IRC message ingestion (inbound messages → inbox) | Done | P0 | Backend | BE-002, INT-001 | Inbound messages create conversations/messages in DB (PR #257) | PVTI_lAHOAB4wV84BNGcwzgkHbAU | 129 |
+| INT-003 | Implement IRC message delivery (outbound messages → IRC channel) | Ready | P0 | Backend | BE-010, INT-001 | Messages sent to IRC channel, status updated to sent/failed | PVTI_lAHOAB4wV84BNGcwzgkHbB4 | 130 |
 | INT-004 | Implement IRC auto-reconnect with exponential backoff (1s → 60s max, 5 attempts) | Not Started | P0 | Backend | INT-001 | Disconnects trigger reconnect attempts with backoff | PVTI_lAHOAB4wV84BNGcwzgj_824 | 60 |
 | INT-005 | Implement IRC connection status tracking (connected/retrying/disconnected) | Not Started | P0 | Backend | INT-004 | Status stored in DB, exposed via WebSocket | PVTI_lAHOAB4wV84BNGcwzgj_6NE | 59 |
 | INT-006 | Create IRC configuration endpoint (POST /integrations/irc/config) | Not Started | P0 | Backend | BE-005 | Saves server, port, username, password to env/db | PVTI_lAHOAB4wV84BNGcwzgj_6MQ | 53 |
