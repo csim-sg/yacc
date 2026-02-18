@@ -430,6 +430,9 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
           error: errorMessage,
           platform: 'irc',
           correlationId: this.correlationId,
+          reconnectIncidentId: this.reconnectIncidentId,
+          attempt: this.reconnectAttempts,
+          maxAttempts: this.maxReconnectAttempts,
         },
         'IRC client error'
       );
@@ -444,7 +447,13 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
     // Handle socket close (disconnection during operation)
     client.on('socket close', () => {
       logger.warn(
-        { platform: 'irc', correlationId: this.correlationId },
+        {
+          platform: 'irc',
+          correlationId: this.correlationId,
+          reconnectIncidentId: this.reconnectIncidentId,
+          attempt: this.reconnectAttempts,
+          maxAttempts: this.maxReconnectAttempts,
+        },
         'IRC socket closed'
       );
       this.setStatus('disconnected');
@@ -456,7 +465,13 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
     // Handle connection closure (disconnection during operation)
     client.on('close', () => {
       logger.info(
-        { platform: 'irc', correlationId: this.correlationId },
+        {
+          platform: 'irc',
+          correlationId: this.correlationId,
+          reconnectIncidentId: this.reconnectIncidentId,
+          attempt: this.reconnectAttempts,
+          maxAttempts: this.maxReconnectAttempts,
+        },
         'IRC connection closed'
       );
       this.setStatus('disconnected');
@@ -511,7 +526,11 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
    */
   async disconnect(): Promise<void> {
     logger.info(
-      { platform: 'irc', correlationId: this.reconnectIncidentId },
+      {
+        platform: 'irc',
+        correlationId: this.correlationId,
+        reconnectIncidentId: this.reconnectIncidentId,
+      },
       'Disconnecting from IRC server'
     );
 
@@ -520,7 +539,11 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       clearTimeout(this.reconnectTimeoutId);
       this.reconnectTimeoutId = null;
       logger.debug(
-        { platform: 'irc', correlationId: this.reconnectIncidentId },
+        {
+          platform: 'irc',
+          correlationId: this.correlationId,
+          reconnectIncidentId: this.reconnectIncidentId,
+        },
         'Cleared pending reconnect timeout'
       );
     }
@@ -541,7 +564,11 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
     await this.destroy();
 
     logger.info(
-      { platform: 'irc', correlationId: this.reconnectIncidentId },
+      {
+        platform: 'irc',
+        correlationId: this.correlationId,
+        reconnectIncidentId: this.reconnectIncidentId,
+      },
       'Successfully disconnected from IRC'
     );
   }
