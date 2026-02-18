@@ -18,7 +18,6 @@ import { ircIngestionService } from '../services/irc-ingestion.service';
  * - Sending and receiving messages
  * - Channel management
  * - Event-driven reconnection with exponential backoff
- * - Message queue with capacity limits
  */
 
 type IRCConfig = ConnectorConfig<'irc'> & {
@@ -29,13 +28,6 @@ type IRCConfig = ConnectorConfig<'irc'> & {
   channels: string[];
 };
 
-// Message queue with hard capacity limit
-interface QueuedMessage {
-  channel: string;
-  message: string;
-}
-
-const MESSAGE_QUEUE_MAX_SIZE = 1000;
 const CONNECT_TIMEOUT_MS = 30000;
 const MAX_MESSAGE_LENGTH = 400; // IRC limit is 512 total, leave room for protocol overhead
 
@@ -57,7 +49,6 @@ function sanitizeMessage(message: string): string {
 
 export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
   private client: IRCClient | null = null;
-  private messageQueue: QueuedMessage[] = [];
   private isConnecting: boolean = false;
   private reconnectTimeoutId: NodeJS.Timeout | null = null;
   private connectTimeoutId: NodeJS.Timeout | null = null;
@@ -91,7 +82,12 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
 
     if (this.isConnecting) {
       logger.warn(
-        { platform: 'irc', correlationId: this.reconnectIncidentId },
+        {
+          platform: 'irc',
+          correlationId: this.correlationId,
+          reconnectIncidentId: this.reconnectIncidentId,
+          attempt: this.reconnectAttempts,
+        },
         'Connection already in progress'
       );
       return;
@@ -104,6 +100,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       {
         platform: 'irc',
         correlationId: this.correlationId,
+        reconnectIncidentId: this.reconnectIncidentId,
         server: this.config.server,
         port: this.config.port,
         nick: this.config.nick,
@@ -138,16 +135,14 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       logger.info(
         {
           platform: 'irc',
-          correlationId: this.reconnectIncidentId,
+          correlationId: this.correlationId,
+          reconnectIncidentId: this.reconnectIncidentId,
           server: this.config.server,
           channels: this.config.channels,
           attemptsUsed: previousAttempts,
         },
         'Successfully connected to IRC server'
       );
-
-      // Process any queued messages
-      await this.processMessageQueue();
     } catch (error) {
       this.isConnecting = false;
       const errorReason = this.sanitizeErrorReason(error);
@@ -157,8 +152,10 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         {
           error: errorReason,
           platform: 'irc',
-          correlationId: this.reconnectIncidentId,
+          correlationId: this.correlationId,
+          reconnectIncidentId: this.reconnectIncidentId,
           attempt: this.reconnectAttempts,
+          maxAttempts: this.maxReconnectAttempts,
           server: this.config?.server,
         },
         'Failed to connect to IRC server, scheduling reconnection'
@@ -318,7 +315,9 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       logger.debug(
         {
           platform: 'irc',
-          correlationId: this.reconnectIncidentId,
+          correlationId: this.correlationId,
+          reconnectIncidentId: this.reconnectIncidentId,
+          attempt: this.reconnectAttempts,
         },
         'Reconnect already scheduled, ignoring duplicate request'
       );
@@ -329,7 +328,8 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       logger.error(
         {
           platform: 'irc',
-          correlationId: this.reconnectIncidentId,
+          correlationId: this.correlationId,
+          reconnectIncidentId: this.reconnectIncidentId,
           attempt: this.reconnectAttempts,
           maxAttempts: this.maxReconnectAttempts,
         },
@@ -346,7 +346,8 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
     logger.info(
       {
         platform: 'irc',
-        correlationId: this.reconnectIncidentId,
+        correlationId: this.correlationId,
+        reconnectIncidentId: this.reconnectIncidentId,
         attempt: this.reconnectAttempts,
         maxAttempts: this.maxReconnectAttempts,
         delayMs,
@@ -362,10 +363,12 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
         logger.error(
           {
             platform: 'irc',
-            correlationId: this.reconnectIncidentId,
+            correlationId: this.correlationId,
+            reconnectIncidentId: this.reconnectIncidentId,
             attempt: this.reconnectAttempts,
             maxAttempts: this.maxReconnectAttempts,
             error: errMsg,
+            delayMs,
           },
           'Error during scheduled reconnection attempt'
         );
@@ -533,7 +536,6 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       this.client = null;
     }
 
-    this.messageQueue = [];
     this.reconnectAttempts = 0; // Reset attempts on manual disconnect
     this.setStatus('disconnected');
     await this.destroy();
@@ -714,56 +716,4 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
     return null;
   }
 
-  /**
-   * Process queued messages when connection is established
-   */
-  private async processMessageQueue(): Promise<void> {
-    if (!this.isConnected() || this.messageQueue.length === 0) {
-      return;
-    }
-
-    const queueCorrelationId = randomUUID();
-    logger.info(
-      {
-        platform: 'irc',
-        correlationId: queueCorrelationId,
-        queuedMessages: this.messageQueue.length,
-      },
-      'Processing queued IRC messages'
-    );
-
-    const queue = [...this.messageQueue];
-    this.messageQueue = [];
-
-    for (const { channel, message } of queue) {
-      try {
-        if (!this.client) {
-          throw new Error('IRC client not initialized');
-        }
-
-        // Sanitize message to prevent CRLF injection
-        const sanitizedMessage = sanitizeMessage(message);
-        
-        // Use say() for safer transmission instead of raw()
-        this.client.say(channel, sanitizedMessage);
-        logger.debug(
-          { channel, platform: 'irc', correlationId: queueCorrelationId },
-          'Queued message sent to IRC channel'
-        );
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(
-          {
-            error: errorMessage,
-            channel,
-            platform: 'irc',
-            correlationId: queueCorrelationId,
-          },
-          'Error sending queued message'
-        );
-        // Re-queue the message
-        this.messageQueue.push({ channel, message });
-      }
-    }
-  }
 }
