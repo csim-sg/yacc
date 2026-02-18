@@ -62,9 +62,12 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
   private reconnectTimeoutId: NodeJS.Timeout | null = null;
   private connectTimeoutId: NodeJS.Timeout | null = null;
   private correlationId: string = '';
+  private reconnectIncidentId: string = '';
 
   constructor() {
     super('irc');
+    // Override max reconnect attempts for IRC: EA spec requires exactly 5 attempts
+    this.maxReconnectAttempts = 5;
   }
 
   /**
@@ -79,10 +82,16 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
 
     // Generate correlation ID for this connection attempt
     this.correlationId = randomUUID();
+    
+    // Initialize reconnect incident ID on first attempt (startup or after manual disconnect)
+    // This ID tracks the entire reconnect series (1-5 attempts)
+    if (this.reconnectAttempts === 0) {
+      this.reconnectIncidentId = randomUUID();
+    }
 
     if (this.isConnecting) {
       logger.warn(
-        { platform: 'irc', correlationId: this.correlationId },
+        { platform: 'irc', correlationId: this.reconnectIncidentId },
         'Connection already in progress'
       );
       return;
@@ -121,12 +130,18 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       await this.performHandshake();
 
       this.isConnecting = false;
+      
+      // Reset attempts on successful connection (per spec)
+      const previousAttempts = this.reconnectAttempts;
+      this.reconnectAttempts = 0;
+      
       logger.info(
         {
           platform: 'irc',
-          correlationId: this.correlationId,
+          correlationId: this.reconnectIncidentId,
           server: this.config.server,
           channels: this.config.channels,
+          attemptsUsed: previousAttempts,
         },
         'Successfully connected to IRC server'
       );
@@ -135,17 +150,18 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       await this.processMessageQueue();
     } catch (error) {
       this.isConnecting = false;
-      const errorMessage = error instanceof Error ? error.message : 'Connection failed';
-      this.setStatus('disconnected', errorMessage);
+      const errorReason = this.sanitizeErrorReason(error);
+      this.setStatus('disconnected', errorReason);
 
       logger.error(
         {
-          error: errorMessage,
+          error: errorReason,
           platform: 'irc',
-          correlationId: this.correlationId,
+          correlationId: this.reconnectIncidentId,
+          attempt: this.reconnectAttempts,
           server: this.config?.server,
         },
-        'Failed to connect to IRC server'
+        'Failed to connect to IRC server, scheduling reconnection'
       );
 
       // Schedule reconnection with exponential backoff
@@ -266,7 +282,34 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
   }
 
   /**
+   * Calculate exponential backoff delay in milliseconds
+   * Formula: delayMs = min(60000, 1000 * 2^(attempt-1))
+   * Maps to: 1s, 2s, 4s, 8s, 16s (capped at 60s)
+   *
+   * @param attemptNumber - 1-based attempt number (1, 2, 3, 4, 5)
+   * @returns delay in milliseconds
+   */
+  private calculateBackoffMs(attemptNumber: number): number {
+    const baseDelayMs = 1000; // 1 second base
+    const exponentialDelayMs = baseDelayMs * Math.pow(2, attemptNumber - 1);
+    return Math.min(60000, exponentialDelayMs); // Cap at 60 seconds
+  }
+
+  /**
+   * Sanitize error message for logging (remove sensitive info)
+   */
+  private sanitizeErrorReason(error: unknown): string {
+    if (error instanceof Error) {
+      // Remove potential stack traces and keep just the message
+      return error.message.split('\n')[0];
+    }
+    const str = String(error);
+    return str.substring(0, 200); // Cap length to prevent spam
+  }
+
+  /**
    * Schedule reconnection with exponential backoff
+   * Implements EA-approved spec: 5 attempts, 1s→16s backoff, capped at 60s
    * Guards against multiple parallel reconnect timeouts
    */
   private scheduleReconnect(): void {
@@ -275,7 +318,7 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       logger.debug(
         {
           platform: 'irc',
-          correlationId: this.correlationId,
+          correlationId: this.reconnectIncidentId,
         },
         'Reconnect already scheduled, ignoring duplicate request'
       );
@@ -286,40 +329,48 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
       logger.error(
         {
           platform: 'irc',
-          correlationId: this.correlationId,
+          correlationId: this.reconnectIncidentId,
+          attempt: this.reconnectAttempts,
           maxAttempts: this.maxReconnectAttempts,
         },
-        'Max reconnection attempts reached'
+        'Max reconnection attempts reached, marking as failed'
       );
+      this.setStatus('failed');
       return;
     }
 
-    const backoffMs = this.reconnectBackoffMs[this.reconnectAttempts] || 30000;
+    // Increment attempt counter (1-based for formula)
+    this.reconnectAttempts++;
+    const delayMs = this.calculateBackoffMs(this.reconnectAttempts);
+
     logger.info(
       {
         platform: 'irc',
-        correlationId: this.correlationId,
-        attempt: this.reconnectAttempts + 1,
-        backoffMs,
+        correlationId: this.reconnectIncidentId,
+        attempt: this.reconnectAttempts,
+        maxAttempts: this.maxReconnectAttempts,
+        delayMs,
+        server: this.config?.server,
       },
-      'Scheduling IRC reconnection'
+      'Scheduling IRC reconnection attempt'
     );
 
-    this.reconnectAttempts++;
     this.reconnectTimeoutId = setTimeout(() => {
       this.reconnectTimeoutId = null;
       this.connect().catch((err) => {
-        const errMsg = err instanceof Error ? err.message : String(err);
+        const errMsg = this.sanitizeErrorReason(err);
         logger.error(
           {
             platform: 'irc',
-            correlationId: this.correlationId,
+            correlationId: this.reconnectIncidentId,
+            attempt: this.reconnectAttempts,
+            maxAttempts: this.maxReconnectAttempts,
             error: errMsg,
           },
-          'Error during scheduled reconnect'
+          'Error during scheduled reconnection attempt'
         );
       });
-    }, backoffMs);
+    }, delayMs);
   }
 
   /**
@@ -453,19 +504,20 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
 
   /**
    * Disconnect from IRC server
+   * Clears all pending timers and resets reconnect state
    */
   async disconnect(): Promise<void> {
     logger.info(
-      { platform: 'irc', correlationId: this.correlationId },
+      { platform: 'irc', correlationId: this.reconnectIncidentId },
       'Disconnecting from IRC server'
     );
 
-    // Clear pending reconnect timeout if any
+    // Clear pending reconnect timeout if any (manual disconnect stops retry loop)
     if (this.reconnectTimeoutId) {
       clearTimeout(this.reconnectTimeoutId);
       this.reconnectTimeoutId = null;
       logger.debug(
-        { platform: 'irc', correlationId: this.correlationId },
+        { platform: 'irc', correlationId: this.reconnectIncidentId },
         'Cleared pending reconnect timeout'
       );
     }
@@ -482,11 +534,12 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
     }
 
     this.messageQueue = [];
+    this.reconnectAttempts = 0; // Reset attempts on manual disconnect
     this.setStatus('disconnected');
     await this.destroy();
 
     logger.info(
-      { platform: 'irc', correlationId: this.correlationId },
+      { platform: 'irc', correlationId: this.reconnectIncidentId },
       'Successfully disconnected from IRC'
     );
   }
