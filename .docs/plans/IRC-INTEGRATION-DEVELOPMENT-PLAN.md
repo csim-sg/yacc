@@ -117,15 +117,20 @@ INT-013, INT-014 (Tests)
 #### INT-004: Auto-reconnect
 - **Description**: Implement exponential backoff reconnection strategy
 - **Deliverables**:
-  - Exponential backoff (1s, 2s, 4s, 8s, 16s, 30s)
-  - Max 10 retry attempts
+  - Exponential backoff with cap (1s -> 60s max)
+  - Max 5 reconnect attempts per disconnect incident
   - After max attempts, mark as failed
   - Manual reconnect trigger capability
-- **Dependencies**: INT-001, BE-013 (queue)
+- **Dependencies**: INT-001
 - **Acceptance Criteria**:
-  - Reconnection attempts follow backoff schedule
-  - Max 10 attempts enforced
+  - Disconnects trigger reconnect attempts with backoff
+  - Max 5 attempts enforced
   - Queued messages processed on reconnect
+
+**Backoff policy (authoritative)**
+- Delay before attempt `n` (1-indexed) is `min(60s, 2^(n-1) * 1s)`
+- Schedule for 5 attempts: 1s, 2s, 4s, 8s, 16s
+- Attempts reset on successful reconnect
 
 #### INT-005: Status Tracking
 - **Description**: Track and expose IRC connection status
