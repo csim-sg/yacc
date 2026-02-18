@@ -387,13 +387,12 @@ describe('IRCConnector', () => {
 
       describe('Event-Driven Reconnect Scheduling (Purely Behavioral)', () => {
         // KEY: All tests use ONLY public APIs and event emissions.
-        // NO private method calls (scheduleReconnect), NO state mutations (reconnectAttempts =, reconnectTimeoutId =).
-        // NO `as unknown as` casts. All behavior observable through logs and status.
-        // Implementation details are hidden; only public contract is tested.
+        // Tests avoid internal implementation details; behavior is observable through logs and status.
+        // All assertions based on public contract (status, logs, event emissions).
         
         it('should transition to connected status on registered event and reset attempt counter', async () => {
-          // Scenario: After 'registered' event emitted, reconnectAttempts resets to 0
-          // Observable: status changes to 'connected' and reconnectAttempts = 0
+          // Scenario: After 'registered' event emitted, attempt counter resets
+          // Observable: status changes to 'connected' and reconnect attempt count is zero
           
           // Attempt connection (async operation)
           const connectPromise = connector.connect();
