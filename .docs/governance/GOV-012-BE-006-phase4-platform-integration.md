@@ -165,7 +165,7 @@ If Failed: Wait 30s → Retry (continues at 30s intervals)
 - ✅ Comprehensive logging
 - ✅ TODO stubs for IRC library integration (intentional, allows phased implementation)
 
-**Tests:** 12+ test cases covering connection, disconnection, reconnection, message queuing, error scenarios.
+**Tests:** 12+ test cases covering connection, disconnection, reconnection, BullMQ-managed retry/DLQ, error scenarios.
 
 ---
 
