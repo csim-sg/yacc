@@ -100,21 +100,23 @@ export class IrcProfileController {
 
       const profile = await createIrcProfile(DEFAULT_TENANT_ID, body, user);
       return res.status(201).json(profile);
-    } catch (error: any) {
-      logger.error({ err: error }, 'Failed to create IRC profile');
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err }, 'Failed to create IRC profile');
 
       // Handle specific error codes
-      if (error.code === IrcProfileErrorCode.PROFILE_LIMIT_EXCEEDED) {
+      const errorWithCode = error as { code?: string; statusCode?: number };
+      if (errorWithCode.code === IrcProfileErrorCode.PROFILE_LIMIT_EXCEEDED) {
         return res.status(409).json({
           error: 'IRC profile limit exceeded',
-          code: error.code,
+          code: errorWithCode.code,
         });
       }
 
-      if (error.code === IrcProfileErrorCode.ENCRYPTION_KEY_MISSING) {
+      if (errorWithCode.code === IrcProfileErrorCode.ENCRYPTION_KEY_MISSING) {
         return res.status(400).json({
           error: 'Encryption key not configured',
-          code: error.code,
+          code: errorWithCode.code,
         });
       }
 
@@ -148,8 +150,9 @@ export class IrcProfileController {
 
       const profiles = await listIrcProfiles(DEFAULT_TENANT_ID);
       return res.status(200).json(profiles);
-    } catch (error: any) {
-      logger.error({ err: error }, 'Failed to list IRC profiles');
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err }, 'Failed to list IRC profiles');
       return res.status(500).json({ error: 'Failed to list profiles' });
     }
   }
@@ -190,8 +193,9 @@ export class IrcProfileController {
       }
 
       return res.status(200).json(profile);
-    } catch (error: any) {
-      logger.error({ err: error, profileId: id }, 'Failed to get IRC profile');
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, profileId: id }, 'Failed to get IRC profile');
       return res.status(500).json({ error: 'Failed to get profile' });
     }
   }
@@ -234,17 +238,19 @@ export class IrcProfileController {
         user
       );
       return res.status(200).json(profile);
-    } catch (error: any) {
-      logger.error({ err: error, profileId: id }, 'Failed to update IRC profile');
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, profileId: id }, 'Failed to update IRC profile');
 
-      if (error.statusCode === 404) {
+      const errorWithCode = error as { statusCode?: number; code?: string };
+      if (errorWithCode.statusCode === 404) {
         return res.status(404).json({ error: 'Profile not found' });
       }
 
-      if (error.code === IrcProfileErrorCode.ENCRYPTION_KEY_MISSING) {
+      if (errorWithCode.code === IrcProfileErrorCode.ENCRYPTION_KEY_MISSING) {
         return res.status(400).json({
           error: 'Encryption key not configured',
-          code: error.code,
+          code: errorWithCode.code,
         });
       }
 
@@ -289,17 +295,19 @@ export class IrcProfileController {
         user
       );
       return res.status(200).json(profile);
-    } catch (error: any) {
-      logger.error({ err: error, profileId: id }, 'Failed to activate IRC profile');
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, profileId: id }, 'Failed to activate IRC profile');
 
-      if (error.statusCode === 404) {
+      const errorWithCode = error as { statusCode?: number; code?: string };
+      if (errorWithCode.statusCode === 404) {
         return res.status(404).json({ error: 'Profile not found' });
       }
 
-      if (error.code === IrcProfileErrorCode.CANNOT_ACTIVATE_DISABLED) {
+      if (errorWithCode.code === IrcProfileErrorCode.CANNOT_ACTIVATE_DISABLED) {
         return res.status(409).json({
           error: 'Cannot activate a disabled profile',
-          code: error.code,
+          code: errorWithCode.code,
         });
       }
 
@@ -344,10 +352,12 @@ export class IrcProfileController {
         user
       );
       return res.status(200).json(profile);
-    } catch (error: any) {
-      logger.error({ err: error, profileId: id }, 'Failed to disable IRC profile');
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, profileId: id }, 'Failed to disable IRC profile');
 
-      if (error.statusCode === 404) {
+      const errorWithCode = error as { statusCode?: number };
+      if (errorWithCode.statusCode === 404) {
         return res.status(404).json({ error: 'Profile not found' });
       }
 
@@ -389,17 +399,19 @@ export class IrcProfileController {
 
       await deleteIrcProfile(DEFAULT_TENANT_ID, profileId, user);
       return res.status(204).send();
-    } catch (error: any) {
-      logger.error({ err: error, profileId: id }, 'Failed to delete IRC profile');
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, profileId: id }, 'Failed to delete IRC profile');
 
-      if (error.statusCode === 404) {
+      const errorWithCode = error as { statusCode?: number; code?: string };
+      if (errorWithCode.statusCode === 404) {
         return res.status(404).json({ error: 'Profile not found' });
       }
 
-      if (error.code === IrcProfileErrorCode.CANNOT_DELETE_ACTIVE) {
+      if (errorWithCode.code === IrcProfileErrorCode.CANNOT_DELETE_ACTIVE) {
         return res.status(409).json({
           error: 'Cannot delete an active profile',
-          code: error.code,
+          code: errorWithCode.code,
         });
       }
 
@@ -456,10 +468,12 @@ export class IrcProfileController {
       await recordTestResult(DEFAULT_TENANT_ID, profileId, result.passed, user);
 
       return res.status(200).json(result);
-    } catch (error: any) {
-      logger.error({ err: error, profileId: id }, 'Failed to test IRC connection');
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err, profileId: id }, 'Failed to test IRC connection');
 
-      if (error.statusCode === 404) {
+      const errorWithCode = error as { statusCode?: number };
+      if (errorWithCode.statusCode === 404) {
         return res.status(404).json({ error: 'Profile not found' });
       }
 

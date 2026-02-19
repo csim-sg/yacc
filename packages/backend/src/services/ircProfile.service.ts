@@ -20,6 +20,7 @@ import { integrationConnectionProfiles } from '../schemas/integrationConnectionP
 import { eq, and } from 'drizzle-orm';
 import { logger } from '../infrastructure/logger';
 import { EncryptionService } from './encryption.service';
+import { auditService } from './audit.service';
 import {
   CreateIrcProfileRequest,
   UpdateIrcProfileRequest,
@@ -27,6 +28,7 @@ import {
   IrcProfileWithSecrets,
   IrcProfileErrorCode,
   IrcProfileConfig,
+  IrcProfileSecrets,
 } from '../types/ircProfile.types';
 import { User } from '../schemas/user.schema';
 
@@ -105,7 +107,22 @@ export async function createIrcProfile(
     })
     .returning();
 
-  logger.info({ profileId: inserted[0].id, profileName: req.name }, 'IRC profile created');
+  const profileId = inserted[0].id;
+  logger.info({ profileId, profileName: req.name }, 'IRC profile created');
+
+  // Log audit event (no secrets in metadata, don't await to avoid blocking response)
+  void auditService.logAction({
+    actorId: createdBy.id,
+    action: 'create',
+    entityType: 'integration',
+    entityId: `irc-profile-${profileId}`,
+    metadata: {
+      profileName: req.name,
+      server: req.config.server,
+      username: req.config.username,
+      channels: req.config.channels,
+    },
+  });
 
   return toResponseNoSecrets(inserted[0]);
 }
@@ -218,7 +235,7 @@ export async function updateIrcProfile(
   }
 
   // Build update object
-  const updateData: Record<string, any> = {
+  const updateData: Record<string, string | number | boolean | Date> = {
     updatedByUserId: updatedBy.id,
     updatedAt: new Date(),
   };
@@ -262,6 +279,23 @@ export async function updateIrcProfile(
     .returning();
 
   logger.info({ profileId }, 'IRC profile updated');
+
+  // Log audit event
+  const changes: Record<string, unknown> = {};
+  if (req.name !== undefined) changes.name = req.name;
+  if (req.config !== undefined) changes.config = req.config;
+  if (req.password !== undefined) changes.hasPassword = !!req.password;
+  if (req.isEnabled !== undefined) changes.isEnabled = req.isEnabled;
+
+  if (Object.keys(changes).length > 0) {
+    void auditService.logAction({
+      actorId: updatedBy.id,
+      action: 'update',
+      entityType: 'integration',
+      entityId: `irc-profile-${profileId}`,
+      metadata: changes,
+    });
+  }
 
   return toResponseNoSecrets(updated[0]);
 }
@@ -329,6 +363,14 @@ export async function activateIrcProfile(
 
   logger.info({ profileId }, 'IRC profile activated');
 
+  // Log audit event
+  void auditService.logAction({
+    actorId: activatedBy.id,
+    action: 'activate',
+    entityType: 'integration',
+    entityId: `irc-profile-${profileId}`,
+  });
+
   const updated = await dbClient
     .select()
     .from(integrationConnectionProfiles)
@@ -378,6 +420,17 @@ export async function disableIrcProfile(
 
   logger.info({ profileId, wasActive: profile[0].isActive }, 'IRC profile disabled');
 
+  // Log audit event
+  void auditService.logAction({
+    actorId: disabledBy.id,
+    action: 'disable',
+    entityType: 'integration',
+    entityId: `irc-profile-${profileId}`,
+    metadata: {
+      clearedActive: profile[0].isActive,
+    },
+  });
+
   return toResponseNoSecrets(updated[0]);
 }
 
@@ -421,6 +474,14 @@ export async function deleteIrcProfile(
     .where(eq(integrationConnectionProfiles.id, profileId));
 
   logger.info({ profileId }, 'IRC profile deleted');
+
+  // Log audit event
+  void auditService.logAction({
+    actorId: deletedBy.id,
+    action: 'delete',
+    entityType: 'integration',
+    entityId: `irc-profile-${profileId}`,
+  });
 }
 
 /**
@@ -448,9 +509,9 @@ export async function getActiveIrcProfile(
 
   // Decrypt secrets
   const profile = active[0];
-  let decrypted: any;
+  let decrypted: IrcProfileSecrets;
   try {
-    decrypted = EncryptionService.decryptJSON(profile.encryptedCredentials);
+    decrypted = EncryptionService.decryptJSON(profile.encryptedCredentials) as IrcProfileSecrets;
   } catch (error) {
     logger.error({ err: error, profileId: profile.id }, 'Failed to decrypt active IRC profile secrets');
     throw new Error('Failed to decrypt profile credentials');
@@ -465,7 +526,7 @@ export async function getActiveIrcProfile(
     isActive: profile.isActive,
     config: JSON.parse(profile.config),
     password: decrypted.password || '',
-    createdByUserId: profile.createdByUserId,
+    createdByUserId: profile.createdByUserId || '',
     updatedByUserId: profile.updatedByUserId ?? undefined,
     lastTestedAt: profile.lastTestedAt ?? undefined,
     lastTestPassed: profile.lastTestPassed ?? undefined,
@@ -499,6 +560,17 @@ export async function recordTestResult(
     );
 
   logger.info({ profileId, passed }, 'IRC profile test recorded');
+
+  // Log audit event
+  void auditService.logAction({
+    actorId: recordedBy.id,
+    action: 'test',
+    entityType: 'integration',
+    entityId: `irc-profile-${profileId}`,
+    metadata: {
+      testPassed: passed,
+    },
+  });
 }
 
 /**

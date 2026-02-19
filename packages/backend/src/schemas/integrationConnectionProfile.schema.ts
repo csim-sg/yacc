@@ -88,10 +88,10 @@ export const integrationConnectionProfiles = pgTable(
     /**
      * User who created this profile
      * References users table; set null if user deleted (but log audit event)
+     * Nullable to handle user deletion while maintaining referential integrity
      */
     createdByUserId: text('created_by_id')
-      .references(() => users.id, { onDelete: 'set null' })
-      .notNull(),
+      .references(() => users.id, { onDelete: 'set null' }),
 
     /**
      * User who last updated this profile (e.g., password change, enable/disable, activate)
