@@ -13,6 +13,7 @@
  */
 
 import { eq } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
 import { appConfig } from '../config/appConfig';
 import { dbClient } from '../infrastructure/db.client';
 import { ircStatusClient } from '../infrastructure/ircStatus.client';
@@ -20,6 +21,9 @@ import { logger } from '../infrastructure/logger';
 import { integrationConfigs } from '../schemas/integrationConfig.schema';
 import type { IRCConfigRequest, IRCConfigResponseData } from '../types/ircIntegration.types';
 import { EncryptionService } from './encryption.service';
+import { connectorManager } from './connector-manager';
+import { IRCConnector } from '../connectors/irc.connector';
+import { connectorStatusWiring } from './connector-status-wiring.service';
 
 export class IRCConfigService {
   /**
@@ -227,7 +231,6 @@ export class IRCConfigService {
    * Sets status to 'retrying' with attemptCount=0 for manual initiation
    * Idempotent: if already connected/connecting, returns current status
    *
-   * Note: Actual connection attempt is handled by connector manager
    * @returns Config object if available, null otherwise
    */
   async checkAndPrepareConnect(): Promise<{
@@ -266,9 +269,12 @@ export class IRCConfigService {
         ircStatusClient.setStatus('retrying', null, undefined);
       }
 
+      // Initiate actual connection via connectorManager
+      await this.initiateConnectorConnection(config);
+
       logger.info(
         { platform: 'irc', method: 'checkAndPrepareConnect' },
-        'IRC connection ready to initiate'
+        'IRC connection initiated'
       );
 
       return config;
@@ -280,6 +286,74 @@ export class IRCConfigService {
           error: error instanceof Error ? error.message : 'Unknown error',
         },
         'Failed to prepare IRC connection'
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Initiate actual IRC connector connection via connectorManager
+   * Creates/registers IRC connector if needed, applies config, and calls connect()
+   * Handles config changes with controlled reconnect
+   */
+  private async initiateConnectorConnection(config: {
+    server: string;
+    port: number;
+    username: string;
+    password?: string;
+    channels: string[];
+    source: 'db' | 'env';
+  }): Promise<void> {
+    try {
+      let ircConnector = connectorManager.getConnector('irc') as IRCConnector | undefined;
+
+      // Create and register connector if not exists
+      if (!ircConnector) {
+        logger.info(
+          { platform: 'irc', method: 'initiateConnectorConnection' },
+          'Creating and registering IRC connector'
+        );
+        ircConnector = new IRCConnector();
+        connectorManager.registerConnector('irc', ircConnector);
+        
+        // Wire status events so connector updates ircStatusClient
+        connectorStatusWiring.wire();
+      }
+
+      // Configure connector with stored config
+      ircConnector.setConfig({
+        platform: 'irc',
+        server: config.server,
+        port: config.port,
+        nick: config.username,
+        password: config.password,
+        channels: config.channels,
+      });
+
+      // Initiate connection (non-blocking; connector handles reconnect logic)
+      ircConnector.connect().catch((error) => {
+        logger.error(
+          {
+            platform: 'irc',
+            method: 'initiateConnectorConnection',
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'IRC connector connection failed (will retry with backoff)'
+        );
+      });
+
+      logger.debug(
+        { platform: 'irc', method: 'initiateConnectorConnection' },
+        'IRC connector connection initiated (non-blocking)'
+      );
+    } catch (error) {
+      logger.error(
+        {
+          platform: 'irc',
+          method: 'initiateConnectorConnection',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        'Failed to initiate connector connection'
       );
       throw error;
     }
@@ -384,6 +458,7 @@ export class IRCConfigService {
 
   /**
    * Create temporary IRC client and test connection with hard 10s timeout
+   * Uses irc-framework (same library as live connector)
    * Does not modify live connector state
    *
    * @returns Promise resolving to { success: boolean, message: string }
@@ -394,6 +469,10 @@ export class IRCConfigService {
     username: string;
     password?: string;
   }): Promise<{ success: boolean; message: string }> {
+    // Import at method level to avoid circular dependencies
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Client: IRCClient } = require('irc-framework');
+
     // Create timeout promise (10 seconds)
     const timeoutPromise = new Promise<{ success: boolean; message: string }>((_, reject) => {
       setTimeout(() => {
@@ -404,64 +483,77 @@ export class IRCConfigService {
     // Create connection test promise
     const connectionPromise = new Promise<{ success: boolean; message: string }>((resolve, reject) => {
       try {
-        // Dynamic import to avoid top-level dependency issues
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const irc = require('irc');
+        const testClient = new IRCClient();
 
-        const client = new irc.Client(config.server, config.username, {
-          port: config.port,
-          password: config.password,
-          // Don't auto-connect; we'll manually check
-          autoConnect: false,
-          secure: config.port === 6697 || config.port === 994,
-        });
+        let registered = false;
+        let testCompleted = false;
 
-        let connected = false;
-        const timeout = setTimeout(() => {
-          if (!connected) {
-            client.disconnect('Test timeout');
-            reject(new Error('Connection test timed out'));
+        const cleanup = () => {
+          try {
+            testClient.quit('Test complete');
+          } catch (err) {
+            logger.debug({ error: err }, 'Error during test client cleanup');
           }
-        }, 9500); // 9.5s to leave margin
+        };
 
-        client.addListener('registered', () => {
-          connected = true;
-          clearTimeout(timeout);
-          client.disconnect('Test complete');
-          resolve({
+        const finalize = (result: { success: boolean; message: string }) => {
+          if (!testCompleted) {
+            testCompleted = true;
+            cleanup();
+            resolve(result);
+          }
+        };
+
+        // Register event handler BEFORE connecting
+        testClient.on('registered', () => {
+          registered = true;
+          finalize({
             success: true,
             message: `Successfully connected to ${config.server}:${config.port}`,
           });
         });
 
-        client.addListener('error', (error: Error) => {
-          clearTimeout(timeout);
-          client.disconnect('Test error');
-          reject(
-            new Error(
-              `IRC connection error: ${error.message.substring(0, 100)}`
-            )
-          );
+        testClient.on('error', (error: { message: string }) => {
+          if (!testCompleted) {
+            testCompleted = true;
+            cleanup();
+            reject(
+              new Error(
+                `IRC connection error: ${(error.message || '').substring(0, 100)}`
+              )
+            );
+          }
         });
 
-        client.addListener('netError', (error: Error) => {
-          clearTimeout(timeout);
-          client.disconnect('Test network error');
-          reject(
-            new Error(
-              `IRC network error: ${error.message.substring(0, 100)}`
-            )
-          );
+        testClient.on('close', () => {
+          if (!registered && !testCompleted) {
+            testCompleted = true;
+            reject(new Error('IRC connection closed without registration'));
+          }
         });
 
-        // Initiate connection
-        client.connect(0, () => {
-          // Connected to server, waiting for 'registered' event
+        // Connect with proper settings for test
+        testClient.connect({
+          host: config.server,
+          port: config.port,
+          nick: config.username,
+          password: config.password,
+          gecos: 'IRC Test Client',
+          tls: config.port === 6697 || config.port === 994,
         });
+
+        // Fallback timeout to ensure hard 10s limit
+        setTimeout(() => {
+          if (!testCompleted) {
+            testCompleted = true;
+            cleanup();
+            reject(new Error('Connection test timed out (10s hard limit exceeded)'));
+          }
+        }, 10000);
       } catch (error) {
         reject(
           new Error(
-            `Failed to create IRC client: ${error instanceof Error ? error.message : 'Unknown error'}`
+            `Failed to create IRC test client: ${error instanceof Error ? error.message : 'Unknown error'}`
           )
         );
       }
