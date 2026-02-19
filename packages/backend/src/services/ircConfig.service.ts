@@ -48,12 +48,31 @@ export class IRCConfigService {
     let passwordUpdatedAt: Date | null = null;
 
     if (request.password && request.password.trim().length > 0) {
+      // Check if encryption key is available
+      if (!EncryptionService.isEncryptionAvailable()) {
+        logger.error(
+          { userId, platform: 'irc', method: 'saveConfig' },
+          'Cannot save password: encryption key missing'
+        );
+        throw new Error(
+          'Encryption key missing; cannot save password. Set INTEGRATION_CREDENTIALS_ENCRYPTION_KEY environment variable.'
+        );
+      }
+
       passwordEncrypted = EncryptionService.encrypt(request.password);
-      hasPassword = !!passwordEncrypted;
+      if (!passwordEncrypted) {
+        logger.error(
+          { userId, platform: 'irc', method: 'saveConfig' },
+          'Password encryption returned null'
+        );
+        throw new Error('Failed to encrypt password');
+      }
+
+      hasPassword = true;
       passwordUpdatedAt = new Date();
 
       logger.debug(
-        { userId, platform: 'irc', method: 'saveConfig', encrypted: !!passwordEncrypted },
+        { userId, platform: 'irc', method: 'saveConfig', encrypted: true },
         'Password encrypted for storage'
       );
     }
@@ -134,9 +153,22 @@ export class IRCConfigService {
           'IRC config retrieved from database'
         );
 
-        const password = dbConfig.passwordEncrypted
-          ? EncryptionService.decrypt(dbConfig.passwordEncrypted)
-          : undefined;
+        let password: string | undefined;
+        if (dbConfig.passwordEncrypted) {
+          try {
+            password = EncryptionService.decrypt(dbConfig.passwordEncrypted);
+          } catch (decryptError) {
+            logger.error(
+              {
+                platform: 'irc',
+                method: 'getStoredConfig',
+                error: decryptError instanceof Error ? decryptError.message : 'Unknown error',
+              },
+              'Failed to decrypt stored password'
+            );
+            throw new Error('Failed to decrypt IRC password. Encryption key may be invalid.');
+          }
+        }
 
         const channels = JSON.parse(dbConfig.channels) as string[];
 
@@ -259,16 +291,17 @@ export class IRCConfigService {
    * Timeout: hard 10 seconds
    *
    * @param testRequest - Optional test request (body-first)
-   * @returns { success: boolean, message: string }
+   * @returns { success: boolean, message: string, source }
    */
   async testConnection(
     testRequest?: { server?: string; port?: number; username?: string; password?: string }
   ): Promise<{ success: boolean; message: string; source: 'body' | 'db' | 'env' }> {
+    let source: 'body' | 'db' | 'env' = 'db';
+    
     try {
       let config:
         | { server: string; port: number; username: string; password?: string; source: 'body' | 'db' | 'env' }
         | null = null;
-      let source: 'body' | 'db' | 'env' = 'db';
 
       // Body-first test
       if (testRequest && (testRequest.server || testRequest.port || testRequest.username)) {
@@ -319,26 +352,24 @@ export class IRCConfigService {
         );
       }
 
-      // Create temporary test client (not exported, creates new IRC client)
-      // This is a placeholder; actual implementation would use irc-framework directly
       logger.info(
         { platform: 'irc', method: 'testConnection', server: config.server, port: config.port, source },
         'IRC connection test initiated'
       );
 
-      // Simulate test (real implementation would connect and verify)
-      // For now, basic validation: can reach server on port
+      // Test connection with hard 10s timeout
+      const result = await this.createAndTestTemporaryClient(config);
       return {
-        success: true,
-        message: `Connected to IRC server ${config.server}:${config.port}`,
+        ...result,
         source,
       };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error(
         {
           platform: 'irc',
           method: 'testConnection',
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: errorMessage,
         },
         'IRC connection test failed'
       );
@@ -346,9 +377,98 @@ export class IRCConfigService {
       return {
         success: false,
         message: 'Connection test failed',
-        source: 'db',
+        source,
       };
     }
+  }
+
+  /**
+   * Create temporary IRC client and test connection with hard 10s timeout
+   * Does not modify live connector state
+   *
+   * @returns Promise resolving to { success: boolean, message: string }
+   */
+  private async createAndTestTemporaryClient(config: {
+    server: string;
+    port: number;
+    username: string;
+    password?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    // Create timeout promise (10 seconds)
+    const timeoutPromise = new Promise<{ success: boolean; message: string }>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Connection test timed out (10s limit)'));
+      }, 10000);
+    });
+
+    // Create connection test promise
+    const connectionPromise = new Promise<{ success: boolean; message: string }>((resolve, reject) => {
+      try {
+        // Dynamic import to avoid top-level dependency issues
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const irc = require('irc');
+
+        const client = new irc.Client(config.server, config.username, {
+          port: config.port,
+          password: config.password,
+          // Don't auto-connect; we'll manually check
+          autoConnect: false,
+          secure: config.port === 6697 || config.port === 994,
+        });
+
+        let connected = false;
+        const timeout = setTimeout(() => {
+          if (!connected) {
+            client.disconnect('Test timeout');
+            reject(new Error('Connection test timed out'));
+          }
+        }, 9500); // 9.5s to leave margin
+
+        client.addListener('registered', () => {
+          connected = true;
+          clearTimeout(timeout);
+          client.disconnect('Test complete');
+          resolve({
+            success: true,
+            message: `Successfully connected to ${config.server}:${config.port}`,
+          });
+        });
+
+        client.addListener('error', (error: Error) => {
+          clearTimeout(timeout);
+          client.disconnect('Test error');
+          reject(
+            new Error(
+              `IRC connection error: ${error.message.substring(0, 100)}`
+            )
+          );
+        });
+
+        client.addListener('netError', (error: Error) => {
+          clearTimeout(timeout);
+          client.disconnect('Test network error');
+          reject(
+            new Error(
+              `IRC network error: ${error.message.substring(0, 100)}`
+            )
+          );
+        });
+
+        // Initiate connection
+        client.connect(0, () => {
+          // Connected to server, waiting for 'registered' event
+        });
+      } catch (error) {
+        reject(
+          new Error(
+            `Failed to create IRC client: ${error instanceof Error ? error.message : 'Unknown error'}`
+          )
+        );
+      }
+    });
+
+    // Race between connection test and timeout
+    return Promise.race([connectionPromise, timeoutPromise]);
   }
 
   /**

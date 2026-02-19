@@ -133,7 +133,7 @@ export class IRCIntegrationController {
    * If neither exists => 409 { code: 'irc_not_configured' }
    *
    * Idempotent: if already connected/connecting, returns 200 with current status
-   * Ignores request body if provided; do not validate/log
+   * Request body is ignored; side effect sets status='retrying' with attemptCount=0
    *
    * Response 200: { data: IRCConnectionStatusModel }
    * Error 409: irc_not_configured
@@ -153,8 +153,8 @@ export class IRCIntegrationController {
         'IRC manual connect request received'
       );
 
-      // Check if configured
-      const config = await ircConfigService.getStoredConfig();
+      // Check and prepare connection (sets status to retrying with attemptCount=0)
+      const config = await ircConfigService.checkAndPrepareConnect();
       if (!config) {
         logger.warn(
           { correlationId, userId, platform: 'irc', method: 'connect' },
@@ -177,8 +177,7 @@ export class IRCIntegrationController {
         } as IntegrationErrorResponse);
       }
 
-      // Get current IRC connector (would be injected in real app)
-      // For now, just return the status (placeholder)
+      // Get current status (now set to retrying with attemptCount=0)
       const status = ircIntegrationService.getConnectionStatus();
 
       // Audit log
@@ -192,7 +191,7 @@ export class IRCIntegrationController {
       });
 
       logger.info(
-        { correlationId, userId, platform: 'irc', method: 'connect', source: config.source },
+        { correlationId, userId, platform: 'irc', method: 'connect', source: config.source, status: status.status },
         'IRC manual connect initiated'
       );
 

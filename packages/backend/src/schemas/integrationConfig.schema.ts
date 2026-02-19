@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, timestamp, boolean, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, serial, integer, varchar, text, timestamp, boolean, uniqueIndex } from 'drizzle-orm/pg-core';
 import { users } from './user.schema';
 
 /**
@@ -31,7 +31,7 @@ export const integrationConfigs = pgTable(
      * Server port (e.g., 6667, 6697 for SSL)
      * Range: 1-65535
      */
-    port: serial('port').notNull(),
+    port: integer('port').notNull(),
     
     /**
      * Username/nick for authentication
