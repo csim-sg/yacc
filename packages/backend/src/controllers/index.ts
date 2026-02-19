@@ -25,6 +25,7 @@ import { BulkActionsController } from './bulkActions.controller.js';
 import { ConversationsController } from './conversations.controller.js';
 import { DLQController } from './dlq.controller.js';
 import { HealthController } from './health.controller.js';
+import { IRCIntegrationController } from './ircIntegration.controller.js';
 import { MessageController } from './message.controller.js';
 import { NotesController } from './notes.controller.js';
 import { NotificationsController } from './notifications.controller.js';
@@ -41,6 +42,7 @@ export const controllers = [
   ConversationsController,
   DLQController,
   HealthController,
+  IRCIntegrationController,
   MessageController,
   NotesController,
   NotificationsController,

@@ -125,7 +125,7 @@ INT-013, INT-014 (Tests)
 - **Acceptance Criteria**:
   - Disconnects trigger reconnect attempts with backoff
   - Max 5 attempts enforced
-  - Queued messages processed on reconnect
+  - Fail-fast on send; BullMQ handles retry/DLQ logic
 
 **Backoff policy (authoritative)**
 - Delay before attempt `n` (1-indexed) is `min(60s, 2^(n-1) * 1s)`
