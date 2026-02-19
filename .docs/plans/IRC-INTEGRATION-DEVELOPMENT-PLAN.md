@@ -74,7 +74,7 @@ INT-013, INT-014 (Tests)
 - **Deliverables**:
   - Replace mock implementation with actual IRC client
   - Handlers for connection events (connected, disconnected, error)
-  - Status management (connected/reconnecting/disconnected/error)
+  - Status management (connected/retrying/disconnected/failed)
   - Fail-fast on send; BullMQ retry/DLQ handles offline message recovery
 - **Dependencies**: BE-001 (PostgreSQL), BE-002 (schema)
 - **Acceptance Criteria**:
@@ -190,14 +190,14 @@ INT-013, INT-014 (Tests)
 #### INT-009: IRC Status Endpoint
 - **Description**: Get current IRC connection status
 - **Deliverables**:
-   - `GET /api/integrations/irc/status`
-   - Return: connected/disconnected status
-   - Include: timestamps, error message, reconnect attempts
-   - RBAC: admin+ only
+    - `GET /api/integrations/irc/status`
+    - Return: connected/retrying/disconnected/failed status
+    - Include: timestamps, error message, reconnect attempts
+    - RBAC: admin+ only
 - **Dependencies**: INT-005
 - **Acceptance Criteria**:
-   - Status endpoint returns correct data
-   - RBAC enforced
+    - Status endpoint returns correct data
+    - RBAC enforced
 
 ### Phase 3: Mapping & Error Handling (INT-010 to INT-012)
 
