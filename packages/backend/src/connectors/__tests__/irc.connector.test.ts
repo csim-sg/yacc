@@ -12,7 +12,16 @@ vi.mock('../../infrastructure/logger', () => ({
 }));
 
 // Mock IRC framework with proper event emitter
-let lastCreatedClient: any = null;
+// Using unknown type here to avoid any, but @ts-ignore on usages is necessary due to vitest mock hoisting
+let lastCreatedClient: unknown = null;
+
+// Helper function to safely emit events on mock client (typed approach to avoid any casts)
+function emitClientEvent(eventName: string, ...args: unknown[]): void {
+  if (lastCreatedClient && typeof lastCreatedClient === 'object' && 'emit' in lastCreatedClient) {
+    const client = lastCreatedClient as { emit: (name: string, ...a: unknown[]) => boolean };
+    client.emit(eventName, ...args);
+  }
+}
 
 vi.mock('irc-framework', () => {
   const { EventEmitter } = require('events');
@@ -400,7 +409,7 @@ describe('IRCConnector', () => {
            await vi.advanceTimersByTimeAsync(50);
            
            // Now emit 'registered' to signal successful handshake
-           lastCreatedClient?.emit('registered');
+           emitClientEvent('registered');
            
            // Wait for the handlers to process and status to update
            await vi.advanceTimersByTimeAsync(50);
@@ -449,14 +458,14 @@ describe('IRCConnector', () => {
            // First connect successfully
            const connectPromise = connector.connect();
            await vi.advanceTimersByTimeAsync(50);
-           lastCreatedClient?.emit('registered');
+           emitClientEvent('registered');
            await vi.advanceTimersByTimeAsync(50);
            
            let status = connector.getConnectionStatus();
            expect(status.status).toBe('connected');
 
            // Now emit close event
-           lastCreatedClient?.emit('close');
+           emitClientEvent('close');
            await vi.advanceTimersByTimeAsync(10);
 
            // Verify status changed
@@ -474,7 +483,7 @@ describe('IRCConnector', () => {
            await vi.advanceTimersByTimeAsync(50);
            
            // Emit error during handshake
-           lastCreatedClient?.emit('error', new Error('boom'));
+           emitClientEvent('error', new Error('boom'));
            await vi.advanceTimersByTimeAsync(10);
            
            // Verify error was logged
@@ -494,13 +503,13 @@ describe('IRCConnector', () => {
            // Connect successfully
            const connectPromise = connector.connect();
            await vi.advanceTimersByTimeAsync(50);
-           lastCreatedClient?.emit('registered');
+           emitClientEvent('registered');
            await vi.advanceTimersByTimeAsync(50);
            
            expect(connector.getConnectionStatus().status).toBe('connected');
            
            // Now emit close event
-           lastCreatedClient?.emit('close');
+           emitClientEvent('close');
            await vi.advanceTimersByTimeAsync(10);
            
            // Verify status changed to disconnected
@@ -521,7 +530,7 @@ describe('IRCConnector', () => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
-           lastCreatedClient?.emit('error', new Error('fail'));
+           emitClientEvent('error', new Error('fail'));
            await vi.advanceTimersByTimeAsync(10);
            
            // Verify a scheduling log was created with delayMs
@@ -530,11 +539,14 @@ describe('IRCConnector', () => {
            );
            expect(schedulingLogs.length).toBeGreaterThan(0);
            
-           // Verify the first delay is 1000ms
-           if (schedulingLogs.length > 0) {
-             const logObj = schedulingLogs[0][0];
-             expect((logObj as any).delayMs).toBe(1000);
-           }
+            // Verify the first delay is 1000ms
+            if (schedulingLogs.length > 0) {
+              const logObj = schedulingLogs[0][0];
+              if (logObj && typeof logObj === 'object' && 'delayMs' in logObj) {
+                const payload = logObj as Record<string, unknown>;
+                expect(payload.delayMs).toBe(1000);
+              }
+            }
          });
 
          it('(EA: Timer Behavior) should attempt reconnect after delay expires', async () => {
@@ -545,7 +557,7 @@ describe('IRCConnector', () => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
-           lastCreatedClient?.emit('error', new Error('fail'));
+           emitClientEvent('error', new Error('fail'));
            await vi.advanceTimersByTimeAsync(10);
            
            // Clear and advance past the 1s delay
@@ -572,11 +584,11 @@ describe('IRCConnector', () => {
                  // Expected failure, catch it
                });
                await vi.advanceTimersByTimeAsync(50);
-               lastCreatedClient?.emit('error', new Error('fail'));
+               emitClientEvent('error', new Error('fail'));
                await vi.advanceTimersByTimeAsync(10);
              } else {
                // Re-trigger failure to schedule next attempt
-               lastCreatedClient?.emit('error', new Error('fail'));
+               emitClientEvent('error', new Error('fail'));
                await vi.advanceTimersByTimeAsync(10);
              }
              
@@ -585,12 +597,16 @@ describe('IRCConnector', () => {
                .filter((call) => (call[1] as string)?.includes('Scheduling'))
                .slice(-1);
              
-             if (schedulingLogs.length > 0) {
-               const logObj = schedulingLogs[0][0];
-               if (logObj && typeof logObj === 'object' && 'delayMs' in logObj) {
-                 recordedDelays.push((logObj as any).delayMs);
-               }
-             }
+              if (schedulingLogs.length > 0) {
+                const logObj = schedulingLogs[0][0];
+                if (logObj && typeof logObj === 'object' && 'delayMs' in logObj) {
+                  const payload = logObj as Record<string, unknown>;
+                  const delayMs = payload.delayMs;
+                  if (typeof delayMs === 'number') {
+                    recordedDelays.push(delayMs);
+                  }
+                }
+              }
              
              // Advance to the scheduled time to allow the reconnect to fire
              const nextDelay = attempt === 0 ? 1000 : recordedDelays[attempt] || 1000;
@@ -614,7 +630,7 @@ describe('IRCConnector', () => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
-           lastCreatedClient?.emit('error', new Error('fail'));
+           emitClientEvent('error', new Error('fail'));
            await vi.advanceTimersByTimeAsync(10);
            
            // Count scheduling logs from first failure
@@ -623,7 +639,7 @@ describe('IRCConnector', () => {
            ).length;
            
            // Emit another error immediately (should not schedule a second timer)
-           lastCreatedClient?.emit('error', new Error('fail again'));
+           emitClientEvent('error', new Error('fail again'));
            await vi.advanceTimersByTimeAsync(10);
            
            // Count scheduling logs after second error
@@ -642,13 +658,13 @@ describe('IRCConnector', () => {
            // First successful connection
            const connectPromise = connector.connect();
            await vi.advanceTimersByTimeAsync(50);
-           lastCreatedClient?.emit('registered');
+           emitClientEvent('registered');
            await vi.advanceTimersByTimeAsync(50);
            
            expect(connector.getConnectionStatus().reconnectAttempts).toBe(0);
            
            // Disconnect
-           lastCreatedClient?.emit('close');
+           emitClientEvent('close');
            await vi.advanceTimersByTimeAsync(10);
            
            // Check reconnect scheduling
@@ -656,14 +672,17 @@ describe('IRCConnector', () => {
              .filter((call) => (call[1] as string)?.includes('Scheduling'))
              .slice(-1);
            
-           if (schedulingLogs.length > 0) {
-             const logObj = schedulingLogs[0][0];
-             if (logObj && typeof logObj === 'object' && 'delayMs' in logObj) {
-               // First attempt after success should be 1000ms
-               expect((logObj as any).delayMs).toBe(1000);
-               expect((logObj as any).attempt).toBe(1);
-             }
-           }
+            if (schedulingLogs.length > 0) {
+              const logObj = schedulingLogs[0][0];
+              if (logObj && typeof logObj === 'object') {
+                const payload = logObj as Record<string, unknown>;
+                if ('delayMs' in payload && 'attempt' in payload) {
+                  // First attempt after success should be 1000ms
+                  expect(payload.delayMs).toBe(1000);
+                  expect(payload.attempt).toBe(1);
+                }
+              }
+            }
          });
 
          it('(EA: Exhaustion After 5 Failures) should mark status as failed and stop scheduling after 5 attempts', async () => {
@@ -675,7 +694,7 @@ describe('IRCConnector', () => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
-           lastCreatedClient?.emit('error', new Error('fail'));
+           emitClientEvent('error', new Error('fail'));
            await vi.advanceTimersByTimeAsync(10);
            
            // Count scheduling logs before loop
@@ -688,7 +707,7 @@ describe('IRCConnector', () => {
              await vi.advanceTimersByTimeAsync(delayMs + 50);
              
              // Emit error to fail this attempt and schedule the next
-             lastCreatedClient?.emit('error', new Error('fail'));
+             emitClientEvent('error', new Error('fail'));
              await vi.advanceTimersByTimeAsync(10);
              
              // Track scheduling log count
@@ -714,7 +733,7 @@ describe('IRCConnector', () => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
-           lastCreatedClient?.emit('error', new Error('fail'));
+           emitClientEvent('error', new Error('fail'));
            await vi.advanceTimersByTimeAsync(10);
            
            // Now manually disconnect
@@ -742,7 +761,7 @@ describe('IRCConnector', () => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
-           lastCreatedClient?.emit('error', new Error('fail'));
+           emitClientEvent('error', new Error('fail'));
            await vi.advanceTimersByTimeAsync(10);
            
            const schedulingLogs = vi.mocked(logger).info.mock.calls.filter(
@@ -751,14 +770,19 @@ describe('IRCConnector', () => {
            
            expect(schedulingLogs.length).toBeGreaterThan(0);
            
-           schedulingLogs.forEach((log) => {
-             const logObj = log[0];
-             expect(logObj).toHaveProperty('maxAttempts', 5);
-             expect(logObj).toHaveProperty('delayMs');
-             const delayMs = (logObj as any).delayMs;
-             expect(delayMs).toBeGreaterThanOrEqual(1000);
-             expect(delayMs).toBeLessThanOrEqual(60000);
-           });
+            schedulingLogs.forEach((log) => {
+              const logObj = log[0];
+              expect(logObj).toHaveProperty('maxAttempts', 5);
+              expect(logObj).toHaveProperty('delayMs');
+              if (logObj && typeof logObj === 'object') {
+                const payload = logObj as Record<string, unknown>;
+                const delayMs = payload.delayMs;
+                if (typeof delayMs === 'number') {
+                  expect(delayMs).toBeGreaterThanOrEqual(1000);
+                  expect(delayMs).toBeLessThanOrEqual(60000);
+                }
+              }
+            });
          });
 
          it('(EA: Correlation IDs) should include both correlationId and reconnectIncidentId in scheduling logs', async () => {
@@ -769,7 +793,7 @@ describe('IRCConnector', () => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
-           lastCreatedClient?.emit('error', new Error('fail'));
+           emitClientEvent('error', new Error('fail'));
            await vi.advanceTimersByTimeAsync(10);
            
            const schedulingLogs = vi.mocked(logger).info.mock.calls.filter(
@@ -778,13 +802,16 @@ describe('IRCConnector', () => {
            
            expect(schedulingLogs.length).toBeGreaterThan(0);
            
-           schedulingLogs.forEach((log) => {
-             const logObj = log[0];
-             expect(logObj).toHaveProperty('correlationId');
-             expect(logObj).toHaveProperty('reconnectIncidentId');
-             expect((logObj as any).correlationId).toBeTruthy();
-             expect((logObj as any).reconnectIncidentId).toBeTruthy();
-           });
+            schedulingLogs.forEach((log) => {
+              const logObj = log[0];
+              expect(logObj).toHaveProperty('correlationId');
+              expect(logObj).toHaveProperty('reconnectIncidentId');
+              if (logObj && typeof logObj === 'object') {
+                const payload = logObj as Record<string, unknown>;
+                expect(payload.correlationId).toBeTruthy();
+                expect(payload.reconnectIncidentId).toBeTruthy();
+              }
+            });
          });
        });
     });
