@@ -319,9 +319,9 @@ export class IRCIntegrationController {
         }
 
         if (type === 'timeout') {
-          return res.status(408).json({
+          return res.status(500).json({
             code: 'internal_error',
-            message: 'Connection test timed out (10s limit exceeded)',
+            message: 'Connection test failed',
           } as IntegrationErrorResponse);
         }
 
