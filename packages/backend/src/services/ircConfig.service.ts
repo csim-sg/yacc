@@ -311,6 +311,7 @@ export class IRCConfigService {
    * Initiate actual IRC connector connection via connectorManager
    * Creates/registers IRC connector if needed, applies config, and calls connect()
    * Handles config changes with controlled reconnect
+   * Ensures status wiring is active (idempotent, safe to call multiple times)
    */
   private async initiateConnectorConnection(config: {
     server: string;
@@ -331,10 +332,11 @@ export class IRCConfigService {
         );
         ircConnector = new IRCConnector();
         connectorManager.registerConnector('irc', ircConnector);
-        
-        // Wire status events so connector updates ircStatusClient
-        connectorStatusWiring.wire();
       }
+
+      // Wire status events so connector updates ircStatusClient
+      // Idempotent: safe to call even if already wired (startup path or INT-007 path)
+      connectorStatusWiring.wire();
 
       // Configure connector with stored config
       ircConnector.setConfig({
