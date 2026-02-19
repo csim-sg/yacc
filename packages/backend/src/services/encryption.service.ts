@@ -158,7 +158,7 @@ export class EncryptionService {
    * @param obj - Object to encrypt
    * @returns Encrypted string
    */
-  public static encryptJSON(obj: any): string | null {
+  public static encryptJSON<T = unknown>(obj: T): string | null {
     return this.encrypt(JSON.stringify(obj));
   }
 
@@ -167,9 +167,9 @@ export class EncryptionService {
    * @param encrypted - Encrypted string from encryptJSON()
    * @returns Decrypted object
    */
-  public static decryptJSON(encrypted: string): any {
+  public static decryptJSON<T = unknown>(encrypted: string): T {
     const decrypted = this.decrypt(encrypted);
-    return JSON.parse(decrypted);
+    return JSON.parse(decrypted) as T;
   }
 }
 

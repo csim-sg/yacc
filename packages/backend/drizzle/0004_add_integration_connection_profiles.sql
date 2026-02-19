@@ -7,7 +7,7 @@ CREATE TABLE "integration_connection_profiles" (
 	"is_active" boolean DEFAULT false NOT NULL,
 	"encrypted_credentials" text NOT NULL,
 	"config" text NOT NULL,
-	"created_by_id" text NOT NULL,
+	"created_by_id" text,
 	"updated_by_id" text,
 	"last_tested_at" timestamp,
 	"last_test_passed" boolean,

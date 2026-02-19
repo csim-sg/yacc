@@ -30,6 +30,7 @@ import {
   IrcProfileConfig,
   IrcProfileSecrets,
 } from '../types/ircProfile.types';
+import { IrcProfileError } from '../types/ircProfileError.types';
 import { User } from '../schemas/user.schema';
 
 /**
@@ -63,12 +64,11 @@ export async function createIrcProfile(
     );
 
   if (existingProfiles.length >= IRC_PROFILE_CAP) {
-    const err = new Error(
-      `IRC profile limit exceeded (cap: ${IRC_PROFILE_CAP})`
+    throw new IrcProfileError(
+      `IRC profile limit exceeded (cap: ${IRC_PROFILE_CAP})`,
+      IrcProfileErrorCode.PROFILE_LIMIT_EXCEEDED,
+      409
     );
-    (err as any).code = IrcProfileErrorCode.PROFILE_LIMIT_EXCEEDED;
-    (err as any).statusCode = 409;
-    throw err;
   }
 
   // Encrypt credentials
@@ -82,10 +82,11 @@ export async function createIrcProfile(
     encryptedCredentials = encrypted;
   } catch (error) {
     logger.error({ err: error }, 'Failed to encrypt IRC profile credentials');
-    const err = new Error('Failed to encrypt credentials');
-    (err as any).code = IrcProfileErrorCode.ENCRYPTION_KEY_MISSING;
-    (err as any).statusCode = 400;
-    throw err;
+    throw new IrcProfileError(
+      'Failed to encrypt credentials',
+      IrcProfileErrorCode.ENCRYPTION_KEY_MISSING,
+      400
+    );
   }
 
   // Serialize config
@@ -208,9 +209,11 @@ export async function updateIrcProfile(
     .limit(1);
 
   if (current.length === 0) {
-    const err = new Error('IRC profile not found');
-    (err as any).statusCode = 404;
-    throw err;
+    throw new IrcProfileError(
+      'IRC profile not found',
+      IrcProfileErrorCode.FORBIDDEN,
+      404
+    );
   }
 
   const profile = current[0];
@@ -261,10 +264,11 @@ export async function updateIrcProfile(
       updateData.encryptedCredentials = encrypted;
     } catch (error) {
       logger.error({ err: error, profileId }, 'Failed to encrypt IRC profile credentials during update');
-      const err = new Error('Failed to encrypt credentials');
-      (err as any).code = IrcProfileErrorCode.ENCRYPTION_KEY_MISSING;
-      (err as any).statusCode = 400;
-      throw err;
+      throw new IrcProfileError(
+        'Failed to encrypt credentials',
+        IrcProfileErrorCode.ENCRYPTION_KEY_MISSING,
+        400
+      );
     }
   }
 
@@ -323,17 +327,20 @@ export async function activateIrcProfile(
     .limit(1);
 
   if (profile.length === 0) {
-    const err = new Error('IRC profile not found');
-    (err as any).statusCode = 404;
-    throw err;
+    throw new IrcProfileError(
+      'IRC profile not found',
+      IrcProfileErrorCode.FORBIDDEN,
+      404
+    );
   }
 
   // Check: cannot activate disabled profile
   if (!profile[0].isEnabled) {
-    const err = new Error('Cannot activate a disabled profile');
-    (err as any).code = IrcProfileErrorCode.CANNOT_ACTIVATE_DISABLED;
-    (err as any).statusCode = 409;
-    throw err;
+    throw new IrcProfileError(
+      'Cannot activate a disabled profile',
+      IrcProfileErrorCode.CANNOT_ACTIVATE_DISABLED,
+      409
+    );
   }
 
   // Deactivate any currently active profile (atomic transaction)
@@ -402,9 +409,11 @@ export async function disableIrcProfile(
     .limit(1);
 
   if (profile.length === 0) {
-    const err = new Error('IRC profile not found');
-    (err as any).statusCode = 404;
-    throw err;
+    throw new IrcProfileError(
+      'IRC profile not found',
+      IrcProfileErrorCode.FORBIDDEN,
+      404
+    );
   }
 
   const updated = await dbClient
@@ -456,17 +465,20 @@ export async function deleteIrcProfile(
     .limit(1);
 
   if (profile.length === 0) {
-    const err = new Error('IRC profile not found');
-    (err as any).statusCode = 404;
-    throw err;
+    throw new IrcProfileError(
+      'IRC profile not found',
+      IrcProfileErrorCode.FORBIDDEN,
+      404
+    );
   }
 
   // Reject delete if profile is active
   if (profile[0].isActive) {
-    const err = new Error('Cannot delete an active profile');
-    (err as any).code = IrcProfileErrorCode.CANNOT_DELETE_ACTIVE;
-    (err as any).statusCode = 409;
-    throw err;
+    throw new IrcProfileError(
+      'Cannot delete an active profile',
+      IrcProfileErrorCode.CANNOT_DELETE_ACTIVE,
+      409
+    );
   }
 
   await dbClient
@@ -511,7 +523,7 @@ export async function getActiveIrcProfile(
   const profile = active[0];
   let decrypted: IrcProfileSecrets;
   try {
-    decrypted = EncryptionService.decryptJSON(profile.encryptedCredentials) as IrcProfileSecrets;
+    decrypted = EncryptionService.decryptJSON<IrcProfileSecrets>(profile.encryptedCredentials);
   } catch (error) {
     logger.error({ err: error, profileId: profile.id }, 'Failed to decrypt active IRC profile secrets');
     throw new Error('Failed to decrypt profile credentials');
@@ -599,9 +611,10 @@ function toResponseNoSecrets(
  */
 export async function validateEncryptionKeyConfigured(): Promise<void> {
   if (!process.env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY) {
-    const err = new Error('Encryption key not configured');
-    (err as any).code = IrcProfileErrorCode.ENCRYPTION_KEY_MISSING;
-    (err as any).statusCode = 400;
-    throw err;
+    throw new IrcProfileError(
+      'Encryption key not configured',
+      IrcProfileErrorCode.ENCRYPTION_KEY_MISSING,
+      400
+    );
   }
 }
