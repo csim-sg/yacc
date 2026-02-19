@@ -1,6 +1,6 @@
 # IRC Integration Tasks Development Plan
 
-**Status**: INT-001-005 completed; INT-006/007/008 in review; INT-009 completed  
+**Status**: INT-001-009 completed (PR #263 merged for INT-006/007/008)  
 **Created**: February 15, 2026  
 **Target**: Phase 1 MVP completion  
 **Focus**: Backend IRC connector implementation with full message lifecycle
