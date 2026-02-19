@@ -1447,7 +1447,7 @@ Manual connect initiation using stored config. Request body is ignored; uses DB 
 - `500 internal_error`: Connector or configuration loading failure
 
 **Notes**:
-- Request body completely ignored (for idempotency and simplicity)
+- Request body completely ignored (to avoid ambiguity; connect uses stored config only)
 - Audit logged with source (db|env) and reconnect flag
 - Actual connection status updates pushed via WebSocket to clients
 

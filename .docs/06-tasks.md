@@ -1,7 +1,7 @@
 # 06. Issues & User stories
 
 **Last Updated**: February 19, 2026  
-**Status**: ✅ Phase 1 COMPLETE; ✅ Phase 2 COMPLETE; ✅ MVP stage  
+**Status**: ⏳ Phase 1 in progress (IRC admin endpoints); ✅ Phase 2 COMPLETE; ✅ MVP stage  
 **Current focus**: Post-MVP backlog / hardening (GitHub Project is source of truth)  
 **Governance**: ADR-003, ADR-014, ADR-015, GOV-026
 
@@ -237,11 +237,11 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | INT-002 | Implement IRC message ingestion (inbound messages → inbox) | **Done** (PR #257 merged) | P0 | Backend | BE-002, INT-001 | Inbound messages create conversations/messages in DB; WebSocket `message.received` backlog-aware; tests passing | PVTI_lAHOAB4wV84BNGcwzgkHbAU | 129 |
 | INT-003 | Implement IRC message delivery (outbound messages → IRC channel) | **Done** (PR #259 merged) | P0 | Backend | BE-010, INT-001 | Messages sent to IRC channel, status updated to sent/failed | PVTI_lAHOAB4wV84BNGcwzgkHbB4 | 130 |
 | INT-004 | Implement IRC auto-reconnect with exponential backoff (1s → 60s max, 5 attempts) | **Done** (PR #260 merged) | P0 | Backend | INT-001 | Disconnects trigger reconnect attempts with backoff; strict timer boundary + post-exhaustion disconnect behavioral tests | PVTI_lAHOAB4wV84BNGcwzgj_824 | 60 |
-| INT-005 | Implement IRC connection status tracking (connected/retrying/disconnected/failed) | **In Progress** | P0 | Backend | INT-004 | Status stored in runtime memory (no DB persistence for MVP); exposed via endpoint + WebSocket | PVTI_lAHOAB4wV84BNGcwzgj_6NE | 59 |
-| INT-006 | Create IRC configuration endpoint (POST /api/integrations/irc/config) | **In Review** (PR #263) | P0 | Backend | BE-005 | Saves server, port, username, password, channels with AES-256-GCM encryption; validates all fields; RBAC super_admin only; audit logged; migration 0003 creates table | PVTI_lAHOAB4wV84BNGcwzgj_6MQ | 53 |
-| INT-007 | Create IRC connect endpoint (POST /api/integrations/irc/connect) | **In Review** (PR #263) | P0 | Backend | INT-006 | Initiates non-blocking connection from stored config; sets status=retrying, attemptCount=0; uses connectorManager; 409 if not configured | PVTI_lAHOAB4wV84BNGcwzgj_6Mk | 50 |
-| INT-008 | Create IRC connection test endpoint (POST /api/integrations/irc/test) | **In Review** (PR #263) | P0 | Backend | INT-001 | Tests connection with hard 10s timeout; body-first validation with stored config fallback; uses irc-framework Client; no state changes; audit logged | PVTI_lAHOAB4wV84BNGcwzgj_6MY | 55 |
-| INT-009 | Implement IRC connection status endpoint (GET /api/integrations/irc/status) | **In Progress** | P0 | Backend | INT-005 | Returns current connection status; RBAC admin+; no secrets exposed | PVTI_lAHOAB4wV84BNGcwzgj_6Mc | 57 |
+| INT-005 | Implement IRC connection status tracking (connected/retrying/disconnected/failed) | **Done** (PR #261 merged) | P0 | Backend | INT-004 | Status stored in runtime memory (no DB persistence for MVP); exposed via endpoint + WebSocket | PVTI_lAHOAB4wV84BNGcwzgj_6NE | 59 |
+| INT-006 | Create IRC configuration endpoint (POST /api/integrations/irc/config) | **In Review** (PR #263) | P0 | Backend | BE-005 | Saves server, port, username, password, channels with AES-256-GCM encryption; validates all fields; RBAC super_admin only; audit logged; DB migration exists for `integration_configs` | PVTI_lAHOAB4wV84BNGcwzgj_6MQ | 53 |
+| INT-007 | Create IRC connect endpoint (POST /api/integrations/irc/connect) | **In Review** (PR #263) | P0 | Backend | INT-006 | Initiates non-blocking connection from stored config; each call forces status=retrying and resets attemptCount=0; uses connectorManager; `409 irc_not_configured` if not configured | PVTI_lAHOAB4wV84BNGcwzgj_6Mk | 50 |
+| INT-008 | Create IRC connection test endpoint (POST /api/integrations/irc/test) | **In Review** (PR #263) | P0 | Backend | INT-001 | Tests connection with hard 10s timeout (timeout returns `500 internal_error`); body-first validation with stored config fallback; uses irc-framework Client; no state changes; audit logged | PVTI_lAHOAB4wV84BNGcwzgj_6MY | 55 |
+| INT-009 | Implement IRC connection status endpoint (GET /api/integrations/irc/status) | **Done** (PR #262 merged) | P0 | Backend | INT-005 | Returns current connection status; RBAC admin+; no secrets exposed | PVTI_lAHOAB4wV84BNGcwzgj_6Mc | 57 |
 | INT-010 | Implement IRC environment variable management (store credentials securely) | Not Started | P1 | Backend | INT-006 | Credentials loaded from env vars on startup | PVTI_lAHOAB4wV84BNGcwzgj_6Mo | 61 |
 | INT-011 | Map IRC channels to conversations (one conversation per channel) | Not Started | P0 | Backend | INT-002, BE-002 | Channel joins create/update conversations, external_thread_id = channel name | PVTI_lAHOAB4wV84BNGcwzgj_6M4 | 65 |
 | INT-012 | Handle IRC connection errors (logging, DLQ for failed messages) | Not Started | P1 | Backend | INT-001, BE-015 | Connection errors logged, failed messages moved to DLQ | PVTI_lAHOAB4wV84BNGcwzgj_6NY | 64 |
@@ -270,7 +270,7 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
 | DOC-001 | Update Phase 1 scope (Telegram + IRC; Phase 2 = WhatsApp/WeChat/Meta/X) | Completed | P0 | Product Owner | SV-001 | Phase 1 scope aligned; Architect review approved | PVTI_lAHOAB4wV84BNGcwzgj_6gY | 69 |
-| DOC-002 | Update 02-api-and-data-model.md with IRC-specific endpoints | Not Started | P1 | Backend | INT-009 | IRC endpoints documented with request/response examples | PVTI_lAHOAB4wV84BNGcwzgj_6f8 | 72 |
+| DOC-002 | Update 02-api-and-data-model.md with IRC-specific endpoints | **Done** (updated INT-006/007/008 contract) | P1 | Backend | INT-009 | IRC endpoints documented with request/response examples | PVTI_lAHOAB4wV84BNGcwzgj_6f8 | 72 |
 | DOC-003 | Update 03-implementation-guide.md with IRC connector architecture | Not Started | P1 | Backend | INT-001 | IRC integration documented in architecture section | PVTI_lAHOAB4wV84BNGcwzgj_9kw | 67 |
 | DOC-004 | Create IRC integration guide (setup, configuration, troubleshooting) | Not Started | P1 | Backend | INT-004 | Step-by-step guide for connecting IRC to YACC | PVTI_lAHOAB4wV84BNGcwzgj_6hc | 87 |
 | DOC-005 | Update 05-quick-reference.md with Phase 1 endpoint list | Not Started | P1 | Product Owner | BE-025 | All Phase 1 endpoints listed in quick reference | PVTI_lAHOAB4wV84BNGcwzgj_7Ew | 98 |

@@ -55,7 +55,7 @@ CREATE TABLE integration_configs (
 ### Configuration Source Priority
 1. **Primary**: DB `integration_configs` table (encrypted)
 2. **Fallback**: Environment variables (IRC_SERVER, IRC_USERNAME, IRC_PASSWORD, IRC_CHANNELS)
-3. **None**: Return 409 not_configured if neither exists
+3. **None**: Return 409 irc_not_configured if neither exists
 
 **Rationale**: 
 - DB allows runtime configuration without env var changes
@@ -82,6 +82,10 @@ CREATE TABLE integration_configs (
 - **Side Effects**: None (test uses temporary client)
 - **Audit**: Logs `integration.irc.test_requested` and `integration.irc.test_result` with source and success flag
 
+**Body-first strict mode**:
+- If any of `server` / `port` / `username` is present in the request body, all three are required.
+- Otherwise, an empty body `{}` uses stored config (DB first, then env fallback).
+
 ### Audit Logging
 **Never audit plaintext passwords.** Metadata logged instead:
 ```json
@@ -100,9 +104,11 @@ CREATE TABLE integration_configs (
 ```
 
 ### Error Codes
-- **400 validation_error**: Invalid server/port/username/channels format
+- **400 validation_error**: Invalid server/port/username/channels format; or INT-008 body-first missing required fields
+- **400 encryption_key_missing**: INT-006 password provided but `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` not set
 - **403 forbidden**: Non-super_admin user attempts INT-006/007/008
 - **409 irc_not_configured**: Neither DB nor env config exists for INT-007/008
+- **500 internal_error**: Unexpected failures (DB/encryption/connector/test timeout)
 
 ### Key Initialization
 `EncryptionService.initializeKey()` called at application startup:

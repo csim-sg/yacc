@@ -733,21 +733,22 @@ packages/frontend/tests/acceptance/phase1/
    - IRC connector joins new channel
    - Expect: Conversation created, channel=irc
 
-7. HP-INT-006: INT-006 - Save IRC config with all required fields
-   - POST `/api/integrations/irc/config` with valid server, port, nick, password, channels
-   - Expect: 201, `{ success: true, message: "IRC configuration saved" }`
-   - Verify: Password encrypted in database, audit log created
+7. HP-INT-007: INT-006 - Save IRC config with all required fields (no side effects)
+   - POST `/api/integrations/irc/config` with valid `server`, `port`, `username`, optional `password`, `channels`
+   - Expect: 200, `{ data: { server, port, username, channels, hasPassword, updatedAt } }`
+   - Verify: Response does NOT include `password`; audit metadata contains no plaintext password
+   - Verify: Save does NOT trigger live connector connect or status changes
 
-8. HP-INT-007: INT-007 - Initiate IRC connection from stored config
-   - First save config (HP-INT-006)
+8. HP-INT-008: INT-007 - Initiate IRC connection from stored config (manual semantics)
+   - First save config (HP-INT-007)
    - POST `/api/integrations/irc/connect` (body ignored)
-   - Expect: 200, `{ status: "retrying", attemptCount: 0, lastAttemptAt: "..." }`
-   - Verify: Connector.connect() called non-blocking, connection happens asynchronously
+   - Expect: 200, `{ data: { status: "retrying", attemptCount: 0, lastChangedAt: "...", lastConnectedAt: null, lastError: null } }`
+   - Verify: attemptCount is reset to 0 on manual connect; connect is non-blocking
 
-9. HP-INT-008: INT-008 - Test IRC connection with provided credentials
-   - POST `/api/integrations/irc/test` with server, port, nick, password
-   - Expect: 200, `{ success: true, message: "Connection successful" }`
-   - Verify: Socket disconnected cleanly, 10s timeout enforced
+9. HP-INT-009: INT-008 - Test IRC connection with provided credentials (body-first)
+   - POST `/api/integrations/irc/test` with `server`, `port`, `username`, optional `password`
+   - Expect: 200, `{ data: { success: true, message: "..." } }`
+   - Verify: 10s timeout enforced; response/error never contains credentials
 
 **Edge Case Tests (6)**:
 10. EDGE-INT-001: Telegram API timeout → message queued for retry
@@ -767,34 +768,33 @@ packages/frontend/tests/acceptance/phase1/
     - Expect: 400, payload validation error
 
 14. EDGE-INT-006: INT-006 - Config missing encryption key
-    - Unset INTEGRATION_CREDENTIALS_ENCRYPTION_KEY
-    - POST `/api/integrations/irc/config` with password
-    - Expect: 400, "Encryption key not configured"
+     - Unset INTEGRATION_CREDENTIALS_ENCRYPTION_KEY
+     - POST `/api/integrations/irc/config` with password
+     - Expect: 400, code=`encryption_key_missing`
+     - Verify: No secret leakage in error body (no password, no key)
 
 15. EDGE-INT-007: INT-007 - Connect without stored config
-    - POST `/api/integrations/irc/connect` when no config saved
-    - Expect: 409, "IRC not configured"
+     - POST `/api/integrations/irc/connect` when no config saved
+     - Expect: 409, code=`irc_not_configured`
 
 16. EDGE-INT-008a: INT-008 - Test timeout at 10 seconds
-    - POST `/api/integrations/irc/test` with unreachable server
-    - Expect: 500, "Connection test failed"
-    - Verify: Socket closed after timeout, timeout enforced at 10s hard limit
+     - POST `/api/integrations/irc/test` with unreachable server
+     - Expect: 500, code=`internal_error` (sanitized message)
+     - Verify: Socket closed after timeout, timeout enforced at 10s hard limit
 
-17. EDGE-INT-008b: INT-008 - Test with body-first validation fallback
-    - Save IRC config (HP-INT-006)
-    - POST `/api/integrations/irc/test` with server + port only (no nick, no password)
-    - Expect: 200 or 400 depending on stored config completeness
-    - Verify: Falls back to stored nick/password if not in body
+17. EDGE-INT-008b: INT-008 - Strict body-first validation (partial body rejected)
+    - POST `/api/integrations/irc/test` with server + port only (missing username)
+    - Expect: 400, code=`validation_error`
 
 18. EDGE-INT-008c: INT-008 - Test with invalid port (body-first validation)
-    - POST `/api/integrations/irc/test` with port=99999 (out of range)
-    - Expect: 400, "Port must be between 1 and 65535"
+     - POST `/api/integrations/irc/test` with port=99999 (out of range)
+     - Expect: 400, code=`validation_error` (message includes port range)
 
 **RBAC Tests (3)**:
 19. RBAC-INT-001: super_admin can manage IRC integrations
-    - Login as super_admin
-    - POST `/api/integrations/irc/config` with valid config
-    - Expect: 201
+     - Login as super_admin
+     - POST `/api/integrations/irc/config` with valid config
+     - Expect: 200
 
 20. RBAC-INT-002: INT-006 - admin/manager/user cannot save IRC config
     - Login as admin
@@ -1022,4 +1022,3 @@ On every release (weekly):
 **Last Updated**: 2026-02-13  
 **Status**: Ready for Implementation  
 **Next Step**: Start Wave 1 - Implement auth.spec.ts + inbox-list-filters.spec.ts
-

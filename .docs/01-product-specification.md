@@ -823,23 +823,26 @@ flowchart TD
 **AC:**
 - Admin UI form to input: server, port, username, password, channels (required array, each starting with #)
 - Backend validation: INT-006 `POST /api/integrations/irc/config` saves config with encrypted password
-  - Returns 400 if server/port/username/channels invalid
-  - Returns 400 if password provided but INTEGRATION_CREDENTIALS_ENCRYPTION_KEY env var not set
+  - Returns `400 validation_error` if server/port/username/channels invalid
+  - Returns `400 encryption_key_missing` if password provided but `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` env var not set
   - Upsert behavior (no duplicates)
   - Audit logged without plaintext password
   - Password never returned in response (only `hasPassword` flag)
+  - Save has no side effects: does NOT auto-connect and does NOT mutate current IRC runtime status
 - "Test Connection" button: INT-008 `POST /api/integrations/irc/test`
   - Body-first: test with provided credentials if given
   - Fallback: use stored config if body omitted
   - Hard 10-second timeout
-  - Returns 409 if neither body nor stored config available
+  - Returns `400 validation_error` if request body is partially provided (any of server/port/username present but not all 3)
+  - Returns `409 irc_not_configured` if neither body nor stored config available
+  - Timeout returns `500 internal_error` (sanitized message)
   - Sanitized response (no secrets exposed)
   - Does NOT modify live connector state
 - Manual "Connect" button: INT-007 `POST /api/integrations/irc/connect`
   - Sets status to `retrying` with `attemptCount=0`
   - Request body ignored
-  - Returns 409 if not configured (no DB config, no env fallback)
-  - Idempotent (if already connecting/connected, returns current status)
+  - Returns `409 irc_not_configured` if not configured (no DB config, no env fallback)
+  - Manual connect is non-idempotent: each call forces `status=retrying` and resets `attemptCount=0`
 - Connection status visible: INT-009 `GET /api/integrations/irc/status`
   - Returns: status (connected|retrying|disconnected|failed), attemptCount, timestamps, error message
   - Auto-reconnect status shown (retrying state with attempt counter)
