@@ -284,12 +284,12 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| HD-001 | Create Docker Compose configuration (PostgreSQL, Redis, R2 local/minio) | Not Started | P0 | Backend | BE-001, BE-013, BE-020 | All services running via docker compose up | PVTI_lAHOAB4wV84BNGcwzgj_7D0 | 103 |
-| HD-002 | Create production Docker image for backend (multi-stage build) | Not Started | P0 | Backend | BE-025 | Docker image builds and runs correctly | PVTI_lAHOAB4wV84BNGcwzgj_8js | 88 |
+| HD-001 | Create Docker Compose configuration (PostgreSQL, Redis, R2 local/minio) | In Progress | P0 | Backend | BE-001, BE-013, BE-020 | All services running via docker compose up | PVTI_lAHOAB4wV84BNGcwzgj_7D0 | 103 |
+| HD-002 | Create production Docker image for backend (multi-stage build) | In Progress | P0 | Backend | BE-025 | Docker image builds and runs correctly | PVTI_lAHOAB4wV84BNGcwzgj_8js | 88 |
 | HD-003 | Create production Docker image for frontend (static build for S3) | Not Started | P0 | Frontend | FE-021 | Docker image generates static build | PVTI_lAHOAB4wV84BNGcwzgj_7EA | 99 |
-| HD-004 | Create database migration scripts (Drizzle migrations) | Not Started | P0 | Backend | BE-002 | Migrations tested, reversible | PVTI_lAHOAB4wV84BNGcwzgj_8O8 | 101 |
-| HD-005 | Set up CI/CD pipeline (GitHub Actions for tests, lint, build) | Not Started | P1 | Architect | QA-012 | Automated pipeline passing on PRs | PVTI_lAHOAB4wV84BNGcwzgj_7D4 | 94 |
-| HD-006 | Create production environment template (env.example with all variables) | Not Started | P0 | Backend | DOC-007 | Template includes IRC, R2, Redis, DB variables | PVTI_lAHOAB4wV84BNGcwzgj_7EU | 96 |
+| HD-004 | Create database migration scripts (Drizzle migrations) | In Progress | P0 | Backend | BE-002 | Migrations tested, reversible | PVTI_lAHOAB4wV84BNGcwzgj_8O8 | 101 |
+| HD-005 | Set up CI/CD pipeline (GitHub Actions for tests, lint, build) | In Progress | P1 | Architect | QA-012 | Automated pipeline passing on PRs | PVTI_lAHOAB4wV84BNGcwzgj_7D4 | 94 |
+| HD-006 | Create production environment template (env.example with all variables) | **Done** | P0 | Backend | DOC-007 | Template includes IRC, R2, Redis, DB variables | PVTI_lAHOAB4wV84BNGcwzgj_7EU | 96 |
 | HD-007 | Perform security review (env vars, RBAC, input validation) | Not Started | P1 | Architect | BE-005 | No critical vulnerabilities found | PVTI_lAHOAB4wV84BNGcwzgj_7Dc | 95 |
 | HD-008 | Deploy Phase 1 to staging environment | Not Started | P0 | Backend | HD-001, HD-002 | Staging environment functional | PVTI_lAHOAB4wV84BNGcwzgj_7EI | 97 |
 | HD-009 | Run QA regression suite on staging environment | Not Started | P0 | QA | HD-008 | All regression tests passing | PVTI_lAHOAB4wV84BNGcwzgj_8Pk | 90 |
