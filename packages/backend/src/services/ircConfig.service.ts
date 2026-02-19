@@ -23,6 +23,10 @@ import { EncryptionService } from './encryption.service';
 import { connectorManager } from './connector-manager';
 import { IRCConnector } from '../connectors/irc.connector';
 import { connectorStatusWiring } from './connector-status-wiring.service';
+import {
+  resolveIrcConfig,
+  IrcProfileResolutionError,
+} from './ircProfileResolution.service';
 
 /**
  * Typed errors for INT-008 validation and connection issues
@@ -169,7 +173,8 @@ export class IRCConfigService {
 
   /**
    * Get stored IRC configuration (DB or env fallback)
-   * Returns null if neither DB nor env config exists
+   * Uses INT-010 DB-first resolution logic
+   * Returns null if neither DB nor env config exists, or throws on resolution conflict
    *
    * @returns Config object with decrypted password, or null if not configured
    */
@@ -181,75 +186,34 @@ export class IRCConfigService {
     channels: string[];
     source: 'db' | 'env';
   } | null> {
+    const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000000';
+
     try {
-      // Try DB first
-      const dbConfig = await dbClient.query.integrationConfigs.findFirst({
-        where: eq(integrationConfigs.platform, 'irc'),
-      });
+      // Use INT-010 resolution logic (DB-first)
+      const resolved = await resolveIrcConfig(DEFAULT_TENANT_ID);
 
-      if (dbConfig) {
-        logger.debug(
-          { platform: 'irc', method: 'getStoredConfig', source: 'db' },
-          'IRC config retrieved from database'
-        );
-
-        let password: string | undefined;
-        if (dbConfig.passwordEncrypted) {
-          try {
-            password = EncryptionService.decrypt(dbConfig.passwordEncrypted);
-          } catch (decryptError) {
-            logger.error(
-              {
-                platform: 'irc',
-                method: 'getStoredConfig',
-                error: decryptError instanceof Error ? decryptError.message : 'Unknown error',
-              },
-              'Failed to decrypt stored password'
-            );
-            throw new Error('Failed to decrypt IRC password. Encryption key may be invalid.');
-          }
-        }
-
-        const channels = JSON.parse(dbConfig.channels) as string[];
-
-        return {
-          server: dbConfig.server,
-          port: dbConfig.port,
-          username: dbConfig.username,
-          password,
-          channels,
-          source: 'db',
-        };
-      }
-
-      // Fallback to env vars
-      if (appConfig.IRC_SERVER && appConfig.IRC_USERNAME && appConfig.IRC_CHANNELS) {
-        logger.debug(
-          { platform: 'irc', method: 'getStoredConfig', source: 'env' },
-          'IRC config retrieved from environment variables (fallback)'
-        );
-
-        const channels = appConfig.IRC_CHANNELS.split(',')
-          .map((c) => c.trim())
-          .filter((c) => c.length > 0);
-
-        return {
-          server: appConfig.IRC_SERVER,
-          port: appConfig.IRC_PORT,
-          username: appConfig.IRC_USERNAME,
-          password: appConfig.IRC_PASSWORD,
-          channels,
-          source: 'env',
-        };
-      }
-
-      logger.debug(
-        { platform: 'irc', method: 'getStoredConfig' },
-        'No IRC configuration found (DB or env)'
-      );
-
-      return null;
+      return {
+        server: resolved.server,
+        port: resolved.port,
+        username: resolved.nick,
+        password: resolved.password,
+        channels: resolved.channels,
+        source: resolved.source,
+      };
     } catch (error) {
+      // If profile resolution error (409), re-throw as-is (will be handled by caller)
+      if (error instanceof IrcProfileResolutionError) {
+        if (error.statusCode === 409) {
+          // Not configured yet, return null (allows fallback)
+          logger.debug(
+            { method: 'getStoredConfig', code: error.code },
+            'IRC not yet configured'
+          );
+          return null;
+        }
+        throw error;
+      }
+
       logger.error(
         {
           platform: 'irc',
