@@ -10,7 +10,7 @@ lets start handsoff development, follow the below steps
 1. @ea-architecture-validator to review and understand the task, then plan a handsoff development + QA tasks.
     a. The tasks must be clear and concise
     b. A clear expectation of the task must be presented.
-2. @product-owner should review the tasks, analyze any missed gaps from the user perspective. 
+2. @product-owner should review the tasks from step 1, analyze any missed gaps from the user perspective. 
 3. If found any gaps, go back to @ea-architecture-validator to resolve or re-evaluate the tasks.
 4. Repeat 2-3 till all possible gaps are resolved. This is **"Gap Analysis"** Phase
 5. Once the tasks are ready, @fullstack-developer to take over and start the development work. 
