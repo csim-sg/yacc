@@ -90,6 +90,22 @@ export class IRCStatusClient {
   }
 
   /**
+   * Set status to 'retrying' with attemptCount=0 (manual connect reset)
+   * Used for INT-007 manual connect endpoint to force clean retry sequence
+   * Ignores any prior attempt count, always sets to 0
+   */
+  public setManualRetrying(): void {
+    this.status = {
+      status: 'retrying',
+      attemptCount: 0,
+      lastChangedAt: new Date().toISOString(),
+      lastConnectedAt: this.status.lastConnectedAt,
+      lastError: null,
+      reconnectIncidentId: this.status.reconnectIncidentId,
+    };
+  }
+
+  /**
    * Mark max reconnection attempts exhausted
    * Transitions status from 'retrying' to 'failed'
    */

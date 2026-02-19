@@ -34,6 +34,8 @@ export const envSchema = z.object({
   IRC_PASSWORD: z.string().optional(),
   IRC_CHANNELS: z.string().optional(),
 
+  INTEGRATION_CREDENTIALS_ENCRYPTION_KEY: z.string().min(32).optional(),
+
   SENDGRID_API_KEY: z.string().optional(),
   SENDGRID_FROM_EMAIL: z.string().email().optional(),
   SENDGRID_FROM_NAME: z.string().optional(),
