@@ -4,15 +4,16 @@ import { desc, eq, and } from 'drizzle-orm';
 
 /**
  * Log audit action parameters
- * Supports multi-entity audit logging (conversation, rule, user, message, etc.)
+ * Supports multi-entity audit logging (conversation, rule, user, message, integration, etc.)
  */
 export interface LogAuditParams {
   actorId?: string;
   action: string;
-  entityType: 'conversation' | 'rule' | 'user' | 'message' | 'notification' | 'tag';
+  entityType: 'conversation' | 'rule' | 'user' | 'message' | 'notification' | 'tag' | 'integration';
   entityId: string;
   metadata?: Record<string, unknown>;
   ipAddress?: string;
+  correlationId?: string;
 }
 
 /**
@@ -29,18 +30,18 @@ export class AuditService {
     * Log an audit event for any entity type (conversation, rule, user, etc.)
     * Supports multi-entity audit logging
     */
-   async logAction(params: LogAuditParams) {
-     const { actorId, action, entityType, entityId, metadata, ipAddress } = params;
+    async logAction(params: LogAuditParams) {
+      const { actorId, action, entityType, entityId, metadata, ipAddress } = params;
 
-     // Validate entityType
-     const validEntityTypes = ['conversation', 'rule', 'user', 'message', 'notification', 'tag'];
-     if (!validEntityTypes.includes(entityType)) {
-       console.error(
-         '❌ Audit log error: invalid entityType:',
-         entityType,
-       );
-       return { success: false, error: `Invalid entityType: ${entityType}` };
-     }
+      // Validate entityType
+      const validEntityTypes = ['conversation', 'rule', 'user', 'message', 'notification', 'tag', 'integration'];
+      if (!validEntityTypes.includes(entityType)) {
+        console.error(
+          '❌ Audit log error: invalid entityType:',
+          entityType,
+        );
+        return { success: false, error: `Invalid entityType: ${entityType}` };
+      }
 
      try {
        await dbClient.insert(auditLogs).values({

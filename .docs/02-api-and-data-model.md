@@ -1360,26 +1360,148 @@ Phase 1 includes Telegram + IRC integration. Additional platforms are deferred t
 
 ---
 
-#### `POST /api/integrations/irc/connect`
+#### `POST /api/integrations/irc/config` (INT-006)
+**RBAC**: super_admin only
+
+Save/upsert IRC configuration with encrypted password storage. No auto-connect side effects.
+
 **Request:**
 ```json
 {
-  "server": "irc.example.com",
-  "port": 6667,
+  "server": "irc.libera.chat",
+  "port": 6697,
   "username": "botname",
-  "password": "bot-password"
+  "password": "bot-password-optional",
+  "channels": ["#channel1", "#channel2"]
 }
 ```
 
-**Response:**
+**Response: 200 OK**
 ```json
 {
   "data": {
-    "status": "connected",
-    "server": "irc.example.com"
+    "server": "irc.libera.chat",
+    "port": 6697,
+    "username": "botname",
+    "channels": ["#channel1", "#channel2"],
+    "hasPassword": true,
+    "updatedAt": "2026-02-19T15:30:00.000Z"
   }
 }
 ```
+
+**Validation**:
+- `server`: required, non-empty string
+- `port`: required, integer 1-65535
+- `username`: required, non-empty string
+- `channels`: required, array of min 1 item, each must start with '#'
+- `password`: optional; if provided, encryption key must be set (INTEGRATION_CREDENTIALS_ENCRYPTION_KEY env var)
+
+**Errors**:
+- `400 validation_error`: Invalid input (server, port, username, channels)
+- `400 encryption_key_missing`: Password provided but encryption key not set
+- `403 forbidden`: Not super_admin
+- `500 internal_error`: Database or encryption failure
+
+**Notes**:
+- Password never returned in response (only `hasPassword` flag)
+- Audit logged without plaintext password
+- Upsert behavior: if config already exists, it is updated (not duplicated)
+- No auto-connect triggered by save
+
+---
+
+#### `POST /api/integrations/irc/connect` (INT-007)
+**RBAC**: super_admin only
+
+Manual connect initiation using stored config. Request body is ignored; uses DB config or environment fallback.
+
+**Request:**
+```json
+{}
+```
+
+**Response: 200 OK**
+```json
+{
+  "data": {
+    "status": "retrying",
+    "attemptCount": 0,
+    "lastChangedAt": "2026-02-19T15:30:00.000Z",
+    "lastConnectedAt": null,
+    "lastError": null
+  }
+}
+```
+
+**Behavior**:
+- Retrieves configuration from DB (first) or environment fallback
+- Sets status to `retrying` with `attemptCount=0` for manual initiation (always, even if already connected/retrying)
+- Non-idempotent: each call triggers a reset and reconnect attempt (manual semantics)
+- Delegates actual connection to IRC connector (non-blocking)
+- Connector updates `ircStatusClient` as connection progresses
+
+**Errors**:
+- `409 irc_not_configured`: No DB config and no environment fallback (IRC_SERVER, IRC_USERNAME, IRC_CHANNELS env vars)
+- `403 forbidden`: Not super_admin
+- `500 internal_error`: Connector or configuration loading failure
+
+**Notes**:
+- Request body completely ignored (to avoid ambiguity; connect uses stored config only)
+- Audit logged with source (db|env) and reconnect flag
+- Actual connection status updates pushed via WebSocket to clients
+
+---
+
+#### `POST /api/integrations/irc/test` (INT-008)
+**RBAC**: super_admin only
+
+Test IRC connection without modifying live connector state. Body-first validation with fallback to stored config.
+
+**Request (body-first):**
+```json
+{
+  "server": "irc.libera.chat",
+  "port": 6697,
+  "username": "testuser",
+  "password": "optional-password"
+}
+```
+
+**Response: 200 OK**
+```json
+{
+  "data": {
+    "success": true,
+    "message": "Successfully connected to irc.libera.chat:6697"
+  }
+}
+```
+
+**Request (stored config fallback):**
+```json
+{}
+```
+
+**Behavior**:
+- Body-first: if server/port/username provided in request, test with those credentials
+- Fallback: if body missing, uses stored config (DB first, then environment)
+- Uses temporary IRC client (irc-framework) - does NOT modify live connector
+- Hard 10-second timeout - test fails if no registered message received
+- Sanitized response messages - no credentials exposed
+
+**Errors**:
+- `400 validation_error`: Body test mode requires server, port, AND username
+- `409 irc_not_configured`: No body provided AND no stored config (DB or env)
+- `403 forbidden`: Not super_admin
+- `500 internal_error`: IRC client creation or connection test failure
+
+**Notes**:
+- Does NOT set any IRC connector status or state
+- Does NOT trigger reconnect logic
+- Audit logged with source (body|db|env) and success flag
+- Response message never contains credentials or sensitive data
+- Timeout error sanitized (no server details exposed)
 
 ---
 

@@ -14,7 +14,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 
 ## Current Delivery Status
 - Phase 1: ⏳ In Progress
-- Phase 2: ⏳ Not Started
+- Phase 2: ✅ Completed (collaboration + rules merged)
 - QA: ⏳ Not Started
 
 ## Current Integration Task Status (Phase 1)
@@ -27,8 +27,10 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **INT-003** (IRC Delivery) | ✅ **COMPLETED** (PR #259 merged) | INT-001 | Outbound messages → IRC channel; pending → sent/failed; BullMQ retry worker + correlationId propagation |
 | **INT-004** (IRC Auto-Reconnect) | ✅ **COMPLETED** (PR #260 merged) | INT-001 | Exponential backoff reconnect (1s, 2s, 4s, 8s, 16s; 5 attempts max), behavioral timer-boundary tests |
 | **INT-005** (IRC Status) | ✅ **COMPLETED** (PR #261 merged) | INT-004 | Connection status model + infrastructure (runtime memory storage) |
-| **INT-006-014** (IRC Config/Env) | ⏳ **READY** | INT-005 | Config persistence, environment management, integration setup |
-| **INT-009** (Status Endpoint) | ✅ **COMPLETED** (PR #261 merged) | INT-005 | GET /api/integrations/irc/status endpoint (admin+ RBAC) |
+| **INT-006** (IRC Config) | ✅ **COMPLETED** (PR #263 merged) | INT-005 | POST /api/integrations/irc/config - save/upsert with encryption (super_admin only) |
+| **INT-007** (IRC Connect) | ✅ **COMPLETED** (PR #263 merged) | INT-005 | POST /api/integrations/irc/connect - manual connect via connectorManager (super_admin, body ignored) |
+| **INT-008** (IRC Test) | ✅ **COMPLETED** (PR #263 merged) | INT-005 | POST /api/integrations/irc/test - test connection with 10s timeout, no side effects (super_admin) |
+| **INT-009** (Status Endpoint) | ✅ **COMPLETED** (PR #262 merged) | INT-005 | GET /api/integrations/irc/status endpoint (admin+ RBAC) |
 
 ### Test Results (INT-001)
 - **28/28 tests passing** (100% pass rate)

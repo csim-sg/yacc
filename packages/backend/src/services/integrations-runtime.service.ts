@@ -3,6 +3,7 @@ import { IRCConnector } from '../connectors/irc.connector';
 import { TelegramConnector } from '../connectors/telegram.connector';
 import { logger } from '../infrastructure/logger';
 import { connectorManager } from './connector-manager';
+import { connectorStatusWiring } from './connector-status-wiring.service';
 
 export async function initializeIntegrationsRuntime(): Promise<void> {
   // Telegram
@@ -63,6 +64,9 @@ export async function initializeIntegrationsRuntime(): Promise<void> {
     });
 
     connectorManager.registerConnector('irc', irc);
+
+    // Wire status events so connector updates ircStatusClient
+    connectorStatusWiring.wire();
 
     irc.connect().catch((error) => {
       logger.error(
