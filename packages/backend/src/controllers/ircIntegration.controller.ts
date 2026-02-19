@@ -17,7 +17,7 @@ import type { Request, Response } from 'express';
 import { Controller, Get, Post, Res, Req, Authorized, Body } from 'routing-controllers';
 import { logger } from '../infrastructure/logger';
 import { auditService } from '../services/audit.service';
-import { ircConfigService } from '../services/ircConfig.service';
+import { ircConfigService, TestConnectionFailedError } from '../services/ircConfig.service';
 import { ircIntegrationService } from '../services/ircIntegration.service';
 import type { AuthUser } from '../types/auth.types';
 import type {
@@ -230,7 +230,9 @@ export class IRCIntegrationController {
    * Timeout: hard 10s
    *
    * Response 200: { data: { success: boolean, message: string } } sanitized
-   * Error 409: irc_not_configured
+   * Error 400: validation_error (partial body missing required fields)
+   * Error 409: irc_not_configured (empty body AND no stored config)
+   * Error 500: internal_error (connection/client creation failure)
    */
   @Post('/test')
   @Authorized(['super_admin'])
@@ -250,24 +252,7 @@ export class IRCIntegrationController {
 
       const result = await ircConfigService.testConnection(body);
 
-      if (!result.success && result.source === 'db') {
-        // Audit log (not configured)
-        await auditService.logAction({
-          actorId: userId,
-          action: 'integration.irc.test_requested',
-          entityType: 'integration',
-          entityId: 'irc',
-          metadata: { source: result.source, configured: false },
-          correlationId,
-        });
-
-        return res.status(409).json({
-          code: 'irc_not_configured',
-          message: result.message,
-        } as IntegrationErrorResponse);
-      }
-
-      // Audit log (test result)
+      // Audit log (test completed successfully)
       await auditService.logAction({
         actorId: userId,
         action: 'integration.irc.test_requested',
@@ -277,28 +262,8 @@ export class IRCIntegrationController {
         correlationId,
       });
 
-      if (result.success) {
-        await auditService.logAction({
-          actorId: userId,
-          action: 'integration.irc.test_result',
-          entityType: 'integration',
-          entityId: 'irc',
-          metadata: { success: true, reason: 'Connection successful' },
-          correlationId,
-        });
-      } else {
-        await auditService.logAction({
-          actorId: userId,
-          action: 'integration.irc.test_result',
-          entityType: 'integration',
-          entityId: 'irc',
-          metadata: { success: false, reason: result.message },
-          correlationId,
-        });
-      }
-
       logger.info(
-        { correlationId, userId, platform: 'irc', method: 'test', success: result.success },
+        { correlationId, userId, platform: 'irc', method: 'test', success: result.success, source: result.source },
         'IRC connection test completed'
       );
 
@@ -309,15 +274,74 @@ export class IRCIntegrationController {
         },
       } as IRCTestResponse);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const correlationIdForLog = correlationId;
+      const userIdForLog = userId;
+
+      // Handle typed TestConnectionFailedError
+      if (error instanceof TestConnectionFailedError) {
+        const { type, message } = error.errorInfo;
+
+        logger.warn(
+          {
+            correlationId: correlationIdForLog,
+            userId: userIdForLog,
+            platform: 'irc',
+            method: 'test',
+            errorType: type,
+            message,
+          },
+          'IRC connection test validation/error'
+        );
+
+        // Audit log for errors
+        await auditService.logAction({
+          actorId: userIdForLog,
+          action: 'integration.irc.test_requested',
+          entityType: 'integration',
+          entityId: 'irc',
+          metadata: { errorType: type, message: message.substring(0, 200) },
+          correlationId: correlationIdForLog,
+        });
+
+        if (type === 'validation_error') {
+          return res.status(400).json({
+            code: 'validation_error',
+            message,
+          } as IntegrationErrorResponse);
+        }
+
+        if (type === 'not_configured') {
+          return res.status(409).json({
+            code: 'irc_not_configured',
+            message,
+          } as IntegrationErrorResponse);
+        }
+
+        if (type === 'timeout') {
+          return res.status(408).json({
+            code: 'internal_error',
+            message: 'Connection test timed out (10s limit exceeded)',
+          } as IntegrationErrorResponse);
+        }
+
+        // type === 'internal_error'
+        return res.status(500).json({
+          code: 'internal_error',
+          message: 'Connection test failed',
+        });
+      }
+
+      // Unexpected error
       logger.error(
         {
-          correlationId,
-          userId,
+          correlationId: correlationIdForLog,
+          userId: userIdForLog,
           platform: 'irc',
           method: 'test',
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: errorMessage,
         },
-        'IRC connection test failed'
+        'IRC connection test failed (unexpected error)'
       );
 
       return res.status(500).json({

@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EncryptionService } from '../../services/encryption.service';
-import { ircConfigService } from '../../services/ircConfig.service';
+import { ircConfigService, TestConnectionFailedError } from '../../services/ircConfig.service';
 import { ircIntegrationService } from '../../services/ircIntegration.service';
 import { ircStatusClient } from '../../infrastructure/ircStatus.client';
 import type { IRCConfigRequest } from '../../types/ircIntegration.types';
@@ -160,22 +160,71 @@ describe('IRC Integration (INT-006, INT-007, INT-008)', () => {
   });
 
   describe('INT-008: Test Connection Validation', () => {
-    it('requires server, port, username', async () => {
-      const result = await ircConfigService.testConnection({ server: 'irc.test.com' } as any);
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('server, port, and username');
+    it('throws validation_error when body partially specifies (missing fields)', async () => {
+      await expect(ircConfigService.testConnection({ server: 'irc.test.com' } as any)).rejects.toThrow(
+        TestConnectionFailedError
+      );
+      
+      try {
+        await ircConfigService.testConnection({ server: 'irc.test.com' } as any);
+      } catch (error) {
+        if (error instanceof TestConnectionFailedError) {
+          expect(error.errorInfo.type).toBe('validation_error');
+          expect(error.errorInfo.message).toContain('server, port, and username');
+        }
+      }
     });
 
-    it('does not expose secrets in response', async () => {
-      const result = await ircConfigService.testConnection({
-        server: 'irc.test.com',
-        port: 6697,
-        username: 'secret-user',
-        password: 'secret-pass-123',
-      });
-      
-      expect(result.message).not.toContain('secret-user');
-      expect(result.message).not.toContain('secret-pass-123');
+    it('throws validation_error for invalid port range', async () => {
+      await expect(
+        ircConfigService.testConnection({
+          server: 'irc.test.com',
+          port: 99999,
+          username: 'user',
+        })
+      ).rejects.toThrow(TestConnectionFailedError);
+
+      try {
+        await ircConfigService.testConnection({
+          server: 'irc.test.com',
+          port: 99999,
+          username: 'user',
+        });
+      } catch (error) {
+        if (error instanceof TestConnectionFailedError) {
+          expect(error.errorInfo.type).toBe('validation_error');
+          expect(error.errorInfo.message).toContain('Port must be between');
+        }
+      }
+    });
+
+    it('throws not_configured when empty body and no stored config', async () => {
+      await expect(ircConfigService.testConnection({})).rejects.toThrow(TestConnectionFailedError);
+
+      try {
+        await ircConfigService.testConnection({});
+      } catch (error) {
+        if (error instanceof TestConnectionFailedError) {
+          expect(error.errorInfo.type).toBe('not_configured');
+          expect(error.errorInfo.message).toContain('IRC not configured');
+        }
+      }
+    });
+
+    it('does not expose secrets in error messages', async () => {
+      try {
+        await ircConfigService.testConnection({
+          server: 'irc.test.com',
+          port: 6697,
+          username: 'secret-user',
+          password: 'secret-pass-123',
+        });
+      } catch (error) {
+        if (error instanceof TestConnectionFailedError) {
+          expect(error.errorInfo.message).not.toContain('secret-user');
+          expect(error.errorInfo.message).not.toContain('secret-pass-123');
+        }
+      }
     });
 
     it('does not modify live connector status', () => {

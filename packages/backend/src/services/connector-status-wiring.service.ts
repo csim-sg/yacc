@@ -3,16 +3,29 @@
  *
  * Connects connector events (from connectorManager) to ircStatusClient
  * Ensures GET /api/integrations/irc/status reflects real connector state
+ *
+ * Idempotent: Safe to call multiple times; prevents duplicate event listeners
  */
 
 import { connectorManager } from './connector-manager';
 import { ircStatusClient } from '../infrastructure/ircStatus.client';
 import { logger } from '../infrastructure/logger';
 
+/**
+ * Track if wiring has already been done (prevent duplicate listeners)
+ */
+let isWired = false;
+
 export function wireConnectorStatusEvents(): void {
+  // Idempotent: skip if already wired
+  if (isWired) {
+    logger.debug({ platform: 'irc' }, 'Connector status wiring already applied');
+    return;
+  }
+
   const ircConnector = connectorManager.getConnector('irc');
   if (!ircConnector) {
-    logger.debug({ platform: 'irc' }, 'IRC connector not registered yet');
+    logger.debug({ platform: 'irc' }, 'IRC connector not registered yet; wiring deferred');
     return;
   }
 
@@ -39,6 +52,7 @@ export function wireConnectorStatusEvents(): void {
     ircStatusClient.setStatus('failed', sanitizedMessage, undefined);
   });
 
+  isWired = true;
   logger.info({ platform: 'irc' }, 'Connector status events wired to ircStatusClient');
 }
 

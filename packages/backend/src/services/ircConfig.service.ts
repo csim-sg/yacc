@@ -25,6 +25,22 @@ import { connectorManager } from './connector-manager';
 import { IRCConnector } from '../connectors/irc.connector';
 import { connectorStatusWiring } from './connector-status-wiring.service';
 
+/**
+ * Typed errors for INT-008 validation and connection issues
+ */
+type TestConnectionError = 
+  | { type: 'validation_error'; message: string }
+  | { type: 'not_configured'; message: string }
+  | { type: 'timeout'; message: string }
+  | { type: 'internal_error'; message: string };
+
+class TestConnectionFailedError extends Error {
+  constructor(public errorInfo: TestConnectionError) {
+    super(errorInfo.message);
+    this.name = 'TestConnectionFailedError';
+  }
+}
+
 export class IRCConfigService {
   /**
    * Save IRC configuration to database (upsert)
@@ -364,8 +380,12 @@ export class IRCConfigService {
    * Uses body-first validation, then stored config fallback
    * Timeout: hard 10 seconds
    *
+   * Throws TestConnectionFailedError with typed errorInfo for HTTP error mapping
+   * On success, returns { success: true, message: string, source }
+   *
    * @param testRequest - Optional test request (body-first)
-   * @returns { success: boolean, message: string, source }
+   * @returns { success: true, message: string, source } on success
+   * @throws TestConnectionFailedError for validation, not_configured, timeout, or internal errors
    */
   async testConnection(
     testRequest?: { server?: string; port?: number; username?: string; password?: string }
@@ -377,14 +397,22 @@ export class IRCConfigService {
         | { server: string; port: number; username: string; password?: string; source: 'body' | 'db' | 'env' }
         | null = null;
 
-      // Body-first test
+      // Body-first test (strict validation)
       if (testRequest && (testRequest.server || testRequest.port || testRequest.username)) {
+        // Partial body provided: validate all required fields
         if (!testRequest.server || !testRequest.port || !testRequest.username) {
-          return {
-            success: false,
-            message: 'Test mode: server, port, and username are required',
-            source: 'body',
-          };
+          throw new TestConnectionFailedError({
+            type: 'validation_error',
+            message: 'Body test mode: server, port, and username are all required',
+          });
+        }
+
+        // Validate port range
+        if (testRequest.port < 1 || testRequest.port > 65535) {
+          throw new TestConnectionFailedError({
+            type: 'validation_error',
+            message: 'Port must be between 1 and 65535',
+          });
         }
 
         config = {
@@ -401,14 +429,13 @@ export class IRCConfigService {
           'Testing with body-provided config'
         );
       } else {
-        // Fallback to stored config
+        // Empty body: use stored config (DB or env)
         const storedConfig = await this.getStoredConfig();
         if (!storedConfig) {
-          return {
-            success: false,
-            message: 'IRC not configured. Provide server, port, and username in request body.',
-            source: 'db',
-          };
+          throw new TestConnectionFailedError({
+            type: 'not_configured',
+            message: 'IRC not configured. Provide server, port, and username in request body or save config first.',
+          });
         }
 
         config = {
@@ -438,21 +465,35 @@ export class IRCConfigService {
         source,
       };
     } catch (error) {
+      // Re-throw typed TestConnectionFailedError as-is
+      if (error instanceof TestConnectionFailedError) {
+        throw error;
+      }
+
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Categorize error type
+      let errorType: TestConnectionError['type'] = 'internal_error';
+      if (errorMessage.includes('timed out') || errorMessage.includes('timeout')) {
+        errorType = 'timeout';
+      }
+
       logger.error(
         {
           platform: 'irc',
           method: 'testConnection',
           error: errorMessage,
+          errorType,
         },
         'IRC connection test failed'
       );
 
-      return {
-        success: false,
-        message: 'Connection test failed',
-        source,
-      };
+      throw new TestConnectionFailedError({
+        type: errorType,
+        message: errorMessage.includes('timed out')
+          ? 'Connection test timed out (10s limit exceeded)'
+          : 'Connection test failed',
+      });
     }
   }
 
@@ -608,3 +649,4 @@ export class IRCConfigService {
 }
 
 export const ircConfigService = new IRCConfigService();
+export { TestConnectionFailedError, type TestConnectionError };
