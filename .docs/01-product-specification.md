@@ -821,12 +821,28 @@ flowchart TD
 **So that** teams can start managing IRC in the inbox.
 
 **AC:**
-- Admin UI form to input: server, port, username, password
-- "Test Connection" button validates credentials and shows status
-- Clear error message on failure
-- On success, show "Connected" status
-- Connection status visible in admin dashboard
-- Auto-reconnect status shown (currently connected/retrying/disconnected)
+- Admin UI form to input: server, port, username, password, channels (required array, each starting with #)
+- Backend validation: INT-006 `POST /api/integrations/irc/config` saves config with encrypted password
+  - Returns 400 if server/port/username/channels invalid
+  - Returns 400 if password provided but INTEGRATION_CREDENTIALS_ENCRYPTION_KEY env var not set
+  - Upsert behavior (no duplicates)
+  - Audit logged without plaintext password
+  - Password never returned in response (only `hasPassword` flag)
+- "Test Connection" button: INT-008 `POST /api/integrations/irc/test`
+  - Body-first: test with provided credentials if given
+  - Fallback: use stored config if body omitted
+  - Hard 10-second timeout
+  - Returns 409 if neither body nor stored config available
+  - Sanitized response (no secrets exposed)
+  - Does NOT modify live connector state
+- Manual "Connect" button: INT-007 `POST /api/integrations/irc/connect`
+  - Sets status to `retrying` with `attemptCount=0`
+  - Request body ignored
+  - Returns 409 if not configured (no DB config, no env fallback)
+  - Idempotent (if already connecting/connected, returns current status)
+- Connection status visible: INT-009 `GET /api/integrations/irc/status`
+  - Returns: status (connected|retrying|disconnected|failed), attemptCount, timestamps, error message
+  - Auto-reconnect status shown (retrying state with attempt counter)
 
 ---
 

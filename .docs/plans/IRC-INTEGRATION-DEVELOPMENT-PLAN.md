@@ -148,44 +148,107 @@ INT-013, INT-014 (Tests)
 ### Phase 2: API Endpoints (INT-006 to INT-009)
 
 #### INT-006: IRC Config Endpoint
-- **Description**: Save IRC server configuration
+- **Description**: Save IRC server configuration (encrypted, channels required)
+- **Status**: ✅ IMPLEMENTED (PR #263)
 - **Deliverables**:
-  - `POST /api/integrations/irc/config`
-  - Save: server, port, nick, password, channels
-  - RBAC: super_admin only
-  - Validation before save
-  - Return: validation errors or success
-- **Dependencies**: BE-005 (RBAC)
+  - `POST /api/integrations/irc/config` - Save IRC server configuration
+  - **Request body**: `{ server: string, port: integer, nick: string, password: string, channels: string[] }`
+  - **Validation**:
+    - `server`: required, non-empty, max 255 chars
+    - `port`: required, integer, 1-65535
+    - `nick`: required, non-empty, max 30 chars (IRC nick limit)
+    - `password`: required, non-empty (stored encrypted with INTEGRATION_CREDENTIALS_ENCRYPTION_KEY)
+    - `channels`: required, non-empty array, each max 50 chars (includes # prefix)
+  - **Encryption**: Password encrypted deterministically (AES-256-CBC) before storage; rejects if key missing (400 error)
+  - **No side effects**: Config saved only, does NOT initiate connection
+  - **RBAC**: `super_admin` only (403 if lower role)
+  - **Response**: 201 `{ success: true, message: "IRC configuration saved" }` on success
+  - **Error responses**:
+    - 400: validation error (missing field, invalid format, encryption key missing)
+    - 403: insufficient permissions
+    - 500: database/encryption error
+  - **Audit**: Logged as `action: "irc_config_saved"`, `entity_type: "irc_integration"`, no password in metadata
+- **Dependencies**: BE-005 (RBAC), Encryption key env var
 - **Acceptance Criteria**:
-  - Configuration saved and validated
-  - RBAC enforced
-  - Errors returned for invalid config
+  - ✅ Configuration saved to database with encrypted password
+  - ✅ Validation enforced for all required fields
+  - ✅ RBAC enforced (super_admin only)
+  - ✅ Proper HTTP status codes (201, 400, 403, 500)
+  - ✅ No secrets in response or error messages
+  - ✅ Audit log created
 
 #### INT-007: IRC Connect Endpoint
-- **Description**: Initiate IRC connection
+- **Description**: Initiate IRC connection from stored config (non-blocking)
+- **Status**: ✅ IMPLEMENTED (PR #263)
 - **Deliverables**:
-  - `POST /api/integrations/irc/connect`
-  - Initiate connection from stored config
-  - Return: current connection status
-  - RBAC: super_admin only
-- **Dependencies**: INT-001, INT-006
+  - `POST /api/integrations/irc/connect` - Initiate connection to IRC network
+  - **Request body**: (ignored; uses stored config only)
+  - **Behavior**:
+    - Checks if config exists; returns 409 if not configured
+    - Sets IRC connector status to `retrying` with `attemptCount: 0`
+    - Calls `connector.connect()` non-blocking (fire-and-forget)
+    - Does NOT wait for connection (may take seconds); returns immediately
+    - Connector emits events: `connected`, `disconnected`, `error` → updates status dynamically
+  - **No side effects**: Connection happens asynchronously; does NOT block response
+  - **RBAC**: `super_admin` only (403 if lower role)
+  - **Response**: 200 `{ status: "retrying", attemptCount: 0, lastAttemptAt: "2026-02-19T..." }` on success
+  - **Error responses**:
+    - 400: invalid request body (typically not triggered since body ignored)
+    - 403: insufficient permissions
+    - 409: IRC not configured (no config found in database)
+    - 500: connector initialization error
+  - **Audit**: Logged as `action: "irc_connect_initiated"`, `entity_type: "irc_integration"`, includes status
+- **Dependencies**: INT-006 (config must exist), INT-001 (connector infrastructure)
 - **Acceptance Criteria**:
-  - Connection initiated
-  - Status returned correctly
+  - ✅ Connection initiated non-blocking
+  - ✅ Status returned immediately with `retrying` state
+  - ✅ Ignores request body, uses stored config
+  - ✅ 409 returned if config not found
+  - ✅ RBAC enforced (super_admin only)
+  - ✅ No sensitive data in response
+  - ✅ Audit log created
 
 #### INT-008: IRC Test Endpoint
-- **Description**: Test IRC connection before saving
+- **Description**: Test IRC connection before saving config (with 10s timeout)
+- **Status**: ✅ IMPLEMENTED (PR #263)
 - **Deliverables**:
-  - `POST /api/integrations/irc/test`
-  - Accept: server, port, nick, password
-  - Test connection (10s timeout)
-  - Return: success/failure message
-  - RBAC: super_admin only
-- **Dependencies**: INT-001
+  - `POST /api/integrations/irc/test` - Test IRC connection with provided credentials
+  - **Request body**: `{ server: string, port: integer, nick: string, password?: string }`
+  - **Validation** (body-first):
+    - `server`: required, non-empty, max 255 chars
+    - `port`: required, integer, 1-65535
+    - `nick`: required, non-empty, max 30 chars
+    - `password`: optional in body; falls back to stored password if omitted
+  - **Connection test**:
+    - Uses `irc-framework` Client (same as live connector)
+    - Connects to provided server:port with nick + password
+    - Hard 10s timeout via `Promise.race()` (connection attempt aborted at 10s)
+    - Cleanly disconnects after test (closes socket)
+  - **Behavior**:
+    - Body-first validation: if body has server/port/nick, uses those
+    - Fallback to stored config: if body incomplete, uses stored server/port/nick/password
+    - Returns immediately after timeout or successful connection
+    - Does NOT modify stored config or connector state
+  - **RBAC**: `super_admin` only (403 if lower role)
+  - **Response**: 200 `{ success: true, message: "Connection successful" }` on success
+  - **Error responses**:
+    - 400: validation error (missing required fields, invalid format)
+    - 403: insufficient permissions
+    - 408: connection timeout (10s exceeded)
+    - 409: IRC not configured (body incomplete AND no stored config)
+    - 500: connection error, network issue, or other server error
+  - **Error messages**: Sanitized (no connection details leaked); e.g., "Connection failed" vs "Connection refused on 192.168.1.1:6667"
+  - **Audit**: Logged as `action: "irc_test_connection"`, `entity_type: "irc_integration"`, no password in metadata
+- **Dependencies**: INT-001 (connector infrastructure)
 - **Acceptance Criteria**:
-  - Connection tested successfully
-  - Timeout enforced
-  - Error messages clear
+  - ✅ Connection tested with hard 10s timeout
+  - ✅ Body-first validation with stored config fallback
+  - ✅ Proper timeout handling (408 returned at 10s)
+  - ✅ Socket cleanly closed after test
+  - ✅ No persistent state changes (not affecting stored config or connector)
+  - ✅ RBAC enforced (super_admin only)
+  - ✅ Sanitized error messages (no secrets/IPs leaked)
+  - ✅ Audit log created
 
 #### INT-009: IRC Status Endpoint
 - **Description**: Get current IRC connection status

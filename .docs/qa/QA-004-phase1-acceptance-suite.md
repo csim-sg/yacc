@@ -66,9 +66,9 @@ packages/frontend/tests/acceptance/phase1/
 | **Messaging** | Send, Receive, Delivery Status | 8 | 10 | 6 | 24 | ✅ Ready |
 | **Retry Queue** | Backoff, DLQ, Ops Access | 6 | 8 | 6 | 20 | ✅ Ready |
 | **WebSocket** | Real-Time, Backlog, Reconnect | 10 | 10 | 8 | 28 | ✅ Ready |
-| **Integrations** | Telegram, IRC (Stub) | 6 | 4 | 2 | 12 | ✅ Ready |
+| **Integrations** | Telegram, IRC (Config/Connect/Test) | 9 | 6 | 3 | 18 | ✅ Ready |
 | **Smoke** | Critical Paths | 15 | - | - | 15 | ✅ Ready |
-| **TOTAL** | | 60 | 47 | 36 | **143** | |
+| **TOTAL** | | 63 | 49 | 39 | **151** | |
 
 ---
 
@@ -694,7 +694,7 @@ packages/frontend/tests/acceptance/phase1/
 
 ---
 
-### 3.7 Integrations: Telegram & IRC (12 scenarios)
+### 3.7 Integrations: Telegram & IRC (18 scenarios)
 
 #### File: `integrations-telegram-irc.spec.ts`
 
@@ -702,8 +702,9 @@ packages/frontend/tests/acceptance/phase1/
 - Telegram connector stubbed (mock API responses)
 - IRC connector stubbed (mock network connection)
 - Pre-configured credentials in env vars
+- INTEGRATION_CREDENTIALS_ENCRYPTION_KEY env var set for password encryption
 
-**Happy Path Tests (6)**:
+**Happy Path Tests (9)**:
 1. HP-INT-001: Telegram message received and stored
    - Webhook from Telegram (simulated)
    - Message stored in conversation
@@ -732,32 +733,77 @@ packages/frontend/tests/acceptance/phase1/
    - IRC connector joins new channel
    - Expect: Conversation created, channel=irc
 
-**Edge Case Tests (4)**:
-7. EDGE-INT-001: Telegram API timeout → message queued for retry
-   - Send message, Telegram API times out
-   - Expect: Message status=pending, queued for retry
+7. HP-INT-006: INT-006 - Save IRC config with all required fields
+   - POST `/api/integrations/irc/config` with valid server, port, nick, password, channels
+   - Expect: 201, `{ success: true, message: "IRC configuration saved" }`
+   - Verify: Password encrypted in database, audit log created
 
-8. EDGE-INT-002: IRC connection lost → auto-reconnect
-   - IRC connection drops
-   - Expect: Connector auto-reconnects; pending messages managed by BullMQ retry queue (fail-fast if disconnected, no connector-local queuing)
+8. HP-INT-007: INT-007 - Initiate IRC connection from stored config
+   - First save config (HP-INT-006)
+   - POST `/api/integrations/irc/connect` (body ignored)
+   - Expect: 200, `{ status: "retrying", attemptCount: 0, lastAttemptAt: "..." }`
+   - Verify: Connector.connect() called non-blocking, connection happens asynchronously
 
-9. EDGE-INT-003: Duplicate Telegram message (idempotency)
-   - Same Telegram message received twice (webhook duplication)
-   - Expect: Only one message stored (deduped by external_message_id)
+9. HP-INT-008: INT-008 - Test IRC connection with provided credentials
+   - POST `/api/integrations/irc/test` with server, port, nick, password
+   - Expect: 200, `{ success: true, message: "Connection successful" }`
+   - Verify: Socket disconnected cleanly, 10s timeout enforced
 
-10. EDGE-INT-004: Malformed webhook payload rejected
+**Edge Case Tests (6)**:
+10. EDGE-INT-001: Telegram API timeout → message queued for retry
+    - Send message, Telegram API times out
+    - Expect: Message status=pending, queued for retry
+
+11. EDGE-INT-002: IRC connection lost → auto-reconnect
+    - IRC connection drops
+    - Expect: Connector auto-reconnects; pending messages managed by BullMQ retry queue (fail-fast if disconnected, no connector-local queuing)
+
+12. EDGE-INT-003: Duplicate Telegram message (idempotency)
+    - Same Telegram message received twice (webhook duplication)
+    - Expect: Only one message stored (deduped by external_message_id)
+
+13. EDGE-INT-004: Malformed webhook payload rejected
     - Telegram sends invalid payload
     - Expect: 400, payload validation error
 
-**RBAC Tests (2)**:
-11. RBAC-INT-001: super_admin only can manage integrations
-    - Login as super_admin
-    - GET `/api/integrations` (view creds)
-    - Expect: 200
+14. EDGE-INT-006: INT-006 - Config missing encryption key
+    - Unset INTEGRATION_CREDENTIALS_ENCRYPTION_KEY
+    - POST `/api/integrations/irc/config` with password
+    - Expect: 400, "Encryption key not configured"
 
-12. RBAC-INT-002: admin/manager/user cannot view integration credentials
+15. EDGE-INT-007: INT-007 - Connect without stored config
+    - POST `/api/integrations/irc/connect` when no config saved
+    - Expect: 409, "IRC not configured"
+
+16. EDGE-INT-008a: INT-008 - Test timeout at 10 seconds
+    - POST `/api/integrations/irc/test` with unreachable server
+    - Expect: 408, "Connection timeout (10s exceeded)"
+    - Verify: Socket closed after timeout
+
+17. EDGE-INT-008b: INT-008 - Test with body-first validation fallback
+    - Save IRC config (HP-INT-006)
+    - POST `/api/integrations/irc/test` with server + port only (no nick, no password)
+    - Expect: 200 or 400 depending on stored config completeness
+    - Verify: Falls back to stored nick/password if not in body
+
+18. EDGE-INT-008c: INT-008 - Test with invalid port (body-first validation)
+    - POST `/api/integrations/irc/test` with port=99999 (out of range)
+    - Expect: 400, "Port must be between 1 and 65535"
+
+**RBAC Tests (3)**:
+19. RBAC-INT-001: super_admin can manage IRC integrations
+    - Login as super_admin
+    - POST `/api/integrations/irc/config` with valid config
+    - Expect: 201
+
+20. RBAC-INT-002: INT-006 - admin/manager/user cannot save IRC config
     - Login as admin
-    - GET `/api/integrations`
+    - POST `/api/integrations/irc/config`
+    - Expect: 403
+
+21. RBAC-INT-003: INT-007/008 - admin/manager/user cannot initiate/test IRC
+    - Login as manager
+    - POST `/api/integrations/irc/connect` or `/api/integrations/irc/test`
     - Expect: 403
 
 ---
