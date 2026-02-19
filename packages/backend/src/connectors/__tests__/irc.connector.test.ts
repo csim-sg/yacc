@@ -522,32 +522,46 @@ describe('IRCConnector', () => {
            expect(schedulingLogs.length).toBeGreaterThan(0);
          });
 
-         it('(EA: Timer Behavior) should not attempt reconnect before delay expires', async () => {
-           // Scenario: Schedule reconnect with 1s delay, verify delays are respected
-           // Observable: Reconnect scheduling logs include proper delayMs values
-           
-           const connectPromise = connector.connect().catch(() => {
-             // Expected failure, catch it
-           });
-           await vi.advanceTimersByTimeAsync(50);
-           emitClientEvent('error', new Error('fail'));
-           await vi.advanceTimersByTimeAsync(10);
-           
-           // Verify a scheduling log was created with delayMs
-           const schedulingLogs = vi.mocked(logger).info.mock.calls.filter(
-             (call) => (call[1] as string)?.includes('Scheduling')
-           );
-           expect(schedulingLogs.length).toBeGreaterThan(0);
-           
-            // Verify the first delay is 1000ms
-            if (schedulingLogs.length > 0) {
-              const logObj = schedulingLogs[0][0];
-              if (logObj && typeof logObj === 'object' && 'delayMs' in logObj) {
-                const payload = logObj as Record<string, unknown>;
-                expect(payload.delayMs).toBe(1000);
-              }
-            }
-         });
+          it('(EA: Timer Behavior) should not attempt reconnect before delay expires', async () => {
+            // Scenario: Schedule reconnect with 1s delay, verify delays are respected
+            // Observable: Timer behavior shows reconnect respects the exact delay
+            // GATE B REQ 1a: Verify timer fires at 1000ms and not before (at 500ms)
+            
+            const connectPromise = connector.connect().catch(() => {
+              // Expected failure, catch it
+            });
+            await vi.advanceTimersByTimeAsync(50);
+            emitClientEvent('error', new Error('fail'));
+            await vi.advanceTimersByTimeAsync(10);
+            
+            // At this point, reconnect timer is scheduled for 1000ms from now
+            // Verify that a timer is pending
+            expect(vi.getTimerCount()).toBeGreaterThan(0);
+            
+            // Get count of "Connecting to IRC server" logs at baseline
+            const connectingLogsAtBaseline = vi.mocked(logger).info.mock.calls.filter(
+              (call) => (call[1] as string)?.includes('Connecting to IRC server')
+            ).length;
+            
+            // GATE B REQ 1a: Advance by 500ms (well before 1000ms delay expires)
+            await vi.advanceTimersByTimeAsync(500);
+            
+            // Assert NO NEW "Connecting to IRC server" log occurred, timer still pending
+            let connectingLogsAfter500 = vi.mocked(logger).info.mock.calls.filter(
+              (call) => (call[1] as string)?.includes('Connecting to IRC server')
+            ).length;
+            expect(connectingLogsAfter500).toBe(connectingLogsAtBaseline);
+            expect(vi.getTimerCount()).toBeGreaterThan(0);
+            
+            // GATE B REQ 1a: Advance by 500ms more (total 1000ms = delay expires, timer fires)
+            await vi.advanceTimersByTimeAsync(500);
+            
+            // Assert that EXACTLY ONE NEW "Connecting to IRC server" log occurred
+            let connectingLogsAfter1000 = vi.mocked(logger).info.mock.calls.filter(
+              (call) => (call[1] as string)?.includes('Connecting to IRC server')
+            ).length;
+            expect(connectingLogsAfter1000).toBe(connectingLogsAtBaseline + 1);
+          });
 
          it('(EA: Timer Behavior) should attempt reconnect after delay expires', async () => {
            // Scenario: Schedule reconnect with 1s delay, verify attempt AFTER 1s
@@ -571,56 +585,55 @@ describe('IRCConnector', () => {
            expect(attemptLogs.length).toBeGreaterThan(0);
          });
 
-         it('(EA: Exponential Backoff Sequence) should follow backoff delays: 1s, 2s, 4s, 8s, 16s across 5 attempts', async () => {
-           // Scenario: Trigger 5 consecutive failures and verify delays
-           // Observable: Logger scheduling logs include delayMs values: [1000, 2000, 4000, 8000, 16000]
-           
-           const recordedDelays: number[] = [];
-           
-           for (let attempt = 0; attempt < 5; attempt++) {
-             // Connect with fresh connector state for each attempt
-             if (attempt === 0) {
-               const connectPromise = connector.connect().catch(() => {
-                 // Expected failure, catch it
-               });
-               await vi.advanceTimersByTimeAsync(50);
-               emitClientEvent('error', new Error('fail'));
-               await vi.advanceTimersByTimeAsync(10);
-             } else {
-               // Re-trigger failure to schedule next attempt
-               emitClientEvent('error', new Error('fail'));
-               await vi.advanceTimersByTimeAsync(10);
-             }
-             
-             // Find the most recent scheduling log
-             const schedulingLogs = vi.mocked(logger).info.mock.calls
-               .filter((call) => (call[1] as string)?.includes('Scheduling'))
-               .slice(-1);
-             
-              if (schedulingLogs.length > 0) {
-                const logObj = schedulingLogs[0][0];
-                if (logObj && typeof logObj === 'object' && 'delayMs' in logObj) {
-                  const payload = logObj as Record<string, unknown>;
-                  const delayMs = payload.delayMs;
-                  if (typeof delayMs === 'number') {
-                    recordedDelays.push(delayMs);
-                  }
-                }
+          it('(EA: Exponential Backoff Sequence) should follow backoff delays: 1s, 2s, 4s, 8s, 16s across 5 attempts', async () => {
+            // Scenario: Trigger 5 consecutive failures and verify delays
+            // Observable: Logger scheduling logs include delayMs values: [1000, 2000, 4000, 8000, 16000]
+            // GATE B REQ 2: Must capture all 5 delays and assert deep equality to [1000,2000,4000,8000,16000]
+            
+            const recordedDelays: number[] = [];
+            
+            for (let attempt = 0; attempt < 5; attempt++) {
+              // Connect with fresh connector state for each attempt
+              if (attempt === 0) {
+                const connectPromise = connector.connect().catch(() => {
+                  // Expected failure, catch it
+                });
+                await vi.advanceTimersByTimeAsync(50);
+                emitClientEvent('error', new Error('fail'));
+                await vi.advanceTimersByTimeAsync(10);
+              } else {
+                // Re-trigger failure to schedule next attempt
+                emitClientEvent('error', new Error('fail'));
+                await vi.advanceTimersByTimeAsync(10);
               }
-             
-             // Advance to the scheduled time to allow the reconnect to fire
-             const nextDelay = attempt === 0 ? 1000 : recordedDelays[attempt] || 1000;
-             await vi.advanceTimersByTimeAsync(nextDelay + 100);
-           }
-           
-           // Verify delays match exponential backoff
-           const expectedDelays = [1000, 2000, 4000, 8000, 16000];
-           expectedDelays.forEach((expected, idx) => {
-             if (recordedDelays[idx] !== undefined) {
-               expect(recordedDelays[idx]).toBe(expected);
-             }
-           });
-         });
+              
+              // Find the most recent scheduling log
+              const schedulingLogs = vi.mocked(logger).info.mock.calls
+                .filter((call) => (call[1] as string)?.includes('Scheduling'))
+                .slice(-1);
+              
+              // GATE B REQ 2: Must extract delay unconditionally (no conditional if checks)
+              expect(schedulingLogs.length).toBeGreaterThan(0);
+              const logObj = schedulingLogs[0][0];
+              expect(logObj).toBeTruthy();
+              expect(logObj).toHaveProperty('delayMs');
+              const payload = logObj as Record<string, unknown>;
+              const delayMs = payload.delayMs as number;
+              expect(typeof delayMs).toBe('number');
+              recordedDelays.push(delayMs);
+              
+              // Advance to the scheduled time to allow the reconnect to fire
+              const currentDelay = delayMs;
+              await vi.advanceTimersByTimeAsync(currentDelay + 100);
+            }
+            
+            // GATE B REQ 2: Assert length is exactly 5
+            expect(recordedDelays.length).toBe(5);
+            
+            // GATE B REQ 2: Assert deep equality to exact backoff sequence
+            const expectedDelays = [1000, 2000, 4000, 8000, 16000];
+            expect(recordedDelays).toEqual(expectedDelays);
+          });
 
          it('(EA: Single Timer Guard) should prevent multiple concurrent reconnect timeouts', async () => {
            // Scenario: Rapid failures should not schedule multiple timers
@@ -685,45 +698,70 @@ describe('IRCConnector', () => {
             }
          });
 
-         it('(EA: Exhaustion After 5 Failures) should mark status as failed and stop scheduling after 5 attempts', async () => {
-           // Scenario: 5 consecutive failures → status becomes 'failed', max attempts reached
-           // Observable: Exactly 5 scheduling logs created, then no more
-           
-           // Trigger initial connection failure
-           const connectPromise = connector.connect().catch(() => {
-             // Expected failure, catch it
-           });
-           await vi.advanceTimersByTimeAsync(50);
-           emitClientEvent('error', new Error('fail'));
-           await vi.advanceTimersByTimeAsync(10);
-           
-           // Count scheduling logs before loop
-           let previousSchedulingCount = 0;
-           
-           // Trigger 4 more failures by advancing through the backoff delays
-           for (let i = 0; i < 4; i++) {
-             // Advance past the scheduled reconnect delay to allow connect() to be called
-             const delayMs = Math.min(60000, 1000 * Math.pow(2, i));
-             await vi.advanceTimersByTimeAsync(delayMs + 50);
-             
-             // Emit error to fail this attempt and schedule the next
-             emitClientEvent('error', new Error('fail'));
-             await vi.advanceTimersByTimeAsync(10);
-             
-             // Track scheduling log count
-             previousSchedulingCount = vi.mocked(logger).info.mock.calls.filter(
-               (call) => (call[1] as string)?.includes('Scheduling')
-             ).length;
-           }
-           
-           // After 5 failed attempts, no more scheduling should occur
-           // so the count should remain at 5
-           const finalSchedulingCount = vi.mocked(logger).info.mock.calls.filter(
-             (call) => (call[1] as string)?.includes('Scheduling')
-           ).length;
-           
-           expect(finalSchedulingCount).toBe(5);
-         });
+          it('(EA: Exhaustion After 5 Failures) should mark status as failed and stop scheduling after 5 attempts', async () => {
+            // Scenario: 5 consecutive failures → status becomes 'failed', max attempts reached, no more timers
+            // Observable: 
+            // 1. Status becomes 'failed' after 5 attempts exhaust
+            // 2. No pending timers remain (vi.getTimerCount() === 0)
+            // 3. Additional disconnect/error events do NOT schedule new reconnects
+            // GATE B REQ 3: Strict assertions on status, timer count, and scheduling idempotence
+            
+            // Trigger initial connection failure
+            const connectPromise = connector.connect().catch(() => {
+              // Expected failure, catch it
+            });
+            await vi.advanceTimersByTimeAsync(50);
+            emitClientEvent('error', new Error('fail'));
+            await vi.advanceTimersByTimeAsync(10);
+            
+            // Trigger 4 more failures by advancing through the backoff delays
+            // Each iteration: advance timer, let connect() fire, emit error, get scheduled
+            for (let i = 0; i < 4; i++) {
+              // Advance past the scheduled reconnect delay to allow connect() to be called
+              // delayMs for attempt i: 1000 * 2^i = 1000, 2000, 4000, 8000
+              const delayMs = Math.min(60000, 1000 * Math.pow(2, i));
+              await vi.advanceTimersByTimeAsync(delayMs + 50);
+              
+              // Now connect() has been called (attempt i+1), emit error during handshake
+              emitClientEvent('error', new Error('fail'));
+              await vi.advanceTimersByTimeAsync(10);
+            }
+            
+            // Now we're at 5 scheduled attempts total (attempts 1-5)
+            // Advance the final timer (attempt 5 delay = 16000ms) to let the 5th attempt fire
+            const finalDelayMs = Math.min(60000, 1000 * Math.pow(2, 4)); // 16000
+            await vi.advanceTimersByTimeAsync(finalDelayMs + 50);
+            
+            // Emit error on the 5th attempt
+            emitClientEvent('error', new Error('fail'));
+            await vi.advanceTimersByTimeAsync(10);
+            
+            // After 5 failed attempts, verify:
+            // GATE B REQ 3a: Status must be 'failed' (set when scheduleReconnect sees reconnectAttempts === 5)
+            const status = connector.getConnectionStatus();
+            expect(status.status).toBe('failed');
+            
+            // GATE B REQ 3a: No pending reconnect timers should remain
+            expect(vi.getTimerCount()).toBe(0);
+            
+            // GATE B REQ 3b: Get current scheduling log count before extra event
+            const schedulingCountBefore = vi.mocked(logger).info.mock.calls.filter(
+              (call) => (call[1] as string)?.includes('Scheduling')
+            ).length;
+            
+            // GATE B REQ 3b: Trigger another disconnect/error event (should be ignored)
+            emitClientEvent('error', new Error('fail again'));
+            await vi.advanceTimersByTimeAsync(10);
+            
+            // GATE B REQ 3b: Verify no new "Scheduling" log was emitted
+            const schedulingCountAfter = vi.mocked(logger).info.mock.calls.filter(
+              (call) => (call[1] as string)?.includes('Scheduling')
+            ).length;
+            expect(schedulingCountAfter).toBe(schedulingCountBefore);
+            
+            // GATE B REQ 3b: Verify timer count remains 0 (no new timer scheduled)
+            expect(vi.getTimerCount()).toBe(0);
+          });
 
          it('(EA: Manual Disconnect) should clear pending reconnect timer on disconnect()', async () => {
            // Scenario: Schedule reconnect, then manually disconnect → timer cleared
