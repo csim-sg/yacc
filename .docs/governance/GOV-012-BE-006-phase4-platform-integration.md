@@ -363,7 +363,7 @@ describe('Message retry failure flow', () => {
 | **Connector Pattern** | Platform integration abstraction | Extensible for Phase 2 (WhatsApp, WeChat, etc.) | ✅ Approved |
 | **Exponential Backoff** | Message retry strategy | Industry standard, reduces server load | ✅ Approved |
 | **WebSocket Events** | Real-time frontend updates | Instant delivery, better UX | ✅ Approved |
-| **Message Queuing (IRC)** | Offline message buffering | Preserves messages during disconnection | ✅ Approved |
+| **Message Retry Queue** | BullMQ-managed exponential backoff + DLQ | Fail-fast connector; BullMQ handles retry/DLQ (no connector-local queue) | ✅ Approved |
 | **DLQ Pattern** | Failed message handling | Ops visibility, manual recovery | ✅ Approved |
 
 ### Security Review ✅

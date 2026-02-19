@@ -33,10 +33,10 @@ IRC Connector (INT-001)
          └─ Channel → Conversation Mapping (INT-011)
 
 REST API (INT-006 to INT-009)
-    ├─ POST /integrations/irc/config (INT-006)
-    ├─ POST /integrations/irc/connect (INT-007)
-    ├─ POST /integrations/irc/test (INT-008)
-    └─ GET /integrations/irc/status (INT-009)
+    ├─ POST /api/integrations/irc/config (INT-006)
+    ├─ POST /api/integrations/irc/connect (INT-007)
+    ├─ POST /api/integrations/irc/test (INT-008)
+    └─ GET /api/integrations/irc/status (INT-009)
 
 Infrastructure
     ├─ Environment Variables (INT-010)
@@ -75,7 +75,7 @@ INT-013, INT-014 (Tests)
   - Replace mock implementation with actual IRC client
   - Handlers for connection events (connected, disconnected, error)
   - Status management (connected/reconnecting/disconnected/error)
-  - Message queue for offline messages
+  - Fail-fast on send; BullMQ retry/DLQ handles offline message recovery
 - **Dependencies**: BE-001 (PostgreSQL), BE-002 (schema)
 - **Acceptance Criteria**:
   - Connects to IRC server
@@ -190,14 +190,14 @@ INT-013, INT-014 (Tests)
 #### INT-009: IRC Status Endpoint
 - **Description**: Get current IRC connection status
 - **Deliverables**:
-  - `GET /integrations/irc/status`
-  - Return: connected/disconnected status
-  - Include: timestamps, error message, reconnect attempts
-  - RBAC: admin+ only
+   - `GET /api/integrations/irc/status`
+   - Return: connected/disconnected status
+   - Include: timestamps, error message, reconnect attempts
+   - RBAC: admin+ only
 - **Dependencies**: INT-005
 - **Acceptance Criteria**:
-  - Status endpoint returns correct data
-  - RBAC enforced
+   - Status endpoint returns correct data
+   - RBAC enforced
 
 ### Phase 3: Mapping & Error Handling (INT-010 to INT-012)
 

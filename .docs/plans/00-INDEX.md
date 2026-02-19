@@ -28,7 +28,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **INT-004** (IRC Auto-Reconnect) | ✅ **COMPLETED** (PR #260 merged) | INT-001 | Exponential backoff reconnect (1s, 2s, 4s, 8s, 16s; 5 attempts max), behavioral timer-boundary tests |
 | **INT-005** (IRC Status) | ⏳ **IN PROGRESS** | INT-004 | Connection status model + infrastructure (runtime memory storage) |
 | **INT-006-014** (IRC Config/Env) | ⏳ **READY** | INT-005 | Config persistence, environment management, integration setup |
-| **INT-009** (Status Endpoint) | ⏳ **IN PROGRESS** | INT-005 | GET /integrations/irc/status endpoint (admin+ RBAC) |
+| **INT-009** (Status Endpoint) | ⏳ **IN PROGRESS** | INT-005 | GET /api/integrations/irc/status endpoint (admin+ RBAC) |
 
 ### Test Results (INT-001)
 - **28/28 tests passing** (100% pass rate)
