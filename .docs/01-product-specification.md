@@ -24,7 +24,7 @@
 ## 1. Product Overview
 
 ### Concept
-**YACC (Yet Another Chat Client)** is a cloud-hosted, single-tenant omni-channel chat platform that centralizes social communications (MVP Phase 1: Telegram groups/channels and IRC) into one unified inbox. Built with React, Node.js, PostgreSQL, and deployed to Cloudflare R2 + CDN for frontend assets and file storage, with backend on VPS.
+**YACC (Yet Another Chat Client)** is a cloud-hosted, multi-tenant omni-channel chat platform that centralizes social communications (MVP Phase 1: Telegram groups/channels and IRC) into one unified inbox. Built with React, Node.js, PostgreSQL, and deployed to Cloudflare R2 + CDN for frontend assets and file storage, with backend on VPS.
 
 **Initial Release (Phase 1)**: Unified Inbox + Auth + Basic Ops + Telegram/IRC messaging  
 **Post-MVP**: Additional channels (WhatsApp/WeChat/Meta/X) + advanced features
@@ -32,6 +32,8 @@
 ---
 
 ## 2. Target Users & Roles
+
+All roles and data access are scoped to a **tenant (organization)** unless explicitly stated otherwise.
 
 | Role | Permissions |
 |------|-----------|
@@ -66,7 +68,7 @@
 - Email notifications
 - WhatsApp, WeChat, Meta, X integrations
 - RTL support
-- Multi-tenant architecture
+- External credential vault / secrets manager
 - Elasticsearch for search (use PostgreSQL FTS in MVP)
 
 ---
@@ -848,6 +850,32 @@ flowchart TD
   - Auto-reconnect status shown (retrying state with attempt counter)
 
 ---
+
+### Story 16.3: Manage Tenant-Owned Integration Credentials & Connection Profiles
+**As a** tenant super admin  
+**I want** integration credentials and connection details stored in the database per tenant  
+**So that** the tenant can manage many configured connection profiles without relying on environment variables.
+
+**Notes / Decisions Required (blocks implementation)**:
+- Scope: does this apply to IRC only, or to all integrations (IRC + Telegram in MVP)?
+- Within a tenant, do we support multiple profiles per integration (0..N) or exactly one?
+- Some integrations may be technically limited to a single profile (0..1). We need an explicit per-integration policy.
+
+**AC (business-level)**:
+- System stores integration connection profiles in DB and scopes them to a tenant
+- Tenant super admins can create/update/delete profiles; other roles are denied (explicit RBAC)
+- Passwords/tokens are encrypted at rest and never returned in API responses
+- Logs and audit trails never include plaintext secrets; audit records secret changes as booleans only
+- System enforces a per-integration **profile policy** stored in settings:
+  - Default policy: multi-profile allowed (0..N)
+  - Integrations that only support a single profile must enforce maxProfiles=1 (0..1)
+  - Tenant settings can only **tighten** limits (reduce maxProfiles); they can never increase beyond the integration hard limit
+  - Attempting to create a profile beyond maxProfiles returns a clear, sanitized validation error
+- If tenant settings are tightened below the current number of existing profiles:
+  - System blocks creating new profiles for that integration until the tenant remediates (disable/delete profiles)
+  - System does not auto-delete or auto-disable profiles
+- Tenant can select which profile is active for connection/sending (behavior defined per integration)
+- Error messages are sanitized and do not leak secrets
 
 ### Story 17.1: Create Tags On-the-Fly
 **As a** user  
