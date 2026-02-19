@@ -1,6 +1,6 @@
 # Execution Status Index
 
-**Last Updated**: 2026-02-16  
+**Last Updated**: 2026-02-19  
 **Status**: ⏳ Phase 1 in progress (IRC integration)
 
 ---
@@ -25,7 +25,8 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **INT-001** (IRC Connector) | ✅ **COMPLETED** (Feb 15, 2026) | — | Code merged to dev; production-ready IRC server connection with proper handshake, event-driven reconnect, security hardening |
 | **INT-002** (IRC Ingestion) | ✅ **COMPLETED** (PR #257 merged) | INT-001 | Inbound messages → conversations/messages in DB; atomic upsert, auto-reopen resolved conversations, WebSocket events (backlog-aware) |
 | **INT-003** (IRC Delivery) | ✅ **COMPLETED** (PR #259 merged) | INT-001 | Outbound messages → IRC channel; pending → sent/failed; BullMQ retry worker + correlationId propagation |
-| **INT-004-014** (IRC Infra) | ⏳ **READY** | INT-003 | Connection status, config, auto-reconnect, environment management |
+| **INT-004** (IRC Auto-Reconnect) | ✅ **COMPLETED** (PR #260 merged) | INT-001 | Exponential backoff reconnect (1s, 2s, 4s, 8s, 16s; 5 attempts max), behavioral timer-boundary tests |
+| **INT-005-014** (IRC Infra) | ⏳ **READY** | INT-004 | Connection status, config, environment management |
 
 ### Test Results (INT-001)
 - **28/28 tests passing** (100% pass rate)
