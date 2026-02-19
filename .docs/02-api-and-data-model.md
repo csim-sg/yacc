@@ -1341,7 +1341,7 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 
 Phase 1 includes Telegram + IRC integration. Additional platforms are deferred to post-MVP (WhatsApp, WeChat, Meta, X).
 
-#### `POST /integrations/telegram/connect`
+#### `POST /api/integrations/telegram/connect`
 **Request:**
 ```json
 { "botToken": "bot-token-from-telegram" }
@@ -1360,7 +1360,7 @@ Phase 1 includes Telegram + IRC integration. Additional platforms are deferred t
 
 ---
 
-#### `POST /integrations/irc/connect`
+#### `POST /api/integrations/irc/connect`
 **Request:**
 ```json
 {
@@ -1412,7 +1412,7 @@ Get current IRC connection status. Works even when IRC is unconfigured; does not
 
 ---
 
-#### `GET /integrations/status`
+#### `GET /api/integrations/status`
 **Response:**
 ```json
 {

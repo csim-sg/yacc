@@ -73,7 +73,7 @@ INT-013, INT-014 (Tests)
 - **Description**: Implement real IRC connection using `irc` npm package
 - **Deliverables**:
   - Replace mock implementation with actual IRC client
-  - Handlers for connection events (connected, disconnected, error)
+  - Handlers for connection lifecycle states (connected, retrying, disconnected, failed)
   - Status management (connected/retrying/disconnected/failed)
   - Fail-fast on send; BullMQ retry/DLQ handles offline message recovery
 - **Dependencies**: BE-001 (PostgreSQL), BE-002 (schema)
@@ -150,7 +150,7 @@ INT-013, INT-014 (Tests)
 #### INT-006: IRC Config Endpoint
 - **Description**: Save IRC server configuration
 - **Deliverables**:
-  - `POST /integrations/irc/config`
+  - `POST /api/integrations/irc/config`
   - Save: server, port, nick, password, channels
   - RBAC: super_admin only
   - Validation before save
@@ -164,7 +164,7 @@ INT-013, INT-014 (Tests)
 #### INT-007: IRC Connect Endpoint
 - **Description**: Initiate IRC connection
 - **Deliverables**:
-  - `POST /integrations/irc/connect`
+  - `POST /api/integrations/irc/connect`
   - Initiate connection from stored config
   - Return: current connection status
   - RBAC: super_admin only
@@ -176,7 +176,7 @@ INT-013, INT-014 (Tests)
 #### INT-008: IRC Test Endpoint
 - **Description**: Test IRC connection before saving
 - **Deliverables**:
-  - `POST /integrations/irc/test`
+  - `POST /api/integrations/irc/test`
   - Accept: server, port, nick, password
   - Test connection (10s timeout)
   - Return: success/failure message
