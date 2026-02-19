@@ -522,24 +522,35 @@ describe('IRCConnector', () => {
            expect(schedulingLogs.length).toBeGreaterThan(0);
          });
 
-           it('(EA: Timer Behavior) should not attempt reconnect before delay expires', async () => {
-             // Scenario: Schedule reconnect with 1s delay, verify delays are respected
-             // Observable: Timer behavior shows reconnect respects the exact delay
-             // GATE B REQ 1a: Verify timer fires at 1000ms and not before (at 999ms)
+            it('(EA: Timer Behavior) should not attempt reconnect before delay expires', async () => {
+              // Scenario: Schedule reconnect with 1s delay, verify delays are respected
+              // Observable: Timer behavior shows reconnect respects the exact delay
+              // GATE B REQ 1a: Verify timer fires at 1000ms and not before (at 999ms)
              
-             const connectPromise = connector.connect().catch(() => {
-               // Expected failure, catch it
-             });
-             await vi.advanceTimersByTimeAsync(50);
-             emitClientEvent('error', new Error('fail'));
-             await vi.advanceTimersByTimeAsync(10);
+              const connectPromise = connector.connect().catch(() => {
+                // Expected failure, catch it
+              });
+              await vi.advanceTimersByTimeAsync(50);
+              emitClientEvent('error', new Error('fail'));
+              await vi.advanceTimersByTimeAsync(0);
+
+              const connectingLogsBefore = vi.mocked(logger).info.mock.calls.filter((call) =>
+                (call[1] as string)?.includes('Connecting to IRC server')
+              ).length;
+              expect(connectingLogsBefore).toBe(1);
              
              // At this point, reconnect timer is scheduled for 1000ms from now
              // Verify that a timer is pending
              expect(vi.getTimerCount()).toBeGreaterThan(0);
              
-             // GATE B REQ 1a: Advance by 999ms (well before 1000ms delay expires)
-             await vi.advanceTimersByTimeAsync(999);
+              // GATE B REQ 1a: Advance by 999ms (well before 1000ms delay expires)
+              await vi.advanceTimersByTimeAsync(999);
+
+              // No connection attempt should have happened yet
+              const connectingLogsAt999 = vi.mocked(logger).info.mock.calls.filter((call) =>
+                (call[1] as string)?.includes('Connecting to IRC server')
+              ).length;
+              expect(connectingLogsAt999).toBe(connectingLogsBefore);
              
              // Count "Scheduling IRC reconnection attempt" logs at 999ms mark
              const schedulingLogsAt999 = vi.mocked(logger).info.mock.calls.filter(
@@ -552,17 +563,18 @@ describe('IRCConnector', () => {
              // Verify timer is still pending
              expect(vi.getTimerCount()).toBeGreaterThan(0);
              
-             // GATE B REQ 1a: Advance by 1ms more (total 1000ms = delay expires, timer fires)
-             await vi.advanceTimersByTimeAsync(1);
+              // GATE B REQ 1a: Advance by 1ms more (total 1000ms = delay expires, timer fires)
+              await vi.advanceTimersByTimeAsync(1);
              
              // Count "Connecting to IRC server" logs at 1000ms mark
              const connectingLogsAfter1000 = vi.mocked(logger).info.mock.calls.filter(
                (call) => (call[1] as string)?.includes('Connecting to IRC server')
              ).length;
              
-             // Should now be 2 (initial connect + reconnect after timer)
-             expect(connectingLogsAfter1000).toBe(2);
-           });
+              // Should now be 2 (initial connect + reconnect after timer)
+              expect(connectingLogsAfter1000).toBe(2);
+              expect(connectingLogsAfter1000).toBe(connectingLogsAt999 + 1);
+            });
 
          it('(EA: Timer Behavior) should attempt reconnect after delay expires', async () => {
            // Scenario: Schedule reconnect with 1s delay, verify attempt AFTER 1s
