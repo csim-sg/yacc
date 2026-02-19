@@ -26,7 +26,9 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **INT-002** (IRC Ingestion) | ✅ **COMPLETED** (PR #257 merged) | INT-001 | Inbound messages → conversations/messages in DB; atomic upsert, auto-reopen resolved conversations, WebSocket events (backlog-aware) |
 | **INT-003** (IRC Delivery) | ✅ **COMPLETED** (PR #259 merged) | INT-001 | Outbound messages → IRC channel; pending → sent/failed; BullMQ retry worker + correlationId propagation |
 | **INT-004** (IRC Auto-Reconnect) | ✅ **COMPLETED** (PR #260 merged) | INT-001 | Exponential backoff reconnect (1s, 2s, 4s, 8s, 16s; 5 attempts max), behavioral timer-boundary tests |
-| **INT-005-014** (IRC Infra) | ⏳ **READY** | INT-004 | Connection status, config, environment management |
+| **INT-005** (IRC Status) | ⏳ **IN PROGRESS** | INT-004 | Connection status model + infrastructure (runtime memory storage) |
+| **INT-006-014** (IRC Config/Env) | ⏳ **READY** | INT-005 | Config persistence, environment management, integration setup |
+| **INT-009** (Status Endpoint) | ⏳ **IN PROGRESS** | INT-005 | GET /api/integrations/irc/status endpoint (admin+ RBAC) |
 
 ### Test Results (INT-001)
 - **28/28 tests passing** (100% pass rate)

@@ -1341,7 +1341,7 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 
 Phase 1 includes Telegram + IRC integration. Additional platforms are deferred to post-MVP (WhatsApp, WeChat, Meta, X).
 
-#### `POST /integrations/telegram/connect`
+#### `POST /api/integrations/telegram/connect`
 **Request:**
 ```json
 { "botToken": "bot-token-from-telegram" }
@@ -1360,7 +1360,7 @@ Phase 1 includes Telegram + IRC integration. Additional platforms are deferred t
 
 ---
 
-#### `POST /integrations/irc/connect`
+#### `POST /api/integrations/irc/connect`
 **Request:**
 ```json
 {
@@ -1383,7 +1383,36 @@ Phase 1 includes Telegram + IRC integration. Additional platforms are deferred t
 
 ---
 
-#### `GET /integrations/status`
+#### `GET /api/integrations/irc/status` (INT-009)
+**RBAC**: admin+ (super_admin, admin)
+
+Get current IRC connection status. Works even when IRC is unconfigured; does not expose configuration secrets.
+
+**Response: 200 OK**
+```json
+{
+  "data": {
+    "status": "connected|retrying|disconnected|failed",
+    "attemptCount": 0,
+    "lastChangedAt": "2026-02-19T15:30:00.000Z",
+    "lastConnectedAt": "2026-02-19T15:25:00.000Z",
+    "lastError": null,
+    "reconnectIncidentId": "incident-uuid"
+  }
+}
+```
+
+**Field Descriptions**:
+- `status`: Current connection state (connected, retrying, disconnected, failed)
+- `attemptCount`: Number of reconnection attempts in current incident (0-5); resets to 0 on successful connection
+- `lastChangedAt`: ISO-8601 timestamp of last status change
+- `lastConnectedAt`: ISO-8601 timestamp of last successful connection (null if never connected)
+- `lastError`: Sanitized error message (null if no error); no secrets exposed
+- `reconnectIncidentId`: Unique identifier for current reconnection incident; optional, only present when status = 'retrying' or 'failed'
+
+---
+
+#### `GET /api/integrations/status`
 **Response:**
 ```json
 {

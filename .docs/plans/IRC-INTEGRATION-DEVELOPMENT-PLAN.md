@@ -33,10 +33,10 @@ IRC Connector (INT-001)
          └─ Channel → Conversation Mapping (INT-011)
 
 REST API (INT-006 to INT-009)
-    ├─ POST /integrations/irc/config (INT-006)
-    ├─ POST /integrations/irc/connect (INT-007)
-    ├─ POST /integrations/irc/test (INT-008)
-    └─ GET /integrations/irc/status (INT-009)
+    ├─ POST /api/integrations/irc/config (INT-006)
+    ├─ POST /api/integrations/irc/connect (INT-007)
+    ├─ POST /api/integrations/irc/test (INT-008)
+    └─ GET /api/integrations/irc/status (INT-009)
 
 Infrastructure
     ├─ Environment Variables (INT-010)
@@ -73,9 +73,9 @@ INT-013, INT-014 (Tests)
 - **Description**: Implement real IRC connection using `irc` npm package
 - **Deliverables**:
   - Replace mock implementation with actual IRC client
-  - Handlers for connection events (connected, disconnected, error)
-  - Status management (connected/reconnecting/disconnected/error)
-  - Message queue for offline messages
+  - Handlers for connection lifecycle states (connected, retrying, disconnected, failed)
+  - Status management (connected/retrying/disconnected/failed)
+  - Fail-fast on send; BullMQ retry/DLQ handles offline message recovery
 - **Dependencies**: BE-001 (PostgreSQL), BE-002 (schema)
 - **Acceptance Criteria**:
   - Connects to IRC server
@@ -125,7 +125,7 @@ INT-013, INT-014 (Tests)
 - **Acceptance Criteria**:
   - Disconnects trigger reconnect attempts with backoff
   - Max 5 attempts enforced
-  - Queued messages processed on reconnect
+  - Fail-fast on send; BullMQ handles retry/DLQ logic
 
 **Backoff policy (authoritative)**
 - Delay before attempt `n` (1-indexed) is `min(60s, 2^(n-1) * 1s)`
@@ -150,7 +150,7 @@ INT-013, INT-014 (Tests)
 #### INT-006: IRC Config Endpoint
 - **Description**: Save IRC server configuration
 - **Deliverables**:
-  - `POST /integrations/irc/config`
+  - `POST /api/integrations/irc/config`
   - Save: server, port, nick, password, channels
   - RBAC: super_admin only
   - Validation before save
@@ -164,7 +164,7 @@ INT-013, INT-014 (Tests)
 #### INT-007: IRC Connect Endpoint
 - **Description**: Initiate IRC connection
 - **Deliverables**:
-  - `POST /integrations/irc/connect`
+  - `POST /api/integrations/irc/connect`
   - Initiate connection from stored config
   - Return: current connection status
   - RBAC: super_admin only
@@ -176,7 +176,7 @@ INT-013, INT-014 (Tests)
 #### INT-008: IRC Test Endpoint
 - **Description**: Test IRC connection before saving
 - **Deliverables**:
-  - `POST /integrations/irc/test`
+  - `POST /api/integrations/irc/test`
   - Accept: server, port, nick, password
   - Test connection (10s timeout)
   - Return: success/failure message
@@ -190,14 +190,14 @@ INT-013, INT-014 (Tests)
 #### INT-009: IRC Status Endpoint
 - **Description**: Get current IRC connection status
 - **Deliverables**:
-  - `GET /integrations/irc/status`
-  - Return: connected/disconnected status
-  - Include: timestamps, error message, reconnect attempts
-  - RBAC: admin+ only
+    - `GET /api/integrations/irc/status`
+    - Return: connected/retrying/disconnected/failed status
+    - Include: timestamps, error message, reconnect attempts
+    - RBAC: admin+ only
 - **Dependencies**: INT-005
 - **Acceptance Criteria**:
-  - Status endpoint returns correct data
-  - RBAC enforced
+    - Status endpoint returns correct data
+    - RBAC enforced
 
 ### Phase 3: Mapping & Error Handling (INT-010 to INT-012)
 

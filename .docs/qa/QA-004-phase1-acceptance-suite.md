@@ -329,7 +329,7 @@ packages/frontend/tests/acceptance/phase1/
 
 4. HP-MSG-004: Send message to IRC conversation
    - POST `/api/messages` to IRC conversation
-   - Expect: 201, queued for IRC connector
+   - Expect: 201, message status=pending; if IRC disconnected, message queued in BullMQ (1m/5m/30m retries), not connector-local queue
 
 5. HP-MSG-005: Receive inbound message from Telegram
    - Webhook from Telegram (simulated)
@@ -739,7 +739,7 @@ packages/frontend/tests/acceptance/phase1/
 
 8. EDGE-INT-002: IRC connection lost → auto-reconnect
    - IRC connection drops
-   - Expect: Connector auto-reconnects, messages queued
+   - Expect: Connector auto-reconnects; pending messages managed by BullMQ retry queue (fail-fast if disconnected, no connector-local queuing)
 
 9. EDGE-INT-003: Duplicate Telegram message (idempotency)
    - Same Telegram message received twice (webhook duplication)
