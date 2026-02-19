@@ -655,7 +655,43 @@ CREATE TABLE audit_logs (
   INDEX(entity_type),
   INDEX(created_at DESC)
 );
+
+CREATE TABLE integration_connection_profiles (
+  id SERIAL PRIMARY KEY,
+  tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+  integration_type VARCHAR(50) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  is_enabled BOOLEAN NOT NULL DEFAULT true,
+  is_active BOOLEAN NOT NULL DEFAULT false,
+  encrypted_credentials TEXT NOT NULL,
+  config TEXT NOT NULL,
+  created_by_id TEXT NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+  updated_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  last_tested_at TIMESTAMP,
+  last_test_passed BOOLEAN,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+  UNIQUE(tenant_id, integration_type, is_active) WHERE is_active = true,
+  INDEX(tenant_id, integration_type),
+  INDEX(is_active),
+  INDEX(created_by_id),
+  CONSTRAINT icp_active_implies_enabled CHECK (is_active = false OR is_enabled = true)
+);
 ```
+
+**Notes on integration_connection_profiles**:
+- **Hard Cap**: Max 10 profiles per tenant+integration (MVP constraint)
+- **Active Constraint**: At most one active profile per (tenant, integration); enforced by partial unique index
+- **Encryption**: `encrypted_credentials` is encrypted at rest using AES-256-GCM with `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY`
+- **Format**: Encrypted credentials stored as `iv:encryptedData:authTag` (hex-encoded)
+- **Config**: Stored as JSON string; never includes secrets
+- **Defaults**: Profiles start disabled and inactive (user must test and activate)
+- **Semantics**: 
+  - Active implies enabled (CHECK constraint)
+  - Disabling active profile clears is_active flag (atomic)
+  - Deleting active profile is forbidden (409)
+  - Activating disabled profile is forbidden (409)
 
 ---
 
@@ -1531,6 +1567,248 @@ Get current IRC connection status. Works even when IRC is unconfigured; does not
 - `lastConnectedAt`: ISO-8601 timestamp of last successful connection (null if never connected)
 - `lastError`: Sanitized error message (null if no error); no secrets exposed
 - `reconnectIncidentId`: Unique identifier for current reconnection incident; optional, only present when status = 'retrying' or 'failed'
+
+---
+
+#### `POST /api/integrations/irc/profiles` (INT-010)
+**RBAC**: super_admin only
+
+Create a new IRC connection profile. Enforces hard cap of 10 profiles per tenant.
+
+**Request Body**:
+```json
+{
+  "name": "Libera Chat - Primary",
+  "config": {
+    "server": "irc.libera.chat",
+    "port": 6697,
+    "username": "botname",
+    "channels": ["#dev", "#general"]
+  },
+  "password": "server_password"
+}
+```
+
+**Response: 201 Created**
+```json
+{
+  "id": 1,
+  "name": "Libera Chat - Primary",
+  "isEnabled": true,
+  "isActive": false,
+  "config": {
+    "server": "irc.libera.chat",
+    "port": 6697,
+    "username": "botname",
+    "channels": ["#dev", "#general"]
+  },
+  "hasPassword": true,
+  "lastTestedAt": null,
+  "lastTestPassed": null,
+  "createdAt": "2026-02-19T15:30:00.000Z",
+  "updatedAt": "2026-02-19T15:30:00.000Z"
+}
+```
+
+**Error Responses**:
+- `400 encryption_key_missing`: INTEGRATION_CREDENTIALS_ENCRYPTION_KEY not configured
+- `409 irc_profile_limit_exceeded`: 10 profiles already exist
+- `403 forbidden`: User is not super_admin
+
+---
+
+#### `GET /api/integrations/irc/profiles` (INT-010)
+**RBAC**: admin+ (admin, manager, super_admin)
+
+List all IRC connection profiles for the tenant.
+
+**Response: 200 OK**
+```json
+[
+  {
+    "id": 1,
+    "name": "Libera Chat - Primary",
+    "isEnabled": true,
+    "isActive": true,
+    "config": { "server": "...", "port": 6697, "username": "...", "channels": [...] },
+    "hasPassword": true,
+    "lastTestedAt": "2026-02-19T14:00:00.000Z",
+    "lastTestPassed": true,
+    "createdAt": "2026-02-19T15:30:00.000Z",
+    "updatedAt": "2026-02-19T15:30:00.000Z"
+  }
+]
+```
+
+**Error Responses**:
+- `403 forbidden`: User does not have admin+ role
+
+---
+
+#### `GET /api/integrations/irc/profiles/:id` (INT-010)
+**RBAC**: admin+ (admin, manager, super_admin)
+
+Get a single IRC profile by ID.
+
+**Response: 200 OK**
+```json
+{
+  "id": 1,
+  "name": "Libera Chat - Primary",
+  "isEnabled": true,
+  "isActive": true,
+  "config": { "server": "...", "port": 6697, "username": "...", "channels": [...] },
+  "hasPassword": true,
+  "lastTestedAt": "2026-02-19T14:00:00.000Z",
+  "lastTestPassed": true,
+  "createdAt": "2026-02-19T15:30:00.000Z",
+  "updatedAt": "2026-02-19T15:30:00.000Z"
+}
+```
+
+**Error Responses**:
+- `404 not_found`: Profile does not exist
+- `403 forbidden`: User does not have admin+ role
+
+---
+
+#### `PUT /api/integrations/irc/profiles/:id` (INT-010)
+**RBAC**: super_admin only
+
+Update an IRC profile (partial update allowed).
+
+**Request Body** (all fields optional):
+```json
+{
+  "name": "Libera Chat - Backup",
+  "config": { "port": 6667 },
+  "password": "new_password",
+  "isEnabled": true
+}
+```
+
+**Response: 200 OK**
+```json
+{
+  "id": 1,
+  "name": "Libera Chat - Backup",
+  "isEnabled": true,
+  "isActive": false,
+  "config": { "server": "...", "port": 6667, "username": "...", "channels": [...] },
+  "hasPassword": true,
+  "lastTestedAt": "2026-02-19T14:00:00.000Z",
+  "lastTestPassed": true,
+  "createdAt": "2026-02-19T15:30:00.000Z",
+  "updatedAt": "2026-02-19T15:35:00.000Z"
+}
+```
+
+**Constraints**:
+- If `isEnabled` is false and profile is currently active, active flag is cleared atomically
+- Disabling active profile clears `isActive` flag
+
+**Error Responses**:
+- `404 not_found`: Profile does not exist
+- `400 encryption_key_missing`: Cannot encrypt new password
+- `403 forbidden`: User is not super_admin
+
+---
+
+#### `POST /api/integrations/irc/profiles/:id/activate` (INT-010)
+**RBAC**: super_admin only
+
+Activate an IRC profile. Deactivates any currently active profile (one active per integration).
+
+**Response: 200 OK**
+```json
+{
+  "id": 1,
+  "name": "Libera Chat - Primary",
+  "isEnabled": true,
+  "isActive": true,
+  "config": { ... },
+  "hasPassword": true,
+  "lastTestedAt": "2026-02-19T14:00:00.000Z",
+  "lastTestPassed": true,
+  "createdAt": "2026-02-19T15:30:00.000Z",
+  "updatedAt": "2026-02-19T15:36:00.000Z"
+}
+```
+
+**Error Responses**:
+- `404 not_found`: Profile does not exist
+- `409 IRC_PROFILE_ACTIVATE_DISABLED_FORBIDDEN`: Cannot activate a disabled profile
+- `403 forbidden`: User is not super_admin
+
+---
+
+#### `POST /api/integrations/irc/profiles/:id/disable` (INT-010)
+**RBAC**: super_admin only
+
+Disable an IRC profile. If profile is active, active flag is cleared.
+
+**Response: 200 OK**
+```json
+{
+  "id": 1,
+  "name": "Libera Chat - Primary",
+  "isEnabled": false,
+  "isActive": false,
+  "config": { ... },
+  "hasPassword": true,
+  "lastTestedAt": "2026-02-19T14:00:00.000Z",
+  "lastTestPassed": true,
+  "createdAt": "2026-02-19T15:30:00.000Z",
+  "updatedAt": "2026-02-19T15:37:00.000Z"
+}
+```
+
+**Error Responses**:
+- `404 not_found`: Profile does not exist
+- `403 forbidden`: User is not super_admin
+
+---
+
+#### `DELETE /api/integrations/irc/profiles/:id` (INT-010)
+**RBAC**: super_admin only
+
+Delete an IRC profile. Rejects with 409 if profile is active.
+
+**Response: 204 No Content**
+
+**Error Responses**:
+- `404 not_found`: Profile does not exist
+- `409 IRC_PROFILE_DELETE_ACTIVE_FORBIDDEN`: Cannot delete an active profile (disable or activate different profile first)
+- `403 forbidden`: User is not super_admin
+
+---
+
+#### `POST /api/integrations/irc/profiles/:id/test` (INT-010)
+**RBAC**: super_admin only
+
+Test IRC connection for a profile. No side effects - does not create running connection or modify connector state.
+
+**Response: 200 OK**
+```json
+{
+  "passed": true,
+  "reason": null,
+  "duration": 1234
+}
+```
+
+**Error Response (Connection Failed): 200 OK**
+```json
+{
+  "passed": false,
+  "reason": "Connection refused (Connection refused)",
+  "duration": 2000
+}
+```
+
+**Error Responses**:
+- `404 not_found`: Profile does not exist
+- `403 forbidden`: User is not super_admin
 
 ---
 
