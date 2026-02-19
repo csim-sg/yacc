@@ -1436,8 +1436,8 @@ Manual connect initiation using stored config. Request body is ignored; uses DB 
 
 **Behavior**:
 - Retrieves configuration from DB (first) or environment fallback
-- Sets status to `retrying` with `attemptCount=0` for manual initiation
-- Idempotent: if already connected/connecting, returns current status without restart
+- Sets status to `retrying` with `attemptCount=0` for manual initiation (always, even if already connected/retrying)
+- Non-idempotent: each call triggers a reset and reconnect attempt (manual semantics)
 - Delegates actual connection to IRC connector (non-blocking)
 - Connector updates `ircStatusClient` as connection progresses
 

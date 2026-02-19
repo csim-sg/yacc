@@ -103,12 +103,22 @@ export class IRCIntegrationController {
       } as IRCConfigResponse);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
+      const errorCode = error instanceof Error && 'code' in error ? (error.code as string | null) : null;
 
       logger.error(
-        { correlationId, userId, platform: 'irc', method: 'saveConfig', error: message },
+        { correlationId, userId, platform: 'irc', method: 'saveConfig', error: message, code: errorCode },
         'IRC config save failed'
       );
 
+      // Handle encryption key missing error (400)
+      if (errorCode === 'encryption_key_missing') {
+        return res.status(400).json({
+          code: 'encryption_key_missing',
+          message: 'Encryption key not configured. Set INTEGRATION_CREDENTIALS_ENCRYPTION_KEY environment variable.',
+        } as IntegrationErrorResponse);
+      }
+
+      // Handle validation errors (400)
       if (message.includes('required') || message.includes('must be')) {
         return res.status(400).json({
           code: 'validation_error',

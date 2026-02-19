@@ -6,11 +6,56 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { ircStatusClient } from '../../infrastructure/ircStatus.client';
 import { EncryptionService } from '../../services/encryption.service';
 import { ircConfigService, TestConnectionFailedError } from '../../services/ircConfig.service';
 import { ircIntegrationService } from '../../services/ircIntegration.service';
-import { ircStatusClient } from '../../infrastructure/ircStatus.client';
 import type { IRCConfigRequest } from '../../types/ircIntegration.types';
+
+interface MockListeners {
+  [key: string]: Array<() => void>;
+}
+
+interface MockClientThis {
+  listeners: MockListeners;
+  on: (event: string, handler: () => void) => void;
+  connect: (config?: unknown) => void;
+  quit: () => void;
+}
+
+// Mock irc-framework to prevent real network connections in tests
+vi.mock('irc-framework', () => {
+  const mockClient = {
+    on: vi.fn(function(this: MockClientThis, event: string, handler: () => void) {
+      if (!this.listeners) {
+        this.listeners = {};
+      }
+      if (!this.listeners[event]) {
+        this.listeners[event] = [];
+      }
+      this.listeners[event].push(handler);
+    }),
+    connect: vi.fn(function(this: MockClientThis) {
+      // Simulate registration after short delay (offline, no real network)
+      setTimeout(() => {
+        const registeredHandler = this.listeners?.['registered']?.[0];
+        if (registeredHandler) {
+          registeredHandler();
+        }
+      }, 10);
+    }),
+    quit: vi.fn(),
+  };
+
+  const MockClient = vi.fn(function(this: MockClientThis) {
+    this.listeners = {};
+    this.on = mockClient.on;
+    this.connect = mockClient.connect;
+    this.quit = mockClient.quit;
+  });
+
+  return { Client: MockClient };
+});
 
 // Mock dbClient to avoid table not existing errors in test env
 vi.mock('../../infrastructure/db.client', () => {
@@ -107,9 +152,7 @@ describe('IRC Integration (INT-006, INT-007, INT-008)', () => {
       };
       
       if (!EncryptionService.isEncryptionAvailable()) {
-        await expect(ircConfigService.saveConfig('user1', request)).rejects.toThrow(
-          /encryption key|not initialized/i
-        );
+        await expect(ircConfigService.saveConfig('user1', request)).rejects.toThrow(/encryption key/i);
       }
     });
 
@@ -161,12 +204,13 @@ describe('IRC Integration (INT-006, INT-007, INT-008)', () => {
 
   describe('INT-008: Test Connection Validation', () => {
     it('throws validation_error when body partially specifies (missing fields)', async () => {
-      await expect(ircConfigService.testConnection({ server: 'irc.test.com' } as any)).rejects.toThrow(
+      const partialBody = { server: 'irc.test.com' };
+      await expect(ircConfigService.testConnection(partialBody)).rejects.toThrow(
         TestConnectionFailedError
       );
       
       try {
-        await ircConfigService.testConnection({ server: 'irc.test.com' } as any);
+        await ircConfigService.testConnection(partialBody);
       } catch (error) {
         if (error instanceof TestConnectionFailedError) {
           expect(error.errorInfo.type).toBe('validation_error');
@@ -233,18 +277,42 @@ describe('IRC Integration (INT-006, INT-007, INT-008)', () => {
       expect(after.status).toBe(before.status);
       expect(after.attemptCount).toBe(before.attemptCount);
     });
+
+    it('times out after 10s without hanging indefinitely', async () => {
+      // Mock a slow/non-responsive client by mocking irc-framework to never emit 'registered'
+      vi.resetModules();
+      vi.unmock('irc-framework');
+      vi.mock('irc-framework', () => ({
+        Client: vi.fn(() => ({
+          on: vi.fn(),
+          connect: vi.fn(), // Never emits 'registered' - simulates hang
+          quit: vi.fn(),
+        })),
+      }));
+
+      // Test should timeout and reject with timeout error
+      await expect(
+        ircConfigService.testConnection({
+          server: 'slow.server.com',
+          port: 6667,
+          username: 'user',
+        })
+      ).rejects.toThrow(TestConnectionFailedError);
+    });
   });
 
   describe('Security: No Password Leakage', () => {
     it('error messages do not expose password', async () => {
       try {
-        await ircConfigService.saveConfig('user1', {
+        // Invalid channels format - string instead of array
+        const invalidRequest = {
           server: 'irc.test.com',
           port: 6667,
           username: 'user',
           password: 'super-secret-password',
-          channels: 'invalid',
-        } as any);
+          channels: 'invalid' as unknown,
+        } as IRCConfigRequest;
+        await ircConfigService.saveConfig('user1', invalidRequest);
       } catch (error) {
         const message = error instanceof Error ? error.message : '';
         expect(message).not.toContain('super-secret-password');

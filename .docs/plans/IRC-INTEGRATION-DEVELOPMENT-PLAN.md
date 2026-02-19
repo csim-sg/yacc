@@ -148,105 +148,115 @@ INT-013, INT-014 (Tests)
 ### Phase 2: API Endpoints (INT-006 to INT-009)
 
 #### INT-006: IRC Config Endpoint
-- **Description**: Save IRC server configuration (encrypted, channels required)
+- **Description**: Save IRC server configuration (encrypted password, channels required)
 - **Status**: ✅ IMPLEMENTED (PR #263)
 - **Deliverables**:
   - `POST /api/integrations/irc/config` - Save IRC server configuration
-  - **Request body**: `{ server: string, port: integer, nick: string, password: string, channels: string[] }`
+  - **Request body**: `{ server: string, port: integer, username: string, password?: string, channels: string[] }`
   - **Validation**:
-    - `server`: required, non-empty, max 255 chars
+    - `server`: required, non-empty string, max 255 chars
     - `port`: required, integer, 1-65535
-    - `nick`: required, non-empty, max 30 chars (IRC nick limit)
-    - `password`: required, non-empty (stored encrypted with INTEGRATION_CREDENTIALS_ENCRYPTION_KEY)
-    - `channels`: required, non-empty array, each max 50 chars (includes # prefix)
-  - **Encryption**: Password encrypted deterministically (AES-256-CBC) before storage; rejects if key missing (400 error)
+    - `username`: required, non-empty string, max 255 chars
+    - `password`: optional, non-empty string if provided (stored encrypted with AES-256-GCM if encryption key available)
+    - `channels`: required, non-empty array, each must start with '#', deduplicated
+  - **Encryption**: Password encrypted with AES-256-GCM (authenticated encryption) before storage; returns 400 if password provided but encryption key missing
+  - **Upsert**: Uses atomic `onConflictDoUpdate` for data integrity (not delete-then-insert)
   - **No side effects**: Config saved only, does NOT initiate connection
   - **RBAC**: `super_admin` only (403 if lower role)
-  - **Response**: 201 `{ success: true, message: "IRC configuration saved" }` on success
+  - **Response**: 200 `{ data: { server, port, username, channels, hasPassword, updatedAt } }` on success
   - **Error responses**:
-    - 400: validation error (missing field, invalid format, encryption key missing)
+    - 400: validation_error (invalid field format or encryption_key_missing)
     - 403: insufficient permissions
     - 500: database/encryption error
-  - **Audit**: Logged as `action: "irc_config_saved"`, `entity_type: "irc_integration"`, no password in metadata
-- **Dependencies**: BE-005 (RBAC), Encryption key env var
+  - **Audit**: Logged as `action: "integration.irc.config_updated"`, `entity_type: "integration"`, includes fields but NO password in metadata
+- **Dependencies**: BE-005 (RBAC), Encryption key env var (optional, required only if password provided)
 - **Acceptance Criteria**:
-  - ✅ Configuration saved to database with encrypted password
+  - ✅ Configuration saved to database with encrypted password (if provided)
   - ✅ Validation enforced for all required fields
   - ✅ RBAC enforced (super_admin only)
-  - ✅ Proper HTTP status codes (201, 400, 403, 500)
-  - ✅ No secrets in response or error messages
-  - ✅ Audit log created
+  - ✅ Proper HTTP status codes (200, 400, 403, 500)
+  - ✅ 400 encryption_key_missing when password provided but key unavailable
+  - ✅ No plaintext password in response or error messages
+  - ✅ Audit log created without plaintext password
+  - ✅ Upsert uses atomic operation (data integrity)
 
 #### INT-007: IRC Connect Endpoint
-- **Description**: Initiate IRC connection from stored config (non-blocking)
+- **Description**: Initiate IRC connection from stored config (manual connect semantics, always resets status)
 - **Status**: ✅ IMPLEMENTED (PR #263)
 - **Deliverables**:
-  - `POST /api/integrations/irc/connect` - Initiate connection to IRC network
+  - `POST /api/integrations/irc/connect` - Initiate manual connection to IRC network
   - **Request body**: (ignored; uses stored config only)
   - **Behavior**:
-    - Checks if config exists; returns 409 if not configured
-    - Sets IRC connector status to `retrying` with `attemptCount: 0`
+    - Retrieves config from DB (first) or environment fallback
+    - Returns 409 if neither DB config nor environment variables configured
+    - ALWAYS sets IRC connector status to `retrying` with `attemptCount=0` (even if already connected/retrying)
     - Calls `connector.connect()` non-blocking (fire-and-forget)
     - Does NOT wait for connection (may take seconds); returns immediately
     - Connector emits events: `connected`, `disconnected`, `error` → updates status dynamically
-  - **No side effects**: Connection happens asynchronously; does NOT block response
+  - **Manual semantics**: Non-idempotent; each call triggers status reset and reconnect attempt
   - **RBAC**: `super_admin` only (403 if lower role)
-  - **Response**: 200 `{ status: "retrying", attemptCount: 0, lastAttemptAt: "2026-02-19T..." }` on success
+  - **Response**: 200 `{ data: { status: "retrying", attemptCount: 0, lastChangedAt: "...", lastConnectedAt: null, lastError: null } }` on success
   - **Error responses**:
-    - 400: invalid request body (typically not triggered since body ignored)
     - 403: insufficient permissions
-    - 409: IRC not configured (no config found in database)
+    - 409: irc_not_configured (no DB config AND no env fallback)
     - 500: connector initialization error
-  - **Audit**: Logged as `action: "irc_connect_initiated"`, `entity_type: "irc_integration"`, includes status
+  - **Audit**: Logged as `action: "integration.irc.connect_requested"`, includes source (db|env) and reconnect flag
 - **Dependencies**: INT-006 (config must exist), INT-001 (connector infrastructure)
 - **Acceptance Criteria**:
   - ✅ Connection initiated non-blocking
-  - ✅ Status returned immediately with `retrying` state
+  - ✅ Status reset to `retrying` with `attemptCount=0` on each call (manual semantics)
   - ✅ Ignores request body, uses stored config
-  - ✅ 409 returned if config not found
+  - ✅ 409 returned if config not found (DB or env)
   - ✅ RBAC enforced (super_admin only)
   - ✅ No sensitive data in response
-  - ✅ Audit log created
+  - ✅ Audit log created with source
 
 #### INT-008: IRC Test Endpoint
-- **Description**: Test IRC connection before saving config (with 10s timeout)
+- **Description**: Test IRC connection with temporary client (body-first or stored config fallback, 10s timeout, no side effects)
 - **Status**: ✅ IMPLEMENTED (PR #263)
 - **Deliverables**:
-  - `POST /api/integrations/irc/test` - Test IRC connection with provided credentials
-  - **Request body**: `{ server: string, port: integer, nick: string, password?: string }`
+  - `POST /api/integrations/irc/test` - Test IRC connection without modifying live connector
+  - **Request body**: `{ server?: string, port?: integer, username?: string, password?: string }` (all optional)
   - **Validation** (body-first):
-    - `server`: required, non-empty, max 255 chars
-    - `port`: required, integer, 1-65535
-    - `nick`: required, non-empty, max 30 chars
-    - `password`: optional in body; falls back to stored password if omitted
+    - If any of server/port/username provided: ALL THREE are required (strict body-first mode)
+    - `server`: required if body has fields, non-empty, max 255 chars
+    - `port`: required if body has fields, integer, 1-65535
+    - `username`: required if body has fields, non-empty, max 255 chars
+    - `password`: optional in body
   - **Connection test**:
-    - Uses `irc-framework` Client (same as live connector)
-    - Connects to provided server:port with nick + password
-    - Hard 10s timeout via `Promise.race()` (connection attempt aborted at 10s)
-    - Cleanly disconnects after test (closes socket)
+    - Creates temporary `irc-framework` Client (does NOT use live connector)
+    - Hard 10-second timeout via `Promise.race([connectionPromise, timeoutPromise])`
+    - Connects to provided/stored server:port with username + password
+    - Awaits `registered` event or timeout
+    - Cleanly disconnects after test (calls `quit()`)
   - **Behavior**:
-    - Body-first validation: if body has server/port/nick, uses those
-    - Fallback to stored config: if body incomplete, uses stored server/port/nick/password
+    - Body-first: if request body has server/port/username, validates and tests those (strict mode)
+    - Fallback to stored config: if empty body `{}`, uses DB config or environment fallback
+    - Returns 409 if empty body AND no stored config
     - Returns immediately after timeout or successful connection
     - Does NOT modify stored config or connector state
+    - Does NOT update ircStatusClient or IRC connector state
   - **RBAC**: `super_admin` only (403 if lower role)
-  - **Response**: 200 `{ success: true, message: "Connection successful" }` on success
+  - **Response**: 200 `{ data: { success: true, message: "Successfully connected to ..." } }` on success
   - **Error responses**:
-    - 400: validation error (missing required fields, invalid format)
+    - 400: validation_error (body test mode missing required fields, or invalid port range)
     - 403: insufficient permissions
-    - 408: connection timeout (10s exceeded)
-    - 409: IRC not configured (body incomplete AND no stored config)
-    - 500: connection error, network issue, or other server error
-  - **Error messages**: Sanitized (no connection details leaked); e.g., "Connection failed" vs "Connection refused on 192.168.1.1:6667"
-  - **Audit**: Logged as `action: "irc_test_connection"`, `entity_type: "irc_integration"`, no password in metadata
-- **Dependencies**: INT-001 (connector infrastructure)
+    - 409: irc_not_configured (empty body AND no stored config)
+    - 500: internal_error (connection failed, client creation error, timeout)
+  - **Error messages**: Sanitized (no credentials/server details leaked in error); generic "Connection test failed"
+  - **Audit**: Logged as `action: "integration.irc.test_requested"` and `action: "integration.irc.test_result"` (if success), includes source (body|db|env) and success flag
+- **Dependencies**: INT-006 (optional; fallback to env vars), INT-001 (not used directly; independent test client)
 - **Acceptance Criteria**:
-  - ✅ Connection tested with hard 10s timeout
-  - ✅ Body-first validation with stored config fallback
-  - ✅ Proper timeout handling (408 returned at 10s)
-  - ✅ Socket cleanly closed after test
-  - ✅ No persistent state changes (not affecting stored config or connector)
+  - ✅ Connection tested with temporary client (irc-framework)
+  - ✅ Hard 10s timeout enforced (test fails/rejects after 10s)
+  - ✅ Body-first validation (all three required if body has fields)
+  - ✅ Stored config fallback when empty body
+  - ✅ 409 returned when not configured (no body AND no stored config)
+  - ✅ No persistent state changes (config, connector status unchanged)
+  - ✅ No secrets in response or error messages
   - ✅ RBAC enforced (super_admin only)
+  - ✅ Socket cleanly closed after test
+  - ✅ Audit logs created
   - ✅ Sanitized error messages (no secrets/IPs leaked)
   - ✅ Audit log created
 

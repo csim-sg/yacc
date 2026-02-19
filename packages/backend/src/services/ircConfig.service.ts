@@ -13,7 +13,6 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { randomUUID } from 'crypto';
 import { appConfig } from '../config/appConfig';
 import { dbClient } from '../infrastructure/db.client';
 import { ircStatusClient } from '../infrastructure/ircStatus.client';
@@ -38,6 +37,15 @@ class TestConnectionFailedError extends Error {
   constructor(public errorInfo: TestConnectionError) {
     super(errorInfo.message);
     this.name = 'TestConnectionFailedError';
+  }
+}
+
+class EncryptionKeyMissingError extends Error {
+  public readonly code = 'encryption_key_missing';
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'EncryptionKeyMissingError';
   }
 }
 
@@ -74,7 +82,7 @@ export class IRCConfigService {
           { userId, platform: 'irc', method: 'saveConfig' },
           'Cannot save password: encryption key missing'
         );
-        throw new Error(
+        throw new EncryptionKeyMissingError(
           'Encryption key missing; cannot save password. Set INTEGRATION_CREDENTIALS_ENCRYPTION_KEY environment variable.'
         );
       }
@@ -102,9 +110,7 @@ export class IRCConfigService {
     const channelsJson = JSON.stringify(channelsList);
 
     try {
-      // Upsert: delete existing, then insert (PostgreSQL approach)
-      await dbClient.delete(integrationConfigs).where(eq(integrationConfigs.platform, 'irc'));
-
+      // Upsert: use onConflictDoUpdate for atomic operation (ACID compliant)
       const result = await dbClient
         .insert(integrationConfigs)
         .values({
@@ -117,6 +123,20 @@ export class IRCConfigService {
           passwordUpdatedAt,
           channels: channelsJson,
           updatedByUserId: userId,
+        })
+        .onConflictDoUpdate({
+          target: integrationConfigs.platform,
+          set: {
+            server: request.server,
+            port: request.port,
+            username: request.username,
+            passwordEncrypted,
+            hasPassword,
+            passwordUpdatedAt,
+            channels: channelsJson,
+            updatedByUserId: userId,
+            updatedAt: new Date(),
+          },
         })
         .returning();
 
@@ -245,7 +265,7 @@ export class IRCConfigService {
   /**
    * Check and prepare IRC connection
    * Sets status to 'retrying' with attemptCount=0 for manual initiation
-   * Idempotent: if already connected/connecting, returns current status
+   * Always resets status and initiates connection (manual connect semantics)
    *
    * @returns Config object if available, null otherwise
    */
@@ -273,17 +293,14 @@ export class IRCConfigService {
         'IRC connection preparation initiated'
       );
 
-      // Check if already connected/connecting
-      const currentStatus = ircStatusClient.getStatus();
-      if (currentStatus.status === 'connected' || currentStatus.status === 'retrying') {
-        logger.debug(
-          { platform: 'irc', method: 'checkAndPrepareConnect', currentStatus: currentStatus.status },
-          'Already connected/connecting; idempotent return'
-        );
-      } else {
-        // Set status to retrying with attemptCount=0 for manual connect
-        ircStatusClient.setStatus('retrying', null, undefined);
-      }
+      // Manual connect: ALWAYS set status to 'retrying' with attemptCount=0
+      // This applies even if already connected/retrying (enforces manual semantics)
+      ircStatusClient.setStatus('retrying', null, undefined);
+
+      logger.debug(
+        { platform: 'irc', method: 'checkAndPrepareConnect' },
+        'Status set to retrying with attemptCount=0 (manual connect)'
+      );
 
       // Initiate actual connection via connectorManager
       await this.initiateConnectorConnection(config);
@@ -651,4 +668,5 @@ export class IRCConfigService {
 }
 
 export const ircConfigService = new IRCConfigService();
-export { TestConnectionFailedError, type TestConnectionError };
+export { TestConnectionFailedError };
+export type { TestConnectionError };

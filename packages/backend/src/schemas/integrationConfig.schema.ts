@@ -31,7 +31,7 @@ export const integrationConfigs = pgTable(
      * Server port (e.g., 6667, 6697 for SSL)
      * Range: 1-65535
      */
-    port: integer('port').notNull(),
+    port: integer('port').notNull().default(6667),
     
     /**
      * Username/nick for authentication
