@@ -104,26 +104,26 @@ Full bi-directional Telegram integration via connector pattern.
 
 **File:** `src/connectors/irc.connector.ts` (380 lines)
 
-Full bi-directional IRC integration with auto-reconnect and message queuing.
+Full bi-directional IRC integration with fail-fast strategy and auto-reconnect logic.
 
 **Implementation Details:**
 - Extends `BaseConnector` abstract class
 - Manages IRC server socket connections
 - Auto-reconnect with exponential backoff: 1s → 2s → 4s → 8s → 16s → 30s max
 - Channel management (join/part on demand)
-- Message queuing when disconnected (auto-retry on reconnect)
 - Configuration validation (server, port, nick, channels)
 - Channel extraction from recipient ID (formats: `irc:#channel` or `#channel`)
+- **Fail-fast on send**: Returns error immediately if disconnected (no local queuing)
 
 **Supported Operations:**
 - ✅ Establish IRC server connection with auth
 - ✅ Join/part channels dynamically
 - ✅ Send messages to channels or users
-- ✅ Queue messages during disconnection
+- ✅ Fail fast if disconnected (error returned immediately)
 - ✅ Auto-reconnect with exponential backoff
 - ✅ Handle network failures gracefully
 
-**Reconnection Strategy:**
+**Reconnection Strategy (Connection Recovery):**
 ```
 Initial Connection Attempt
   ↓
@@ -142,17 +142,19 @@ If Failed: Wait 16s → Retry (attempt 5)
 If Failed: Wait 30s → Retry (continues at 30s intervals)
 ```
 
+**Outbound Message Retry:**
+- When IRC connector returns error (disconnected, rate limit, etc.):
+  - Message marked as `pending` with failure reason
+  - BullMQ message queue handles retry with exponential backoff (1m, 5m, 30m)
+  - Maximum 3 retry attempts
+  - After max retries → moved to Dead Letter Queue (DLQ)
+  - No local queuing in connector (connector is stateless for sends)
+
 **Error Handling (4 scenarios):**
 1. Cannot resolve IRC server hostname
 2. Connection timeout (no response from server)
 3. Authentication failure (bad nick/password)
 4. Network interruption during session
-
-**Message Queuing:**
-- Messages queued locally when disconnected
-- Queued messages auto-sent after reconnection
-- Order preserved (FIFO)
-- Max queue size: 100 messages (configurable)
 
 **Architecture Compliance:**
 - ✅ No `any` types (strict TypeScript)

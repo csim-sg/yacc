@@ -1383,7 +1383,7 @@ Phase 1 includes Telegram + IRC integration. Additional platforms are deferred t
 
 ---
 
-#### `GET /integrations/irc/status` (INT-009)
+#### `GET /api/integrations/irc/status` (INT-009)
 **RBAC**: admin+ (super_admin, admin)
 
 Get current IRC connection status. Works even when IRC is unconfigured; does not expose configuration secrets.
