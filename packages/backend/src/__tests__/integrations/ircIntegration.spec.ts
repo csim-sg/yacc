@@ -362,4 +362,40 @@ describe('IRC Integration (INT-006, INT-007, INT-008)', () => {
       }
     });
   });
+
+  describe('INT-007: Manual Connect Reset (Blocker #1)', () => {
+    it('should reset attemptCount to 0 on manual connect (setManualRetrying)', () => {
+      // Pre-condition: simulate prior retries with attemptCount > 0
+      ircStatusClient.setStatus('retrying', null, 'prior-incident-id');
+      ircStatusClient.setAttemptCount(3, 'prior-incident-id');
+      let status = ircStatusClient.getStatus();
+      expect(status.attemptCount).toBe(3);
+      expect(status.status).toBe('retrying');
+
+      // Action: manual connect calls setManualRetrying()
+      ircStatusClient.setManualRetrying();
+
+      // Assert: attemptCount forced to 0, status is retrying
+      status = ircStatusClient.getStatus();
+      expect(status.status).toBe('retrying');
+      expect(status.attemptCount).toBe(0);
+      expect(status.lastChangedAt).toBeTruthy();
+    });
+
+    it('should preserve lastConnectedAt when manual retrying', () => {
+      // Set an initial connection time
+      ircStatusClient.setStatus('connected', null, undefined);
+      const initialStatus = ircStatusClient.getStatus();
+      const lastConnectedAt = initialStatus.lastConnectedAt;
+
+      // Simulate manual connect reset
+      ircStatusClient.setManualRetrying();
+
+      // Assert: lastConnectedAt preserved, attemptCount reset to 0
+      const newStatus = ircStatusClient.getStatus();
+      expect(newStatus.lastConnectedAt).toBe(lastConnectedAt);
+      expect(newStatus.attemptCount).toBe(0);
+      expect(newStatus.status).toBe('retrying');
+    });
+  });
 });

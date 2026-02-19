@@ -295,7 +295,7 @@ export class IRCConfigService {
 
       // Manual connect: ALWAYS set status to 'retrying' with attemptCount=0
       // This applies even if already connected/retrying (enforces manual semantics)
-      ircStatusClient.setStatus('retrying', null, undefined);
+      ircStatusClient.setManualRetrying();
 
       logger.debug(
         { platform: 'irc', method: 'checkAndPrepareConnect' },

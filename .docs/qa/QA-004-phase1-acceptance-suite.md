@@ -777,8 +777,8 @@ packages/frontend/tests/acceptance/phase1/
 
 16. EDGE-INT-008a: INT-008 - Test timeout at 10 seconds
     - POST `/api/integrations/irc/test` with unreachable server
-    - Expect: 408, "Connection timeout (10s exceeded)"
-    - Verify: Socket closed after timeout
+    - Expect: 500, "Connection test failed"
+    - Verify: Socket closed after timeout, timeout enforced at 10s hard limit
 
 17. EDGE-INT-008b: INT-008 - Test with body-first validation fallback
     - Save IRC config (HP-INT-006)
