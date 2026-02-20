@@ -46,6 +46,19 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | Test Coverage | ⏳ In Progress | #272 | UUID contract tests ≥85%, RBAC tests ≥85% |
 | Governance Documentation | ⏳ In Progress | #272 | GOV-028 created, API docs updated, implementation guide updated |
 
+## Pending: Test & Lint Stabilization (PR #274 Follow-Up)
+
+**Context**: PR #274 adds interim CI gating to enforce quality on new code while baseline cleanup proceeds in parallel (see GOV-029).
+
+| Task | Status | Owner | Priority | Estimate | Notes |
+|------|--------|-------|----------|----------|-------|
+| **fix/backend-lint-baseline** | ⏳ Not Started | Backend Dev | 🔴 HIGH | 1-2 days | Resolve 449 lint errors (import order, type annotations, unused vars, filename cases) |
+| **fix/backend-test-baseline-stabilization** | ⏳ Not Started | QA/Test Lead | 🔴 HIGH | 2-3 days | Stabilize integration tests (timeouts, flakes); ensure full suite passes consistently |
+
+**Exit Condition for PR #274**: Both tasks completed + merged, then remove interim gating (changed-files lint → full lint; test split → single blocking test job).
+
+**Related**: GOV-029 (interim policy), PR #274 (CI checks)
+
 ## References (Authoritative)
 - Product scope & ACs: `.docs/01-product-specification.md`
 - API & data model: `.docs/02-api-and-data-model.md`

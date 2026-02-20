@@ -1,8 +1,8 @@
 # ADR-011: File Naming Convention Standardization (UPDATED)
 
 **Date**: January 27, 2026  
-**Last Updated**: January 27, 2026 (Session 2)  
-**Status**: APPROVED & FULLY IMPLEMENTED ✅  
+**Last Updated**: February 20, 2026 (Session 3 - Extended to allow kebabCase)  
+**Status**: Approved; Enforcement Partially Implemented (CI gating pending PR #274)  
 **Decision Maker**: Architect  
 **Affected Areas**: All packages (backend, frontend, common)  
 **Priority**: HIGH  
@@ -11,13 +11,15 @@
 
 ## Executive Summary
 
-Standardize file naming conventions across the YACC monorepo with **camelCase as default**, while respecting **React conventions**:
+Standardize file naming conventions across the YACC monorepo with **camelCase and kebabCase both allowed**, while respecting **React conventions**:
 - **Components (.tsx)**: PascalCase (e.g., `Header.tsx`, `LoginPage.tsx`)
 - **Hooks (.ts)**: camelCase with `use` prefix (e.g., `useMessages.ts`)
-- **Services/Utilities (.ts)**: camelCase (e.g., `authService.ts`)
-- **Schemas/Types (.ts)**: camelCase (e.g., `loginRequest.schema.ts`)
+- **Services/Utilities (.ts)**: Both camelCase and kebabCase allowed (e.g., `authService.ts` or `auth-service.ts`)
+- **Schemas/Types (.ts)**: Both camelCase and kebabCase allowed (e.g., `loginRequest.schema.ts` or `login-request.schema.ts`)
 
-This ensures consistency with modern JavaScript/TypeScript and React conventions while reducing cognitive load for developers.
+This accommodates both naming styles observed in the codebase while enforcing consistency with modern JavaScript/TypeScript and React conventions, reducing cognitive load for developers.
+
+**Key Change (Feb 2026):** Extended from camelCase-only to allow both camelCase and kebabCase per eslint rule update (PR #273).
 
 ---
 
@@ -59,19 +61,19 @@ The codebase currently has **inconsistent file naming conventions**:
 
 ## Decision
 
-**Standardized file naming with React conventions respected:**
+**Standardized file naming with React conventions and dual-case flexibility:**
 
-### Naming Convention Rules
+### Naming Convention Rules (Updated Feb 2026)
 
 | Category | Convention | Example |
 |----------|-----------|---------|
-| **React Components (.tsx)** | `PascalCase` | `Header.tsx`, `LoginPage.tsx`, `ProtectedRoute.tsx` |
-| **React Context (.tsx)** | `PascalCase` | `AuthContext.tsx` |
-| **React Hooks (.ts)** | `camelCase` with `use` prefix | `useMessages.ts`, `useSocket.ts`, `useConversations.ts` |
-| **Backend Services (.ts)** | `camelCase` | `messageStatusTracker.ts`, `authService.ts` |
-| **Backend Controllers (.ts)** | `camelCase` | `auth.controller.ts`, `conversations.controller.ts` |
-| **Backend Middleware (.ts)** | `camelCase` | `correlationId.middleware.ts`, `requestLogging.middleware.ts` |
-| **Schemas/Types (.ts)** | `camelCase` | `passwordReset.schema.ts`, `loginRequest.schema.ts` |
+| **React Components (.tsx)** | `PascalCase` (convention) | `Header.tsx`, `LoginPage.tsx`, `ProtectedRoute.tsx` |
+| **React Context (.tsx)** | `PascalCase` (convention) | `AuthContext.tsx` |
+| **React Hooks (.ts)** | `camelCase` with `use` prefix (convention) | `useMessages.ts`, `useSocket.ts`, `useConversations.ts` |
+| **Backend Services (.ts)** | `camelCase` OR `kebabCase` | `messageStatusTracker.ts` or `message-status-tracker.ts`, `authService.ts` or `auth-service.ts` |
+| **Backend Controllers (.ts)** | `camelCase` OR `kebabCase` | `auth.controller.ts` or `auth-controller.ts` |
+| **Backend Middleware (.ts)** | `camelCase` OR `kebabCase` | `correlationId.middleware.ts` or `correlation-id.middleware.ts` |
+| **Schemas/Types (.ts)** | `camelCase` OR `kebabCase` | `passwordReset.schema.ts` or `password-reset.schema.ts` |
 | **Config Files** | Exception | `vite.config.ts`, `eslint.config.js`, `turbo.json` |
 | **Classes/Interfaces** | `PascalCase` | `class MessageStatusTracker {}`, `interface User {}` |
 | **Constants** | `UPPER_SNAKE_CASE` | `const MAX_RETRIES = 3` |
@@ -83,75 +85,87 @@ The codebase currently has **inconsistent file naming conventions**:
 
 ```typescript
 // ✅ CORRECT
-// File: messageStatusTracker.ts
+// File: messageStatusTracker.ts or message-status-tracker.ts (both allowed)
 export class MessageStatusTracker { }
 
-// File: AuthContext.tsx  (React Context = PascalCase)
+// File: AuthContext.tsx  (React Context = PascalCase convention)
 export const AuthContext = createContext();
 
-// File: useMessages.ts  (React Hook = camelCase with use prefix)
+// File: useMessages.ts  (React Hook = camelCase with use prefix convention)
 export const useMessages = () => { };
 
-// File: Header.tsx  (React Component = PascalCase)
+// File: Header.tsx  (React Component = PascalCase convention)
 export function Header() {}
 
-// ❌ INCORRECT
-// File: authContext.tsx  (React Context should be PascalCase)
-export const AuthContext = createContext();
+// ⚠️ NOTE: In React directories (components/, pages/, contexts/), the unicorn/filename-case rule is disabled.
+// PascalCase is a documented convention, not an enforced lint rule. Both these are acceptable:
+// File: AuthContext.tsx ✅ (PascalCase convention)
+// File: authContext.tsx ✅ (Also passes linter for these directories)
 ```
 
 ---
 
 ## Rationale
 
-### 1. **Alignment with JavaScript Conventions**
-   - Modern JavaScript/TypeScript projects (Next.js, React, Express) use camelCase
+### 1. **Pragmatic Flexibility (Updated Feb 2026)**
+   - Both camelCase and kebabCase are widely used in the codebase
+   - PascalCase is a convention for React components (not lint-enforced)
+   - Backend services and utilities use both styles interchangeably
+   - Linter rule now permits both to match actual project patterns
+   - Enforcing single case would require massive refactoring for minimal benefit
+
+### 2. **Alignment with JavaScript Conventions**
+   - Modern JavaScript/TypeScript projects use either camelCase or kebabCase
    - Prevents confusion between file names and class/interface names
-   - Reduces the need for case conversions in tooling
+   - Both are acceptable in industry standard projects
 
-### 2. **Consistency Across the Team**
-   - Single, uniform rule reduces decision-making burden
-   - Easier onboarding for new team members
-   - Reduces code review friction
+### 3. **Consistency Within Layers**
+   - Frontend: PascalCase for components (React convention), camelCase for utilities
+   - Backend: Both camelCase and kebabCase allowed for services/middleware/types
+   - Easier onboarding for new team members (flexible, not rigid)
+   - Reduces code review friction (both styles accepted)
 
-### 3. **File System Compatibility**
+### 4. **File System Compatibility**
    - Some developers use case-insensitive file systems (macOS by default)
-   - PascalCase + camelCase in same repo can cause subtle Git issues
-   - camelCase is safer and more portable
+   - PascalCase + camelCase + kebabCase can work on case-insensitive systems
+   - Both camelCase and kebabCase are more portable than PascalCase-heavy repos
 
-### 4. **Modern Tooling Support**
-   - Vite, TypeScript, Jest, Vitest all work better with consistent naming
-   - Import paths are more predictable
-   - IDE autocomplete functions better
+### 5. **Modern Tooling Support**
+   - Vite, TypeScript, Jest, Vitest support both camelCase and kebabCase
+   - Import paths work with both naming styles
+   - IDE autocomplete functions equally well with both
 
-### 5. **ADR Precedent**
+### 6. **ADR Precedent**
    - [ADR-005](./ADR-005-infrastructure-config-pattern.md) established "flat folder structure" principle
-   - This naming convention standardization complements and reinforces that decision
+   - This naming convention standardization complements that decision
+   - Both ADRs support "keep it simple" (KISS) philosophy
 
 ---
 
 ## Implementation Plan
 
-### Phase 1: Setup ESLint Rule (Enforce Going Forward)
-**Timeline**: This sprint  
-**Owner**: Backend Lead
+### Phase 1: Setup ESLint Rule (Updated Feb 2026)
+**Timeline**: Complete  
+**Owner**: Architecture Team
 
-Update `eslint.config.js` to enforce camelCase only:
+Update `eslint.config.js` to allow both camelCase and kebabCase (PR #273):
 
 ```javascript
 'unicorn/filename-case': [
   'error',
   {
     cases: {
-      camelCase: true,  // ✅ ALLOWED
-      kebabCase: false, // ❌ NOT ALLOWED
-      pascalCase: false, // ❌ NOT ALLOWED
+      camelCase: true,   // ✅ ALLOWED
+      kebabCase: true,   // ✅ ALLOWED (Feb 2026 update)
+      pascalCase: false, // ❌ NOT ALLOWED (except React components)
     },
   },
 ],
 ```
 
-**Effect**: New files MUST follow camelCase. Existing violations are flagged but not breaking.
+**Effect**: New files can use either camelCase or kebabCase. PascalCase only for React components/contexts. This aligns with actual project patterns without requiring widespread refactoring.
+
+**Status**: ✅ COMPLETED in PR #273
 
 ### Phase 2: Refactor Backend (PR-based) ✅ COMPLETED
 **Timeline**: Sprint after Phase 1  
@@ -226,34 +240,95 @@ Update `eslint.config.js` to enforce camelCase only:
 ## Enforcement Mechanism
 
 ### ESLint Rule (Automated)
+
+**Updated Feb 2026 (PR #273):** Now allows both camelCase and kebabCase:
+
+**Root ESLint Config** (`eslint.config.js`):
 ```javascript
-// In eslint.config.js
+// Global rule: camelCase OR kebabCase allowed
 'unicorn/filename-case': [
   'error',
   {
     cases: {
-      camelCase: true,
+      camelCase: true,   // ✅ ALLOWED
+      kebabCase: true,   // ✅ ALLOWED (Feb 2026 update)
+      pascalCase: false, // ❌ NOT ALLOWED
     },
     ignore: [
-      // Ignore specific patterns if needed (e.g., config files)
+      // Config files (standard exceptions)
       'vite.config.ts',
       'vitest.config.ts',
       'playwright.config.ts',
       'drizzle.config.ts',
+      'eslint.config.js',
+      'turbo.json',
+      // React root component
+      'App.tsx',
     ],
   },
 ],
 ```
 
+**React Components/Pages/Contexts Override** (disables enforcement for PascalCase in these directories):
+```javascript
+// Files matching these patterns disable unicorn/filename-case rule
+// allowing PascalCase per React conventions
+{
+  files: [
+    '**/components/**/*.{tsx,ts}',
+    '**/pages/**/*.{tsx,ts}',
+    '**/contexts/**/*.{tsx,ts}',
+  ],
+  rules: {
+    'unicorn/filename-case': 'off',  // ✅ PascalCase is ALLOWED here (documented convention)
+  },
+},
+```
+
+**Interpretation:**
+- `unicorn/filename-case` is **DISABLED** (turned `off`) for `**/{components,pages,contexts}/**/*.{ts,tsx}`
+- This means PascalCase is **a documented convention** in these directories, not an enforced requirement
+- Outside these directories: camelCase and kebabCase are both accepted equally
+- Global rule (root config) requires either camelCase or kebabCase; PascalCase outside React dirs is flagged as violation
+
 ### CI/CD Integration
-- ESLint runs on all PRs (`pnpm lint`)
-- PRs with filename violations are blocked
-- Developers see clear error: `"File name should be in camelCase"`
+
+**Current Status (Feb 2026):**
+- Legacy `.github/workflows/lint.yml` runs ESLint on `pull_request` events targeting `main` or `develop` branches only (NOT `dev`)
+- Legacy `.github/workflows/tests.yml` runs tests on `pull_request` events targeting `main` or `develop` branches only (NOT `dev`)
+- **Backend/Frontend/Common PRs targeting `dev`**: Currently have no automated lint/tests; run locally until PR #274 merges
+- **Once PR #274 merges**: Backend CI workflow activates for PRs targeting `dev`, enforcing changed-files lint gate
+
+**How It Works Once PR #274 Merges:**
+- New Backend CI workflow activates for PRs targeting `dev`, `develop`, or `main`
+- ESLint runs on **changed files only** in backend PRs (not full baseline)
+- Files with camelCase or kebabCase names: ✅ PASS
+- Files with PascalCase names (outside React dirs): ❌ FAIL with unicorn/filename-case violation
+- React components in `/components/`, `/pages/`, `/contexts/`: ✅ PASS with PascalCase (override is active)
+
+### What Is Enforced vs Convention (Feb 2026 Update)
+
+**Strictly Enforced by ESLint:**
+- ✅ **Global rule** (all files outside React dirs): camelCase OR kebabCase ALLOWED (both equally accepted)
+- ❌ **Global rule** (all files outside React dirs): PascalCase BLOCKED (violates `unicorn/filename-case`)
+
+**React Directories (components/, pages/, contexts/): Rule Disabled (Convention-Based)**
+- The `unicorn/filename-case` rule is **turned OFF** (`'off'`) for files matching `**/components/**/*.{tsx,ts}`, `**/pages/**/*.{tsx,ts}`, `**/contexts/**/*.{tsx,ts}`
+- Result: PascalCase is **NOT enforced** but is a **documented convention** for React components
+- In practice: `AuthContext.tsx` (PascalCase) and `authContext.tsx` (camelCase) both pass linting in these directories
+
+**Documented Conventions (Guidance, Not Enforced):**
+- **React Hooks** (.ts): Prefer camelCase with `use` prefix (e.g., `useMessages.ts`), but other naming passes linter
+- **React Components/Pages/Contexts** (.tsx): Prefer PascalCase (e.g., `Header.tsx`, `LoginPage.tsx`, `AuthContext.tsx`), but enforcement is disabled; both PascalCase and camelCase pass linter
+- **Backend Services/Middleware/Types** (.ts): Either camelCase or kebabCase acceptable; no preference enforced by linter
+- **Rationale**: Allow flexibility in React directories while maintaining the core principle of preventing PascalCase in backend code (where classes should not match file names)
 
 ### Code Review Checklist
-- [ ] All new files use camelCase
-- [ ] No PascalCase file names added
+- [ ] All new files use camelCase OR kebabCase (both acceptable per ESLint rule)
+- [ ] React components use PascalCase (components/, pages/, contexts/) - **convention documented, not enforced**
+- [ ] No PascalCase outside React directories (global rule enforces this)
 - [ ] Imports updated if renamed files affected
+- [ ] ESLint passes on changed files (no filename-case violations on new code)
 
 ---
 
@@ -294,34 +369,50 @@ Update `eslint.config.js` to enforce camelCase only:
 
 | Role | Status | Notes |
 |------|--------|-------|
-| **Architect** | ✅ APPROVED | ADR approved, all phases executed with React conventions respected |
-| **Backend Developer** | ✅ COMPLETED | Phase 2: 11 files renamed, all imports updated |
+| **Architect** | ✅ APPROVED | ADR approved, all phases executed with React conventions respected. Feb 2026: Extended to allow dual camelCase/kebabCase per PR #273 |
+| **Backend Developer** | ✅ COMPLETED | Phase 2: 11 files renamed, all imports updated. Feb 2026: kebabCase now allowed |
 | **Frontend Developer** | ✅ COMPLETED | Phase 3: 10 files kept as PascalCase, 3 utilities renamed to camelCase |
-| **Common Package Lead** | ✅ COMPLETED | Phase 4: 8 files renamed from kebab-case to camelCase |
+| **Common Package Lead** | ✅ COMPLETED | Phase 4: 8 files renamed from kebab-case to camelCase. Feb 2026: kebabCase now allowed |
 | **QA Lead** | ✅ COMPLETED | Phase 5: ESLint verified, no filename violations |
-| **ESLint Enforcement** | ✅ ACTIVE | Phase 1: unicorn/filename-case enforces standard (with React overrides) |
+| **ESLint Enforcement** | ✅ ACTIVE | Phase 1: unicorn/filename-case rule allows camelCase OR kebabCase (with React override disabling rule for PascalCase in components/pages/contexts, Feb 2026 update) |
+| **CI/CD Integration** | ⏳ PENDING PR #274 | Once PR #274 merges, backend PRs will lint changed files only; global rule will enforce camelCase/kebabCase naming |
 | **Product Owner** | ✅ NO IMPACT | Internal refactoring, no business changes |
 
 ---
 
-## Implementation Complete ✅
+## Implementation Complete ✅ (Updated Feb 2026)
 
-All phases have been successfully executed:
+All phases have been successfully executed with Feb 2026 update:
 
-1. ✅ **Phase 1**: ESLint configuration updated with React component overrides
-2. ✅ **Phase 2**: Backend files standardized (11 files renamed to camelCase)
+1. ✅ **Phase 1**: ESLint configuration updated with React component overrides AND dual-case allowance (camelCase OR kebabCase)
+   - Global rule: `'unicorn/filename-case': { cases: { camelCase: true, kebabCase: true } }`
+   - React override: `'unicorn/filename-case': 'off'` for `/components/`, `/pages/`, `/contexts/` directories
+   - Implementation: PR #273 (ESLint config), ADR-011 updated to document dual-case convention
+
+2. ✅ **Phase 2**: Backend files standardized (11 files renamed to camelCase, now kebabCase also allowed per PR #273)
 3. ✅ **Phase 3**: Frontend files standardized (10 components kept as PascalCase, 3 utilities renamed)
-4. ✅ **Phase 4**: Common package standardized (8 files renamed from kebab-case to camelCase)
-5. ✅ **Phase 5**: ESLint verification passed (0 filename violations)
+4. ✅ **Phase 4**: Common package standardized (8 files renamed from kebab-case to camelCase, now kebabCase allowed again per PR #273)
+5. ✅ **Phase 5**: ESLint verification passed (0 filename violations); CI gate implementation pending PR #274
 
-**Key Changes**:
-- All backend files now use camelCase
-- All frontend utilities use camelCase
-- All frontend React components use PascalCase (React convention)
-- All common package files use camelCase
-- ESLint rule updated to allow PascalCase for `/components/`, `/pages/`, `/contexts/` directories
+**Key Enforcement Details** (Feb 2026):
+- **Frontend React components**: PascalCase (convention documented, ESLint rule disabled for these directories)
+- **Frontend utilities/hooks**: camelCase (convention, allowed by global rule)
+- **Backend services/middleware/types**: camelCase OR kebabCase (both allowed equally by global rule)
+- **Common package**: camelCase OR kebabCase (both allowed equally by global rule)
+- **Global ESLint rule**: Enforces camelCase OR kebabCase; blocks PascalCase outside React directories
 
-**Status**: Ready for PR and merge to `dev` branch
+**CI/CD Status** (Feb 2026):
+- ESLint configuration updated: PR #273 (merged when approved)
+- Backend CI gate implementation: PR #274 (not yet merged; will enforce changed-files lint gate once merged)
+- Once PR #274 merges: backend PRs will lint only changed files, enforcing global filename-case rule
+
+**Feb 2026 Update Rationale**:
+- Backend codebase uses both naming styles interchangeably
+- Enforcing single case would require massive refactoring with minimal benefit
+- Allowing both camelCase and kebabCase aligns with KISS principle (ADR-005)
+- All tools and IDEs support both styles equally
+
+**Status**: Implementation extended to support dual-case convention (PR #273); CI gate pending PR #274
 
 ---
 
@@ -333,5 +424,6 @@ All phases have been successfully executed:
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: January 27, 2026
+**Document Version**: 1.1  
+**Last Updated**: February 20, 2026 (Session 3 - Extended to dual-case convention)  
+**Previous Version**: 1.0 (January 27, 2026 - camelCase only)
