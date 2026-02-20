@@ -28,8 +28,11 @@ if (process.env.SUPPRESS_LOGS === 'true') {
     // No-op function
   };
 
+  // eslint-disable-next-line no-console
   console.log = noop;
+  // eslint-disable-next-line no-console
   console.info = noop;
+  // eslint-disable-next-line no-console
   console.debug = noop;
 
   // Keep error and warning output always visible

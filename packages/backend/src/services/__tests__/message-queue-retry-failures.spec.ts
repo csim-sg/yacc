@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SendMessageJobPayload } from '../../types/message-queue.types';
-import type { BaseConnector } from '../../connectors/base/baseConnector';
 import { connectorManager } from '../connector-manager';
 import { queueDatabaseIntegration } from '../queue-database-integration';
 

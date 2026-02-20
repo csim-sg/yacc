@@ -1,11 +1,11 @@
+import { eq } from 'drizzle-orm';
+import type { Express } from 'express';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { dbClient } from '../src/infrastructure/db.client.js';
-import { messages } from '../src/schemas/message.schema.js';
 import { deadLetterQueue } from '../src/schemas/deadLetterQueue.schema.js';
-import { eq } from 'drizzle-orm';
+import { messages } from '../src/schemas/message.schema.js';
 import { dlqService } from '../src/services/dlq.service.js';
 import { createTestApp, createTestUser, seedTestConversations } from './test-helpers.js';
-import type { Express } from 'express';
 
 describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
   let app: Express;
