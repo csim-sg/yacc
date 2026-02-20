@@ -11,14 +11,10 @@
 import { appConfig } from './appConfig';
 
 // Configuration object for BetterAuth
-// This is intentionally kept simple and is wired with actual clients in infrastructure/better-auth.client.ts
+// Database adapter is wired in infrastructure/better-auth.client.ts
+// This contains the base config that will be extended with the database adapter
 export const authConfig = {
-  database: {
-    // Database client will be injected by better-auth.client.ts
-    client: null as any,
-  },
   secret: appConfig.BETTER_AUTH_SECRET,
   baseURL: appConfig.APP_FRONTEND_URL,
   basePath: '/auth',
-  sessionExpiresIn: 60 * 60 * 24 * 7, // 7 days in seconds
-};
+} as const;
