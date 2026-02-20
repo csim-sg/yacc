@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events';
 import type { Client as _IRCClient } from 'irc-framework';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-
 // Mock the logger
 vi.mock('../../infrastructure/logger', () => ({
   logger: {

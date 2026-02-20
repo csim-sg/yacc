@@ -11,6 +11,7 @@
  */
 
 import { Socket } from 'net';
+import type { Request, Response } from 'express';
 import {
   JsonController,
   Post,
@@ -23,7 +24,15 @@ import {
   Req,
   HttpCode,
 } from 'routing-controllers';
-import type { Request, Response } from 'express';
+import type {
+  CreateIrcProfileRequest,
+  UpdateIrcProfileRequest,
+  IrcProfileResponse,
+  TestConnectionResult,
+} from '../types/ircProfile.types';
+import type { User } from '../schemas/user.schema';
+import { IrcProfileErrorCode } from '../types/ircProfile.types';
+import { IrcProfileError } from '../types/ircProfileError.types';
 import {
   createIrcProfile,
   listIrcProfiles,
@@ -34,15 +43,6 @@ import {
   deleteIrcProfile,
   recordTestResult,
 } from '../services/ircProfile.service';
-import type {
-  CreateIrcProfileRequest,
-  UpdateIrcProfileRequest,
-  IrcProfileResponse,
-  TestConnectionResult,
-} from '../types/ircProfile.types';
-import { IrcProfileErrorCode } from '../types/ircProfile.types';
-import { IrcProfileError } from '../types/ircProfileError.types';
-import type { User } from '../schemas/user.schema';
 import { logger } from '../infrastructure/logger';
 
 /**
