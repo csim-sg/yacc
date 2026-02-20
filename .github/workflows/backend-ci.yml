@@ -37,18 +37,26 @@ jobs:
         run: |
           # Get diff between base (dev) and head (current PR/push)
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE_REF="origin/${{ github.base_ref }}"
+            DIFF_RANGE="origin/${{ github.base_ref }}..HEAD"
           else
-            BASE_REF="origin/dev~1"
+            DIFF_RANGE="${{ github.event.before }}..${{ github.sha }}"
           fi
           
           # Get files changed in packages/backend (src + tests)
-          CHANGED=$(git diff --name-only $BASE_REF..HEAD -- packages/backend/src packages/backend/tests 2>/dev/null || echo "")
+          # --diff-filter=ACMRT: Added, Copied, Modified, Renamed, Type changed (exclude deleted)
+          CHANGED=$(git diff --name-only --diff-filter=ACMRT $DIFF_RANGE -- packages/backend/src packages/backend/tests 2>/dev/null || echo "")
           if [ -z "$CHANGED" ]; then
             echo "files=" >> $GITHUB_OUTPUT
           else
-            # Convert newlines to spaces for eslint
-            FILES=$(echo "$CHANGED" | tr '\n' ' ')
+            # Filter out deleted files and verify file exists
+            FILES=""
+            for FILE in $CHANGED; do
+              if [ -f "$FILE" ]; then
+                FILES="$FILES $FILE"
+              fi
+            done
+            # Trim leading/trailing spaces
+            FILES=$(echo "$FILES" | xargs)
             echo "files=$FILES" >> $GITHUB_OUTPUT
           fi
 
@@ -145,7 +153,7 @@ jobs:
           REDIS_PORT: 6379
           NODE_ENV: test
 
-  # Smoke tests (required) - curated small stable subset
+  # Smoke tests (required) - integration test with in-process backend + DB + Redis
   test-smoke:
     runs-on: ubuntu-latest
     strategy:
@@ -195,7 +203,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run backend smoke tests (curated stable subset)
+      - name: Run backend smoke tests (integration test with Supertest against in-process backend)
         run: pnpm --filter @yacc/backend test tests/QA-001-integration.spec.ts
         env:
           DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
@@ -204,12 +212,14 @@ jobs:
           NODE_ENV: test
 
   # Full backend test suite (informational only) - may fail on dev baseline
+  # Shows as red (failing check) if tests fail, documenting baseline instability
   test-full:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         node-version: [20.x]
     timeout-minutes: 15
+    if: always()  # Always run, even if previous jobs fail
 
     services:
       postgres:
@@ -254,11 +264,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run full backend test suite (informational, may fail on baseline)
-        continue-on-error: true
+      - name: Run full backend test suite
         run: pnpm --filter @yacc/backend test
         env:
           DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           NODE_ENV: test
+
+      - name: Test full suite status (informational)
+        if: always()
+        run: |
+          echo "ℹ️  Full backend test suite is informational only (may fail on baseline debt)"
+          echo "See GOV-029 for exit criteria to make this required"

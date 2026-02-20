@@ -138,18 +138,21 @@ Three test jobs replace the single `test` job:
    - Timeout: Standard (10s per test)
    - Rationale: Only includes proven-stable unit tests from dev baseline (verified no flakes)
 
-2. **test-smoke** (REQUIRED): Curated small stable subset
-   - Runs: `pnpm --filter @yacc/backend test tests/QA-001-integration.spec.ts`
-   - Must pass to merge PR
-   - Timeout: Standard (10s per test)
-   - Smoke suite file: `tests/QA-001-integration.spec.ts` (stable integration test)
+2. **test-smoke** (REQUIRED): Integration test with Supertest against in-process backend + DB + Redis
+    - Runs: `pnpm --filter @yacc/backend test tests/QA-001-integration.spec.ts`
+    - Must pass to merge PR
+    - Tests: Real integration against in-process Express app, PostgreSQL service, Redis service
+    - Timeout: Standard (10s per test)
+    - Smoke suite file: `tests/QA-001-integration.spec.ts` (stable integration test using Supertest)
+    - Rationale: Provides endpoint integration coverage (real API gate, not just unit tests)
 
 3. **test-full** (INFORMATIONAL): Full backend test suite
-   - Runs: `pnpm --filter @yacc/backend test` (all tests)
-   - Does NOT block merge (`continue-on-error: true`)
-   - Timeout: 15 minutes (prevents hanging CI)
-   - Provides signal for test baseline issues
-   - Status will show as informational/skipped if fails
+    - Runs: `pnpm --filter @yacc/backend test` (all tests)
+    - Does NOT block merge (no `continue-on-error`, but documented as informational)
+    - Timeout: 15 minutes (prevents hanging CI)
+    - Shows as RED/failing check if tests fail (not masked)
+    - Provides signal for test baseline issues
+    - Status clearly indicates informational purpose (not hidden as "pass")
 
 **CI Status for PR #274:**
 ```
@@ -326,11 +329,15 @@ Once BOTH conditions are met:
 
 ```bash
 # For pull_request event:
-git diff origin/${{ github.base_ref }}..HEAD -- packages/backend/src packages/backend/tests
+git diff --name-only --diff-filter=ACMRT origin/${{ github.base_ref }}..HEAD -- packages/backend/src packages/backend/tests
 
 # For push event:
-git diff origin/dev~1..HEAD -- packages/backend/src packages/backend/tests
+git diff --name-only --diff-filter=ACMRT ${{ github.event.before }}..${{ github.sha }} -- packages/backend/src packages/backend/tests
 ```
+
+**Filters Applied:**
+- `--diff-filter=ACMRT`: Added, Copied, Modified, Renamed, Type-changed (excludes deleted files)
+- File existence check: Verify each file exists before passing to eslint (handles renames safely)
 
 **Edge Cases Handled:**
 - ✅ No files changed: skip lint (success)
@@ -338,21 +345,23 @@ git diff origin/dev~1..HEAD -- packages/backend/src packages/backend/tests
 - ✅ Backend files in src/ only: lint runs
 - ✅ Backend files in tests/ only: lint runs
 - ✅ Multiple files: all linted together
+- ✅ Deleted files: excluded from lint (not added to file list)
+- ✅ Renamed files: handled correctly by file existence check
 
 ### ESLint Direct Invocation
 
-Instead of `pnpm --filter @yacc/backend lint` (which hardcodes `src`), use:
+Uses root `eslint.config.js` (not backend-specific config):
 
 ```bash
 npx eslint <file1> <file2> <file3> \
-  --config packages/backend/eslint.config.js \
   --max-warnings 0
 ```
 
 **Why:**
-- Allows file list flexibility
-- Maintains same config and rules
+- Allows flexible file list input (any changed file, not just `src/`)
+- Uses root config: consistent with `pnpm lint` behavior
 - `--max-warnings 0` keeps strict enforcement
+- Replaces `pnpm --filter @yacc/backend lint` which hardcodes `src/` directory
 
 ---
 

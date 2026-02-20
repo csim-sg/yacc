@@ -38,8 +38,8 @@
 |-------|---------|----------|--------|-------|
 | **lint-changed** | `eslint <changed-files>` | ✅ YES | Required | New code must be lint-clean (no changed-files lint debt) |
 | **test-unit** | `pnpm test src/services/__tests__/irc-ingestion.service.test.ts` | ✅ YES | Required | Curated stable unit tests (IRC ingestion service) |
-| **test-smoke** | `pnpm test tests/QA-001-integration.spec.ts` | ✅ YES | Required | Curated stable integration test (smoke suite) |
-| **test-full** | `pnpm test` (all tests) | ⚠️ NO | Informational | May fail on baseline; `continue-on-error: true`; timeout 15m |
+| **test-smoke** | `pnpm test tests/QA-001-integration.spec.ts` | ✅ YES | Required | Integration test with Supertest against in-process backend + DB + Redis |
+| **test-full** | `pnpm test` (all tests) | ⚠️ NO | Informational | May fail on baseline; shows as RED if failing (not masked); timeout 15m |
 
 **Rationale**: Dev baseline has test instability + lint debt. Required checks ensure new code quality while full suite provides signal for baseline issues.
 
