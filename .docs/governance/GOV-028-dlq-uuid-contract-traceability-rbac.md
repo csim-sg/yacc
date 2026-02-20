@@ -2,8 +2,8 @@
 
 **Date:** 2026-02-20  
 **Decision:** ⏳ Pending Architect Approval  
-**Architect:** Enterprise/Solution Architect (to be approved during PR review)  
-**Product Owner:** Product Owner ⏳  
+**Architect:** Pending Architect Approval  
+**Product Owner:** Product Owner (Pending Approval)  
 **Status:** Implementation in PR #272  
 **Impact Level:** Medium (DLQ critical ops functionality, adds 4 traceability fields)  
 **Database Migration:** 0005-add-dlq-traceability-fields.sql  
@@ -147,13 +147,13 @@ await dlqService.moveToDLQ(
 -- Find DLQ entry
 SELECT id, messageId, conversationId, correlationId, externalThreadId, metadata
 FROM deadLetterQueue
-WHERE conversationId = 'conv-123' AND failureReason = 'api_error'
+WHERE conversationId = 'a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6' AND failureReason = 'api_error'
 ORDER BY movedAt DESC;
 
 -- Result:
--- id: dlq-456
--- messageId: msg-789 (UUID, can verify in messages table)
--- conversationId: conv-123
+-- id: d7e8f9a0-b1c2-43d4-8e5f-6a7b8c9d0e1f (UUID)
+-- messageId: b1c2d3e4-f5a6-47b8-9c0d-e1f2a3b4c5d6 (UUID, can verify in messages table)
+-- conversationId: a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6
 -- correlationId: trace-abc123 (ops can search logs with this ID)
 -- externalThreadId: tg-group-456123 (ops knows which Telegram group)
 -- metadata: { jobId: "msg-payload-xyz", externalMessageId: "tg-msg-789123" }
@@ -276,9 +276,9 @@ List dead letter queue entries with pagination.
 {
   "entries": [
     {
-      "id": "dlq-123",
-      "messageId": "msg-456",  // UUID FK
-      "conversationId": "conv-789",
+      "id": "a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6",
+      "messageId": "b1c2d3e4-f5a6-47b8-9c0d-e1f2a3b4c5d6",
+      "conversationId": "c2d3e4f5-a6b7-48c9-ad0e-f1a2b3c4d5e6",
       "failureReason": "api_error",
       "totalAttempts": 3,
       "lastError": "Failed to send to Telegram API",
@@ -343,9 +343,9 @@ Move DLQ entry back to retry queue for manual retry.
   "success": true,
   "message": "Entry re-queued for delivery",
   "entry": {
-    "id": "dlq-123",
-    "messageId": "msg-456",
-    "conversationId": "conv-789"
+    "id": "a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6",
+    "messageId": "b1c2d3e4-f5a6-47b8-9c0d-e1f2a3b4c5d6",
+    "conversationId": "c2d3e4f5-a6b7-48c9-ad0e-f1a2b3c4d5e6"
   }
 }
 ```
@@ -375,9 +375,9 @@ Permanently remove DLQ entry (after ops review/resolution).
   "success": true,
   "message": "DLQ entry deleted successfully",
   "deletedEntry": {
-    "id": "dlq-123",
-    "messageId": "msg-456",
-    "conversationId": "conv-789",
+    "id": "a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6",
+    "messageId": "b1c2d3e4-f5a6-47b8-9c0d-e1f2a3b4c5d6",
+    "conversationId": "c2d3e4f5-a6b7-48c9-ad0e-f1a2b3c4d5e6",
     "failureReason": "api_error"
   }
 }
@@ -430,10 +430,10 @@ Dead Letter Queue (DLQ)
 
 **Example** (Telegram message to DLQ):
 ```typescript
-// messageId is UUID
+// messageId is UUID FK to messages.id
 const dlqEntry = await dlqService.moveToDLQ(
-  'a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6',  // UUID, FK to messages.id
-  conversationId,
+  'd1e2f3a4-b5c6-49d7-ae8f-0a1b2c3d4e5f',  // UUID FK to messages.id
+  'c2d3e4f5-a6b7-48c9-ad0e-f1a2b3c4d5e6',  // conversationId
   payload,
   'api_error',
   'Telegram API returned 500 error'
@@ -486,9 +486,9 @@ WHERE externalThreadId = 'tg-group-456123'
 ORDER BY movedAt DESC;
 
 -- ops can:
--- 1. Get message details: SELECT * FROM messages WHERE id = '{messageId}'
+-- 1. Get message details: SELECT * FROM messages WHERE id = 'd1e2f3a4-b5c6-49d7-ae8f-0a1b2c3d4e5f' (UUID)
 -- 2. Check platform thread: Telegram API for thread tg-group-456123
--- 3. Debug: Search logs with correlationId
+-- 3. Debug: Search logs with correlationId (e.g., trace-abc123)
 ```
 
 ### RBAC Policy
@@ -705,13 +705,13 @@ Tests verify:
 ### Approval Signatures
 
 **Architect Approval:**
-- Name: Enterprise/Solution Architect (Claude Code)
+- Name: Pending Architect Approval
 - Date: _________________
 - Status: ⏳ Pending (review in PR #272)
 - Comments: _________________
 
 **Product Owner Approval:**
-- Name: _________________
+- Name: Pending Product Owner Approval
 - Date: _________________
 - Status: ⏳ Required
 - Comments: _________________
