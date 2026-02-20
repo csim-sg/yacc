@@ -239,13 +239,18 @@ Update `eslint.config.js` to allow both camelCase and kebabCase (PR #273):
 ## Enforcement Mechanism
 
 ### ESLint Rule (Automated)
+
+**Updated Feb 2026 (PR #273):** Now allows both camelCase and kebabCase:
+
 ```javascript
 // In eslint.config.js
 'unicorn/filename-case': [
   'error',
   {
     cases: {
-      camelCase: true,
+      camelCase: true,   // ✅ ENFORCED
+      kebabCase: true,   // ✅ ENFORCED (Feb 2026)
+      pascalCase: false, // ❌ NOT ALLOWED (except React components)
     },
     ignore: [
       // Ignore specific patterns if needed (e.g., config files)
@@ -258,15 +263,36 @@ Update `eslint.config.js` to allow both camelCase and kebabCase (PR #273):
 ],
 ```
 
+**Frontend Override (React Components):**
+```javascript
+// Components, pages, contexts: PascalCase allowed
+// Other files: camelCase or kebabCase
+```
+
 ### CI/CD Integration
 - ESLint runs on all PRs (`pnpm lint`)
-- PRs with filename violations are blocked
-- Developers see clear error: `"File name should be in camelCase"`
+- PRs with PascalCase filenames (outside React dirs) are blocked
+- Developers see clear error: `"File name should be in camelCase or kebabCase"`
+- Both camelCase and kebabCase are accepted; no error for either
+
+### What Is Enforced vs Convention
+
+**Enforced by ESLint:**
+- ✅ React components (.tsx in components/, pages/, contexts/): PascalCase REQUIRED
+- ✅ All other files: camelCase OR kebabCase ALLOWED (both accepted equally)
+- ❌ PascalCase outside React directories: BLOCKED
+
+**Documented Convention (Not Enforced):**
+- React Hooks (.ts): Prefer camelCase with `use` prefix (e.g., `useMessages.ts`), but kebab-case passes lint
+- Backend Services/Middleware (.ts): Either camelCase or kebabCase acceptable; no preference enforced
+- Rationale: ESLint enforces only React conventions strictly; backend flexibility accommodates team preferences
 
 ### Code Review Checklist
-- [ ] All new files use camelCase
-- [ ] No PascalCase file names added
+- [ ] All new files use camelCase OR kebabCase (both acceptable)
+- [ ] React components use PascalCase (components/, pages/, contexts/)
+- [ ] No PascalCase outside React directories
 - [ ] Imports updated if renamed files affected
+- [ ] ESLint passes (`pnpm lint` has no filename-case violations)
 
 ---
 
