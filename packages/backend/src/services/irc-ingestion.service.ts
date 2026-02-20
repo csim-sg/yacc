@@ -21,7 +21,7 @@ import { messages } from '../schemas/message.schema';
 import { auditService } from './audit.service';
 import { conversationService } from './conversation.service';
 import { logger } from '../infrastructure/logger';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { emitToConversation, isWebSocketGatewayAvailable } from './websocket/websocket-gateway';
 import type { MessageReceivedPayload } from '../types/websocket.types';
 
@@ -104,16 +104,24 @@ export class IRCIngestionService {
    */
   private async upsertConversation(channel: string, ircProfileId?: number): Promise<string> {
     // Query for existing conversation using profile-scoped index
+    // Explicitly filter by profileId (or NULL if not provided)
+    const whereClause =
+      ircProfileId !== undefined
+        ? and(
+            eq(conversations.channel, 'irc'),
+            eq(conversations.externalThreadId, channel),
+            eq(conversations.ircProfileId, ircProfileId)
+          )
+        : and(
+            eq(conversations.channel, 'irc'),
+            eq(conversations.externalThreadId, channel),
+            isNull(conversations.ircProfileId)
+          );
+
     const existing = await dbClient
       .select({ id: conversations.id })
       .from(conversations)
-      .where(
-        and(
-          eq(conversations.channel, 'irc'),
-          eq(conversations.externalThreadId, channel),
-          ircProfileId ? eq(conversations.ircProfileId, ircProfileId) : undefined
-        )
-      )
+      .where(whereClause)
       .limit(1);
 
     if (existing.length > 0) {
@@ -155,16 +163,24 @@ export class IRCIngestionService {
       );
 
       // Fetch the existing conversation (created by concurrent request)
+      // Rebuild where clause for retry query
+      const retryWhereClause =
+        ircProfileId !== undefined
+          ? and(
+              eq(conversations.channel, 'irc'),
+              eq(conversations.externalThreadId, channel),
+              eq(conversations.ircProfileId, ircProfileId)
+            )
+          : and(
+              eq(conversations.channel, 'irc'),
+              eq(conversations.externalThreadId, channel),
+              isNull(conversations.ircProfileId)
+            );
+
       const concurrent = await dbClient
         .select({ id: conversations.id })
         .from(conversations)
-        .where(
-          and(
-            eq(conversations.channel, 'irc'),
-            eq(conversations.externalThreadId, channel),
-            ircProfileId ? eq(conversations.ircProfileId, ircProfileId) : undefined
-          )
-        )
+        .where(retryWhereClause)
         .limit(1);
 
       if (!concurrent[0]) {
