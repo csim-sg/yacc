@@ -1,8 +1,9 @@
 # ADR-017: IRC Multi-Profile DB-First Architecture with Encrypted Credentials
 
 **Date**: 2026-02-19  
-**Status**: ACCEPTED  
+**Status**: PROPOSED  
 **Authors**: Enterprise Architect  
+**Approvers**: (Pending)  
 **References**: INT-010, ADR-010 (Encryption), ADR-005 (Infrastructure Pattern)
 
 ## Summary

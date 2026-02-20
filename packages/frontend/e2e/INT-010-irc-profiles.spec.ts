@@ -103,14 +103,27 @@ test.describe('INT-010: IRC Profile Management', () => {
     await expect(profileCardByName).toContainText('test.irc.local');
     await expect(profileCardByName).toContainText('testbot');
 
-    // Test connection (mock endpoint should be configured to prevent real IRC calls)
+    // Test connection (mock endpoint to prevent real IRC network calls)
+    // Mock successful test-connection response (deterministic, no real IRC connection)
+    await page.route(
+      `**/api/integration-profiles/${profileId}/test-connection`,
+      (route) => {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({ success: true, message: 'Connection successful' }),
+        });
+      }
+    );
+
     const testBtn = profileCardByName.locator(`[data-testid="test-btn-${profileId}"]`);
     await expect(testBtn).toBeVisible();
     await testBtn.click();
 
-    // Wait for test result (may show in toast or inline message)
-    // Do not wait for actual connection (would be slow/flaky with real servers)
-    await page.waitForTimeout(1000); // Brief wait for test to complete
+    // Wait for success toast deterministically (UI re-render after mocked API response)
+    // Timeout: 5s allows for API mock response + UI state update + toast animation
+    await expect(
+      page.locator('[data-testid="toast"]').filter({ hasText: /success|passed/i })
+    ).toBeVisible({ timeout: 5000 });
 
     // Activate profile
     const activateBtn = profileCardByName.locator(`[data-testid="activate-btn-${profileId}"]`);
@@ -296,8 +309,10 @@ test.describe('INT-010: IRC Profile Management', () => {
     await expect(activateBtn).toBeVisible();
     await activateBtn.click();
 
-    // Wait for activation to complete
-    await page.waitForTimeout(500);
+    // Wait for activation to complete (explicit: active badge appears)
+    await expect(
+      profileCard.locator('[data-testid="active-badge"]')
+    ).toBeVisible({ timeout: 5000 });
 
     // Delete button should be disabled when active
     const deleteBtn = profileCard.locator(`[data-testid="delete-btn-${profileId}"]`);

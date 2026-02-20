@@ -612,10 +612,98 @@ export async function evaluateRules(
       });
 
       return;  // First match wins
-    }
-  }
+     }
+   }
 }
 ```
+
+---
+
+### 3.7 IRC Profile Management (DB-First with Env Fallback)
+
+**INT-010: Support for multi-profile IRC connections with DB-first gating**
+
+**When to use**: Initialize IRC connector with credentials from database profiles or environment fallback
+
+**Architecture**:
+- **DB-first gating**: If ANY DB profiles exist for tenant + integration='irc', use DB only (ignore env)
+- **Env fallback**: Only if zero DB profiles exist AND all required env vars are set
+- **Error on DB failure**: If DB access errors occur, return 500 `irc_profile_resolution_failed` (fail closed; no silent env fallback)
+- **Encryption**: Credentials stored encrypted at rest using `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` (AES-256-GCM)
+- **Hard cap**: Maximum 10 profiles per tenant (enforce in service layer)
+
+**Configuration**:
+```env
+# Encryption key for credential storage (required if using DB profiles)
+INTEGRATION_CREDENTIALS_ENCRYPTION_KEY=<32-byte base64-encoded key>
+
+# Fallback env vars (only used if zero DB profiles exist)
+IRC_SERVER=irc.example.com
+IRC_PORT=6667
+IRC_USERNAME=mybot
+IRC_PASSWORD=secret  # optional
+IRC_CHANNELS=#channel1,#channel2
+```
+
+**Profile Lifecycle**:
+```
+CREATE → TEST → ACTIVATE → (optional) DISABLE → DELETE
+  ↓       ↓       ↓          ↓                    ↓
+ new   enabled  active   inactive            deleted
+```
+
+**Gating Logic** (in `ircProfileResolution.service.ts`):
+```
+1. Try query DB for ANY profiles (enabled OR disabled)
+   - If DB error → throw 500 irc_profile_resolution_failed (FAIL CLOSED)
+2. If >0 profiles found:
+   - Active profile → use it
+   - 0 active, 1 total → use implicitly (enabled or disabled)
+   - 0 active, >1 total → throw 409 irc_profile_not_selected
+3. If 0 profiles found:
+   - Try env vars (IRC_SERVER, IRC_PORT, IRC_USERNAME, IRC_CHANNELS)
+   - If incomplete → throw 409 irc_not_configured
+   - If valid → use env (source: 'env')
+```
+
+**Key Code**:
+```typescript
+// Resolve IRC config for connector startup
+import { resolveIrcConfig } from './services/ircProfileResolution.service';
+
+// In IRC connector initialization:
+const ircConfig = await resolveIrcConfig(tenantId);
+// Returns: { server, port, nick, password?, channels[], source: 'db' | 'env', profileId? }
+
+// Handle errors:
+try {
+  const config = await resolveIrcConfig(tenantId);
+  await ircConnector.connect(config);
+} catch (error) {
+  if (error instanceof IrcProfileResolutionError) {
+    // 500 irc_profile_resolution_failed → DB access failure
+    // 409 irc_profile_not_selected → Multiple DB profiles, none active
+    // 409 irc_not_configured → No DB profiles, env incomplete
+    logger.error({ code: error.code, statusCode: error.statusCode }, error.message);
+  }
+  throw error;
+}
+```
+
+**RBAC** (who can manage IRC profiles):
+```
+Super Admin: CREATE, UPDATE, TEST, ACTIVATE, DISABLE, DELETE, LIST
+Admin:       LIST, GET (read-only)
+Manager:     LIST, GET (read-only)
+User:        (no access)
+```
+
+**Audit Logging**:
+- All profile lifecycle events logged (create, update, activate, disable, delete, test)
+- Metadata never includes passwords or encrypted credentials
+- Entity type: 'integration', Entity ID: `irc-profile-{id}`
+
+**See also**: `.docs/adr/ADR-017-irc-multi-profile-db-first-architecture.md`
 
 ---
 

@@ -64,6 +64,7 @@ export async function resolveIrcConfig(
   try {
     // Check for DB profiles (ANY profiles: enabled OR disabled)
     // INT-010: DB-first gating requires checking ALL profiles, not just enabled ones
+    // CRITICAL: DB-first requires DB query to succeed; env fallback ONLY if zero profiles exist
     let dbProfiles: typeof integrationConnectionProfiles.$inferSelect[] = [];
     
     try {
@@ -78,13 +79,18 @@ export async function resolveIrcConfig(
           )
         );
     } catch (dbError) {
-      // If DB query fails (e.g., in test environment without proper setup),
-      // treat as no profiles and fallback to env
-      logger.debug(
-        { tenantId, error: dbError instanceof Error ? dbError.message : 'Unknown error' },
-        'Failed to query DB profiles, using env fallback'
+      // If DB query fails, FAIL CLOSED (return 500)
+      // Env fallback is ONLY allowed when DB query SUCCEEDS and profile count is zero
+      const error = dbError instanceof Error ? dbError.message : 'Unknown error';
+      logger.error(
+        { tenantId, error },
+        'IRC profile resolution: DB access failed (fail closed, no env fallback)'
       );
-      dbProfiles = [];
+      throw new IrcProfileResolutionError(
+        'Failed to access IRC profile database',
+        'irc_profile_resolution_failed',
+        500
+      );
     }
 
     logger.debug(
