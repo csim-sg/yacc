@@ -12,10 +12,10 @@
  * Coverage: >=90% for IRC connector and ingestion service
  */
 
+import type { Client as IRCClient } from 'irc-framework';
+import type { IntegrationConnectionProfileInsert } from '../schemas/integrationConnectionProfile.schema';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { eq, and } from 'drizzle-orm';
-import { EventEmitter } from 'events';
-import type { Client as IRCClient } from 'irc-framework';
 import { dbClient } from '../infrastructure/db.client';
 import { conversations } from '../schemas/conversation.schema';
 import { messages } from '../schemas/message.schema';
@@ -23,7 +23,6 @@ import { deadLetterQueue } from '../schemas/deadLetterQueue.schema';
 import { integrationConnectionProfiles } from '../schemas/integrationConnectionProfile.schema';
 import { IRCConnector } from '../connectors/irc.connector';
 import { IRCIngestionService } from '../services/irc-ingestion.service';
-import type { IntegrationConnectionProfileInsert } from '../schemas/integrationConnectionProfile.schema';
 
 // Mock logger
 vi.mock('../infrastructure/logger', () => ({
@@ -40,6 +39,7 @@ let mockIRCClient: IRCClient | null = null;
 let shouldEmitRegistered = true; // Control whether mock emits 'registered' event
 
 vi.mock('irc-framework', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { EventEmitter } = require('events');
 
   class MockIRCClient extends EventEmitter {
@@ -74,7 +74,7 @@ vi.mock('irc-framework', () => {
       this.joinedChannels.push(channel);
     }
 
-    say(target: string, message: string): void {
+    say(_target: string, _message: string): void {
       // Simulate immediate sent status
     }
 

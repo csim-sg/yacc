@@ -77,6 +77,7 @@ describe('IRC Ingestion Service', () => {
           createdProfileIds.push(result[0].id);
         }
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error(`Failed to create profile ${i}:`, error instanceof Error ? error.message : String(error));
         throw error;
       }
