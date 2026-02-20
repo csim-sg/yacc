@@ -204,7 +204,6 @@ jobs:
     strategy:
       matrix:
         node-version: [20.x]
-    continue-on-error: true
     timeout-minutes: 15
 
     services:
@@ -251,6 +250,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run full backend test suite (informational, may fail on baseline)
+        continue-on-error: true
         run: pnpm --filter @yacc/backend test
         env:
           DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
