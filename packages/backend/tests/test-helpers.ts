@@ -15,7 +15,6 @@
 import 'reflect-metadata';
 
 import type { Express } from 'express';
-import request from 'supertest';
 
 export interface TestUserOptions {
   email: string;

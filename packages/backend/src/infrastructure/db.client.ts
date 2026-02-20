@@ -5,9 +5,10 @@
  * Follows ADR-005: Infrastructure folder for client initialization
  */
 
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { appConfig } from '../config/appConfig';
 import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+
+import { appConfig } from '../config/appConfig';
 import { schemas } from '../schemas';
 
 // Singleton: Initialize connection pool once at module load
@@ -27,11 +28,11 @@ export const dbClient = drizzle({
  */
 export async function checkDatabaseConnection(): Promise<boolean> {
   try {
-    await pool.query('SELECT NOW()');
-    return true;
-  } catch (error) {
-    return false;
-  }
+     await pool.query('SELECT NOW()');
+     return true;
+   } catch {
+     return false;
+   }
 }
 
 /**
