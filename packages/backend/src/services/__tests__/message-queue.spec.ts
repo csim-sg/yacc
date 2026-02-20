@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { messageQueueDLQService } from '../message-queue-dlq.service';
-import { messageQueueService } from '../message-queue.service';
 import type { SendMessageJobPayload } from '../../types/message-queue.types';
 import { RETRY_CONFIG } from '../../types/message-queue.types';
+import { messageQueueDLQService } from '../message-queue-dlq.service';
+import { messageQueueService } from '../message-queue.service';
 
 /**
  * Message Queue Service - Unit & Integration Tests
@@ -27,7 +26,7 @@ describe('Message Queue Service', () => {
     // Cleanup: drain queues between tests
     try {
       await messageQueueService.drainQueues();
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors
     }
   });

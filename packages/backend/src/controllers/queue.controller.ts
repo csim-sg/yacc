@@ -1,5 +1,4 @@
 import { Body, Get, JsonController, Param, Post, QueryParam } from 'routing-controllers';
-
 import { logger } from '../infrastructure/logger';
 import { messageQueueDLQService } from '../services/message-queue-dlq.service';
 import { messageQueueService } from '../services/message-queue.service';

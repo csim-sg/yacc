@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BaseConnector } from '../../connectors/base/baseConnector';
-
+import type { SendMessageJobPayload } from '../../types/message-queue.types';
+import { RETRY_CONFIG } from '../../types/message-queue.types';
 import { connectorManager } from '../connector-manager';
 import { messageQueueDLQService } from '../message-queue-dlq.service';
 import { messageQueueService } from '../message-queue.service';
 import { queueDatabaseIntegration } from '../queue-database-integration';
-import type { SendMessageJobPayload } from '../../types/message-queue.types';
-import { RETRY_CONFIG } from '../../types/message-queue.types';
 
 /**
  * Message Queue - End-to-End Integration Tests
@@ -60,7 +59,7 @@ describe('Message Queue - E2E Integration', () => {
     vi.clearAllMocks();
     try {
       await messageQueueService.drainQueues();
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors
     }
   });
@@ -109,7 +108,7 @@ describe('Message Queue - E2E Integration', () => {
     });
 
     it('should call database integration on success', async () => {
-      const updateSentSpy = queueDatabaseIntegration.updateMessageSent as any;
+      const updateSentSpy = queueDatabaseIntegration.updateMessageSent as unknown;
 
       // This test verifies the integration point is wired correctly
       expect(updateSentSpy).toBeDefined();
@@ -123,7 +122,7 @@ describe('Message Queue - E2E Integration', () => {
   describe('Message delivery failure and retry flow', () => {
     it('should handle connector failure gracefully', async () => {
       // Mock connector to throw error
-      (mockConnector.sendMessage as any).mockRejectedValueOnce(
+      (mockConnector.sendMessage as unknown as { mockRejectedValueOnce: (err: Error) => void }).mockRejectedValueOnce(
         new Error('Connection timeout')
       );
 
@@ -132,14 +131,14 @@ describe('Message Queue - E2E Integration', () => {
     });
 
     it('should track retry attempts in database', async () => {
-      const updateFailedSpy = queueDatabaseIntegration.updateMessageFailed as any;
+      const updateFailedSpy = queueDatabaseIntegration.updateMessageFailed as unknown;
 
       // Verify database integration is called on failure
       expect(updateFailedSpy).toBeDefined();
     });
 
     it('should move to DLQ after max retries', async () => {
-      const recordDLQSpy = queueDatabaseIntegration.recordMessageInDLQ as any;
+      const recordDLQSpy = queueDatabaseIntegration.recordMessageInDLQ as unknown;
 
       // Verify DLQ recording integration
       expect(recordDLQSpy).toBeDefined();
@@ -188,7 +187,7 @@ describe('Message Queue - E2E Integration', () => {
 
   describe('Database Integration services', () => {
     it('should call updateMessageSent with correct parameters', async () => {
-      const updateSentSpy = queueDatabaseIntegration.updateMessageSent as any;
+      const updateSentSpy = queueDatabaseIntegration.updateMessageSent as unknown;
 
       const payload: SendMessageJobPayload = {
         messageId: '550e8400-e29b-41d4-a716-446655440001',
@@ -206,7 +205,7 @@ describe('Message Queue - E2E Integration', () => {
     });
 
     it('should call updateMessageFailed with retry info', async () => {
-      const updateFailedSpy = queueDatabaseIntegration.updateMessageFailed as any;
+      const updateFailedSpy = queueDatabaseIntegration.updateMessageFailed as unknown;
 
       const payload: SendMessageJobPayload = {
         messageId: '550e8400-e29b-41d4-a716-446655440001',
@@ -231,7 +230,7 @@ describe('Message Queue - E2E Integration', () => {
     });
 
     it('should record message in DLQ with failure details', async () => {
-      const recordDLQSpy = queueDatabaseIntegration.recordMessageInDLQ as any;
+      const recordDLQSpy = queueDatabaseIntegration.recordMessageInDLQ as unknown;
 
       const payload: SendMessageJobPayload = {
         messageId: '550e8400-e29b-41d4-a716-446655440001',

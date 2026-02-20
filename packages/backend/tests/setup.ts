@@ -24,17 +24,13 @@ process.env.NODE_ENV = 'test';
 // Optional: Suppress console logs during tests (opt-in via SUPPRESS_LOGS=true)
 if (process.env.SUPPRESS_LOGS === 'true') {
   // Only suppress non-critical logs when explicitly requested
-  console.log = (...args: unknown[]) => {
-    // Suppress non-critical logs
+  const noop = () => {
+    // No-op function
   };
 
-  console.info = (...args: unknown[]) => {
-    // Suppress info logs
-  };
-
-  console.debug = (...args: unknown[]) => {
-    // Suppress debug logs
-  };
+  console.log = noop;
+  console.info = noop;
+  console.debug = noop;
 
   // Keep error and warning output always visible
   // console.error and console.warn are intentionally not overridden
