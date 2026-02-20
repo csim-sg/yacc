@@ -19,16 +19,6 @@ import type { ValidationError } from '@yacc/common/types/validationError.interfa
 import { MessageStatusTracker } from '../../services/messageStatusTracker';
 
 // ============================================
-// Type for internal state tracking
-// ============================================
-
-interface ConnectorState {
-  _lastConnectedAt?: Date;
-  _lastDisconnectedAt?: Date;
-  _errorMessage?: string;
-}
-
-// ============================================
 // Abstract Base Connector Class
 // ============================================
 

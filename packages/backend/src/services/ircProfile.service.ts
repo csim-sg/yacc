@@ -42,7 +42,7 @@ const IRC_PROFILE_CAP = 10;
 /**
  * Default tenant ID (MVP single-tenant)
  */
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000000';
+const _DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
 /**
  * Create a new IRC profile

@@ -20,7 +20,7 @@ import { MESSAGE_BACKLOG_DURATION_MS } from '../../websockets/wsConstants';
  */
 interface BacklogEntry {
   eventName: keyof WebSocketEventMap;
-  payload: any;
+  payload: unknown;
   conversationId?: string;
   emittedAt: string;
   expiresAt: string;
@@ -34,7 +34,7 @@ const BACKLOG_KEY_PREFIX = 'ws:backlog';
 /**
  * Calculate expiration time (1 hour from now)
  */
-function getExpirationTime(): number {
+function _getExpirationTime(): number {
   return Math.floor(Date.now() / 1000) + MESSAGE_BACKLOG_DURATION_MS / 1000;
 }
 
@@ -85,10 +85,10 @@ export async function storeEvent<K extends keyof WebSocketEventMap>(
       backlog = backlog.slice(-1000);
     }
 
-    // Store value
-    await redisClient.set(key, JSON.stringify(backlog));
-    // Set expiration (in seconds)
-    await (redisClient.expire as any)(key, Math.floor(ttl));
+     // Store value
+     await redisClient.set(key, JSON.stringify(backlog));
+     // Set expiration (in seconds)
+     await redisClient.expire(key, Math.floor(ttl));
 
     logger.debug(
       'Stored event in backlog - userId: %s, event: %s, conversationId: %s, backlogSize: %d',

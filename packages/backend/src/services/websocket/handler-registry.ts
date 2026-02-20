@@ -43,14 +43,15 @@ export async function emitEvent<K extends keyof WebSocketEventMap>(
   payload: WebSocketEventMap[K]
 ): Promise<void> {
   try {
-    const handler = eventHandlers[eventName];
+    const handler = eventHandlers[eventName as keyof typeof eventHandlers];
 
     if (!handler) {
       throw new Error(`Unknown event type: ${eventName}`);
     }
 
     // Call handler with proper typing
-    await (handler as any)(io, payload);
+    type HandlerFunction = (io: Server, payload: unknown) => Promise<void>;
+    await (handler as HandlerFunction)(io, payload);
 
     logger.debug('Event emitted successfully - event: %s', eventName);
   } catch (error) {
@@ -79,4 +80,4 @@ export function isEventRegistered(eventName: string): eventName is keyof typeof 
   return eventName in eventHandlers;
 }
 
-export type { WebSocketEventMap };
+

@@ -9,7 +9,6 @@
 import type {
   HealthStatus,
   DependencyHealth,
-  HealthSLO,
 } from '@yacc/common/responses/health/healthResponse.response';
 import type { Request, Response } from 'express';
 import { All, Controller, Req, Res } from 'routing-controllers';
@@ -28,6 +27,7 @@ import { redisClient } from '../infrastructure/redis.client';
 async function checkDatabaseConnection(): Promise<boolean> {
   try {
     // Use Drizzle's query builder for health check
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await dbClient.execute('SELECT 1' as any);
     return true;
   } catch {

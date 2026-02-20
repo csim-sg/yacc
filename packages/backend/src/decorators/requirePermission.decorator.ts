@@ -1,4 +1,5 @@
 import { createParamDecorator, ForbiddenError } from 'routing-controllers';
+import type { Request } from 'express';
 import type { AuthUser, Permission } from '../types/auth.types';
 import { PERMISSIONS } from '../types/auth.types';
 
@@ -35,7 +36,7 @@ export function RequirePermission(permission: Permission) {
   return createParamDecorator({
     required: true,
     value: (action) => {
-      const user = (action.request as any).user as AuthUser | undefined;
+      const user = (action.request as Request).user as AuthUser | undefined;
       
       // Check if authenticated
       if (!user) {

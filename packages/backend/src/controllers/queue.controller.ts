@@ -36,7 +36,7 @@ interface AuthenticatedRequest extends Request {
  * - POST /api/queue/dlq/retry - Bulk retry DLQ entries
  */
 
-interface QueueStatsResponse {
+type _QueueStatsResponse = {
   active: number;
   waiting: number;
   completed: number;
@@ -45,9 +45,9 @@ interface QueueStatsResponse {
   dlq: number;
   totalJobs: number;
   timestamp: string;
-}
+};
 
-interface DLQListResponse {
+type _DLQListResponse = {
   entries: Array<{
     messageId: string;
     conversationId: string;
@@ -60,25 +60,25 @@ interface DLQListResponse {
   page: number;
   pageSize: number;
   timestamp: string;
-}
+};
 
-interface RetryResponse {
+type _RetryResponse = {
   success: boolean;
   messageId: string;
   message: string;
   timestamp: string;
-}
+};
 
-interface BulkRetryRequest {
+type BulkRetryRequest = {
   messageIds: string[];
-}
+};
 
-interface BulkRetryResponse {
+type _BulkRetryResponse = {
   successful: number;
   failed: number;
   errors: Array<{ messageId: string; error: string }>;
   timestamp: string;
-}
+};
 
 @JsonController('/api/queue')
 @Authorized()

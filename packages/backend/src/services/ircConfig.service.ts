@@ -12,8 +12,7 @@
  * - Never returns/logs plaintext passwords
  */
 
-import { eq } from 'drizzle-orm';
-import { appConfig } from '../config/appConfig';
+
 import { IRCConnector } from '../connectors/irc.connector';
 import { dbClient } from '../infrastructure/db.client';
 import { ircStatusClient } from '../infrastructure/ircStatus.client';
@@ -673,4 +672,3 @@ export class IRCConfigService {
 
 export const ircConfigService = new IRCConfigService();
 export { TestConnectionFailedError };
-export type { TestConnectionError };

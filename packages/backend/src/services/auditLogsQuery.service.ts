@@ -220,10 +220,10 @@ export async function exportAuditLogs(
   try {
     const filters = request.filters || {};
     
-    // Fetch all matching logs by iterating through pages
-    const allItems: AuditLogEntry[] = [];
-    const currentPage = 1;
-    const pageSize = 100; // Use max page size for efficiency
+     // Fetch all matching logs by iterating through pages
+     const allItems: AuditLogEntry[] = [];
+     let currentPage = 1;
+     const pageSize = 100; // Use max page size for efficiency
     
     // Fetch first page to know total
     const firstPageResponse = await queryAuditLogs(

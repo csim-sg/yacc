@@ -7,7 +7,6 @@
 
 import { eq } from 'drizzle-orm';
 import type { Socket } from 'socket.io';
-import { appConfig } from '../config/appConfig';
 import { betterAuthClient } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
@@ -44,10 +43,11 @@ export async function webSocketAuthMiddleware(
        return next(new Error('Authentication token required'));
      }
 
-      // Validate session with BetterAuth
-      const session = await betterAuthClient.api.getSession({
-       headers: socket.handshake.headers as any,
-     });
+       // Validate session with BetterAuth
+       type HeadersRecord = Record<string, string | string[] | undefined>;
+       const session = await betterAuthClient.api.getSession({
+         headers: socket.handshake.headers as HeadersRecord,
+       });
 
      if (!session) {
        logger.warn('WebSocket connection rejected: Invalid session with socketId: %s', socket.id);
@@ -82,8 +82,12 @@ export async function webSocketAuthMiddleware(
      next();
    } catch (error) {
      logger.error('WebSocket authentication failed - socketId: %s, error: %s', socket.id, error instanceof Error ? error.message : String(error));
-     next(new Error('Authentication failed'));
-   }
-}
+      next(new Error('Authentication failed'));
+    }
+  }
 
+/**
+ * AuthenticatedSocket type - used for typing WebSocket connections with authentication
+ * This is a TypeScript interface re-export, which cannot be replaced with `export const`
+ */
 export type { AuthenticatedSocket };

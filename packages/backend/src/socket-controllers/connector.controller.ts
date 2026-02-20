@@ -6,7 +6,6 @@
  * Uses socket-controllers for declarative event handling
  */
 
-import type { ConnectorEventMap } from '@yacc/common/types/connectorEventMap.type';
 import { SocketController, OnMessage } from 'socket-controllers';
 import type { Socket } from 'socket.io';
 import { logger } from '../infrastructure/logger';

@@ -62,5 +62,4 @@ declare module 'irc-framework' {
     on(event: 'part', handler: (message: IRCMessageEvent) => void): this;
   }
 
-  export { Client, IRCMessageEvent, IRCErrorEvent };
 }

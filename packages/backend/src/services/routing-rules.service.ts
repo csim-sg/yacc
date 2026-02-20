@@ -4,7 +4,7 @@
  * Admin+ only access
  */
 
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
 import { routingRules } from '../schemas/routingRule.schema';
@@ -59,18 +59,18 @@ export class RoutingRulesService {
       await this.validateActions(actions);
 
       // Create rule
-      const result = await dbClient
-        .insert(routingRules)
-        .values({
-          name: name.trim(),
-          description: description?.trim() || undefined,
-          status,
-          priority,
-          conditions: conditions as any,
-          actions: actions as any,
-          createdById,
-        })
-        .returning();
+       const result = await dbClient
+         .insert(routingRules)
+         .values({
+           name: name.trim(),
+           description: description?.trim() || undefined,
+           status,
+           priority,
+           conditions: conditions as unknown,
+           actions: actions as unknown,
+           createdById,
+         })
+         .returning();
 
       const createdRule = result[0];
 
@@ -110,10 +110,10 @@ export class RoutingRulesService {
    */
   async listRules() {
     try {
-      const allRules = (await dbClient
-        .select()
-        .from(routingRules)
-        .orderBy(routingRules.priority)) as any[];
+       const allRules = (await dbClient
+         .select()
+         .from(routingRules)
+         .orderBy(routingRules.priority)) as Array<typeof routingRules.$inferSelect>;
 
       logger.info(
         { count: allRules.length },
@@ -163,10 +163,10 @@ export class RoutingRulesService {
    */
   async updateRule(userId: string, ruleId: string, request: UpdateRoutingRuleRequest) {
     try {
-      // Verify rule exists
-      const existing = await this.getRule(ruleId);
+       // Verify rule exists (throws if not found)
+       await this.getRule(ruleId);
 
-      // Validate updates
+       // Validate updates
       if (request.name !== undefined) {
         if (request.name.trim().length === 0) {
           throw new Error('Rule name is required');
@@ -198,10 +198,10 @@ export class RoutingRulesService {
         await this.validateActions(request.actions);
       }
 
-      // Build update payload
-      const updatePayload: Record<string, any> = {
-        updatedAt: new Date(),
-      };
+       // Build update payload
+       const updatePayload: Record<string, unknown> = {
+         updatedAt: new Date(),
+       };
 
       if (request.name !== undefined) updatePayload.name = request.name.trim();
       if (request.description !== undefined) updatePayload.description = request.description?.trim();
@@ -369,13 +369,13 @@ export class RoutingRulesService {
         }
       }
 
-      // Validate tag exists if tag field
-      if (field === 'tag') {
-        const tagResult = await dbClient
-          .select()
-          .from(tags)
-          .where(eq(tags.id, value as any))
-          .limit(1);
+       // Validate tag exists if tag field
+       if (field === 'tag') {
+         const tagResult = await dbClient
+           .select()
+           .from(tags)
+           .where(eq(tags.id, typeof value === 'number' ? value : parseInt(String(value), 10)))
+           .limit(1);
 
         if (tagResult.length === 0) {
           throw new Error(`Tag ${value} not found`);
@@ -419,13 +419,13 @@ export class RoutingRulesService {
         }
       }
 
-      // Validate tag exists for tag action
-      if (type === 'tag') {
-        const tagResult = await dbClient
-          .select()
-          .from(tags)
-          .where(eq(tags.id, value as any))
-          .limit(1);
+       // Validate tag exists for tag action
+       if (type === 'tag') {
+         const tagResult = await dbClient
+           .select()
+           .from(tags)
+           .where(eq(tags.id, typeof value === 'number' ? value : parseInt(String(value), 10)))
+           .limit(1);
 
         if (tagResult.length === 0) {
           throw new Error(`Tag ${value} not found`);

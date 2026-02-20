@@ -38,9 +38,8 @@ vi.mock('../infrastructure/logger', () => ({
 let mockIRCClient: _IRCClient | null = null;
 let shouldEmitRegistered = true; // Control whether mock emits 'registered' event
 
-vi.mock('irc-framework', () => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { EventEmitter } = require('events');
+vi.mock('irc-framework', async () => {
+  const { EventEmitter } = await import('events');
 
   class MockIRCClient extends EventEmitter {
     public options: Record<string, unknown> | null = null;

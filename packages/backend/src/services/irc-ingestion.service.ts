@@ -19,7 +19,6 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
 import { conversations } from '../schemas/conversation.schema';
-import { messages } from '../schemas/message.schema';
 import type { MessageReceivedPayload } from '../types/websocket.types';
 import { auditService } from './audit.service';
 import { conversationService } from './conversation.service';
@@ -62,11 +61,8 @@ export class IRCIngestionService {
     // Collapse consecutive whitespace characters (including newlines) to single space
     sanitized = sanitized.replace(/\s+/g, ' ');
 
-    // Remove control characters
-    // [\x00-\x08] = null to backspace
-    // [\x0B-\x0C] = vertical tab, form feed
-    // [\x0E-\x1F] = shift out to unit separator
-    // [\x7F] = delete
+    // Remove control characters (null to backspace, vertical tab, form feed, shift out to unit separator, delete)
+    // eslint-disable-next-line no-control-regex
     sanitized = sanitized.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
 
     return sanitized;

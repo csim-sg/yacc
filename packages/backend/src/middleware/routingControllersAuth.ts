@@ -214,8 +214,8 @@ export async function currentUserChecker(
        lastLoginAt: user.lastLoginAt,
      } as AuthUser;
 
-     return undefined;
-   } catch (error) {
-     return undefined;
-   }
+      return undefined;
+    } catch (_error) {
+      return undefined;
+    }
 }

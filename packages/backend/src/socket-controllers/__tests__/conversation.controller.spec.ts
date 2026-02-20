@@ -217,6 +217,7 @@ describe('ConversationController', () => {
       }
 
       // Either emit was called or error was thrown (both acceptable)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const emitCalled = (mockSocket.emit as any).mock.calls.length > 0;
       expect(errorThrown || emitCalled).toBe(true);
     });

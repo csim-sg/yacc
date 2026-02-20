@@ -13,7 +13,6 @@ import {
   Get,
   Post,
   Patch,
-  Delete,
   Param,
   Body,
   Req,
@@ -38,7 +37,7 @@ const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
 const VALID_SORT_BY = ['lastActivity', 'created', 'priority'] as const;
 const VALID_SORT_ORDER = ['asc', 'desc'] as const;
 
-function parsePositiveInt(value: unknown, name: string): number | undefined {
+function parsePositiveInt(value: unknown, _name: string): number | undefined {
   if (value === undefined || value === '') return undefined;
   const n = Number(value);
   if (!Number.isInteger(n) || n < 1) return undefined;

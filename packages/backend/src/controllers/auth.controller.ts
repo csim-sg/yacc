@@ -26,18 +26,6 @@ interface AuthenticatedRequest extends Request {
   correlationId?: string;
 }
 
-interface BetterAuthRequest {
-  correlationId?: string;
-  protocol: string;
-  host: string;
-  originalUrl: string;
-  url: string;
-  method: string;
-  headers: Record<string, string | string[] | undefined>;
-  body?: unknown;
-  get(header: string): string | undefined;
-}
-
 // TODO: Implement EmailService in infrastructure layer
 // import { emailService } from '../infrastructure/email.client';
 

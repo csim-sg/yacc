@@ -18,7 +18,6 @@ import { dbClient } from '../../infrastructure/db.client';
 import { conversations } from '../../schemas/conversation.schema';
 import { integrationConnectionProfiles } from '../../schemas/integrationConnectionProfile.schema';
 import { messages } from '../../schemas/message.schema';
-import { users } from '../../schemas/user.schema';
 import { auditService } from '../audit.service';
 import { IRCIngestionService, type InboundIRCMessageDTO } from '../irc-ingestion.service';
 import * as wsGateway from '../websocket/websocket-gateway';

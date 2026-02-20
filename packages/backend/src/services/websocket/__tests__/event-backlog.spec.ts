@@ -5,7 +5,6 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-
 // Mock logger and redis
 vi.mock('../../../infrastructure/logger', () => ({
   logger: {

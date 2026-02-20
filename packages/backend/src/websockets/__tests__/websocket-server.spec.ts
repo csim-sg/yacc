@@ -4,7 +4,7 @@
  * Tests room subscription, event emission, and user tracking methods
  */
 
-import type { Server, Socket } from 'socket.io';
+import type { Server } from 'socket.io';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock logger to avoid appConfig parsing
@@ -20,16 +20,20 @@ vi.mock('../../infrastructure/logger', () => ({
 /**
  * Create mock Socket.io server and socket for testing
  */
-const createMockSocket = (userId: string, socketId: string) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createMockSocket = (userId: string, socketId: string): any => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mockSocket: any = {
     id: socketId,
     userId,
     email: `user${userId}@example.com`,
     role: 'user',
     rooms: new Set<string>(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     join: vi.fn(function (this: any, room: string) {
       this.rooms.add(room);
     }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     leave: vi.fn(function (this: any, room: string) {
       this.rooms.delete(room);
     }),
@@ -39,13 +43,14 @@ const createMockSocket = (userId: string, socketId: string) => {
 };
 
 const createMockServer = () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sockets = new Map<string, any>();
 
   return {
     sockets: {
       sockets: new Map(sockets),
     },
-    to: vi.fn(function (room: string) {
+    to: vi.fn(function (_room: string) {
       return {
         emit: vi.fn(),
       };
@@ -57,7 +62,7 @@ const createMockServer = () => {
 };
 
 describe('WebSocket Server Room Subscriptions', () => {
-  let mockSocket: any;
+  let mockSocket: ReturnType<typeof createMockSocket>;
   let mockServer: Server;
 
   beforeEach(() => {
@@ -148,12 +153,12 @@ describe('WebSocket Server Room Subscriptions', () => {
 
   describe('Event Emission to Rooms', () => {
     it('should emit event to specific room', () => {
-      const room = 'conversation:123';
-      const roomEmitter = {
-        emit: vi.fn(),
-      };
+       const room = 'conversation:123';
+       const roomEmitter = {
+         emit: vi.fn(),
+       };
 
-      vi.mocked(mockServer.to).mockReturnValue(roomEmitter as any);
+       vi.mocked(mockServer.to).mockReturnValue(roomEmitter as unknown as ReturnType<typeof mockServer.to>);
 
       const emitter = mockServer.to(room);
       emitter.emit('message.sent', { messageId: 'msg1' });
@@ -172,12 +177,12 @@ describe('WebSocket Server Room Subscriptions', () => {
 
     it('should emit to user room', () => {
       const userId = '550e8400-e29b-41d4-a716-446655440000';
-      const room = `user:${userId}`;
-      const roomEmitter = {
-        emit: vi.fn(),
-      };
+       const room = `user:${userId}`;
+       const roomEmitter = {
+         emit: vi.fn(),
+       };
 
-      vi.mocked(mockServer.to).mockReturnValue(roomEmitter as any);
+       vi.mocked(mockServer.to).mockReturnValue(roomEmitter as unknown as ReturnType<typeof mockServer.to>);
 
       const emitter = mockServer.to(room);
       emitter.emit('notification.received', { notificationId: 'notif1' });
@@ -278,13 +283,13 @@ describe('WebSocket Server Room Subscriptions', () => {
   // ============================================
 
   describe('Event Type Safety', () => {
-    it('should emit message.sent event with correct payload', () => {
-      const room = 'conversation:123';
-      const roomEmitter = {
-        emit: vi.fn(),
-      };
+     it('should emit message.sent event with correct payload', () => {
+       const room = 'conversation:123';
+       const roomEmitter = {
+         emit: vi.fn(),
+       };
 
-      vi.mocked(mockServer.to).mockReturnValue(roomEmitter as any);
+       vi.mocked(mockServer.to).mockReturnValue(roomEmitter as unknown as ReturnType<typeof mockServer.to>);
 
       const payload = {
         messageId: '550e8400-e29b-41d4-a716-446655440000',
@@ -302,16 +307,16 @@ describe('WebSocket Server Room Subscriptions', () => {
     });
 
     it('should emit typing.started event with user info', () => {
-      const room = 'conversation:123';
-      const roomEmitter = {
-        emit: vi.fn(),
-      };
+       const room = 'conversation:123';
+       const roomEmitter = {
+         emit: vi.fn(),
+       };
 
-      vi.mocked(mockServer.to).mockReturnValue(roomEmitter as any);
+       vi.mocked(mockServer.to).mockReturnValue(roomEmitter as unknown as ReturnType<typeof mockServer.to>);
 
-      const payload = {
-        conversationId: '550e8400-e29b-41d4-a716-446655440000',
-        userId: '550e8400-e29b-41d4-a716-446655440001',
+       const payload = {
+         conversationId: '550e8400-e29b-41d4-a716-446655440000',
+         userId: '550e8400-e29b-41d4-a716-446655440001',
         name: 'John Doe',
       };
 

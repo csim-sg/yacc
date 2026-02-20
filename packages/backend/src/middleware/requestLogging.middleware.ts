@@ -1,4 +1,5 @@
 import pinoHttp from 'pino-http';
+import type { Request, Response } from 'express';
 import { logger } from '../infrastructure/logger';
 
 /**
@@ -25,10 +26,10 @@ export const requestLoggingMiddleware = pinoHttp({
   logger,
   
   // Use existing correlation ID from request
-  genReqId: (req) => (req as any).correlationId,
+  genReqId: (req: Request) => (req.correlationId || 'unknown'),
   
   // Custom log levels based on status code
-  customLogLevel: (req, res, err) => {
+  customLogLevel: (req: Request, res: Response, err: unknown) => {
     if (res.statusCode >= 500 || err) return 'error';
     if (res.statusCode >= 400) return 'warn';
     if (res.statusCode >= 300) return 'info';
@@ -36,13 +37,14 @@ export const requestLoggingMiddleware = pinoHttp({
   },
   
   // Custom success message
-  customSuccessMessage: (req, res) => {
+  customSuccessMessage: (req: Request, _res: Response) => {
     return `${req.method} ${req.url} completed`;
   },
   
   // Custom error message
-  customErrorMessage: (req, res, err) => {
-    return `${req.method} ${req.url} failed: ${err.message}`;
+  customErrorMessage: (req: Request, _res: Response, err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    return `${req.method} ${req.url} failed: ${message}`;
   },
   
   // Serialize request (exclude sensitive headers and body)
