@@ -9,12 +9,15 @@
  * Happy path: Create → Test → Activate → Disable → Delete (non-active)
  *
  * Test isolation:
+ * - Cleanup runs as Super Admin BEFORE each test (beforeEach)
  * - Does NOT depend on fixed IDs (uses text selectors + data-testid lookup)
- * - Does NOT call real IRC servers (mocks test-connection endpoint if needed)
+ * - Does NOT call real IRC servers (mocks test-connection endpoint)
+ * - For tests with active profiles, teardown disables then deletes
  * - Uses stable, deterministic selectors
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { apiRequest } from './helpers/api';
 
 const BASE_URL = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:5173';
 const API_BASE_URL = process.env.PLAYWRIGHT_TEST_API_BASE_URL || 'http://localhost:3000';
@@ -46,42 +49,147 @@ async function loginAs(page: Page, role: string) {
 }
 
 /**
+ * Helper: Logout
+ */
+async function logout(page: Page) {
+  try {
+    const logoutBtn = page.locator('[data-testid="logout-btn"]');
+    if (await logoutBtn.isVisible({ timeout: 2000 })) {
+      await logoutBtn.click();
+      await page.waitForURL(`${BASE_URL}/login`, { timeout: 5000 });
+    }
+  } catch {
+    // Already logged out or logout button not available
+  }
+}
+
+/**
  * Helper: Generate unique profile name
  */
 function generateProfileName(): string {
   return `test-irc-${Date.now()}`;
 }
 
-test.describe('INT-010: IRC Profile Management', () => {
-  /**
-   * Helper: Clean up test profiles (prevent accumulation across tests)
-   * Cap at 10 profiles total; delete any test profiles created during test run
-   */
-  async function cleanupTestProfiles(page: Page, filterPrefix = 'test-irc-') {
-    // List all profiles via API
-    try {
-      const response = await page.evaluate(async (prefix) => {
-        const res = await fetch('http://localhost:3000/api/integrations/irc/profiles', {
-          credentials: 'include',
-        });
-        if (!res.ok) return [];
-        const profiles = await res.json();
-        return profiles.filter((p: any) => p.name.startsWith(prefix));
-      }, filterPrefix);
-      
-      // Delete each test profile
-      for (const profile of response as any[]) {
-        await page.evaluate(async (id) => {
-          await fetch(`http://localhost:3000/api/integrations/irc/profiles/${id}`, {
-            method: 'DELETE',
-            credentials: 'include',
-          });
-        }, profile.id);
+/**
+ * Helper: Get all IRC profiles via API (requires authentication)
+ */
+async function getAllProfiles(page: Page): Promise<Array<{ id: string; name: string; is_active: boolean }>> {
+  try {
+    const response = await apiRequest(page, {
+      method: 'GET',
+      endpoint: '/integrations/irc/profiles',
+    });
+    
+    if (response.status !== 200) {
+      return [];
+    }
+    
+    const data = response.data as unknown;
+    if (Array.isArray(data)) {
+      return data as Array<{ id: string; name: string; is_active: boolean }>;
+    }
+    
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Helper: Delete a profile by ID via API (requires Super Admin auth)
+ */
+async function deleteProfileById(page: Page, profileId: string): Promise<boolean> {
+  try {
+    const response = await apiRequest(page, {
+      method: 'DELETE',
+      endpoint: `/integrations/irc/profiles/${profileId}`,
+    });
+    
+    return response.status === 200 || response.status === 204;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Helper: Disable a profile by ID via API (requires Super Admin auth)
+ */
+async function disableProfileById(page: Page, profileId: string): Promise<boolean> {
+  try {
+    const response = await apiRequest(page, {
+      method: 'PATCH',
+      endpoint: `/integrations/irc/profiles/${profileId}`,
+      body: { is_active: false },
+    });
+    
+    return response.status === 200;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Helper: Clean up test profiles (prevent accumulation across tests)
+ * Must be called while logged in as Super Admin.
+ * Deletes all profiles with 'test-irc-' prefix.
+ * If a profile is active, disables it first, then deletes it.
+ */
+async function cleanupTestProfiles(page: Page, filterPrefix = 'test-irc-') {
+  const profiles = await getAllProfiles(page);
+  
+  for (const profile of profiles) {
+    if (profile.name.startsWith(filterPrefix)) {
+      // If profile is active, disable it first
+      if (profile.is_active) {
+        await disableProfileById(page, profile.id);
       }
-    } catch (error) {
-      // Silently ignore cleanup errors (test DB might be empty)
+      // Then delete it
+      await deleteProfileById(page, profile.id);
     }
   }
+}
+
+test.describe('INT-010: IRC Profile Management', () => {
+  /**
+   * beforeEach: Login as Super Admin and clean up test profiles
+   * This ensures:
+   * - All tests start with a clean slate (no accumulated test profiles)
+   * - Cleanup has full permissions (Super Admin)
+   * - Tests don't interfere with each other
+   */
+  test.beforeEach(async ({ page }) => {
+    // Login as Super Admin
+    await loginAs(page, 'super_admin');
+    
+    // Clean up any test profiles from previous test runs
+    await cleanupTestProfiles(page);
+  });
+
+  /**
+   * afterEach: Best-effort cleanup (disable + delete any created test profiles)
+   * This ensures profiles don't accumulate even if a test fails partway through.
+   * If the test is already logged out, re-login as Super Admin first.
+   */
+  test.afterEach(async ({ page }) => {
+    try {
+      // Check if we're logged in by trying to access the integrations page
+      const response = await page.request.get(
+        `${API_BASE_URL}/integrations/irc/profiles`,
+        { timeout: 3000 }
+      );
+      
+      // If we get 401, we're logged out; re-login as Super Admin
+      if (response.status() === 401) {
+        await loginAs(page, 'super_admin');
+      }
+    } catch {
+      // If the request fails entirely, assume we're logged out
+      await loginAs(page, 'super_admin');
+    }
+    
+    // Clean up test profiles
+    await cleanupTestProfiles(page);
+  });
 
   /**
    * Test: Super Admin happy path
@@ -91,15 +199,12 @@ test.describe('INT-010: IRC Profile Management', () => {
    * - Search by profile name text
    * - Extract data-testid from matched card
    * - Use extracted ID for subsequent actions
+   * 
+   * Note: beforeEach has already logged us in as Super Admin and cleaned up test profiles.
    */
   test('Super Admin: create, test, activate, disable, delete profile', async ({
     page,
   }) => {
-    // Cleanup before test (fail-safe isolation)
-    await cleanupTestProfiles(page);
-    // Login as super admin
-    await loginAs(page, 'super_admin');
-
     // Navigate to IRC Profiles page
     await page.goto(`${BASE_URL}/integrations/irc-profiles`);
     await expect(page.locator('h1')).toContainText('IRC Profiles');
@@ -135,21 +240,22 @@ test.describe('INT-010: IRC Profile Management', () => {
     await expect(profileCardByName).toContainText('test.irc.local');
     await expect(profileCardByName).toContainText('testbot');
 
-     // Test connection (mock endpoint to prevent real IRC network calls)
-     // Mock successful test response matching the REAL endpoint: POST /api/integrations/irc/profiles/:id/test
-     await page.route(
-       `**/api/integrations/irc/profiles/${profileId}/test`,
-       (route) => {
-         route.fulfill({
-           status: 200,
-           body: JSON.stringify({ success: true, message: 'Connection successful', testedAt: new Date().toISOString() }),
-         });
-       }
-     );
+    // Test connection (mock endpoint to prevent real IRC network calls)
+    // Mock successful test response matching the REAL endpoint: POST /api/integrations/irc/profiles/:id/test
+    await page.route(`**/api/integrations/irc/profiles/${profileId}/test`, (route) => {
+      route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          success: true,
+          message: 'Connection successful',
+          testedAt: new Date().toISOString(),
+        }),
+      });
+    });
 
-     const testBtn = profileCardByName.locator(`[data-testid="test-btn-${profileId}"]`);
-     await expect(testBtn).toBeVisible();
-     await testBtn.click();
+    const testBtn = profileCardByName.locator(`[data-testid="test-btn-${profileId}"]`);
+    await expect(testBtn).toBeVisible();
+    await testBtn.click();
 
     // Wait for success toast deterministically (UI re-render after mocked API response)
     // Timeout: 5s allows for API mock response + UI state update + toast animation
@@ -196,18 +302,18 @@ test.describe('INT-010: IRC Profile Management', () => {
   });
 
   /**
-   * Test: Admin cannot see action buttons
+   * Test: Admin cannot see action buttons (read-only view)
+   * 
+   * Strategy:
+   * - Let beforeEach create a seeded test profile as Super Admin (via separate fixture setup or create here then switch role)
+   * - Login as Admin and verify read-only access
+   * - afterEach will clean up the created profile
    */
   test('Admin: can view profiles but no action buttons', async ({ page }) => {
-    // Cleanup before test (fail-safe isolation)
-    await cleanupTestProfiles(page);
-    
-    // Setup: Create a profile as super admin
+    // Setup: Create a profile as Super Admin (we're already logged in from beforeEach)
     const profileName = generateProfileName();
     
-    await loginAs(page, 'super_admin');
     await page.goto(`${BASE_URL}/integrations/irc-profiles`);
-
     await page.click('[data-testid="create-profile-btn"]');
     await page.fill('[data-testid="profile-name-input"]', profileName);
     await page.fill('[data-testid="server-input"]', 'test.irc.local');
@@ -219,11 +325,8 @@ test.describe('INT-010: IRC Profile Management', () => {
     // Wait for profile to appear
     await page.waitForSelector(`text=${profileName}`, { timeout: 10000 });
 
-    // Logout
-    await page.click('[data-testid="logout-btn"]');
-    await page.waitForURL(`${BASE_URL}/login`);
-
-    // Login as admin
+    // Logout and login as Admin
+    await logout(page);
     await loginAs(page, 'admin');
     await page.goto(`${BASE_URL}/integrations/irc-profiles`);
 
@@ -252,24 +355,22 @@ test.describe('INT-010: IRC Profile Management', () => {
     await expect(
       profileCard.locator('[data-testid^="delete-btn-"]')
     ).not.toBeVisible();
-    
-    // Cleanup after test
-    await cleanupTestProfiles(page);
   });
 
   /**
-   * Test: Manager can view but no actions
+   * Test: Manager can view profiles (read-only)
+   * 
+   * Strategy:
+   * - Create a profile as Super Admin (we're already logged in from beforeEach)
+   * - Logout and login as Manager
+   * - Verify Manager can see profiles but no action buttons
+   * - afterEach will clean up the created profile
    */
   test('Manager: can view profiles (read-only)', async ({ page }) => {
-    // Cleanup before test (fail-safe isolation)
-    await cleanupTestProfiles(page);
-    
-    // Setup: Create profile as super admin
+    // Setup: Create profile as Super Admin (we're already logged in from beforeEach)
     const profileName = generateProfileName();
     
-    await loginAs(page, 'super_admin');
     await page.goto(`${BASE_URL}/integrations/irc-profiles`);
-
     await page.click('[data-testid="create-profile-btn"]');
     await page.fill('[data-testid="profile-name-input"]', profileName);
     await page.fill('[data-testid="server-input"]', 'test.irc.local');
@@ -281,11 +382,8 @@ test.describe('INT-010: IRC Profile Management', () => {
     // Wait for profile to appear
     await page.waitForSelector(`text=${profileName}`, { timeout: 10000 });
 
-    // Logout
-    await page.click('[data-testid="logout-btn"]');
-    await page.waitForURL(`${BASE_URL}/login`);
-
-    // Login as manager
+    // Logout and login as Manager
+    await logout(page);
     await loginAs(page, 'manager');
     await page.goto(`${BASE_URL}/integrations/irc-profiles`);
 
@@ -299,9 +397,6 @@ test.describe('INT-010: IRC Profile Management', () => {
     await expect(
       page.locator('[data-testid="create-profile-btn"]')
     ).not.toBeVisible();
-    
-    // Cleanup after test
-    await cleanupTestProfiles(page);
   });
 
   /**
@@ -321,13 +416,16 @@ test.describe('INT-010: IRC Profile Management', () => {
   });
 
   /**
-   * Test: Delete active profile fails with 409
+   * Test: Cannot delete active profile
+   * 
+   * Verifies that:
+   * - Creating and activating a profile works
+   * - Delete button becomes disabled when profile is active
+   * - Disabling the profile re-enables the delete button
+   * - Test teardown (afterEach) disables the profile first, then deletes it
    */
   test('Super Admin: cannot delete active profile', async ({ page }) => {
-    // Cleanup before test (fail-safe isolation)
-    await cleanupTestProfiles(page);
-    
-    await loginAs(page, 'super_admin');
+    // We're already logged in as Super Admin from beforeEach
     await page.goto(`${BASE_URL}/integrations/irc-profiles`);
 
     // Create and activate a profile
@@ -368,8 +466,5 @@ test.describe('INT-010: IRC Profile Management', () => {
     // Should have a title/aria-label indicating why it's disabled
     const title = await deleteBtn.getAttribute('title');
     expect(title || 'Disable before deleting').toContain('Disable');
-    
-    // Cleanup after test
-    await cleanupTestProfiles(page);
   });
 });
