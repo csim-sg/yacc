@@ -43,6 +43,13 @@
       "when": 1771554110956,
       "tag": "0005_add_irc_profile_to_conversations",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771554336432,
+      "tag": "0006_add_dlq_tracing_fields",
+      "breakpoints": true
     }
   ]
 }

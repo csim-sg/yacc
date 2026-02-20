@@ -500,4 +500,178 @@ describe('IRC Ingestion Service', () => {
       expect(result.conversationId).toBeUndefined();
     });
   });
+
+  describe('Profile-Scoped Conversation Mapping (INT-011)', () => {
+    it('should create profile-scoped conversations with different profileIds', async () => {
+      const channel = `${testChannelPrefix}-profile-scoped`;
+      const dto1: InboundIRCMessageDTO = {
+        channel,
+        nick: 'alice',
+        message: 'From profile 1',
+        connectorNick: 'bot',
+        ircProfileId: 1,
+      };
+
+      const result1 = await service.ingestInboundMessage(dto1);
+      expect(result1.success).toBe(true);
+      if (result1.conversationId) {
+        createdConversationIds.push(result1.conversationId);
+      }
+
+      const dto2: InboundIRCMessageDTO = {
+        channel,
+        nick: 'bob',
+        message: 'From profile 2',
+        connectorNick: 'bot',
+        ircProfileId: 2,
+      };
+
+      const result2 = await service.ingestInboundMessage(dto2);
+      expect(result2.success).toBe(true);
+      if (result2.conversationId) {
+        createdConversationIds.push(result2.conversationId);
+      }
+
+      // Should create DIFFERENT conversations for different profiles
+      expect(result1.conversationId).not.toBe(result2.conversationId);
+
+      // Verify both conversations exist
+      const convo1 = await dbClient
+        .select()
+        .from(conversations)
+        .where(eq(conversations.id, result1.conversationId!));
+      const convo2 = await dbClient
+        .select()
+        .from(conversations)
+        .where(eq(conversations.id, result2.conversationId!));
+
+      expect(convo1).toHaveLength(1);
+      expect(convo2).toHaveLength(1);
+      expect(convo1[0].ircProfileId).toBe(1);
+      expect(convo2[0].ircProfileId).toBe(2);
+    });
+
+    it('should reuse conversation when same profile sends to same channel', async () => {
+      const channel = `${testChannelPrefix}-profile-reuse`;
+      const profileId = 5;
+
+      const dto1: InboundIRCMessageDTO = {
+        channel,
+        nick: 'alice',
+        message: 'Message 1',
+        connectorNick: 'bot',
+        ircProfileId: profileId,
+      };
+
+      const result1 = await service.ingestInboundMessage(dto1);
+      expect(result1.success).toBe(true);
+      if (result1.conversationId) {
+        createdConversationIds.push(result1.conversationId);
+      }
+
+      const dto2: InboundIRCMessageDTO = {
+        channel,
+        nick: 'bob',
+        message: 'Message 2',
+        connectorNick: 'bot',
+        ircProfileId: profileId,
+      };
+
+      const result2 = await service.ingestInboundMessage(dto2);
+      expect(result2.success).toBe(true);
+
+      // Same profile + channel = same conversation
+      expect(result1.conversationId).toBe(result2.conversationId);
+
+      // Verify two messages in one conversation
+      const msgs = await dbClient
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, result1.conversationId!));
+
+      expect(msgs).toHaveLength(2);
+    });
+
+    it('should accept messages without profileId (backward compatibility)', async () => {
+      const channel = `${testChannelPrefix}-no-profile`;
+      const dto: InboundIRCMessageDTO = {
+        channel,
+        nick: 'alice',
+        message: 'No profile ID',
+        connectorNick: 'bot',
+        // Note: no ircProfileId
+      };
+
+      const result = await service.ingestInboundMessage(dto);
+      expect(result.success).toBe(true);
+      if (result.conversationId) {
+        createdConversationIds.push(result.conversationId);
+      }
+
+      const convo = await dbClient
+        .select()
+        .from(conversations)
+        .where(eq(conversations.id, result.conversationId!));
+
+      expect(convo).toHaveLength(1);
+      // ircProfileId should be null for non-profile conversations
+      expect(convo[0].ircProfileId).toBeNull();
+    });
+
+    it('should isolate conversations from different profiles with same channel', async () => {
+      const channel = `${testChannelPrefix}-isolation`;
+
+      // Profile 1 messages
+      const dto1a: InboundIRCMessageDTO = {
+        channel,
+        nick: 'alice',
+        message: 'Profile 1 - Message 1',
+        connectorNick: 'bot',
+        ircProfileId: 1,
+      };
+      const result1a = await service.ingestInboundMessage(dto1a);
+      if (result1a.conversationId) {
+        createdConversationIds.push(result1a.conversationId);
+      }
+
+      const dto1b: InboundIRCMessageDTO = {
+        channel,
+        nick: 'alice',
+        message: 'Profile 1 - Message 2',
+        connectorNick: 'bot',
+        ircProfileId: 1,
+      };
+      const result1b = await service.ingestInboundMessage(dto1b);
+
+      // Profile 2 messages
+      const dto2a: InboundIRCMessageDTO = {
+        channel,
+        nick: 'alice',
+        message: 'Profile 2 - Message 1',
+        connectorNick: 'bot',
+        ircProfileId: 2,
+      };
+      const result2a = await service.ingestInboundMessage(dto2a);
+      if (result2a.conversationId) {
+        createdConversationIds.push(result2a.conversationId);
+      }
+
+      // Verify isolation
+      expect(result1a.conversationId).toBe(result1b.conversationId); // Same profile + channel
+      expect(result1a.conversationId).not.toBe(result2a.conversationId); // Different profiles
+
+      // Count messages per conversation
+      const msgs1 = await dbClient
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, result1a.conversationId!));
+      const msgs2 = await dbClient
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, result2a.conversationId!));
+
+      expect(msgs1).toHaveLength(2); // Profile 1 has 2 messages
+      expect(msgs2).toHaveLength(1); // Profile 2 has 1 message
+    });
+  });
 });
