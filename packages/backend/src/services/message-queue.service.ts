@@ -3,17 +3,18 @@ import { Queue, Worker } from 'bullmq';
 import { logger } from '../infrastructure/logger';
 import { getRedisClient } from '../infrastructure/redis.client';
 import type {
-  SendMessageJobPayload,
-  QueueStatistics,
   DLQEntry,
   JobCompletionResult,
-  JobRetryMetadata} from '../types/message-queue.types';
+  JobRetryMetadata,
+  QueueStatistics,
+  SendMessageJobPayload,
+} from '../types/message-queue.types';
 import {
-  SendMessageJobPayloadSchema,
-  RETRY_CONFIG,
-  QUEUE_NAMES,
   DLQEntrySchema,
   FailureReason,
+  QUEUE_NAMES,
+  RETRY_CONFIG,
+  SendMessageJobPayloadSchema,
 } from '../types/message-queue.types';
 import { queueDatabaseIntegration } from './queue-database-integration';
 
@@ -280,16 +281,21 @@ class MessageQueueService {
           conversationId: job.data.conversationId,
           attempts: job.attemptsMade,
           error: error.message,
+          correlationId: job.data.correlationId,
         },
         'Message moved to dead-letter queue'
       );
 
-      // Record in database that message is in DLQ
+      // Record in database that message is in DLQ (with traceability context)
       await queueDatabaseIntegration.recordMessageInDLQ(
         job.data,
         FailureReason.MAX_RETRIES_EXCEEDED,
         job.attemptsMade || RETRY_CONFIG.MAX_ATTEMPTS,
-        error.message
+        error.message,
+        {
+          jobId: job.id,
+          correlationId: job.data.correlationId,
+        }
       );
 
       // TODO: Emit via websocket gateway when available

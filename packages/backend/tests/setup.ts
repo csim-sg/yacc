@@ -21,26 +21,20 @@ process.env.APP_FRONTEND_URL = 'http://localhost:3000';
 process.env.RESET_PASSWORD_URL = 'http://localhost:3000/reset-password';
 process.env.NODE_ENV = 'test';
 
-// Suppress console logs during tests (can override with --verbose flag)
-if (process.env.DEBUG !== 'true') {
-  // Keep console for critical errors/warnings
-  const originalLog = console.log;
-  const originalInfo = console.info;
-  const originalDebug = console.debug;
-
-  // Only show console output for errors and warnings
-  console.log = (...args: any[]) => {
-    // Suppress non-critical logs
+// Optional: Suppress console logs during tests (opt-in via SUPPRESS_LOGS=true)
+if (process.env.SUPPRESS_LOGS === 'true') {
+  // Only suppress non-critical logs when explicitly requested
+  const noop = () => {
+    // No-op function
   };
 
-  console.info = (...args: any[]) => {
-    // Suppress info logs
-  };
+  // eslint-disable-next-line no-console
+  console.log = noop;
+  // eslint-disable-next-line no-console
+  console.info = noop;
+  // eslint-disable-next-line no-console
+  console.debug = noop;
 
-  console.debug = (...args: any[]) => {
-    // Suppress debug logs
-  };
-
-  // Keep error and warning output
-  // console.error and console.warn are not overridden
+  // Keep error and warning output always visible
+  // console.error and console.warn are intentionally not overridden
 }

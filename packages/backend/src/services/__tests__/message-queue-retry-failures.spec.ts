@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SendMessageJobPayload } from '../../types/message-queue.types';
 import { connectorManager } from '../connector-manager';
 import { queueDatabaseIntegration } from '../queue-database-integration';
@@ -20,6 +20,7 @@ import { queueDatabaseIntegration } from '../queue-database-integration';
  */
 
 describe('Message Queue - Retry Logic with Mock Failures', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockConnector: any;
   const basePayload: SendMessageJobPayload = {
     messageId: '550e8400-e29b-41d4-a716-446655440001',
@@ -234,7 +235,7 @@ describe('Message Queue - Retry Logic with Mock Failures', () => {
     for (const reason of failureReasons) {
       await queueDatabaseIntegration.recordMessageInDLQ(
         { ...payload, messageId: `msg-${reason}` },
-        reason as any,
+        reason,
         3,
         `Failed with reason: ${reason}`
       );

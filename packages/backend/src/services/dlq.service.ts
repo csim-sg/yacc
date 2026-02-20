@@ -5,11 +5,11 @@
  * Provides operations for viewing, re-queueing, and cleanup
  */
 
-import { eq, desc, and, gte, lte, count, sql } from 'drizzle-orm';
+import { eq, desc, and, lte, count } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client.js';
 import { logger } from '../infrastructure/logger.js';
 import { deadLetterQueue } from '../schemas/deadLetterQueue.schema.js';
-import type { DeadLetterQueueEntry, DeadLetterQueueInsert } from '../schemas/deadLetterQueue.schema.js';
+import type { DeadLetterQueueEntry } from '../schemas/deadLetterQueue.schema.js';
 import type { SendMessageJobPayload } from '../types/message-queue.types.js';
 
 interface DLQQueryOptions {
@@ -30,41 +30,73 @@ interface DLQStatistics {
  */
 export class DLQService {
   /**
-   * Move a failed message to the Dead Letter Queue
-   *
-   * Called after 3 failed retry attempts
-   * Populates tracing fields for debugging and audit:
-   * - correlationId: end-to-end request tracing
-   * - ircProfileId: for IRC-specific DLQ queries
-   * - externalThreadType: platform-specific thread type (channel vs DM)
-   * - externalThreadId: the target thread identifier
-   */
+    * Move a failed message to the Dead Letter Queue
+    *
+    * Called after 3 failed retry attempts
+    * Populates tracing fields for debugging and audit:
+    * - correlationId: end-to-end request tracing
+    * - ircProfileId: for IRC-specific DLQ queries
+    * - externalThreadType: platform-specific thread type (channel vs DM)
+    * - externalThreadId: the target thread identifier
+    *
+    * @param messageId - UUID of message (from messages.id, required for FK)
+    * @param conversationId - UUID of conversation
+    * @param payload - Original message job payload
+    * @param failureReason - Reason for failure
+    * @param lastError - Error message from last attempt
+    * @param traceContext - Traceability context (correlationId, ircProfileId, externalThreadType, externalThreadId)
+    */
   async moveToDLQ(
     messageId: string,
     conversationId: string,
     payload: SendMessageJobPayload,
     failureReason: string,
-    lastError: string
+    lastError: string,
+    traceContext?: {
+      correlationId?: string;
+      ircProfileId?: string;
+      externalThreadType?: string;
+      externalThreadId?: string;
+      jobId?: string;
+    }
   ): Promise<DeadLetterQueueEntry> {
     try {
+      // Validate messageId is a UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(messageId)) {
+        throw new Error(
+          `Invalid messageId: "${messageId}". DLQ entries must use message.id (UUID FK), not job IDs. ` +
+          `Store external IDs in metadata.`
+        );
+      }
+
       // Calculate expiration date (7 days from now)
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
-      // Extract tracing fields from payload
-      const correlationId = payload.correlationId || messageId; // Fallback to messageId if no correlation ID
-      const ircProfileId = payload.platformType === 'irc' && payload.metadata?.ircProfileId
-        ? Number(payload.metadata.ircProfileId)
-        : null;
-      const externalThreadId = payload.recipientId;
-      // Determine thread type based on recipient format:
+      // Extract tracing fields from payload or traceContext
+      const correlationId = traceContext?.correlationId || payload.correlationId || messageId;
+      const ircProfileId = traceContext?.ircProfileId
+        ? Number(traceContext.ircProfileId)
+        : payload.platformType === 'irc' && payload.metadata?.ircProfileId
+          ? Number(payload.metadata.ircProfileId)
+          : null;
+      const externalThreadId = traceContext?.externalThreadId || payload.recipientId;
+      // Determine thread type based on recipient format or use explicit type:
       // IRC channels start with # or &, DMs are usernames
-      const externalThreadType =
+      const externalThreadType = traceContext?.externalThreadType || (
         payload.platformType === 'irc'
           ? externalThreadId?.startsWith('#') || externalThreadId?.startsWith('&')
             ? 'channel'
             : 'dm'
-          : 'unknown';
+          : 'unknown'
+      );
+
+      // Build metadata with external/job IDs
+      const metadata = {
+        ...(payload.metadata || {}),
+        ...(traceContext?.jobId && { jobId: traceContext.jobId }),
+      };
 
       const entry = await dbClient
         .insert(deadLetterQueue)
@@ -81,6 +113,8 @@ export class DLQService {
           ircProfileId,
           externalThreadType,
           externalThreadId,
+          // Metadata stores additional context
+          metadata: Object.keys(metadata).length > 0 ? metadata : null,
         })
         .returning();
 
@@ -90,11 +124,11 @@ export class DLQService {
           conversationId,
           failureReason,
           totalAttempts: payload.retryCount || 3,
-          expiresAt,
           correlationId,
           ircProfileId,
           externalThreadType,
           externalThreadId,
+          expiresAt,
         },
         'Message moved to Dead Letter Queue (INT-012: tracing fields populated)'
       );

@@ -81,7 +81,8 @@ export const deadLetterQueue = pgTable(
     retriedAt: timestamp('retried_at'),
     retriedBy: uuid('retried_by'), // User who retried
     
-    // Metadata
+    // Metadata: stores external/job IDs and other context
+    // Example: { jobId: "msg-...", externalMessageId: "...", platform: "telegram" }
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),

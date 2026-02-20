@@ -13,7 +13,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 ---
 
 ## Current Delivery Status
-- Phase 1: ⏳ In Progress
+- Phase 1: ⏳ In Progress (IRC integration + DLQ contract hardening)
 - Phase 2: ✅ Completed (collaboration + rules merged)
 - QA: ⏳ Not Started
 
@@ -37,11 +37,21 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **INT-013** (Unit Tests ≥90%) | 🔄 **IN PROGRESS** (Feb 20, 2026) | INT-011,012 | Add 15+ unit tests for profile-scoped mapping, error handling, correlation ID logging |
 | **INT-014** (Integration Tests & FE) | 🔄 **IN PROGRESS** (Feb 20, 2026) | INT-011,013 | E2E integration tests (mock IRC server) + frontend IRC sidebar component with profile accordion grouping |
 
+## Recent Merges
+- **PR #272** (Feb 20, 2026): DLQ UUID contract enforcement + traceability fields + RBAC hardening (fixes #270)
+
 ### Test Results (INT-001)
 - **28/28 tests passing** (100% pass rate)
 - **100% type safety** (no `any` types)
 - **Security hardening** (CRLF injection prevention, message length limits)
 - **EA approved** ✅
+
+### DLQ Contract & RBAC Hardening (Phase 1.5)
+| Task | Status | PR | Notes |
+|------|--------|----|----|
+| **DLQ UUID Contract + Traceability + RBAC** | ⏳ **IN PROGRESS** (PR #272) | #272 | UUID FK enforcement, traceability fields (correlationId, ircProfileId, externalThreadId), RBAC policy (manager=read-only, admin=mutate, super_admin=delete), GOV-028 governance decision |
+| Test Coverage | ⏳ In Progress | #272 | UUID contract tests ≥85%, RBAC tests ≥85% |
+| Governance Documentation | ⏳ In Progress | #272 | GOV-028 created, API docs updated, implementation guide updated |
 
 ## Pending: Test & Lint Stabilization (PR #274 Follow-Up)
 
