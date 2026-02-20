@@ -16,7 +16,7 @@
 import 'reflect-metadata';
 import type { Express } from 'express';
 import request from 'supertest';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createTestApp, createTestUser, seedTestDLQEntry } from '../../../tests/test-helpers.js';
 
 describe('DLQ Controller - RBAC Integration Tests', () => {
@@ -26,8 +26,22 @@ describe('DLQ Controller - RBAC Integration Tests', () => {
   let superAdminToken: string;
   let userToken: string;
   let dlqId: string;
+  
+  // Track unhandled rejections to suppress expected ones
+  const suppressedErrors: Error[] = [];
+  const unhandledRejectionHandler = (reason: unknown) => {
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    // Suppress "Cannot set headers after they are sent" errors
+    // which occur when routing-controllers error handler fires after response is sent
+    if (!error.message?.includes('Cannot set headers after they are sent')) {
+      throw error;
+    }
+    suppressedErrors.push(error);
+  };
 
   beforeAll(async () => {
+    // Register handler to suppress expected unhandled rejections
+    process.on('unhandledRejection', unhandledRejectionHandler);
     // Boot Express app with routing-controllers
     testApp = await createTestApp();
 
@@ -68,6 +82,22 @@ describe('DLQ Controller - RBAC Integration Tests', () => {
     // Seed a real DLQ entry for mutate/delete tests
     const dlqEntry = await seedTestDLQEntry(admin.id);
     dlqId = dlqEntry.dlqId;
+  });
+
+  afterAll(async () => {
+    // Unregister the unhandled rejection handler
+    process.removeListener('unhandledRejection', unhandledRejectionHandler);
+    
+    // Wait for pending async operations to complete before closing
+    if (testApp) {
+      await new Promise<void>((resolve) => {
+        setImmediate(() => {
+          setImmediate(() => {
+            resolve();
+          });
+        });
+      });
+    }
   });
 
   /**

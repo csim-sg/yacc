@@ -1,19 +1,22 @@
-import { Queue, Worker, Job } from 'bullmq';
-import { getRedisClient } from '../infrastructure/redis.client';
+import type { Job } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import { logger } from '../infrastructure/logger';
-import { queueDatabaseIntegration } from './queue-database-integration';
-import {
-  SendMessageJobPayload,
-  SendMessageJobPayloadSchema,
-  RETRY_CONFIG,
-  QUEUE_NAMES,
-  QueueStatistics,
+import { getRedisClient } from '../infrastructure/redis.client';
+import type {
   DLQEntry,
-  DLQEntrySchema,
   JobCompletionResult,
   JobRetryMetadata,
-  FailureReason,
+  QueueStatistics,
+  SendMessageJobPayload,
 } from '../types/message-queue.types';
+import {
+  DLQEntrySchema,
+  FailureReason,
+  QUEUE_NAMES,
+  RETRY_CONFIG,
+  SendMessageJobPayloadSchema,
+} from '../types/message-queue.types';
+import { queueDatabaseIntegration } from './queueDatabaseIntegration';
 
 /**
  * Message Queue Service

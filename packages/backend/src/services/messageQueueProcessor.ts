@@ -1,10 +1,11 @@
-import { Job } from 'bullmq';
-import { logger } from '../infrastructure/logger';
-import { SendMessageJobPayload } from '../types/message-queue.types';
-import { queueDatabaseIntegration } from './queue-database-integration';
-import type { BaseConnector } from '../connectors/base/baseConnector';
 import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
 import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse.interface';
+import type { Job } from 'bullmq';
+
+import { logger } from '../infrastructure/logger';
+import type { BaseConnector } from '../connectors/base/baseConnector';
+import type { SendMessageJobPayload } from '../types/message-queue.types';
+import { queueDatabaseIntegration } from './queueDatabaseIntegration';
 
 /**
  * Message Queue Processor
