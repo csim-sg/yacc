@@ -1,7 +1,7 @@
-import type { SendMessageJobPayload } from '../types/message-queue.types';
 import { logger } from '../infrastructure/logger';
 import { wsGateway } from '../websockets/gateway';
 import { QueueEvents } from '../websockets/wsConstants';
+import type { SendMessageJobPayload } from '../types/message-queue.types';
 
 /**
  * Queue Database Integration
