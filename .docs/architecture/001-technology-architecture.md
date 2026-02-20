@@ -33,16 +33,21 @@ Define the approved technology stack, runtime environments, deployment model, an
 ## Deployment Architecture (MVP)
 ### Targets
 - Frontend: AWS S3 + CloudFront
-- Backend: Docker on a single VPS instance
+- Backend: K3s (Kubernetes) cluster
+
+### Delivery / CI/CD
+- Deployment target: K3s
+- Installer: Helm (application charts + dependencies)
+- Reference: ADR-019
 
 ### Mermaid – High-Level Deployment
 ```mermaid
 flowchart LR
   U[Users] --> CF[CloudFront]
   CF --> S3[S3 Static Frontend]
-  U --> API[Backend API - VPS Docker]
-  API --> PG[(PostgreSQL)]
-  API --> R[(Redis)]
+  U --> API[Backend API - K3s]
+  API --> PG[(PostgreSQL - Helm)]
+  API --> R[(Redis - Helm)]
   API --> R2[(Cloudflare R2)]
 ```
 
@@ -58,3 +63,4 @@ flowchart LR
 ## References
 - ADR-004 logging strategy: `.docs/adr/ADR-004-logging-strategy.md`
 - ADR-005 config/infrastructure pattern: `.docs/adr/ADR-005-infrastructure-config-pattern.md`
+- ADR-019 K3s + Helm CI/CD target: `.docs/adr/ADR-019-k3s-helm-cicd-deployment.md`

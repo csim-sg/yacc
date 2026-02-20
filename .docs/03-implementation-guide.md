@@ -113,10 +113,10 @@ After message stored:
 | **Message Queue** | Redis + BullMQ | Outbound message retry queue |
 | **File Storage** | Cloudflare R2 | Raw payloads, attachments, re-hosted files |
 | **Email** | Nodemailer / SendGrid | Password reset emails |
-| **Hosting** | VPS (single-tenant MVP) | Node API + SPA on S3/Cloudflare |
+| **Hosting** | K3s + Helm (single-tenant MVP) | Backend runs on K3s; deploy via Helm; dependencies via Helm |
 | **Testing** | Playwright | E2E testing |
 | **Testing** | Vitest | Unit & integration tests (native ESM, 18.8% faster) |
-| **Package Manager** | pnpm | Monorepo management with workspaces |
+| **Package Manager** | pnpm | Monorepo management with workspaces (Bun migration tracked separately) |
 
 ---
 
@@ -778,8 +778,8 @@ Push to main
 GitHub Actions: backend-deploy.yml
   ├── Build Docker image (multi-stage)
   ├── Push to Docker registry
-  ├── SSH to VPS
-  ├── Pull image + restart container
+  ├── Helm upgrade --install (to K3s)
+  ├── Rollout status check
   ↓
 API live at https://api.example.com
 ```

@@ -13,6 +13,14 @@ See [01-product-specification.md](./01-product-specification.md) for full scope 
 
 ---
 
+## Deployment & CI/CD
+
+- Target runtime: K3s (Kubernetes)
+- Installer: Helm (app charts + dependencies like PostgreSQL/Redis)
+- Architecture decision: `.docs/adr/ADR-019-k3s-helm-cicd-deployment.md`
+
+---
+
 ## Package Manager: pnpm
 
 YACC uses **pnpm** for monorepo management. 
