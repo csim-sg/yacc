@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
-import type { Client as _IRCClient } from 'irc-framework';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { Client as _IRCClient } from 'irc-framework';
 // Mock the logger
 vi.mock('../../infrastructure/logger', () => ({
   logger: {
@@ -31,6 +31,7 @@ vi.mock('irc-framework', () => {
     constructor() {
       super();
       // Store reference for test access
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
       lastCreatedClient = this;
     }
 
@@ -45,19 +46,19 @@ vi.mock('irc-framework', () => {
       this.emit('close');
     }
 
-    quit(message?: string): void {
+    quit(_message?: string): void {
       this.emit('close');
     }
 
-    raw(command: string): void {
+    raw(_command: string): void {
       // PRIVMSG implementation
     }
 
-    join(channel: string): void {
+    join(_channel: string): void {
       // Join channel
     }
 
-    say(target: string, message: string): void {
+    say(_target: string, _message: string): void {
       // Say message
     }
   }
@@ -68,9 +69,10 @@ vi.mock('irc-framework', () => {
   };
 });
 
-import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
+// eslint-disable-next-line import/order
 import { logger } from '../../infrastructure/logger';
 import { IRCConnector } from '../irc.connector';
+import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
 
 describe('IRCConnector', () => {
   let connector: IRCConnector;
@@ -402,7 +404,7 @@ describe('IRCConnector', () => {
            // Observable: status changes to 'connected' and reconnect attempt count is zero
            
            // Attempt connection (async operation)
-           const connectPromise = connector.connect();
+           const _connectPromise = connector.connect();
            
            // Allow async chain to set up handlers
            await vi.advanceTimersByTimeAsync(50);
@@ -455,7 +457,7 @@ describe('IRCConnector', () => {
            // Observable: status.status transitions from 'connected' to 'disconnected'
            
            // First connect successfully
-           const connectPromise = connector.connect();
+           const _connectPromise = connector.connect();
            await vi.advanceTimersByTimeAsync(50);
            emitClientEvent('registered');
            await vi.advanceTimersByTimeAsync(50);
@@ -476,7 +478,7 @@ describe('IRCConnector', () => {
            // Scenario: Error during handshake → reconnect scheduled
            // Observable: logger logs scheduling event with delayMs, attempt, correlationId, reconnectIncidentId
            
-           const connectPromise = connector.connect().catch(() => {
+           const _connectPromise = connector.connect().catch(() => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
@@ -500,7 +502,7 @@ describe('IRCConnector', () => {
            // Observable: First status is 'connected', then reconnect is scheduled
            
            // Connect successfully
-           const connectPromise = connector.connect();
+           const _connectPromise = connector.connect();
            await vi.advanceTimersByTimeAsync(50);
            emitClientEvent('registered');
            await vi.advanceTimersByTimeAsync(50);
@@ -526,7 +528,7 @@ describe('IRCConnector', () => {
               // Observable: Timer behavior shows reconnect respects the exact delay
               // GATE B REQ 1a: Verify timer fires at 1000ms and not before (at 999ms)
              
-              const connectPromise = connector.connect().catch(() => {
+              const _connectPromise = connector.connect().catch(() => {
                 // Expected failure, catch it
               });
               await vi.advanceTimersByTimeAsync(50);
@@ -579,7 +581,7 @@ describe('IRCConnector', () => {
            // Scenario: Schedule reconnect with 1s delay, verify attempt AFTER 1s
            // Observable: logger "Attempting to connect" is called after delay
            
-           const connectPromise = connector.connect().catch(() => {
+           const _connectPromise = connector.connect().catch(() => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
@@ -607,7 +609,7 @@ describe('IRCConnector', () => {
             for (let attempt = 0; attempt < 5; attempt++) {
               // Connect with fresh connector state for each attempt
               if (attempt === 0) {
-                const connectPromise = connector.connect().catch(() => {
+                const _connectPromise = connector.connect().catch(() => {
                   // Expected failure, catch it
                 });
                 await vi.advanceTimersByTimeAsync(50);
@@ -651,7 +653,7 @@ describe('IRCConnector', () => {
            // Scenario: Rapid failures should not schedule multiple timers
            // Observable: scheduleReconnect is idempotent (second call ignored if timer already scheduled)
            
-           const connectPromise = connector.connect().catch(() => {
+           const _connectPromise = connector.connect().catch(() => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
@@ -681,7 +683,7 @@ describe('IRCConnector', () => {
            // Observable: After success, disconnecting again schedules with delayMs=1000
            
            // First successful connection
-           const connectPromise = connector.connect();
+           const _connectPromise = connector.connect();
            await vi.advanceTimersByTimeAsync(50);
            emitClientEvent('registered');
            await vi.advanceTimersByTimeAsync(50);
@@ -720,7 +722,7 @@ describe('IRCConnector', () => {
              // GATE B REQ 3: Strict assertions on status, timer count, and scheduling idempotence
              
              // Trigger initial connection failure
-             const connectPromise = connector.connect().catch(() => {
+             const _connectPromise = connector.connect().catch(() => {
                // Expected failure, catch it
              });
              await vi.advanceTimersByTimeAsync(50);
@@ -806,7 +808,7 @@ describe('IRCConnector', () => {
            // Scenario: Schedule reconnect, then manually disconnect → timer cleared
            // Observable: status.status is 'disconnected', no reconnect attempt occurs after timer delay
            
-           const connectPromise = connector.connect().catch(() => {
+           const _connectPromise = connector.connect().catch(() => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
@@ -834,7 +836,7 @@ describe('IRCConnector', () => {
            // Scenario: Verify all reconnect logs include maxAttempts and delayMs constraints
            // Observable: scheduler logs have maxAttempts=5, delayMs in [1000..60000]
            
-           const connectPromise = connector.connect().catch(() => {
+           const _connectPromise = connector.connect().catch(() => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
@@ -866,7 +868,7 @@ describe('IRCConnector', () => {
            // Scenario: Verify scheduling logs contain both trace IDs for debugging
            // Observable: Both correlationId and reconnectIncidentId present and non-empty
            
-           const connectPromise = connector.connect().catch(() => {
+           const _connectPromise = connector.connect().catch(() => {
              // Expected failure, catch it
            });
            await vi.advanceTimersByTimeAsync(50);
@@ -971,7 +973,7 @@ describe('IRCConnector', () => {
       connector.setConfig(configWithProfile);
       
       // Start connection but don't wait for full handshake
-      const connectPromise = connector.connect();
+      const _connectPromise = connector.connect();
       
       // Emit registered event to complete handshake
       await new Promise(resolve => setImmediate(resolve));
@@ -991,7 +993,7 @@ describe('IRCConnector', () => {
     it('should generate unique correlationId for each connection attempt', async () => {
       connector.setConfig(mockConfig);
       
-      const connectPromise = connector.connect();
+      const _connectPromise = connector.connect();
       
       // Trigger error before handshake completes
       await new Promise(resolve => setImmediate(resolve));
@@ -1014,7 +1016,7 @@ describe('IRCConnector', () => {
     it('should log correlation ID with all error messages', async () => {
       connector.setConfig(mockConfig);
       
-      const connectPromise = connector.connect();
+      const _connectPromise = connector.connect();
       await new Promise(resolve => setImmediate(resolve));
       emitClientEvent('socket close');
       
@@ -1027,7 +1029,7 @@ describe('IRCConnector', () => {
     it('should handle connection errors with proper retry scheduling', async () => {
       connector.setConfig(mockConfig);
       
-      const connectPromise = connector.connect();
+      const _connectPromise = connector.connect();
       await new Promise(resolve => setImmediate(resolve));
       emitClientEvent('error', new Error('Connection refused'));
       
@@ -1049,7 +1051,7 @@ describe('IRCConnector', () => {
       
       // Simulate 5 failed connection attempts
       for (let i = 0; i < 5; i++) {
-        const connectPromise = connector.connect();
+        const _connectPromise = connector.connect();
         await new Promise(resolve => setImmediate(resolve));
         emitClientEvent('error', new Error(`Attempt ${i + 1} failed`));
         try {
