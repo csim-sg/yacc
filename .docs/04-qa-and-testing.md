@@ -28,20 +28,22 @@
 | **Performance** | Search, bulk ops | Custom scripts | Measure response times, throughput |
 | **Security** | Auth, RBAC, SQL injection | Manual + tools | Permission enforcement, input validation |
 
-### PR Gating: Required Checks (Interim Policy)
+### PR Gating: Recommended Checks (Interim Policy)
 
 **Status**: ✅ Implemented in PR #274 (GOV-029)
 
-**Backend CI now enforces three required checks** before PR merge to `dev`:
+**Backend CI now enforces three recommended checks** for PR review and merge to `dev`:
 
 | Check | Command | Required | Status | Notes |
 |-------|---------|----------|--------|-------|
-| **lint-changed** | `eslint <changed-files>` | ✅ YES | Required | New code must be lint-clean (no changed-files lint debt) |
-| **test-unit** | `pnpm test src/services/__tests__/irc-ingestion.service.test.ts` | ✅ YES | Required | Curated stable unit tests (IRC ingestion service) |
-| **test-smoke** | `pnpm test tests/QA-001-integration.spec.ts` | ✅ YES | Required | Integration test with Supertest against in-process backend + DB + Redis |
+| **lint-changed** | `eslint <changed-files>` | ✅ Recommended | Required | New code must be lint-clean (no changed-files lint debt) |
+| **test-unit** | `pnpm test src/services/__tests__/irc-ingestion.service.test.ts` | ✅ Recommended | Required | Curated stable unit tests (IRC ingestion service) |
+| **test-smoke** | `pnpm test tests/QA-001-integration.spec.ts` | ✅ Recommended | Required | Integration test with Supertest against in-process backend + DB + Redis |
 | **test-full** | `pnpm test` (all tests) | ⚠️ NO | Informational | May fail on baseline; shows as RED if failing (not masked); timeout 15m |
 
-**Rationale**: Dev baseline has test instability + lint debt. Required checks ensure new code quality while full suite provides signal for baseline issues.
+**Rationale**: Dev baseline has test instability + lint debt. Recommended checks ensure new code quality while full suite provides signal for baseline issues.
+
+**Branch Ruleset Status**: Branch protection rules do not enforce required status checks yet. See follow-up issue: "Configure branch protection required checks" to formalize enforcement on `dev` branch.
 
 **Exit Plan**: See GOV-029 (two conditions: lint cleanup + test stabilization)
 

@@ -147,20 +147,22 @@ Three test jobs replace the single `test` job:
     - Rationale: Provides endpoint integration coverage (real API gate, not just unit tests)
 
 3. **test-full** (INFORMATIONAL): Full backend test suite
-    - Runs: `pnpm --filter @yacc/backend test` (all tests)
-    - Does NOT block merge (no `continue-on-error`, but documented as informational)
-    - Timeout: 15 minutes (prevents hanging CI)
-    - Shows as RED/failing check if tests fail (not masked)
-    - Provides signal for test baseline issues
-    - Status clearly indicates informational purpose (not hidden as "pass")
+     - Runs: `pnpm --filter @yacc/backend test` (all tests)
+     - Does NOT block merge (marked informational in GOV-029)
+     - Timeout: 15 minutes (prevents hanging CI)
+     - Shows as RED/failing check if tests fail (intentional, not masked; documents baseline instability)
+     - Provides signal for test baseline issues
+     - Status is visible as failing when baseline has issues (intended behavior for awareness)
 
 **CI Status for PR #274:**
 ```
-✅ lint-changed           [REQUIRED] - Check 1
-✅ test-unit              [REQUIRED] - Check 2
-✅ test-smoke             [REQUIRED] - Check 3
-⚠️  test-full             [INFORMATIONAL] - Baseline signal
+✅ lint-changed           [RECOMMENDED] - Check 1 (required for code quality, not yet enforced by branch ruleset)
+✅ test-unit              [RECOMMENDED] - Check 2 (required for code quality, not yet enforced by branch ruleset)
+✅ test-smoke             [RECOMMENDED] - Check 3 (required for code quality, not yet enforced by branch ruleset)
+⚠️  test-full             [INFORMATIONAL] - Baseline signal (shows as RED if failing; not blocking)
 ```
+
+**Note**: Branch protection rules do not enforce these checks yet. See follow-up issue #275 "Configure branch protection required checks" for formal enforcement.
 
 ### Node.js Version
 
@@ -433,16 +435,18 @@ npx eslint <file1> <file2> <file3> \
 - [x] Upgrade Node 20.x in `lint.yml`, `tests.yml`, `backend-ci.yml`
 - [x] Add `test-unit` job (required): unit tests only
 - [x] Add `test-smoke` job (required): `tests/QA-001-integration.spec.ts`
-- [x] Convert `test` job to `test-full` (informational): `continue-on-error: true`, timeout 15m
+- [x] Add `test-full` job (informational): timeout 15m, always runs (if: always()), shows red status when tests fail
+- [x] Add explicit job `name` fields for stable check names: `lint-changed`, `test-unit`, `test-smoke`, `test-full`
 - [x] Revert unintended code/doc changes from PR
 - [x] Create GOV-029 (this document)
 
 ### Before Merge
-- [ ] Run PR #274 CI to verify all required checks pass
-  - ✅ `lint-changed` (required)
-  - ✅ `test-unit` (required)
-  - ✅ `test-smoke` (required)
-  - ⚠️ `test-full` (informational, may fail)
+- [ ] Run PR #274 CI to verify all recommended checks pass
+  - ✅ `lint-changed` (recommended for code quality)
+  - ✅ `test-unit` (recommended for code quality)
+  - ✅ `test-smoke` (recommended for code quality)
+  - ⚠️ `test-full` (informational, may fail on baseline)
+- [ ] Branch protection does not block merge if checks fail (see follow-up: "Configure branch protection required checks")
 - [ ] Document PR #274 URL in GOV-029
 
 ### After Merge to dev

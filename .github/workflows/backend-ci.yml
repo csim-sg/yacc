@@ -23,6 +23,7 @@ on:
 jobs:
   # Compute changed files in packages/backend for linting
   changed-files:
+    name: collect-changes
     runs-on: ubuntu-latest
     outputs:
       backend-files: ${{ steps.changed-backend.outputs.files }}
@@ -62,6 +63,7 @@ jobs:
 
   # Lint only changed backend files (skip if none changed)
   lint:
+    name: lint-changed
     needs: changed-files
     runs-on: ubuntu-latest
     strategy:
