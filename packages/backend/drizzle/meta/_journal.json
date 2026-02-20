@@ -50,6 +50,13 @@
       "when": 1771554336432,
       "tag": "0006_add_dlq_tracing_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1771555013558,
+      "tag": "0007_fix_conversation_uniqueness",
+      "breakpoints": true
     }
   ]
 }

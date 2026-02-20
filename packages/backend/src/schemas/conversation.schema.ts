@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   integer,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { users } from './user.schema';
 import { integrationConnectionProfiles } from './integrationConnectionProfile.schema';
 import { conversationStatusEnum } from '../enums/conversationStatus.enum';
@@ -59,13 +60,22 @@ export const conversations = pgTable(
   },
   (table) => [
     index('conversations_channel_idx').on(table.channel),
-    // Backward compat: (channel, externalThreadId) for Telegram
-    uniqueIndex('conversations_external_thread_idx').on(table.channel, table.externalThreadId),
-    // IRC-specific: (ircProfileId, externalThreadId) for profile-scoped channels
-    uniqueIndex('conversations_irc_profile_channel_idx').on(
-      table.ircProfileId,
-      table.externalThreadId
-    ),
+    /**
+     * IRC uniqueness: (channel='irc', ircProfileId, externalThreadId)
+     * Applied only when channel='irc' via WHERE clause
+     * Allows multiple profiles on same channel without conflict
+     */
+    uniqueIndex('conversations_irc_profile_channel_idx')
+      .on(table.channel, table.ircProfileId, table.externalThreadId)
+      .where(sql`${table.channel} = 'irc'`),
+    /**
+     * Non-IRC uniqueness: (channel, externalThreadId) for Telegram/others
+     * Applied only when channel != 'irc'
+     * Maintains backward compatibility with Telegram
+     */
+    uniqueIndex('conversations_external_thread_idx')
+      .on(table.channel, table.externalThreadId)
+      .where(sql`${table.channel} != 'irc'`),
     index('conversations_irc_profile_id_idx').on(table.ircProfileId),
     index('conversations_status_idx').on(table.status),
     index('conversations_assigned_user_id_idx').on(table.assignedUserId),
