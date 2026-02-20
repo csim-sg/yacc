@@ -265,7 +265,7 @@ messageRetryQueue.process(async (job) => {
 ```typescript
 // ✅ CORRECT: UUID messageId, external ID in metadata
 await dlqService.moveToDLQ(
-  'a1b2c3d4-e5f6-47g8-h9i0-j1k2l3m4n5o6',  // UUID FK
+  'a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6',  // UUID FK
   conversationId,
   payload,
   'api_error',

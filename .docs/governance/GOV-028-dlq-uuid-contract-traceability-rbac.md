@@ -1,8 +1,8 @@
 # GOV-028: DLQ UUID Contract, Traceability, and RBAC Policy
 
 **Date:** 2026-02-20  
-**Decision:** ✅ Approved (Architect: In Progress)  
-**Architect:** Enterprise/Solution Architect (Claude Code)  
+**Decision:** ⏳ Pending Architect Approval  
+**Architect:** Enterprise/Solution Architect (to be approved during PR review)  
 **Product Owner:** Product Owner ⏳  
 **Status:** Implementation in PR #272  
 **Impact Level:** Medium (DLQ critical ops functionality, adds 4 traceability fields)  
@@ -93,7 +93,7 @@ if (!messageId || !isValidUUID(messageId)) {
 interface DLQMetadata {
   jobId?: string;              // BullMQ job ID (e.g., "msg-payload-abc123")
   externalMessageId?: string;  // Platform-specific message ID (e.g., "tg-msg-xyz")
-  [key: string]: any;          // Other external tracking IDs
+  [key: string]: unknown;      // Other external tracking IDs
 }
 ```
 
@@ -101,7 +101,7 @@ interface DLQMetadata {
 ```typescript
 // When moving Telegram message to DLQ
 await dlqService.moveToDLQ(
-  'a1b2c3d4-e5f6-47g8-h9i0-j1k2l3m4n5o6',  // UUID FK to messages.id
+  'a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6',  // UUID FK to messages.id
   'conversation-uuid',
   payload,
   'api_error',
@@ -432,7 +432,7 @@ Dead Letter Queue (DLQ)
 ```typescript
 // messageId is UUID
 const dlqEntry = await dlqService.moveToDLQ(
-  'a1b2c3d4-e5f6-47g8-h9i0-j1k2l3m4n5o6',  // UUID, FK to messages.id
+  'a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6',  // UUID, FK to messages.id
   conversationId,
   payload,
   'api_error',
