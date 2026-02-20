@@ -5,9 +5,8 @@
  * Follows ADR-005: Infrastructure folder for client initialization
  */
 
-import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-
+import { Pool } from 'pg';
 import { appConfig } from '../config/appConfig';
 import { schemas } from '../schemas';
 
