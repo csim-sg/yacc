@@ -39,7 +39,7 @@ REST API (INT-006 to INT-009)
     └─ GET /api/integrations/irc/status (INT-009)
 
 Infrastructure
-    ├─ Environment Variables (INT-010)
+    ├─ DB Connection Profiles (INT-010)
     ├─ Error Handling & DLQ (INT-012)
     ├─ Unit Tests (INT-013)
     └─ Integration Tests (INT-014)
