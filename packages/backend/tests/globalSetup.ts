@@ -89,13 +89,47 @@ export async function setup() {
 
 /**
  * Global teardown function - runs once after all tests
+ * CRITICAL: Closes all open connections to prevent "close timed out" hangs
  */
 export async function teardown() {
   console.log('\n🧹 Global Teardown: Cleaning up...\n');
 
   try {
-    // For now, just log completion
-    console.log('✅ Test suite cleanup completed\n');
+    // Close database connection pool
+    try {
+      const { closeDatabase } = await import('../src/infrastructure/db.client.js');
+      await closeDatabase();
+      console.log('✅ Database connection pool closed');
+    } catch (dbError: unknown) {
+      const dbErrorMsg = dbError instanceof Error ? dbError.message : String(dbError);
+      console.warn(`⚠️ Database cleanup warning: ${dbErrorMsg}`);
+      // Continue to Redis cleanup even if DB cleanup fails
+    }
+
+    // Close Redis connection
+    try {
+      const { redisClient } = await import('../src/infrastructure/redis.client.js');
+      if (redisClient && typeof redisClient === 'object') {
+        // ioredis disconnect returns void or Promise<void> depending on version
+        const result = (redisClient as unknown as { disconnect(): unknown }).disconnect();
+        if (result instanceof Promise) {
+          await result;
+        }
+        console.log('✅ Redis connection closed');
+      }
+    } catch (redisError: unknown) {
+      const redisErrorMsg = redisError instanceof Error ? redisError.message : String(redisError);
+      console.warn(`⚠️ Redis cleanup warning: ${redisErrorMsg}`);
+      // Continue to completion even if Redis cleanup fails
+    }
+
+    // Give any pending timers time to settle, then exit cleanly
+    await new Promise<void>((resolve) => {
+      setTimeout(() => {
+        console.log('✅ Test suite cleanup completed\n');
+        resolve();
+      }, 100);
+    });
   } catch (error: unknown) {
     // Safely handle error without using 'any'
     const errorMessage = error instanceof Error ? error.message : String(error);
