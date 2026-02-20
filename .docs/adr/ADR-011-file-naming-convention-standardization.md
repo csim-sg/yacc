@@ -242,57 +242,85 @@ Update `eslint.config.js` to allow both camelCase and kebabCase (PR #273):
 
 **Updated Feb 2026 (PR #273):** Now allows both camelCase and kebabCase:
 
+**Root ESLint Config** (`eslint.config.js`):
 ```javascript
-// In eslint.config.js
+// Global rule: camelCase OR kebabCase allowed
 'unicorn/filename-case': [
   'error',
   {
     cases: {
-      camelCase: true,   // ✅ ENFORCED
-      kebabCase: true,   // ✅ ENFORCED (Feb 2026)
-      pascalCase: false, // ❌ NOT ALLOWED (except React components)
+      camelCase: true,   // ✅ ALLOWED
+      kebabCase: true,   // ✅ ALLOWED (Feb 2026 update)
+      pascalCase: false, // ❌ NOT ALLOWED
     },
     ignore: [
-      // Ignore specific patterns if needed (e.g., config files)
+      // Config files (standard exceptions)
       'vite.config.ts',
       'vitest.config.ts',
       'playwright.config.ts',
       'drizzle.config.ts',
+      'eslint.config.js',
+      'turbo.json',
+      // React root component
+      'App.tsx',
     ],
   },
 ],
 ```
 
-**Frontend Override (React Components):**
+**React Components/Pages/Contexts Override** (disables enforcement for PascalCase in these directories):
 ```javascript
-// Components, pages, contexts: PascalCase allowed
-// Other files: camelCase or kebabCase
+// Files matching these patterns disable unicorn/filename-case rule
+// allowing PascalCase per React conventions
+{
+  files: [
+    '**/components/**/*.{tsx,ts}',
+    '**/pages/**/*.{tsx,ts}',
+    '**/contexts/**/*.{tsx,ts}',
+  ],
+  rules: {
+    'unicorn/filename-case': 'off',  // ✅ PascalCase is ALLOWED here (documented convention)
+  },
+},
 ```
 
+**Interpretation:**
+- `unicorn/filename-case` is **DISABLED** (turned `off`) for `**/{components,pages,contexts}/**/*.{ts,tsx}`
+- This means PascalCase is **a documented convention** in these directories, not an enforced requirement
+- Outside these directories: camelCase and kebabCase are both accepted equally
+- Global rule (root config) requires either camelCase or kebabCase; PascalCase outside React dirs is flagged as violation
+
 ### CI/CD Integration
-- ESLint runs on all PRs (`pnpm lint`)
-- PRs with PascalCase filenames (outside React dirs) are blocked
-- Developers see clear error: `"File name should be in camelCase or kebabCase"`
-- Both camelCase and kebabCase are accepted; no error for either
 
-### What Is Enforced vs Convention
+**Current Status (Feb 2026):**
+- Backend CI checks depend on PR #274 (Backend CI workflow with changed-files lint gate)
+- Legacy `.github/workflows/lint.yml` and `.github/workflows/tests.yml` run only on `main`/`develop` branches (not on PRs)
+- **When PR #274 merges**: Backend PRs will lint only changed files (enforcing camelCase/kebabCase naming)
 
-**Enforced by ESLint:**
-- ✅ React components (.tsx in components/, pages/, contexts/): PascalCase REQUIRED
-- ✅ All other files: camelCase OR kebabCase ALLOWED (both accepted equally)
-- ❌ PascalCase outside React directories: BLOCKED
+**How It Works Once PR #274 Merges:**
+- ESLint runs on **changed files only** in backend PRs (not full baseline)
+- Files with camelCase or kebabCase names: ✅ PASS
+- Files with PascalCase names (outside React dirs): ❌ FAIL with error `"File name should be in camelCase or kebabCase"`
+- React components in `/components/`, `/pages/`, `/contexts/`: ✅ PASS with PascalCase (override is active)
 
-**Documented Convention (Not Enforced):**
-- React Hooks (.ts): Prefer camelCase with `use` prefix (e.g., `useMessages.ts`), but kebab-case passes lint
-- Backend Services/Middleware (.ts): Either camelCase or kebabCase acceptable; no preference enforced
-- Rationale: ESLint enforces only React conventions strictly; backend flexibility accommodates team preferences
+### What Is Enforced vs Convention (Feb 2026 Update)
+
+**Enforced by ESLint (global rule + override):**
+- ✅ React components (.tsx in `**/components/`, `**/pages/`, `**/contexts/`): **Convention documented, not strictly enforced** (override disables rule)
+- ✅ All other files: **camelCase OR kebabCase ALLOWED** (both accepted equally, no preference)
+- ❌ PascalCase outside React directories: **BLOCKED** (global rule flags as violation)
+
+**Documented Convention (Guidance, Not Enforced):**
+- React Hooks (.ts): Prefer camelCase with `use` prefix (e.g., `useMessages.ts`), but other naming passes linter
+- Backend Services/Middleware/Types (.ts): Either camelCase or kebabCase acceptable; no preference enforced by linter
+- **Rationale**: ESLint rule is disabled for React directories to allow PascalCase (convention-based), while backend allows both camelCase/kebabCase to match actual codebase patterns and minimize refactoring
 
 ### Code Review Checklist
-- [ ] All new files use camelCase OR kebabCase (both acceptable)
-- [ ] React components use PascalCase (components/, pages/, contexts/)
-- [ ] No PascalCase outside React directories
+- [ ] All new files use camelCase OR kebabCase (both acceptable per ESLint rule)
+- [ ] React components use PascalCase (components/, pages/, contexts/) - **convention documented, not enforced**
+- [ ] No PascalCase outside React directories (global rule enforces this)
 - [ ] Imports updated if renamed files affected
-- [ ] ESLint passes (`pnpm lint` has no filename-case violations)
+- [ ] ESLint passes on changed files (no filename-case violations on new code)
 
 ---
 
@@ -338,7 +366,8 @@ Update `eslint.config.js` to allow both camelCase and kebabCase (PR #273):
 | **Frontend Developer** | ✅ COMPLETED | Phase 3: 10 files kept as PascalCase, 3 utilities renamed to camelCase |
 | **Common Package Lead** | ✅ COMPLETED | Phase 4: 8 files renamed from kebab-case to camelCase. Feb 2026: kebabCase now allowed |
 | **QA Lead** | ✅ COMPLETED | Phase 5: ESLint verified, no filename violations |
-| **ESLint Enforcement** | ✅ ACTIVE | Phase 1: unicorn/filename-case enforces camelCase OR kebabCase (with React overrides, Feb 2026 update) |
+| **ESLint Enforcement** | ✅ ACTIVE | Phase 1: unicorn/filename-case rule allows camelCase OR kebabCase (with React override disabling rule for PascalCase in components/pages/contexts, Feb 2026 update) |
+| **CI/CD Integration** | ⏳ PENDING PR #274 | Once PR #274 merges, backend PRs will lint changed files only; global rule will enforce camelCase/kebabCase naming |
 | **Product Owner** | ✅ NO IMPACT | Internal refactoring, no business changes |
 
 ---
@@ -348,17 +377,26 @@ Update `eslint.config.js` to allow both camelCase and kebabCase (PR #273):
 All phases have been successfully executed with Feb 2026 update:
 
 1. ✅ **Phase 1**: ESLint configuration updated with React component overrides AND dual-case allowance (camelCase OR kebabCase)
+   - Global rule: `'unicorn/filename-case': { cases: { camelCase: true, kebabCase: true } }`
+   - React override: `'unicorn/filename-case': 'off'` for `/components/`, `/pages/`, `/contexts/` directories
+   - Implementation: PR #273 (ESLint config), ADR-011 updated to document dual-case convention
+
 2. ✅ **Phase 2**: Backend files standardized (11 files renamed to camelCase, now kebabCase also allowed per PR #273)
 3. ✅ **Phase 3**: Frontend files standardized (10 components kept as PascalCase, 3 utilities renamed)
 4. ✅ **Phase 4**: Common package standardized (8 files renamed from kebab-case to camelCase, now kebabCase allowed again per PR #273)
-5. ✅ **Phase 5**: ESLint verification passed (0 filename violations)
+5. ✅ **Phase 5**: ESLint verification passed (0 filename violations); CI gate implementation pending PR #274
 
-**Key Changes**:
-- Frontend React components: PascalCase (strictly enforced)
-- Frontend utilities/hooks: camelCase (strictly enforced with `use` prefix for hooks)
-- Backend services/middleware/types: camelCase OR kebabCase (both allowed, PR #273)
-- Common package: camelCase OR kebabCase (both allowed, PR #273)
-- ESLint rule allows PascalCase for `/components/`, `/pages/`, `/contexts/` directories only
+**Key Enforcement Details** (Feb 2026):
+- **Frontend React components**: PascalCase (convention documented, ESLint rule disabled for these directories)
+- **Frontend utilities/hooks**: camelCase (convention, allowed by global rule)
+- **Backend services/middleware/types**: camelCase OR kebabCase (both allowed equally by global rule)
+- **Common package**: camelCase OR kebabCase (both allowed equally by global rule)
+- **Global ESLint rule**: Enforces camelCase OR kebabCase; blocks PascalCase outside React directories
+
+**CI/CD Status** (Feb 2026):
+- ESLint configuration updated: PR #273 (merged when approved)
+- Backend CI gate implementation: PR #274 (not yet merged; will enforce changed-files lint gate once merged)
+- Once PR #274 merges: backend PRs will lint only changed files, enforcing global filename-case rule
 
 **Feb 2026 Update Rationale**:
 - Backend codebase uses both naming styles interchangeably
@@ -366,7 +404,7 @@ All phases have been successfully executed with Feb 2026 update:
 - Allowing both camelCase and kebabCase aligns with KISS principle (ADR-005)
 - All tools and IDEs support both styles equally
 
-**Status**: Implementation extended to support dual-case convention (PR #273)
+**Status**: Implementation extended to support dual-case convention (PR #273); CI gate pending PR #274
 
 ---
 
