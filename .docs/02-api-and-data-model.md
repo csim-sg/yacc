@@ -217,21 +217,31 @@ bulk_action_applied
   "payload": {
     "messageId": "uuid",
     "conversationId": "uuid",
-    "recipientId": "uuid",
+    "recipientId": "string",
     "body": "Message content",
     "direction": "outbound",
     "platformType": "telegram",
     "retryCount": 3,
+    "correlationId": "optional-trace-id",
     "lastError": "Platform error"
   },
   "failureReason": "max_retries_exceeded" | "validation_error" | "platform_error" | "network_error" | "unknown",
   "totalAttempts": 3,
   "lastError": "Error details",
+  "correlationId": "optional-trace-id",
+  "ircProfileId": "uuid or null",
+  "externalThreadType": "telegram_group | irc_channel | null",
+  "externalThreadId": "platform-specific-id or null",
   "movedAt": "2026-01-16T10:00:00Z",
   "expiresAt": "2026-01-23T10:00:00Z",
   "retryAttempt": false,
   "retriedAt": "2026-01-16T11:00:00Z",
-  "retriedBy": "uuid",
+  "retriedBy": "uuid or null",
+  "metadata": {
+    "jobId": "msg-...",
+    "externalMessageId": "...",
+    "platform": "telegram"
+  },
   "createdAt": "2026-01-16T10:00:00Z",
   "updatedAt": "2026-01-16T10:00:00Z"
 }
@@ -242,6 +252,11 @@ bulk_action_applied
 **Retention**: 7 days (auto-cleanup via scheduled job)
 
 **Access**: Manager+ roles only
+
+**UUID Contract** (Issue #270):
+- `messageId` is always a UUID FK to `messages.id`
+- External/job IDs (e.g., `msg-payload-...`) are stored in `metadata`, not as `messageId`
+- Traceability fields (`correlationId`, `ircProfileId`, `externalThreadType`, `externalThreadId`) enable ops to investigate failures in their integration context
 
 ### Message
 ```json

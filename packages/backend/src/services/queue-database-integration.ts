@@ -213,12 +213,22 @@ class QueueDatabaseIntegration {
 
   /**
    * Record message in dead-letter queue
+   *
+   * @param payload - Original message job payload (messageId must be UUID)
+   * @param failureReason - Reason for failure
+   * @param totalAttempts - Total number of retry attempts made
+   * @param lastError - Error message from last attempt
+   * @param traceContext - Optional traceability context (jobId, correlationId, etc.)
    */
   async recordMessageInDLQ(
     payload: SendMessageJobPayload,
     failureReason: string,
     totalAttempts: number,
-    lastError: string
+    lastError: string,
+    traceContext?: {
+      jobId?: string;
+      correlationId?: string;
+    }
   ): Promise<void> {
     try {
       logger.error(
@@ -229,6 +239,8 @@ class QueueDatabaseIntegration {
           failureReason,
           totalAttempts,
           lastError,
+          correlationId: traceContext?.correlationId,
+          jobId: traceContext?.jobId,
         },
         'Recording message in dead-letter queue'
       );
@@ -252,6 +264,7 @@ class QueueDatabaseIntegration {
           failureReason,
           totalAttempts,
           lastError,
+          correlationId: traceContext?.correlationId,
           requiresReview: true,
           timestamp: new Date().toISOString(),
         });
@@ -261,7 +274,7 @@ class QueueDatabaseIntegration {
       //   action: 'message.dlq',
       //   entity_type: 'message',
       //   entity_id: payload.messageId,
-      //   metadata: { failureReason, totalAttempts, lastError },
+      //   metadata: { failureReason, totalAttempts, lastError, jobId: traceContext?.jobId },
       // });
 
       // TODO: Notify admins

@@ -278,16 +278,21 @@ class MessageQueueService {
           conversationId: job.data.conversationId,
           attempts: job.attemptsMade,
           error: error.message,
+          correlationId: job.data.correlationId,
         },
         'Message moved to dead-letter queue'
       );
 
-      // Record in database that message is in DLQ
+      // Record in database that message is in DLQ (with traceability context)
       await queueDatabaseIntegration.recordMessageInDLQ(
         job.data,
         FailureReason.MAX_RETRIES_EXCEEDED,
         job.attemptsMade || RETRY_CONFIG.MAX_ATTEMPTS,
-        error.message
+        error.message,
+        {
+          jobId: job.id,
+          correlationId: job.data.correlationId,
+        }
       );
 
       // TODO: Emit via websocket gateway when available
