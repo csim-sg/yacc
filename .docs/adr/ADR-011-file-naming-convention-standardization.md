@@ -109,7 +109,7 @@ export function Header() {}
 
 ### 1. **Pragmatic Flexibility (Updated Feb 2026)**
    - Both camelCase and kebabCase are widely used in the codebase
-   - React convention requires PascalCase for components (enforced)
+   - PascalCase is a convention for React components (not lint-enforced)
    - Backend services and utilities use both styles interchangeably
    - Linter rule now permits both to match actual project patterns
    - Enforcing single case would require massive refactoring for minimal benefit
@@ -296,14 +296,14 @@ Update `eslint.config.js` to allow both camelCase and kebabCase (PR #273):
 **Current Status (Feb 2026):**
 - Legacy `.github/workflows/lint.yml` runs ESLint on `pull_request` events targeting `main` or `develop` branches only (NOT `dev`)
 - Legacy `.github/workflows/tests.yml` runs tests on `pull_request` events targeting `main` or `develop` branches only (NOT `dev`)
-- **Backend PRs targeting `dev`**: PR checks depend on PR #274 (Backend CI workflow with changed-files lint gate)
-- **Frontend/Common PRs targeting `dev`**: Follow legacy workflow behavior (lint on commit, tests manual)
+- **Backend/Frontend/Common PRs targeting `dev`**: Currently have no automated lint/tests; run locally until PR #274 merges
+- **Once PR #274 merges**: Backend CI workflow activates for PRs targeting `dev`, enforcing changed-files lint gate
 
 **How It Works Once PR #274 Merges:**
 - New Backend CI workflow activates for PRs targeting `dev`, `develop`, or `main`
 - ESLint runs on **changed files only** in backend PRs (not full baseline)
 - Files with camelCase or kebabCase names: ✅ PASS
-- Files with PascalCase names (outside React dirs): ❌ FAIL with error `"File name should be in camelCase or kebabCase"`
+- Files with PascalCase names (outside React dirs): ❌ FAIL with unicorn/filename-case violation
 - React components in `/components/`, `/pages/`, `/contexts/`: ✅ PASS with PascalCase (override is active)
 
 ### What Is Enforced vs Convention (Feb 2026 Update)
