@@ -17,7 +17,6 @@ import 'reflect-metadata';
 import type { Express } from 'express';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
-
 import { createTestApp, createTestUser, seedTestDLQEntry } from '../../../tests/test-helpers.js';
 
 describe('DLQ Controller - RBAC Integration Tests', () => {

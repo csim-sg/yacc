@@ -45,8 +45,23 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
 
   describe('DLQ Service - Move to DLQ', () => {
     it('should move failed message to DLQ', async () => {
+      // Create a real message first (DLQ UUID contract requires messages.id)
+      const newMessage = await dbClient
+        .insert(messages)
+        .values({
+          conversationId,
+          senderId: testUserId,
+          senderName: 'Test User',
+          body: 'Test message',
+          status: 'failed',
+          direction: 'outbound',
+        })
+        .returning();
+
+      const messageId = newMessage[0].id;
+
       const testPayload = {
-        messageId: 'msg-' + Date.now(),
+        messageId,
         conversationId,
         recipientId: testUserId,
         body: 'Test message',
@@ -56,7 +71,7 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
       };
 
       const entry = await dlqService.moveToDLQ(
-        testPayload.messageId,
+        messageId,
         conversationId,
         testPayload,
         'max_retries_exceeded',
@@ -64,7 +79,7 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
       );
 
       expect(entry).toBeDefined();
-      expect(entry.messageId).toBe(testPayload.messageId);
+      expect(entry.messageId).toBe(messageId);
       expect(entry.conversationId).toBe(conversationId);
       expect(entry.failureReason).toBe('max_retries_exceeded');
       expect(entry.totalAttempts).toBe(3);
@@ -72,8 +87,23 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
     });
 
     it('should set correct expiration date (7 days)', async () => {
+      // Create a real message first (DLQ UUID contract requires messages.id)
+      const newMessage = await dbClient
+        .insert(messages)
+        .values({
+          conversationId,
+          senderId: testUserId,
+          senderName: 'Test User',
+          body: 'Test message',
+          status: 'failed',
+          direction: 'outbound',
+        })
+        .returning();
+
+      const messageId = newMessage[0].id;
+
       const testPayload = {
-        messageId: 'msg-exp-' + Date.now(),
+        messageId,
         conversationId,
         recipientId: testUserId,
         body: 'Test message',
@@ -83,7 +113,7 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
       };
 
       const entry = await dlqService.moveToDLQ(
-        testPayload.messageId,
+        messageId,
         conversationId,
         testPayload,
         'platform_error',
@@ -212,12 +242,13 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
         'Failed after 3 attempts'
       );
 
-      // Mark as retried
-      const updated = await dlqService.markAsRetried(dlqEntry.id, managerId);
+       // Mark as retried
+       const updated = await dlqService.markAsRetried(dlqEntry.id, managerId);
 
-      expect(updated.retryAttempt).toBe(true);
-      expect(updated.retriedAt).toBeDefined();
-      expect(updated.retriedBy).toBe(managerId);
+       expect(updated.retryAttempt).toBe(true);
+       expect(updated.retriedAt).toBeDefined();
+       // UUID comparison: normalize format for comparison (database may return with or without hyphens)
+       expect(updated.retriedBy?.replace(/-/g, '')).toBe(managerId.replace(/-/g, ''));
     });
   });
 
@@ -346,8 +377,23 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
 
   describe('DLQ Payload Preservation', () => {
     it('should preserve full message payload in DLQ', async () => {
+      // Create a real message first (DLQ UUID contract requires messages.id)
+      const newMessage = await dbClient
+        .insert(messages)
+        .values({
+          conversationId,
+          senderId: testUserId,
+          senderName: 'Test User',
+          body: 'Test message with metadata',
+          status: 'failed',
+          direction: 'outbound',
+        })
+        .returning();
+
+      const messageId = newMessage[0].id;
+
       const testPayload = {
-        messageId: 'msg-payload-' + Date.now(),
+        messageId,
         conversationId,
         recipientId: testUserId,
         body: 'Test message with metadata',
@@ -361,7 +407,7 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
       };
 
       const entry = await dlqService.moveToDLQ(
-        testPayload.messageId,
+        messageId,
         conversationId,
         testPayload,
         'platform_error',
@@ -370,18 +416,34 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
 
       expect(entry.payload).toBeDefined();
       const payload = entry.payload as typeof testPayload;
-      expect(payload.messageId).toBe(testPayload.messageId);
+      expect(payload.messageId).toBe(messageId);
       expect(payload.body).toBe(testPayload.body);
     });
   });
 
   describe('Concurrent DLQ Operations', () => {
     it('should handle concurrent DLQ operations', async () => {
+      // Create 5 real messages first (DLQ UUID contract requires messages.id)
+      const newMessages = await dbClient
+        .insert(messages)
+        .values(
+          Array.from({ length: 5 }, (_, i) => ({
+            conversationId,
+            senderId: testUserId,
+            senderName: 'Test User',
+            body: `Concurrent message ${i}`,
+            status: 'failed' as const,
+            direction: 'outbound' as const,
+          }))
+        )
+        .returning();
+
       const promises: Array<Promise<unknown>> = [];
 
       for (let i = 0; i < 5; i++) {
+        const messageId = newMessages[i].id;
         const payload = {
-          messageId: 'msg-concurrent-' + i + '-' + Date.now(),
+          messageId,
           conversationId,
           recipientId: testUserId,
           body: `Concurrent message ${i}`,
@@ -392,7 +454,7 @@ describe('BE-014: Exponential Backoff Retry Queue + DLQ', () => {
 
         promises.push(
           dlqService.moveToDLQ(
-            payload.messageId,
+            messageId,
             conversationId,
             payload,
             'network_error',
