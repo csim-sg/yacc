@@ -69,7 +69,6 @@ vi.mock('irc-framework', () => {
 });
 
 import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
-
 import { logger } from '../../infrastructure/logger';
 import { IRCConnector } from '../irc.connector';
 
