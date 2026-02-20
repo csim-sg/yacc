@@ -15,11 +15,79 @@ on:
       - 'pnpm-lock.yaml'
 
 jobs:
-  lint-and-test:
+  # Compute changed files in packages/backend for linting
+  changed-files:
+    runs-on: ubuntu-latest
+    outputs:
+      backend-files: ${{ steps.changed-backend.outputs.files }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for diff
+
+      - name: Get changed backend files
+        id: changed-backend
+        run: |
+          # Get diff between base (dev) and head (current PR/push)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="origin/${{ github.base_ref }}"
+          else
+            BASE_REF="origin/dev~1"
+          fi
+          
+          # Get files changed in packages/backend (src + tests)
+          CHANGED=$(git diff --name-only $BASE_REF..HEAD -- packages/backend/src packages/backend/tests 2>/dev/null || echo "")
+          if [ -z "$CHANGED" ]; then
+            echo "files=" >> $GITHUB_OUTPUT
+          else
+            # Convert newlines to spaces for eslint
+            FILES=$(echo "$CHANGED" | tr '\n' ' ')
+            echo "files=$FILES" >> $GITHUB_OUTPUT
+          fi
+
+  # Lint only changed backend files (skip if none changed)
+  lint:
+    needs: changed-files
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x]
+        node-version: [20.x]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint changed backend files
+        if: needs.changed-files.outputs.backend-files != ''
+        run: |
+          npx eslint ${{ needs.changed-files.outputs.backend-files }} \
+            --config packages/backend/eslint.config.js \
+            --max-warnings 0
+
+      - name: Lint skipped (no backend files changed)
+        if: needs.changed-files.outputs.backend-files == ''
+        run: echo "✅ No backend files changed, lint skipped"
+
+  # Test backend (always runs, blocking)
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x]
 
     services:
       postgres:
@@ -63,9 +131,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Lint backend
-        run: pnpm --filter @yacc/backend lint
 
       - name: Run backend tests
         run: pnpm --filter @yacc/backend test
