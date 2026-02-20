@@ -3,6 +3,10 @@
  * Handles conversation CRUD and updates with routing-controllers
  */
 
+import type { AssignRequest } from '@yacc/common/requests/conversations/assign.request';
+import type { ListConversationsRequest } from '@yacc/common/requests/conversations/listConversations.request';
+import type { UpdatePriorityRequest } from '@yacc/common/requests/conversations/updatePriority.request';
+import type { UpdateStatusRequest } from '@yacc/common/requests/conversations/updateStatus.request';
 import type { Request } from 'express';
 import {
   JsonController,
@@ -19,13 +23,9 @@ import {
   BadRequestError,
   NotFoundError,
 } from 'routing-controllers';
-import { conversationService } from '../services/conversation.service';
-import { auditService } from '../services/audit.service';
 import { logger } from '../infrastructure/logger';
-import { ListConversationsRequest } from '@yacc/common/requests/conversations/listConversations.request';
-import { UpdateStatusRequest } from '@yacc/common/requests/conversations/updateStatus.request';
-import { UpdatePriorityRequest } from '@yacc/common/requests/conversations/updatePriority.request';
-import { AssignRequest } from '@yacc/common/requests/conversations/assign.request';
+import { auditService } from '../services/audit.service';
+import { conversationService } from '../services/conversation.service';
 import type { AuthUser } from '../types/auth.types';
 
 interface AuthenticatedRequest extends Request {

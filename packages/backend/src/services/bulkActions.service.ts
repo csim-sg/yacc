@@ -16,12 +16,12 @@
 
 import { eq, and } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
 import { conversations } from '../schemas/conversation.schema';
 import { conversationTags } from '../schemas/conversationTag.schema';
 import { tags } from '../schemas/tag.schema';
-import { auditService } from './audit.service';
 import type { BulkActionResponse, BulkActionFailure, ConversationStatus } from '../types/bulkActions.types';
-import { logger } from '../infrastructure/logger';
+import { auditService } from './audit.service';
 
 const MAX_BULK_SIZE = 100;
 

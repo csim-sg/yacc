@@ -767,7 +767,7 @@ describe('IRCConnector', () => {
              await vi.advanceTimersByTimeAsync(10);
              
              // GATE B REQ 3b: Verify no new "Scheduling" log was emitted
-             let schedulingCountAfterError = vi.mocked(logger).info.mock.calls.filter(
+             const schedulingCountAfterError = vi.mocked(logger).info.mock.calls.filter(
                (call) => (call[1] as string)?.includes('Scheduling')
              ).length;
              expect(schedulingCountAfterError).toBe(schedulingCountBefore);
@@ -780,7 +780,7 @@ describe('IRCConnector', () => {
              await vi.advanceTimersByTimeAsync(10);
              
              // GATE B REQ 3b: Verify no new "Scheduling" log was emitted after close
-             let schedulingCountAfterClose = vi.mocked(logger).info.mock.calls.filter(
+             const schedulingCountAfterClose = vi.mocked(logger).info.mock.calls.filter(
                (call) => (call[1] as string)?.includes('Scheduling')
              ).length;
              expect(schedulingCountAfterClose).toBe(schedulingCountBefore);
@@ -793,7 +793,7 @@ describe('IRCConnector', () => {
              await vi.advanceTimersByTimeAsync(10);
              
              // GATE B REQ 3b: Verify no new "Scheduling" log was emitted after socket close
-             let schedulingCountAfterSocketClose = vi.mocked(logger).info.mock.calls.filter(
+             const schedulingCountAfterSocketClose = vi.mocked(logger).info.mock.calls.filter(
                (call) => (call[1] as string)?.includes('Scheduling')
              ).length;
              expect(schedulingCountAfterSocketClose).toBe(schedulingCountBefore);

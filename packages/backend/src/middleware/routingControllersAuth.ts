@@ -4,14 +4,15 @@
  * Uses BetterAuth session validation
  */
 
-import { Action, UnauthorizedError, ForbiddenError } from 'routing-controllers';
+import { eq } from 'drizzle-orm';
 import type { Request } from 'express';
+import type { Action} from 'routing-controllers';
+import { UnauthorizedError, ForbiddenError } from 'routing-controllers';
+import { appConfig } from '../config/appConfig';
+import { betterAuthClient } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
 import { users } from '../schemas/user.schema';
-import { eq } from 'drizzle-orm';
-import { appConfig } from '../config/appConfig';
 import type { AuthUser } from '../types/auth.types';
-import { betterAuthClient } from '../infrastructure/better-auth.client';
 // TODO: Implement BetterAuth client
 // import { getAuthInstance } from '../infrastructure/better-auth.client';
 

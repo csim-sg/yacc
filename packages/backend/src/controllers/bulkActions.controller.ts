@@ -27,8 +27,8 @@ import {
   ForbiddenError,
   InternalServerError,
 } from 'routing-controllers';
-import { bulkActionsService } from '../services/bulkActions.service';
 import { logger } from '../infrastructure/logger';
+import { bulkActionsService } from '../services/bulkActions.service';
 import type { AuthUser } from '../types/auth.types';
 import type { BulkActionRequest, BulkActionResponse } from '../types/bulkActions.types';
 import { isValidActionType, isValidStatus } from '../types/bulkActions.types';

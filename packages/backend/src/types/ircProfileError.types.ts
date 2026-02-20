@@ -3,7 +3,7 @@
  * Provides type-safe error handling without using `any`
  */
 
-import { IrcProfileErrorCode } from './ircProfile.types';
+import type { IrcProfileErrorCode } from './ircProfile.types';
 
 /**
  * Custom error class for IRC profile operations

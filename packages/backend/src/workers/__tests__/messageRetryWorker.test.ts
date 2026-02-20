@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Job } from 'bullmq';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { SendMessageJobPayload } from '../../types/message-queue.types';
 
 const mocks = vi.hoisted(() => {

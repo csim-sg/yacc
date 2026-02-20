@@ -1,6 +1,6 @@
 import { pgTable, uuid, varchar, text, timestamp, boolean, jsonb, index, uniqueIndex } from 'drizzle-orm/pg-core';
-import { users } from './user.schema';
 import { conversations } from './conversation.schema';
+import { users } from './user.schema';
 
 /**
  * Notifications table - in-app notifications for users

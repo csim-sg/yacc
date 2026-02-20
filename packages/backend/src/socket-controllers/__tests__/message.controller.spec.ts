@@ -4,10 +4,10 @@
  * Tests message event handling and delivery
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MessageController } from '../message.controller';
 import type { Socket } from 'socket.io';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AuthenticatedSocket } from '../../websockets/auth.middleware';
+import { MessageController } from '../message.controller';
 
 describe('MessageController', () => {
   let controller: MessageController;

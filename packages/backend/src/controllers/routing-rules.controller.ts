@@ -5,8 +5,6 @@
  */
 
 import type { Request } from 'express';
-import type { AuthUser } from '../types/auth.types';
-import type { CreateRoutingRuleRequest, UpdateRoutingRuleRequest } from '../types/routingRules.types';
 import {
   JsonController,
   Get,
@@ -24,8 +22,10 @@ import {
   QueryParams,
   Authorized,
 } from 'routing-controllers';
-import { routingRulesService } from '../services/routing-rules.service';
 import { logger } from '../infrastructure/logger';
+import { routingRulesService } from '../services/routing-rules.service';
+import type { AuthUser } from '../types/auth.types';
+import type { CreateRoutingRuleRequest, UpdateRoutingRuleRequest } from '../types/routingRules.types';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;

@@ -6,17 +6,17 @@
  * Uses routing-controllers for automatic route registration
  */
 
-import { All, Controller, Req, Res } from 'routing-controllers';
-import type { Request, Response } from 'express';
-import { dbClient } from '../infrastructure/db.client';
-import { redisClient } from '../infrastructure/redis.client';
-import { checkR2Health, isR2Configured } from '../infrastructure/r2.client';
-import { logger } from '../infrastructure/logger';
 import type {
   HealthStatus,
   DependencyHealth,
   HealthSLO,
 } from '@yacc/common/responses/health/healthResponse.response';
+import type { Request, Response } from 'express';
+import { All, Controller, Req, Res } from 'routing-controllers';
+import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
+import { checkR2Health, isR2Configured } from '../infrastructure/r2.client';
+import { redisClient } from '../infrastructure/redis.client';
 
 // ============================================
 // Health Check Implementation

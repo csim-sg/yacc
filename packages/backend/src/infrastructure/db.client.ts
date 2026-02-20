@@ -6,8 +6,8 @@
  */
 
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { appConfig } from '../config/appConfig';
 import { Pool } from 'pg';
+import { appConfig } from '../config/appConfig';
 import { schemas } from '../schemas';
 
 // Singleton: Initialize connection pool once at module load

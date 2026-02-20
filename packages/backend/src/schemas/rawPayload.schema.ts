@@ -1,5 +1,5 @@
-import { pgTable, serial, uuid, varchar, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import { pgTable, serial, uuid, varchar, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
 import { messages } from './message.schema';
 
 /**

@@ -14,15 +14,15 @@
 
 import { eq } from 'drizzle-orm';
 import { appConfig } from '../config/appConfig';
+import { IRCConnector } from '../connectors/irc.connector';
 import { dbClient } from '../infrastructure/db.client';
 import { ircStatusClient } from '../infrastructure/ircStatus.client';
 import { logger } from '../infrastructure/logger';
 import { integrationConfigs } from '../schemas/integrationConfig.schema';
 import type { IRCConfigRequest, IRCConfigResponseData } from '../types/ircIntegration.types';
-import { EncryptionService } from './encryption.service';
 import { connectorManager } from './connector-manager';
-import { IRCConnector } from '../connectors/irc.connector';
 import { connectorStatusWiring } from './connector-status-wiring.service';
+import { EncryptionService } from './encryption.service';
 import {
   resolveIrcConfig,
   IrcProfileResolutionError,

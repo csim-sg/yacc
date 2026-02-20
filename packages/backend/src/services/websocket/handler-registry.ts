@@ -11,9 +11,9 @@ import { logger } from '../../infrastructure/logger';
 import type { WebSocketEventMap } from '../../types/websocket.types';
 import { handleConversationUpdated } from './conversation.handler';
 import { handleMessageSent, handleMessageFailed } from './message.handler';
-import { handleTypingStarted, handleTypingStopped } from './typing.handler';
 import { handlePresenceUpdated } from './presence.handler';
 import { handleReactionAdded, handleReactionRemoved } from './reaction.handler';
+import { handleTypingStarted, handleTypingStopped } from './typing.handler';
 
 /**
  * Event handler mapping

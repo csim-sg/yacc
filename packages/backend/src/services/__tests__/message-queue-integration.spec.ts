@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { messageQueueService } from '../message-queue.service';
-import { messageQueueDLQService } from '../message-queue-dlq.service';
-import { connectorManager } from '../connector-manager';
-import { queueDatabaseIntegration } from '../queue-database-integration';
-import { SendMessageJobPayload, RETRY_CONFIG } from '../../types/message-queue.types';
 import type { BaseConnector } from '../../connectors/base/baseConnector';
+import type { SendMessageJobPayload} from '../../types/message-queue.types';
+import { RETRY_CONFIG } from '../../types/message-queue.types';
+import { connectorManager } from '../connector-manager';
+import { messageQueueDLQService } from '../message-queue-dlq.service';
+import { messageQueueService } from '../message-queue.service';
+import { queueDatabaseIntegration } from '../queue-database-integration';
 
 /**
  * Message Queue - End-to-End Integration Tests

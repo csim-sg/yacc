@@ -6,8 +6,8 @@
  * NOTE: These tests mock logger to avoid appConfig environment variable requirements
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Server } from 'socket.io';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock logger to avoid appConfig parsing
 vi.mock('../../../infrastructure/logger', () => ({

@@ -20,8 +20,8 @@ import {
   NotFoundError,
   ForbiddenError,
 } from 'routing-controllers';
-import { dlqService } from '../services/dlq.service.js';
 import { logger } from '../infrastructure/logger.js';
+import { dlqService } from '../services/dlq.service.js';
 import type { AuthUser } from '../types/auth.types.js';
 
 interface AuthenticatedRequest extends Request {

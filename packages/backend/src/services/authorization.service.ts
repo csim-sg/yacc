@@ -1,7 +1,7 @@
-import type { AuthUser } from '../types/auth.types';
+import { eq } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
 import { conversations } from '../schemas/conversation.schema';
-import { eq } from 'drizzle-orm';
+import type { AuthUser } from '../types/auth.types';
 
 /**
  * Authorization Service

@@ -11,10 +11,10 @@ import {
   Authorized,
 } from 'routing-controllers';
 import { logger } from '../infrastructure/logger.js';
-import { messageQueueService } from '../services/message-queue.service.js';
 import { messageQueueDLQService } from '../services/message-queue-dlq.service.js';
-import type { QueueStatistics } from '../types/message-queue.types.js';
+import { messageQueueService } from '../services/message-queue.service.js';
 import type { AuthUser } from '../types/auth.types.js';
+import type { QueueStatistics } from '../types/message-queue.types.js';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;

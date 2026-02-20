@@ -1,13 +1,13 @@
 import { randomUUID } from 'crypto';
-import { BaseConnector } from './base/baseConnector';
-import { logger } from '../infrastructure/logger';
+import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
 import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
 import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse.interface';
 import type { ValidationError } from '@yacc/common/types/validationError.interface';
-import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
 import { Client as IRCClient } from 'irc-framework';
 import type { IRCMessageEvent, IRCErrorEvent } from 'irc-framework';
+import { logger } from '../infrastructure/logger';
 import { ircIngestionService } from '../services/irc-ingestion.service';
+import { BaseConnector } from './base/baseConnector';
 
 /**
  * IRC Connector

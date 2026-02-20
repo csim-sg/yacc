@@ -4,9 +4,9 @@
  * Tests user presence and online/offline status
  */
 
+import type { Socket } from 'socket.io';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PresenceController } from '../presence.controller';
-import type { Socket } from 'socket.io';
 
 describe('PresenceController', () => {
   let controller: PresenceController;

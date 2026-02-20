@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   pgTable,
   uuid,
@@ -9,12 +10,11 @@ import {
   uniqueIndex,
   integer,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
-import { users } from './user.schema';
-import { integrationConnectionProfiles } from './integrationConnectionProfile.schema';
-import { conversationStatusEnum } from '../enums/conversationStatus.enum';
-import { conversationPriorityEnum } from '../enums/conversationPriority.enum';
 import { channelTypeEnum } from '../enums/channelType.enum';
+import { conversationPriorityEnum } from '../enums/conversationPriority.enum';
+import { conversationStatusEnum } from '../enums/conversationStatus.enum';
+import { integrationConnectionProfiles } from './integrationConnectionProfile.schema';
+import { users } from './user.schema';
 
 /**
  * Conversations table - represents a conversation thread (one per group/channel)

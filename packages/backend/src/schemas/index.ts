@@ -1,6 +1,8 @@
+import { account } from "./account.schema";
 import { attachments } from "./attachment.schema";
 import { auditLogs } from "./auditLog.schema";
 import { conversations } from "./conversation.schema";
+import { conversationTags } from "./conversationTag.schema";
 import { deadLetterQueue } from "./deadLetterQueue.schema";
 import { integrationConfigs } from "./integrationConfig.schema";
 import { integrationConnectionProfiles } from "./integrationConnectionProfile.schema";
@@ -11,12 +13,10 @@ import { passwordResetTokens } from "./passwordReset.schema";
 import { rawPayloads } from "./rawPayload.schema";
 import { routingRules } from "./routingRule.schema";
 import { routingRuleExecutions } from "./routingRuleExecution.schema";
-import { tags } from "./tag.schema";
-import { conversationTags } from "./conversationTag.schema";
-import { users } from "./user.schema";
 import { session } from "./session.schema";
+import { tags } from "./tag.schema";
+import { users } from "./user.schema";
 import { verification } from "./verification.schema";
-import { account } from "./account.schema";
 
 /**
  * Schema registry - data-only constant for library wiring (Drizzle adapter)

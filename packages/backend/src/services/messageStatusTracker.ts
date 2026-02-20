@@ -5,16 +5,16 @@
  * Persists status to database and emits WebSocket events for real-time updates
  */
 
-import { eq } from 'drizzle-orm';
 import type { Platform } from '@yacc/common/types/platform.type';
+import { eq } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client.js';
-import { enqueueRetry } from '../infrastructure/queues.client.js';
 import { logger } from '../infrastructure/logger.js';
-import { messages } from '../schemas/message.schema.js';
+import { enqueueRetry } from '../infrastructure/queues.client.js';
 import { conversations } from '../schemas/conversation.schema.js';
-import { dlqService } from './dlq.service.js';
+import { messages } from '../schemas/message.schema.js';
 import type { SendMessageJobPayload } from '../types/message-queue.types.js';
 import { MessageEvents } from '../websockets/wsConstants.js';
+import { dlqService } from './dlq.service.js';
 
 // ============================================
 // Message Status Type

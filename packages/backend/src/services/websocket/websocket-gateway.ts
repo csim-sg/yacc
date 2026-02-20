@@ -10,9 +10,9 @@
  *   await ws.emitToConversation('conversation-id', 'message.sent', payload);
  */
 
-import type { WebSocketServer } from '../../websockets/websocket.server';
-import type { WebSocketEventMap } from '../../types/websocket.types';
 import { logger } from '../../infrastructure/logger';
+import type { WebSocketEventMap } from '../../types/websocket.types';
+import type { WebSocketServer } from '../../websockets/websocket.server';
 import { storeEvent } from './event-backlog.service';
 
 /**

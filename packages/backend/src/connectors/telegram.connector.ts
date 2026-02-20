@@ -1,9 +1,9 @@
-import { BaseConnector } from './base/baseConnector';
-import { logger } from '../infrastructure/logger';
+import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
 import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
 import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse.interface';
 import type { ValidationError } from '@yacc/common/types/validationError.interface';
-import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
+import { logger } from '../infrastructure/logger';
+import { BaseConnector } from './base/baseConnector';
 
 /**
  * Telegram Connector

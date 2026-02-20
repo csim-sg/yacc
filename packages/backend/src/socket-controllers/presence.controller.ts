@@ -8,8 +8,8 @@
 import { SocketController, OnMessage } from 'socket-controllers';
 import type { Socket, Server } from 'socket.io';
 import { logger } from '../infrastructure/logger';
-import type { AuthenticatedSocket } from '../websockets/auth.middleware';
 import type { PresenceUpdatedPayload } from '../types/websocket.types';
+import type { AuthenticatedSocket } from '../websockets/auth.middleware';
 
 @SocketController()
 export class PresenceController {

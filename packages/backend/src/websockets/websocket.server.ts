@@ -6,11 +6,11 @@
  */
 
 import { Server, Socket } from 'socket.io';
-import { webSocketAuthMiddleware } from './auth.middleware';
-import { logger } from '../infrastructure/logger';
 import { appConfig } from '../config/appConfig';
-import { PING_INTERVAL_MS, CONNECTION_TIMEOUT_MS } from './wsConstants';
+import { logger } from '../infrastructure/logger';
 import type { WebSocketEventMap } from '../types/websocket.types';
+import { webSocketAuthMiddleware } from './auth.middleware';
+import { PING_INTERVAL_MS, CONNECTION_TIMEOUT_MS } from './wsConstants';
 
 /**
  * WebSocket server class

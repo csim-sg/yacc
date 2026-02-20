@@ -5,10 +5,10 @@
  * Uses Vitest with mocked Socket.io interfaces
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ConversationController } from '../conversation.controller';
 import type { Socket } from 'socket.io';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AuthenticatedSocket } from '../../websockets/auth.middleware';
+import { ConversationController } from '../conversation.controller';
 
 describe('ConversationController', () => {
   let controller: ConversationController;

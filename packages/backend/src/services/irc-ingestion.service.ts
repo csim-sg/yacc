@@ -15,15 +15,15 @@
  * - Uses system actor (actorId=null) for connector-triggered actions
  */
 
+import { eq, and, isNull } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
 import { conversations } from '../schemas/conversation.schema';
 import { messages } from '../schemas/message.schema';
+import type { MessageReceivedPayload } from '../types/websocket.types';
 import { auditService } from './audit.service';
 import { conversationService } from './conversation.service';
-import { logger } from '../infrastructure/logger';
-import { eq, and, isNull } from 'drizzle-orm';
 import { emitToConversation, isWebSocketGatewayAvailable } from './websocket/websocket-gateway';
-import type { MessageReceivedPayload } from '../types/websocket.types';
 
 /**
  * DTO for inbound IRC message

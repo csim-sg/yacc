@@ -1,22 +1,22 @@
 import 'reflect-metadata';
 import 'dotenv/config';
-import express from 'express';
 import http from 'http';
+import express from 'express';
 import { useExpressServer } from 'routing-controllers';
 import { SocketControllers } from 'socket-controllers';
+import { appConfig } from './config/appConfig';
+import { controllers } from './controllers';
 import { checkDatabaseConnection } from './infrastructure/db.client';
-import { authorizationChecker, currentUserChecker } from './middleware/routingControllersAuth';
+import { logger } from './infrastructure/logger';
+import { bodyParserMiddleware } from './middleware/bodyParser.middleware';
 import { correlationIdMiddleware } from './middleware/correlationId.middleware';
 import { requestLoggingMiddleware } from './middleware/requestLogging.middleware';
-import { bodyParserMiddleware } from './middleware/bodyParser.middleware';
-import { controllers } from './controllers';
+import { authorizationChecker, currentUserChecker } from './middleware/routingControllersAuth';
+import { initializeIntegrationsRuntime } from './services/integrations-runtime.service';
+import { setWebSocketGateway } from './services/websocket/websocket-gateway';
 import { socketControllers } from './socket-controllers';
-import { appConfig } from './config/appConfig';
-import { logger } from './infrastructure/logger';
 import { wsGateway } from './websockets/gateway';
 import { WebSocketServer } from './websockets/websocket.server';
-import { setWebSocketGateway } from './services/websocket/websocket-gateway';
-import { initializeIntegrationsRuntime } from './services/integrations-runtime.service';
 import { getRetryWorker, closeRetryWorker } from './workers/messageRetryWorker';
 
 // ===== EXPRESS APP =====

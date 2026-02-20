@@ -4,9 +4,9 @@
  * Tests platform integration events (Telegram, IRC)
  */
 
+import type { Socket } from 'socket.io';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ConnectorController } from '../connector.controller';
-import type { Socket } from 'socket.io';
 
 describe('ConnectorController', () => {
   let controller: ConnectorController;

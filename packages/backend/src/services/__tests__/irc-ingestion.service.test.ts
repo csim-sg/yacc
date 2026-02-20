@@ -12,15 +12,15 @@
  * Coverage target: ≥ 85% for new code
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { dbClient } from '../../infrastructure/db.client';
 import { conversations } from '../../schemas/conversation.schema';
+import { integrationConnectionProfiles } from '../../schemas/integrationConnectionProfile.schema';
 import { messages } from '../../schemas/message.schema';
 import { users } from '../../schemas/user.schema';
-import { integrationConnectionProfiles } from '../../schemas/integrationConnectionProfile.schema';
-import { IRCIngestionService, type InboundIRCMessageDTO } from '../irc-ingestion.service';
 import { auditService } from '../audit.service';
+import { IRCIngestionService, type InboundIRCMessageDTO } from '../irc-ingestion.service';
 import * as wsGateway from '../websocket/websocket-gateway';
 
 // Mock audit service

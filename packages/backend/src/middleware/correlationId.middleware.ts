@@ -1,9 +1,9 @@
-import { Request, Response, NextFunction } from 'express';
 import { AsyncLocalStorage } from 'async_hooks';
 import { randomUUID } from 'crypto';
+import type { Request, Response, NextFunction } from 'express';
+import type { Logger } from 'pino';
 import { logger } from '../infrastructure/logger';
 import type { AuthUser } from '../types/auth.types';
-import type { Logger } from 'pino';
 
 /**
  * Extended Request interface with correlation ID and logger

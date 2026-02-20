@@ -5,13 +5,13 @@
  * Validates sessions and attaches user info to socket
  */
 
-import { Socket } from 'socket.io';
-import { dbClient } from '../infrastructure/db.client';
-import { users } from '../schemas/user.schema';
 import { eq } from 'drizzle-orm';
-import { logger } from '../infrastructure/logger';
+import type { Socket } from 'socket.io';
 import { appConfig } from '../config/appConfig';
 import { betterAuthClient } from '../infrastructure/better-auth.client';
+import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
+import { users } from '../schemas/user.schema';
 
 /**
  * Extended Socket interface with authenticated user

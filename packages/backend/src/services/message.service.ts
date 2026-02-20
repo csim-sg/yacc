@@ -1,12 +1,12 @@
-import { dbClient } from '../infrastructure/db.client.js';
-import { messages } from '../schemas/message.schema.js';
-import { conversations } from '../schemas/conversation.schema.js';
-import { users } from '../schemas/user.schema.js';
-import { eq, desc, asc, and, sql } from 'drizzle-orm';
-import type { Message } from '../schemas/message.schema.js';
-import type { GetMessagesQuery, SendMessageRequestBody } from '../types/message.types.js';
 import type { Platform } from '@yacc/common/types/platform.type';
+import { eq, desc, asc, and, sql } from 'drizzle-orm';
+import { dbClient } from '../infrastructure/db.client.js';
 import { logger } from '../infrastructure/logger.js';
+import { conversations } from '../schemas/conversation.schema.js';
+import { messages } from '../schemas/message.schema.js';
+import type { Message } from '../schemas/message.schema.js';
+import { users } from '../schemas/user.schema.js';
+import type { GetMessagesQuery, SendMessageRequestBody } from '../types/message.types.js';
 import { connectorManager } from './connector-manager.js';
 import { MessageStatusTracker } from './messageStatusTracker.js';
 

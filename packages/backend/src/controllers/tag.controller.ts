@@ -4,6 +4,8 @@
  * Implements endpoints per .docs/02-api-and-data-model.md
  */
 
+import type { AddTagToConversationRequest } from '@yacc/common/requests/tags/addTagToConversation.request';
+import type { CreateTagRequest } from '@yacc/common/requests/tags/createTag.request';
 import type { Request } from 'express';
 import {
   JsonController,
@@ -20,12 +22,10 @@ import {
   BadRequestError,
   ForbiddenError,
 } from 'routing-controllers';
-import type { CreateTagRequest } from '@yacc/common/requests/tags/createTag.request';
-import type { AddTagToConversationRequest } from '@yacc/common/requests/tags/addTagToConversation.request';
-import type { AuthUser } from '../types/auth.types';
-import { authorizationService } from '../services/authorization.service';
 import { logger } from '../infrastructure/logger';
+import { authorizationService } from '../services/authorization.service';
 import { tagService } from '../services/tag.service';
+import type { AuthUser } from '../types/auth.types';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;

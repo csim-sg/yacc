@@ -11,16 +11,16 @@
  * for forgot-password and reset-password endpoints.
  */
 
-import { All, JsonController, Post, Req, Res, Body, BadRequestError, UseBefore } from 'routing-controllers';
+import { eq } from 'drizzle-orm';
 import type { Request, Response } from 'express';
+import { All, JsonController, Post, Req, Res, Body, BadRequestError, UseBefore } from 'routing-controllers';
 import { betterAuthClient } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
-import { users } from '../schemas/user.schema';
-import { eq } from 'drizzle-orm';
-import { generateResetToken, resetPassword } from '../services/passwordReset.service';
 import { logger } from '../infrastructure/logger';
-import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
 import { loginRateLimiter, passwordResetRateLimiter } from '../middleware/rateLimit.middleware';
+import { users } from '../schemas/user.schema';
+import { generateResetToken, resetPassword } from '../services/passwordReset.service';
+import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;

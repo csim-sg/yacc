@@ -7,9 +7,9 @@
  * Idempotent: Safe to call multiple times; prevents duplicate event listeners
  */
 
-import { connectorManager } from './connector-manager';
 import { ircStatusClient } from '../infrastructure/ircStatus.client';
 import { logger } from '../infrastructure/logger';
+import { connectorManager } from './connector-manager';
 
 /**
  * Track if wiring has already been done (prevent duplicate listeners)

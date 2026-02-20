@@ -6,16 +6,16 @@
  */
 
 import { EventEmitter } from 'events';
-import type { Platform } from '@yacc/common/types/platform.type';
-import type { ConnectorStatus } from '@yacc/common/types/connectorStatus.type';
 import type { ConnectionInfo } from '@yacc/common/types/connectionInfo.interface';
+import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
+import type { ConnectorEventMap } from '@yacc/common/types/connectorEventMap.type';
+import type { ConnectorMessage } from '@yacc/common/types/connectorMessage.interface';
+import type { ConnectorStatus } from '@yacc/common/types/connectorStatus.type';
+import type { MessageSendError } from '@yacc/common/types/messageSendError.interface';
+import type { Platform } from '@yacc/common/types/platform.type';
 import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
 import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse.interface';
-import type { ConnectorEventMap } from '@yacc/common/types/connectorEventMap.type';
 import type { ValidationError } from '@yacc/common/types/validationError.interface';
-import type { ConnectorMessage } from '@yacc/common/types/connectorMessage.interface';
-import type { MessageSendError } from '@yacc/common/types/messageSendError.interface';
-import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
 import { MessageStatusTracker } from '../../services/messageStatusTracker';
 
 // ============================================

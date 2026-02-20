@@ -5,14 +5,14 @@
 
 import { eq } from 'drizzle-orm';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import type { CreateRoutingRuleRequest } from '../types/routingRules.types.js';
 import { dbClient } from '../infrastructure/db.client.js';
-import { rulesEngineService } from '../services/rules-engine.service.js';
-import { routingRulesService } from '../services/routing-rules.service.js';
 import { conversations } from '../schemas/conversation.schema.js';
 import { routingRuleExecutions } from '../schemas/routingRuleExecution.schema.js';
 import { tags } from '../schemas/tag.schema.js';
 import { users } from '../schemas/user.schema.js';
+import { routingRulesService } from '../services/routing-rules.service.js';
+import { rulesEngineService } from '../services/rules-engine.service.js';
+import type { CreateRoutingRuleRequest } from '../types/routingRules.types.js';
 
 // Simple hash for testing (in real code, use better-auth/crypto)
 const TEST_PASSWORD_HASH = '$2a$10$gS7c7JG.0GKGhZUZkYZu9uTDGjDqzH8s6HGkJKm0hI9G/xN.KVF2m';

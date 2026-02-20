@@ -24,15 +24,8 @@ import {
   Req,
   HttpCode,
 } from 'routing-controllers';
-import type {
-  CreateIrcProfileRequest,
-  UpdateIrcProfileRequest,
-  IrcProfileResponse,
-  TestConnectionResult,
-} from '../types/ircProfile.types';
+import { logger } from '../infrastructure/logger';
 import type { User } from '../schemas/user.schema';
-import { IrcProfileErrorCode } from '../types/ircProfile.types';
-import { IrcProfileError } from '../types/ircProfileError.types';
 import {
   createIrcProfile,
   listIrcProfiles,
@@ -43,7 +36,14 @@ import {
   deleteIrcProfile,
   recordTestResult,
 } from '../services/ircProfile.service';
-import { logger } from '../infrastructure/logger';
+import type {
+  CreateIrcProfileRequest,
+  UpdateIrcProfileRequest,
+  IrcProfileResponse,
+  TestConnectionResult,
+} from '../types/ircProfile.types';
+import { IrcProfileErrorCode } from '../types/ircProfile.types';
+import { IrcProfileError } from '../types/ircProfileError.types';
 
 /**
  * Custom Request type with user context

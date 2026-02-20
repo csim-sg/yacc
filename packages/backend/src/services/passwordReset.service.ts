@@ -5,12 +5,12 @@
 
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
+import { eq, isNull, and, lt } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
 import { passwordResetTokens } from '../schemas/passwordReset.schema';
 import { users } from '../schemas/user.schema';
-import { eq, isNull, and, lt } from 'drizzle-orm';
-import { validatePassword } from './passwordValidation.service';
 import { auditService } from './audit.service';
+import { validatePassword } from './passwordValidation.service';
 
 /**
  * Generate a password reset token for user

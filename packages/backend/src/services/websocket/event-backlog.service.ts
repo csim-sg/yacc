@@ -10,10 +10,10 @@
  *   3. Cleanup old events: Automatic via TTL
  */
 
-import { redisClient } from '../../infrastructure/redis.client';
 import { logger } from '../../infrastructure/logger';
-import { MESSAGE_BACKLOG_DURATION_MS } from '../../websockets/wsConstants';
+import { redisClient } from '../../infrastructure/redis.client';
 import type { WebSocketEventMap } from '../../types/websocket.types';
+import { MESSAGE_BACKLOG_DURATION_MS } from '../../websockets/wsConstants';
 
 /**
  * Event backlog entry with metadata

@@ -8,13 +8,13 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { authConfig } from '../config/auth.config';
+import { account } from '../schemas/account.schema';
+import { session } from '../schemas/session.schema';
+import { users } from '../schemas/user.schema';
+import { verification } from '../schemas/verification.schema';
 import { dbClient } from './db.client';
 import { emailService } from './email.client';
 import { logger } from './logger';
-import { session } from '../schemas/session.schema';
-import { verification } from '../schemas/verification.schema';
-import { account } from '../schemas/account.schema';
-import { users } from '../schemas/user.schema';
 
 /**
  * User object shape for password reset email callback

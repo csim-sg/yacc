@@ -5,19 +5,19 @@
  */
 
 import { eq, and, desc, sql } from 'drizzle-orm';
+import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
+import { routingRules } from '../schemas/routingRule.schema';
+import { routingRuleExecutions } from '../schemas/routingRuleExecution.schema';
+import { tags } from '../schemas/tag.schema';
+import { users } from '../schemas/user.schema';
 import type {
   CreateRoutingRuleRequest,
   UpdateRoutingRuleRequest,
   RoutingCondition,
   RoutingAction,
 } from '../types/routingRules.types';
-import { routingRules } from '../schemas/routingRule.schema';
-import { routingRuleExecutions } from '../schemas/routingRuleExecution.schema';
-import { users } from '../schemas/user.schema';
-import { tags } from '../schemas/tag.schema';
-import { dbClient } from '../infrastructure/db.client';
 import { auditService } from './audit.service';
-import { logger } from '../infrastructure/logger';
 
 /**
  * Routing Rules Service

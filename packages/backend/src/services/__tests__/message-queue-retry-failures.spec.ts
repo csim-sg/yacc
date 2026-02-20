@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { queueDatabaseIntegration } from '../queue-database-integration';
-import { connectorManager } from '../connector-manager';
 import type { SendMessageJobPayload } from '../../types/message-queue.types';
+import { connectorManager } from '../connector-manager';
+import { queueDatabaseIntegration } from '../queue-database-integration';
 
 /**
  * Message Queue Retry Logic - Advanced Failure Scenarios

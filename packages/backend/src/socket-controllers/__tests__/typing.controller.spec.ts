@@ -4,10 +4,10 @@
  * Tests typing indicator events and timeouts
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TypingController } from '../typing.controller';
 import type { Socket } from 'socket.io';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AuthenticatedSocket } from '../../websockets/auth.middleware';
+import { TypingController } from '../typing.controller';
 
 describe('TypingController', () => {
   let controller: TypingController;

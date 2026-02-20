@@ -26,6 +26,7 @@ vi.mock('../../../infrastructure/redis.client', () => ({
   },
 }));
 
+import { redisClient } from '../../../infrastructure/redis.client';
 import {
   storeEvent,
   getBacklogForUser,
@@ -33,7 +34,6 @@ import {
   clearBacklogForUser,
   getBacklogStats,
 } from '../event-backlog.service';
-import { redisClient } from '../../../infrastructure/redis.client';
 
 /**
  * Helper to create mock payload

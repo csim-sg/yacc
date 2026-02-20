@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { messageQueueService } from '../message-queue.service';
+import type { SendMessageJobPayload} from '../../types/message-queue.types';
+import { RETRY_CONFIG } from '../../types/message-queue.types';
 import { messageQueueDLQService } from '../message-queue-dlq.service';
-import { SendMessageJobPayload, RETRY_CONFIG } from '../../types/message-queue.types';
+import { messageQueueService } from '../message-queue.service';
 
 /**
  * Message Queue Service - Unit & Integration Tests
