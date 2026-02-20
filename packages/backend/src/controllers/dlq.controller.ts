@@ -121,12 +121,13 @@ export class DLQController {
   }
 
   /**
-   * GET /api/dlq/stats
-   * Get DLQ statistics (counts by failure reason, etc.)
-   * Requires: manager+ role (READ)
-   */
-  @Get('/stats')
-  async getDLQStats(
+    * GET /api/dlq/stats
+    * Get DLQ statistics (counts by failure reason, etc.)
+    * Requires: manager+ role (READ)
+    */
+   @Get('/stats')
+   @Authorized(['manager', 'admin', 'super_admin'])
+   async getDLQStats(
     @Req() req: AuthenticatedRequest,
     @Res() res: Response
   ): Promise<void> {
@@ -227,12 +228,13 @@ export class DLQController {
   }
 
   /**
-   * DELETE /api/dlq/:id
-   * Remove DLQ entry (after ops review/resolution)
-   * Requires: super_admin only (MUTATE - strict access control)
-   */
-  @Delete('/:id')
-  async removeDLQEntry(
+    * DELETE /api/dlq/:id
+    * Remove DLQ entry (after ops review/resolution)
+    * Requires: super_admin only (MUTATE - strict access control)
+    */
+   @Delete('/:id')
+   @Authorized(['super_admin'])
+   async removeDLQEntry(
     @Param('id') id: string,
     @Req() req: AuthenticatedRequest,
     @Res() res: Response

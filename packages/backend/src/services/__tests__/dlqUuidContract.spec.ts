@@ -9,12 +9,12 @@
  * Issue: #270 - Enforce DLQ message_id UUID contract (or adjust schema) for retry/DLQ pipeline
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { dlqService } from '../dlq.service';
-import { dbClient } from '../../infrastructure/db.client';
 import { v4 as uuidv4 } from 'uuid';
-import type { SendMessageJobPayload } from '../../types/message-queue.types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MockedFunction } from 'vitest';
+import { dbClient } from '../../infrastructure/db.client';
+import type { SendMessageJobPayload } from '../../types/message-queue.types';
+import { dlqService } from '../dlq.service';
 
 // Mock database client
 vi.mock('../../infrastructure/db.client', () => ({

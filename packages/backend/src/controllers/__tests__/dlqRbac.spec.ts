@@ -14,9 +14,10 @@
  */
 
 import 'reflect-metadata';
-import { describe, it, expect, beforeAll } from 'vitest';
 import type { Express } from 'express';
 import request from 'supertest';
+import { beforeAll, describe, expect, it } from 'vitest';
+
 import { createTestApp, createTestUser, seedTestDLQEntry } from '../../../tests/test-helpers.js';
 
 describe('DLQ Controller - RBAC Integration Tests', () => {
@@ -98,35 +99,35 @@ describe('DLQ Controller - RBAC Integration Tests', () => {
         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
       });
 
-       it('should return 200 when authenticated as manager (READ allowed)', async () => {
-         const response = await request(testApp)
-           .get('/api/dlq')
-           .set('Authorization', `Bearer ${managerToken}`)
-           .expect(200);
+      it('should return 200 when authenticated as manager (READ allowed)', async () => {
+        const response = await request(testApp)
+          .get('/api/dlq')
+          .set('Authorization', `Bearer ${managerToken}`)
+          .expect(200);
 
-         // Manager has READ access, should get successful response
-         expect(response.body).toBeDefined();
-       });
+        // Manager has READ access, should get successful response
+        expect(response.body).toBeDefined();
+      });
 
-       it('should return 200 when authenticated as admin (READ allowed)', async () => {
-         const response = await request(testApp)
-           .get('/api/dlq')
-           .set('Authorization', `Bearer ${adminToken}`)
-           .expect(200);
+      it('should return 200 when authenticated as admin (READ allowed)', async () => {
+        const response = await request(testApp)
+          .get('/api/dlq')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200);
 
-         // Admin has READ access, should get successful response
-         expect(response.body).toBeDefined();
-       });
+        // Admin has READ access, should get successful response
+        expect(response.body).toBeDefined();
+      });
 
-       it('should return 200 when authenticated as super_admin (READ allowed)', async () => {
-         const response = await request(testApp)
-           .get('/api/dlq')
-           .set('Authorization', `Bearer ${superAdminToken}`)
-           .expect(200);
+      it('should return 200 when authenticated as super_admin (READ allowed)', async () => {
+        const response = await request(testApp)
+          .get('/api/dlq')
+          .set('Authorization', `Bearer ${superAdminToken}`)
+          .expect(200);
 
-         // Super admin has READ access, should get successful response
-         expect(response.body).toBeDefined();
-       });
+        // Super admin has READ access, should get successful response
+        expect(response.body).toBeDefined();
+      });
     });
 
     describe('GET /api/dlq/stats', () => {
@@ -147,32 +148,32 @@ describe('DLQ Controller - RBAC Integration Tests', () => {
         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
       });
 
-       it('should return 200 when authenticated as manager', async () => {
-         const response = await request(testApp)
-           .get('/api/dlq/stats')
-           .set('Authorization', `Bearer ${managerToken}`)
-           .expect(200);
+      it('should return 200 when authenticated as manager', async () => {
+        const response = await request(testApp)
+          .get('/api/dlq/stats')
+          .set('Authorization', `Bearer ${managerToken}`)
+          .expect(200);
 
-         expect(response.body).toBeDefined();
-       });
+        expect(response.body).toBeDefined();
+      });
 
-       it('should return 200 when authenticated as admin', async () => {
-         const response = await request(testApp)
-           .get('/api/dlq/stats')
-           .set('Authorization', `Bearer ${adminToken}`)
-           .expect(200);
+      it('should return 200 when authenticated as admin', async () => {
+        const response = await request(testApp)
+          .get('/api/dlq/stats')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200);
 
-         expect(response.body).toBeDefined();
-       });
+        expect(response.body).toBeDefined();
+      });
 
-       it('should return 200 when authenticated as super_admin', async () => {
-         const response = await request(testApp)
-           .get('/api/dlq/stats')
-           .set('Authorization', `Bearer ${superAdminToken}`)
-           .expect(200);
+      it('should return 200 when authenticated as super_admin', async () => {
+        const response = await request(testApp)
+          .get('/api/dlq/stats')
+          .set('Authorization', `Bearer ${superAdminToken}`)
+          .expect(200);
 
-         expect(response.body).toBeDefined();
-       });
+        expect(response.body).toBeDefined();
+      });
     });
   });
 
@@ -181,118 +182,118 @@ describe('DLQ Controller - RBAC Integration Tests', () => {
     * POST /api/dlq/:id/re-queue
     * Note: manager is read-only (cannot mutate)
     */
-   describe('MUTATE Endpoints (admin, super_admin allowed; manager is read-only)', () => {
-     describe('POST /api/dlq/:id/re-queue', () => {
-       it('should return 401 when unauthenticated', async () => {
-         const response = await request(testApp)
-           .post(`/api/dlq/${dlqId}/re-queue`)
-           .expect(401);
+  describe('MUTATE Endpoints (admin, super_admin allowed; manager is read-only)', () => {
+    describe('POST /api/dlq/:id/re-queue', () => {
+      it('should return 401 when unauthenticated', async () => {
+        const response = await request(testApp)
+          .post(`/api/dlq/${dlqId}/re-queue`)
+          .expect(401);
 
-         expect([response.body.error, response.body.name]).toContain('UnauthorizedError');
-       });
+        expect([response.body.error, response.body.name]).toContain('UnauthorizedError');
+      });
 
-       it('should return 403 when authenticated as user', async () => {
-         const response = await request(testApp)
-           .post(`/api/dlq/${dlqId}/re-queue`)
-           .set('Authorization', `Bearer ${userToken}`)
-           .expect(403);
+      it('should return 403 when authenticated as user', async () => {
+        const response = await request(testApp)
+          .post(`/api/dlq/${dlqId}/re-queue`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .expect(403);
 
-         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
-       });
+        expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
+      });
 
-       it('should return 403 when authenticated as manager (read-only)', async () => {
-         // Manager can view DLQ but cannot mutate (retry)
-         const response = await request(testApp)
-           .post(`/api/dlq/${dlqId}/re-queue`)
-           .set('Authorization', `Bearer ${managerToken}`)
-           .expect(403);
+      it('should return 403 when authenticated as manager (read-only)', async () => {
+        // Manager can view DLQ but cannot mutate (retry)
+        const response = await request(testApp)
+          .post(`/api/dlq/${dlqId}/re-queue`)
+          .set('Authorization', `Bearer ${managerToken}`)
+          .expect(403);
 
-         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
-       });
+        expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
+      });
 
-       it('should return 200 when authenticated as admin', async () => {
-         const response = await request(testApp)
-           .post(`/api/dlq/${dlqId}/re-queue`)
-           .set('Authorization', `Bearer ${adminToken}`)
-           .expect(200);
+      it('should return 200 when authenticated as admin', async () => {
+        const response = await request(testApp)
+          .post(`/api/dlq/${dlqId}/re-queue`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200);
 
-         // Admin can mutate, should get successful response
-         expect(response.body).toBeDefined();
-         expect(response.body.message).toBeDefined();
-       });
+        // Admin can mutate, should get successful response
+        expect(response.body).toBeDefined();
+        expect(response.body.message).toBeDefined();
+      });
 
-       it('should return 200 when authenticated as super_admin', async () => {
-         const response = await request(testApp)
-           .post(`/api/dlq/${dlqId}/re-queue`)
-           .set('Authorization', `Bearer ${superAdminToken}`)
-           .expect(200);
+      it('should return 200 when authenticated as super_admin', async () => {
+        const response = await request(testApp)
+          .post(`/api/dlq/${dlqId}/re-queue`)
+          .set('Authorization', `Bearer ${superAdminToken}`)
+          .expect(200);
 
-         // Super admin can mutate, should get successful response
-         expect(response.body).toBeDefined();
-         expect(response.body.message).toBeDefined();
-       });
-     });
-   });
+        // Super admin can mutate, should get successful response
+        expect(response.body).toBeDefined();
+        expect(response.body.message).toBeDefined();
+      });
+    });
+  });
 
   /**
     * DELETE Endpoints Tests
     * DELETE /api/dlq/:id
     * Note: super_admin only (strict access control)
     */
-   describe('DELETE Endpoints (super_admin only)', () => {
-     describe('DELETE /api/dlq/:id', () => {
-       it('should return 401 when unauthenticated', async () => {
-         const response = await request(testApp)
-           .delete(`/api/dlq/${dlqId}`)
-           .expect(401);
+  describe('DELETE Endpoints (super_admin only)', () => {
+    describe('DELETE /api/dlq/:id', () => {
+      it('should return 401 when unauthenticated', async () => {
+        const response = await request(testApp)
+          .delete(`/api/dlq/${dlqId}`)
+          .expect(401);
 
-         expect([response.body.error, response.body.name]).toContain('UnauthorizedError');
-       });
+        expect([response.body.error, response.body.name]).toContain('UnauthorizedError');
+      });
 
-       it('should return 403 when authenticated as user', async () => {
-         const response = await request(testApp)
-           .delete(`/api/dlq/${dlqId}`)
-           .set('Authorization', `Bearer ${userToken}`)
-           .expect(403);
+      it('should return 403 when authenticated as user', async () => {
+        const response = await request(testApp)
+          .delete(`/api/dlq/${dlqId}`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .expect(403);
 
-         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
-       });
+        expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
+      });
 
-       it('should return 403 when authenticated as manager', async () => {
-         const response = await request(testApp)
-           .delete(`/api/dlq/${dlqId}`)
-           .set('Authorization', `Bearer ${managerToken}`)
-           .expect(403);
+      it('should return 403 when authenticated as manager', async () => {
+        const response = await request(testApp)
+          .delete(`/api/dlq/${dlqId}`)
+          .set('Authorization', `Bearer ${managerToken}`)
+          .expect(403);
 
-         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
-       });
+        expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
+      });
 
-       it('should return 403 when authenticated as admin (cannot delete)', async () => {
-         // Admin can retry but cannot permanently delete
-         const response = await request(testApp)
-           .delete(`/api/dlq/${dlqId}`)
-           .set('Authorization', `Bearer ${adminToken}`)
-           .expect(403);
+      it('should return 403 when authenticated as admin (cannot delete)', async () => {
+        // Admin can retry but cannot permanently delete
+        const response = await request(testApp)
+          .delete(`/api/dlq/${dlqId}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(403);
 
-         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
-       });
+        expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
+      });
 
-       it('should return 200 when authenticated as super_admin', async () => {
-         const response = await request(testApp)
-           .delete(`/api/dlq/${dlqId}`)
-           .set('Authorization', `Bearer ${superAdminToken}`)
-           .expect(200);
+      it('should return 200 when authenticated as super_admin', async () => {
+        const response = await request(testApp)
+          .delete(`/api/dlq/${dlqId}`)
+          .set('Authorization', `Bearer ${superAdminToken}`)
+          .expect(200);
 
-         // Super admin can delete, should get successful response
-         expect(response.body).toBeDefined();
-         expect(response.body.message).toBeDefined();
-       });
-     });
-   });
+        // Super admin can delete, should get successful response
+        expect(response.body).toBeDefined();
+        expect(response.body.message).toBeDefined();
+      });
+    });
+  });
 
   /**
-   * RBAC Policy Matrix Validation
-   */
+    * RBAC Policy Matrix Validation
+    */
   describe('RBAC Policy Matrix Verification', () => {
     const rbacMatrix = [
       {
