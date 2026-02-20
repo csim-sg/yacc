@@ -87,16 +87,17 @@ export default [
       ],
 
        /* ---------- Unicorn (safe defaults) ---------- */
-       // Note: Some unicorn rules require ESLint 9 and may fail with ESLint 8
-       // Disable problematic rules for now
-       'unicorn/prefer-node-protocol': 'off',
-       'unicorn/prefer-string-replace-all': 'off',
-       'unicorn/no-abusive-eslint-disable': 'off',
-        'unicorn/filename-case': [
+        // Note: Some unicorn rules require ESLint 9 and may fail with ESLint 8
+        // Disable problematic rules for now
+        'unicorn/prefer-node-protocol': 'off',
+        'unicorn/prefer-string-replace-all': 'off',
+        'unicorn/no-abusive-eslint-disable': 'off',
+         'unicorn/filename-case': [
           'error',
           {
             cases: {
               camelCase: true,
+              kebabCase: true,
             },
             ignore: [
               // Config files (standard naming exceptions)
