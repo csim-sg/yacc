@@ -71,16 +71,9 @@ describe('DLQ Controller - RBAC Integration Tests', () => {
   });
 
   afterAll(async () => {
-    // Ensure all pending operations complete before cleanup
-    // This prevents "Cannot set headers after they are sent" errors
-    if (testApp) {
-      // Give pending requests time to complete
-      await new Promise<void>((resolve) => {
-        setTimeout(() => {
-          resolve();
-        }, 100);
-      });
-    }
+    // No cleanup needed: supertest handles app lifecycle automatically
+    // Tests pass the Express app instance, not an HTTP server
+    // When test suite ends, app will be garbage collected
   });
 
   /**

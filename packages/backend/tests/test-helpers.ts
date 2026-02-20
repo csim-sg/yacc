@@ -32,6 +32,8 @@ export interface TestUser {
 /**
  * Returns a fully configured Express app for testing.
  * Sets up routing-controllers with same configuration as src/index.ts.
+ * 
+ * Note: The app is not started as an HTTP server. It's ready for supertest.
  */
 export async function createTestApp(): Promise<Express> {
    const express = await import('express');
