@@ -33,6 +33,7 @@ export interface InboundIRCMessageDTO {
   nick: string; // Sender nick
   message: string; // Message body (raw from IRC)
   connectorNick: string; // Configured connector nick (for self-echo detection)
+  ircProfileId?: number; // IRC profile ID (required for profile-scoped conversations)
 }
 
 /**
@@ -89,23 +90,28 @@ export class IRCIngestionService {
   /**
    * Find or create a conversation for this IRC channel
    *
+   * Profile-scoped uniqueness:
+   * - Query: (ircProfileId, externalThreadId, channel='irc')
+   * - Insert with ircProfileId to enforce profile-aware uniqueness
+   *
    * Implementation uses select-then-insert pattern with conflict handling:
-   * 1. Select existing conversation for channel
+   * 1. Select existing conversation for (profile, channel)
    * 2. If not found, insert new conversation (may fail due to concurrent insert)
    * 3. If insert fails with constraint error, fetch the conversation created by concurrent request
    *
    * This pattern is acceptable for MVP where IRC channels are created rarely.
    * For higher concurrency, replace with database-level UPSERT (INSERT ... ON CONFLICT).
    */
-  private async upsertConversation(channel: string): Promise<string> {
-    // Query for existing conversation
+  private async upsertConversation(channel: string, ircProfileId?: number): Promise<string> {
+    // Query for existing conversation using profile-scoped index
     const existing = await dbClient
       .select({ id: conversations.id })
       .from(conversations)
       .where(
         and(
           eq(conversations.channel, 'irc'),
-          eq(conversations.externalThreadId, channel)
+          eq(conversations.externalThreadId, channel),
+          ircProfileId ? eq(conversations.ircProfileId, ircProfileId) : undefined
         )
       )
       .limit(1);
@@ -121,6 +127,7 @@ export class IRCIngestionService {
         .values({
           channel: 'irc' as const,
           externalThreadId: channel,
+          ircProfileId: ircProfileId ?? null,
           title: channel, // Use channel name as title
           status: 'open' as const,
           priority: 'normal' as const,
@@ -143,7 +150,7 @@ export class IRCIngestionService {
       }
 
       logger.debug(
-        { channel },
+        { channel, ircProfileId },
         'Conversation created by concurrent request, fetching it'
       );
 
@@ -154,7 +161,8 @@ export class IRCIngestionService {
         .where(
           and(
             eq(conversations.channel, 'irc'),
-            eq(conversations.externalThreadId, channel)
+            eq(conversations.externalThreadId, channel),
+            ircProfileId ? eq(conversations.ircProfileId, ircProfileId) : undefined
           )
         )
         .limit(1);
@@ -235,13 +243,13 @@ export class IRCIngestionService {
    * Main ingestion method: process inbound IRC message
    */
   async ingestInboundMessage(dto: InboundIRCMessageDTO): Promise<IngestionResult> {
-    const { channel, nick, message: rawMessage, connectorNick } = dto;
+    const { channel, nick, message: rawMessage, connectorNick, ircProfileId } = dto;
 
     try {
       // Step 1: Validate channel (must be channel, not DM)
       if (!this.isChannel(channel)) {
         logger.debug(
-          { channel, nick },
+          { channel, nick, ircProfileId },
           'Ignoring non-channel message (DM or server message)'
         );
         return {
@@ -253,7 +261,7 @@ export class IRCIngestionService {
       // Step 2: Check for self-echo
       if (this.isSelfEcho(nick, connectorNick)) {
         logger.debug(
-          { channel, nick, connectorNick },
+          { channel, nick, connectorNick, ircProfileId },
           'Ignoring self-echo message'
         );
         return {
@@ -265,16 +273,16 @@ export class IRCIngestionService {
       // Step 3: Sanitize message body
       const sanitizedBody = this.sanitizeMessageBody(rawMessage);
       if (sanitizedBody.length === 0) {
-        logger.debug({ channel, nick }, 'Ignoring empty message after sanitization');
+        logger.debug({ channel, nick, ircProfileId }, 'Ignoring empty message after sanitization');
         return {
           success: false,
           error: 'Message body is empty after sanitization',
         };
       }
 
-      // Step 4: Upsert conversation
-      const conversationId = await this.upsertConversation(channel);
-      logger.debug({ conversationId, channel }, 'Conversation upserted');
+      // Step 4: Upsert conversation with profile-scoped uniqueness
+      const conversationId = await this.upsertConversation(channel, ircProfileId);
+      logger.debug({ conversationId, channel, ircProfileId }, 'Conversation upserted');
 
       // Step 5: Insert message and handle auto-reopen (uses ConversationService)
       // This also updates lastActivityAt and handles conversation reopening

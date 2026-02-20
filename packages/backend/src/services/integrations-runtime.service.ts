@@ -48,6 +48,7 @@ export async function initializeIntegrationsRuntime(): Promise<void> {
       nick: resolvedConfig.nick,
       password: resolvedConfig.password,
       channels: resolvedConfig.channels,
+      profileId: resolvedConfig.profileId, // Pass profile ID for profile-scoped conversation mapping
     });
 
     connectorManager.registerConnector('irc', irc);
@@ -59,6 +60,7 @@ export async function initializeIntegrationsRuntime(): Promise<void> {
       logger.error(
         {
           platform: 'irc',
+          profileId: resolvedConfig.profileId,
           error: error instanceof Error ? error.message : String(error),
         },
         'IRC connector failed to connect (will retry with backoff)'
@@ -66,7 +68,7 @@ export async function initializeIntegrationsRuntime(): Promise<void> {
     });
 
     logger.info(
-      { platform: 'irc', source: resolvedConfig.source },
+      { platform: 'irc', profileId: resolvedConfig.profileId, source: resolvedConfig.source },
       'IRC connector initialized (DB-first resolution)'
     );
   } catch (error) {

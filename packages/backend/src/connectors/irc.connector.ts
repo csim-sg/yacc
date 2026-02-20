@@ -26,6 +26,7 @@ type IRCConfig = ConnectorConfig<'irc'> & {
   nick: string;
   password?: string;
   channels: string[];
+  profileId?: number; // IRC profile ID (for profile-scoped conversation mapping)
 };
 
 const CONNECT_TIMEOUT_MS = 30000;
@@ -54,11 +55,21 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
   private connectTimeoutId: NodeJS.Timeout | null = null;
   private correlationId: string = '';
   private reconnectIncidentId: string = '';
+  private profileId?: number; // IRC profile ID for profile-scoped conversations
 
   constructor() {
     super('irc');
     // Override max reconnect attempts for IRC: EA spec requires exactly 5 attempts
     this.maxReconnectAttempts = 5;
+  }
+
+  /**
+   * Override setConfig to extract and store profileId
+   */
+  public override setConfig(config: IRCConfig): void {
+    super.setConfig(config);
+    // Store profileId for profile-scoped conversation mapping
+    this.profileId = config.profileId;
   }
 
   /**
@@ -437,12 +448,14 @@ export class IRCConnector extends BaseConnector<'irc', IRCConfig> {
           nick: evt.nick,
           message: evt.message,
           connectorNick: this.config.nick,
+          ircProfileId: this.profileId,
         }).catch((error) => {
           logger.error(
             {
               platform: 'irc',
               nick: evt.nick,
               channel: evt.target,
+              ircProfileId: this.profileId,
               error: error instanceof Error ? error.message : String(error),
             },
             'Error ingesting IRC message'
