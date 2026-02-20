@@ -56,6 +56,13 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     allowedRoles: ['SUPER_ADMIN'],
   },
   {
+    id: 'irc-profiles',
+    label: 'IRC Profiles',
+    href: '/integrations/irc-profiles',
+    icon: '💬',
+    allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+  },
+  {
      id: 'routing-rules',
      label: 'Routing Rules',
      href: '/routing-rules',

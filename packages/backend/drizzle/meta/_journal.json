@@ -22,6 +22,20 @@
       "when": 1771241075535,
       "tag": "0002_fix_priority_enum",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1771513696882,
+      "tag": "0003_add_integration_configs",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1771548503000,
+      "tag": "0004_add_integration_connection_profiles",
+      "breakpoints": true
     }
   ]
 }

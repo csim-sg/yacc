@@ -26,12 +26,14 @@
 ### Concept
 **YACC (Yet Another Chat Client)** is a cloud-hosted, single-tenant omni-channel chat platform that centralizes social communications (MVP Phase 1: Telegram groups/channels and IRC) into one unified inbox. Built with React, Node.js, PostgreSQL, and deployed to Cloudflare R2 + CDN for frontend assets and file storage, with backend on VPS.
 
-**Initial Release (Phase 1)**: Unified Inbox + Auth + Basic Ops + Telegram/IRC messaging  
-**Post-MVP**: Additional channels (WhatsApp/WeChat/Meta/X) + advanced features
+**Initial Release (Phase 1 MVP)**: Single-tenant deployment with unified inbox, auth, messaging (Telegram/IRC), collaboration features, routing rules, and notifications.  
+**Post-MVP**: Multi-tenant support, additional channels (WhatsApp/WeChat/Meta/X), and vault-based credential management.
 
 ---
 
 ## 2. Target Users & Roles
+
+All roles and data access are scoped to a **tenant (organization)** unless explicitly stated otherwise.
 
 | Role | Permissions |
 |------|-----------|
@@ -66,7 +68,7 @@
 - Email notifications
 - WhatsApp, WeChat, Meta, X integrations
 - RTL support
-- Multi-tenant architecture
+- External credential vault / secrets manager
 - Elasticsearch for search (use PostgreSQL FTS in MVP)
 
 ---
@@ -848,6 +850,27 @@ flowchart TD
   - Auto-reconnect status shown (retrying state with attempt counter)
 
 ---
+
+### Story 16.3: Manage Integration Connection Profiles (IRC - MVP Hard Cap)
+**As a** super admin  
+**I want** IRC connection profiles stored in the database  
+**So that** the system can store IRC configuration with encrypted passwords.
+
+**MVP Scope Note**: 
+- Single-tenant MVP with hard cap: **max 10 IRC profiles per system**
+- No tenant-configurable policy settings (post-MVP feature)
+- Profiles stored in database with encrypted passwords
+- Tenant settings and profile policy configuration deferred to Phase 2+
+
+**AC (MVP-locked)**:
+- System stores IRC connection profiles in database with encrypted passwords
+- Super admins can create/update/delete profiles; other roles denied (RBAC enforced)
+- Passwords/tokens encrypted at rest via `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY`
+- Passwords never returned in API responses (only `hasPassword` flag)
+- Hard cap: max 10 profiles total for IRC integration in MVP
+- Attempting to create beyond cap returns: `"Reached maximum of 10 IRC profiles"`
+- Audit logs never include plaintext secrets (recorded as boolean flags only)
+- Error messages sanitized (no secret exposure)
 
 ### Story 17.1: Create Tags On-the-Fly
 **As a** user  

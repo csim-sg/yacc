@@ -3,6 +3,7 @@ import { auditLogs } from "./auditLog.schema";
 import { conversations } from "./conversation.schema";
 import { deadLetterQueue } from "./deadLetterQueue.schema";
 import { integrationConfigs } from "./integrationConfig.schema";
+import { integrationConnectionProfiles } from "./integrationConnectionProfile.schema";
 import { messages } from "./message.schema";
 import { notes } from "./note.schema";
 import { notifications } from "./notification.schema";
@@ -29,6 +30,7 @@ export const schemas = {
   conversationTags,
   deadLetterQueue,
   integrationConfigs,
+  integrationConnectionProfiles,
   messages,
   notes,
   notifications,

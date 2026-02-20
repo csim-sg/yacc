@@ -152,6 +152,25 @@ export class EncryptionService {
   public static isEncryptionAvailable(): boolean {
     return this.encryptionKey !== null;
   }
+
+  /**
+   * Encrypt a JSON object
+   * @param obj - Object to encrypt
+   * @returns Encrypted string
+   */
+  public static encryptJSON<T = unknown>(obj: T): string | null {
+    return this.encrypt(JSON.stringify(obj));
+  }
+
+  /**
+   * Decrypt a JSON object
+   * @param encrypted - Encrypted string from encryptJSON()
+   * @returns Decrypted object
+   */
+  public static decryptJSON<T = unknown>(encrypted: string): T {
+    const decrypted = this.decrypt(encrypted);
+    return JSON.parse(decrypted) as T;
+  }
 }
 
 // Initialize encryption key at module load

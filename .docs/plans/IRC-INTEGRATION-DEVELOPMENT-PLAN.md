@@ -276,17 +276,29 @@ INT-013, INT-014 (Tests)
 
 ### Phase 3: Mapping & Error Handling (INT-010 to INT-012)
 
-#### INT-010: Environment Variables
-- **Description**: Load IRC credentials from environment
-- **Deliverables**:
-  - Create IRC configuration in `.env` (IRC_SERVER, IRC_PORT, IRC_USERNAME, IRC_PASSWORD, IRC_CHANNELS)
-  - Load on application startup
-  - Validate required fields
-  - Fallback to manual config if not set
+#### INT-010: Tenant-Owned Connection Profiles (Re-scoped)
+- **Description**: Store integration connection details in the database per tenant, to support many configured connections.
+- **Why**: Env vars and single-row-per-platform storage do not scale when each tenant may have multiple connection profiles.
+- **Deliverables** (product-level; requires architect design approval):
+  - Define which integrations are in-scope (default: IRC first; others follow the same pattern)
+  - Define ownership + RBAC:
+    - Who can create/update/delete profiles (tenant super_admin vs other roles)
+    - Who can view profiles (tenant-scoped)
+  - Define lifecycle:
+    - Create, list, update, delete a profile
+    - Select active profile(s) used for connection/sending
+  - Security requirements:
+    - Credentials encrypted at rest
+    - No plaintext secrets in API responses, logs, or audit metadata
+    - Audit events record actor + profile identifiers + whether secret changed (not the secret)
 - **Acceptance Criteria**:
-  - Environment variables read correctly
-  - Validation enforced
-  - Clear error messages if missing
+  - A tenant can have 0..N profiles for an integration
+  - Profiles can be created/updated/deleted with clear validation errors
+  - Secrets are never exposed in responses/logs/audit
+  - RBAC behavior is explicit and testable
+  - Migration/backward-compatibility expectations are documented (env fallback, if any)
+
+> Note: The prior INT-010 definition (env var management) is now treated as a deployment/documentation concern and should be captured under DOC-007 and/or a backend infra task if still required.
 
 #### INT-011: Channel Mapping
 - **Description**: Map IRC channels to conversations

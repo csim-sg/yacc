@@ -241,7 +241,7 @@ Development planning documents, task tracking, and sprint planning.
 | **Queue** | Redis + BullMQ | Simple, fast, built-in retry scheduling |
 | **Real-Time** | Socket.io | WebSocket with reconnection & backlog |
 | **Search** | PostgreSQL FTS (MVP) | Sufficient for MVP, Elasticsearch post-MVP |
-| **Architecture** | Single-tenant MVP | Simpler, credentials in env vars |
+| **Architecture** | Single-tenant (MVP) | Default tenant context; tenant-scoped schema readiness for future multi-tenant migration |
 | **Frontend** | React 18 + TanStack Start | Modern, SSR-capable, great DX |
 | **Backend** | Node.js + Express | Simple, fast, familiar ecosystem |
 | **Retry** | Exponential backoff | Standard, reduces server load |

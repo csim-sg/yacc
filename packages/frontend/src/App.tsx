@@ -20,6 +20,7 @@ import { ReconnectingIndicator } from './components/ReconnectingIndicator';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { ConversationPage } from './pages/ConversationPage';
 import { InboxPage } from './pages/InboxPage';
+import { IrcProfilesPage } from './pages/IrcProfilesPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/registerPage';
 import { RoutingRulesPage } from './pages/RoutingRulesPage';
@@ -180,22 +181,32 @@ function AppRoutes(): ReactElement {
            </ProtectedRoute>
          }
        />
+        <Route
+          path="/audit-logs"
+          element={
+            <ProtectedRoute requiredRole="MANAGER">
+              <MainLayout>
+                <AuditLogsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations/irc-profiles"
+          element={
+            <ProtectedRoute requiredRole="ADMIN">
+              <MainLayout>
+                <IrcProfilesPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
        <Route
-         path="/audit-logs"
+         path="/settings"
          element={
-           <ProtectedRoute requiredRole="MANAGER">
+           <ProtectedRoute requiredRole="ADMIN">
              <MainLayout>
-               <AuditLogsPage />
-             </MainLayout>
-           </ProtectedRoute>
-         }
-       />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute requiredRole="ADMIN">
-            <MainLayout>
-              <div className="p-8">Settings (Coming soon)</div>
+               <div className="p-8">Settings (Coming soon)</div>
             </MainLayout>
           </ProtectedRoute>
         }
