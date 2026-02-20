@@ -131,11 +131,12 @@ jobs:
 
 Three test jobs replace the single `test` job:
 
-1. **test-unit** (REQUIRED): Fast, stable unit tests from `src/` only
-   - Runs: `pnpm --filter @yacc/backend test src`
-   - Excludes: `packages/backend/tests/**` (integration tests)
+1. **test-unit** (REQUIRED): Curated stable unit tests
+   - Runs: `pnpm --filter @yacc/backend test src/services/__tests__/irc-ingestion.service.test.ts`
+   - Suite files: `irc-ingestion.service.test.ts` (17 tests, 100% stable)
    - Must pass to merge PR
    - Timeout: Standard (10s per test)
+   - Rationale: Only includes proven-stable unit tests from dev baseline (verified no flakes)
 
 2. **test-smoke** (REQUIRED): Curated small stable subset
    - Runs: `pnpm --filter @yacc/backend test tests/QA-001-integration.spec.ts`

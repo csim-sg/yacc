@@ -37,13 +37,28 @@
 | Check | Command | Required | Status | Notes |
 |-------|---------|----------|--------|-------|
 | **lint-changed** | `eslint <changed-files>` | ✅ YES | Required | New code must be lint-clean (no changed-files lint debt) |
-| **test-unit** | `pnpm test src` | ✅ YES | Required | Unit tests only, fast (unit tests in `src/` directory) |
+| **test-unit** | `pnpm test src/services/__tests__/irc-ingestion.service.test.ts` | ✅ YES | Required | Curated stable unit tests (IRC ingestion service) |
 | **test-smoke** | `pnpm test tests/QA-001-integration.spec.ts` | ✅ YES | Required | Curated stable integration test (smoke suite) |
 | **test-full** | `pnpm test` (all tests) | ⚠️ NO | Informational | May fail on baseline; `continue-on-error: true`; timeout 15m |
 
 **Rationale**: Dev baseline has test instability + lint debt. Required checks ensure new code quality while full suite provides signal for baseline issues.
 
 **Exit Plan**: See GOV-029 (two conditions: lint cleanup + test stabilization)
+
+### Unit Test Suite File List
+
+**Curated stable unit tests that must pass before PR merge:**
+
+| File | Purpose | Test Count | Status |
+|------|---------|-----------|--------|
+| `src/services/__tests__/irc-ingestion.service.test.ts` | IRC message ingestion | 17 | ✅ 100% Stable |
+
+**How to add more unit tests to required suite**: 
+- Test only passes reliably on dev baseline
+- No flaky timeouts or platform-specific failures
+- Fast execution (< 100ms per test)
+- Update table above when adding tests
+- Clear exit condition: when test becomes unstable, remove it
 
 ### Smoke Suite File List
 

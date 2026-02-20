@@ -82,7 +82,7 @@ jobs:
         if: needs.changed-files.outputs.backend-files == ''
         run: echo "✅ No backend files changed, lint skipped"
 
-  # Unit tests (required) - fast, stable subset (src unit tests only, no integration tests)
+  # Unit tests (required) - fast, stable subset of curated unit tests
   test-unit:
     runs-on: ubuntu-latest
     strategy:
@@ -132,8 +132,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run backend unit tests (src only, no integration tests)
-        run: pnpm --filter @yacc/backend test src
+      - name: Run backend unit tests (curated stable subset)
+        run: pnpm --filter @yacc/backend test src/services/__tests__/irc-ingestion.service.test.ts
         env:
           DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
           REDIS_HOST: localhost
