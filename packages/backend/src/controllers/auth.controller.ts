@@ -72,12 +72,12 @@ export class AuthController {
         };
       }
 
-       // Generate token using password reset service
-       const token = await generateResetToken(user.id, correlationId);
+        // Generate token using password reset service
+        const _token = await generateResetToken(user.id, correlationId);
 
-        // TODO: Send email via emailService when implemented
-        // const resetLink = `${appConfig.APP_FRONTEND_URL}/reset-password?token=${token}`;
-        // await emailService.sendPasswordResetEmail(email, resetLink);
+         // TODO: Send email via emailService when implemented
+         // const resetLink = `${appConfig.APP_FRONTEND_URL}/reset-password?token=${_token}`;
+         // await emailService.sendPasswordResetEmail(email, resetLink);
 
        logger.info('Password reset token generated and email sent - correlationId: %s, userId: %s', correlationId, user.id);
 
@@ -142,7 +142,7 @@ export class AuthController {
    */
   @Post('/sign-in/email')
   @UseBefore(loginRateLimiter)
-  async handleSignInEmail(@Req() req: BetterAuthRequest, @Res() res: Response): Promise<void> {
+  async handleSignInEmail(@Req() req: Request, @Res() res: Response): Promise<void> {
     return this.delegateToAuth(req, res);
   }
 
@@ -159,16 +159,16 @@ export class AuthController {
     * - /refresh-token (token refresh with Bearer plugin)
     */
    @All('/*')
-   async handleAuth(@Req() req: any, @Res() res: Response): Promise<void> {
-     return this.delegateToAuth(req, res);
-   }
+    async handleAuth(@Req() req: Request, @Res() res: Response): Promise<void> {
+      return this.delegateToAuth(req, res);
+    }
 
-   /**
-    * Helper method to delegate requests to BetterAuth handler
-    * Reads body from request and converts to BetterAuth format
-    * @private
-    */
-   private async delegateToAuth(req: any, res: Response): Promise<void> {
+    /**
+     * Helper method to delegate requests to BetterAuth handler
+     * Reads body from request and converts to BetterAuth format
+     * @private
+     */
+    private async delegateToAuth(req: Request, res: Response): Promise<void> {
      const correlationId = req.correlationId || 'unknown';
 
      try {
