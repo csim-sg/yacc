@@ -2,7 +2,7 @@
 
 **Date**: January 27, 2026  
 **Last Updated**: February 20, 2026 (Session 3 - Extended to allow kebabCase)  
-**Status**: APPROVED & FULLY IMPLEMENTED ✅  
+**Status**: Approved; Enforcement Partially Implemented (CI gating pending PR #274)  
 **Decision Maker**: Architect  
 **Affected Areas**: All packages (backend, frontend, common)  
 **Priority**: HIGH  
@@ -67,9 +67,9 @@ The codebase currently has **inconsistent file naming conventions**:
 
 | Category | Convention | Example |
 |----------|-----------|---------|
-| **React Components (.tsx)** | `PascalCase` | `Header.tsx`, `LoginPage.tsx`, `ProtectedRoute.tsx` |
-| **React Context (.tsx)** | `PascalCase` | `AuthContext.tsx` |
-| **React Hooks (.ts)** | `camelCase` with `use` prefix | `useMessages.ts`, `useSocket.ts`, `useConversations.ts` |
+| **React Components (.tsx)** | `PascalCase` (convention) | `Header.tsx`, `LoginPage.tsx`, `ProtectedRoute.tsx` |
+| **React Context (.tsx)** | `PascalCase` (convention) | `AuthContext.tsx` |
+| **React Hooks (.ts)** | `camelCase` with `use` prefix (convention) | `useMessages.ts`, `useSocket.ts`, `useConversations.ts` |
 | **Backend Services (.ts)** | `camelCase` OR `kebabCase` | `messageStatusTracker.ts` or `message-status-tracker.ts`, `authService.ts` or `auth-service.ts` |
 | **Backend Controllers (.ts)** | `camelCase` OR `kebabCase` | `auth.controller.ts` or `auth-controller.ts` |
 | **Backend Middleware (.ts)** | `camelCase` OR `kebabCase` | `correlationId.middleware.ts` or `correlation-id.middleware.ts` |
@@ -85,21 +85,22 @@ The codebase currently has **inconsistent file naming conventions**:
 
 ```typescript
 // ✅ CORRECT
-// File: messageStatusTracker.ts
+// File: messageStatusTracker.ts or message-status-tracker.ts (both allowed)
 export class MessageStatusTracker { }
 
-// File: AuthContext.tsx  (React Context = PascalCase)
+// File: AuthContext.tsx  (React Context = PascalCase convention)
 export const AuthContext = createContext();
 
-// File: useMessages.ts  (React Hook = camelCase with use prefix)
+// File: useMessages.ts  (React Hook = camelCase with use prefix convention)
 export const useMessages = () => { };
 
-// File: Header.tsx  (React Component = PascalCase)
+// File: Header.tsx  (React Component = PascalCase convention)
 export function Header() {}
 
-// ❌ INCORRECT
-// File: authContext.tsx  (React Context should be PascalCase)
-export const AuthContext = createContext();
+// ⚠️ NOTE: In React directories (components/, pages/, contexts/), the unicorn/filename-case rule is disabled.
+// PascalCase is a documented convention, not an enforced lint rule. Both these are acceptable:
+// File: AuthContext.tsx ✅ (PascalCase convention)
+// File: authContext.tsx ✅ (Also passes linter for these directories)
 ```
 
 ---
@@ -293,11 +294,13 @@ Update `eslint.config.js` to allow both camelCase and kebabCase (PR #273):
 ### CI/CD Integration
 
 **Current Status (Feb 2026):**
-- Backend CI checks depend on PR #274 (Backend CI workflow with changed-files lint gate)
-- Legacy `.github/workflows/lint.yml` and `.github/workflows/tests.yml` run only on `main`/`develop` branches (not on PRs)
-- **When PR #274 merges**: Backend PRs will lint only changed files (enforcing camelCase/kebabCase naming)
+- Legacy `.github/workflows/lint.yml` runs ESLint on `pull_request` events targeting `main` or `develop` branches only (NOT `dev`)
+- Legacy `.github/workflows/tests.yml` runs tests on `pull_request` events targeting `main` or `develop` branches only (NOT `dev`)
+- **Backend PRs targeting `dev`**: PR checks depend on PR #274 (Backend CI workflow with changed-files lint gate)
+- **Frontend/Common PRs targeting `dev`**: Follow legacy workflow behavior (lint on commit, tests manual)
 
 **How It Works Once PR #274 Merges:**
+- New Backend CI workflow activates for PRs targeting `dev`, `develop`, or `main`
 - ESLint runs on **changed files only** in backend PRs (not full baseline)
 - Files with camelCase or kebabCase names: ✅ PASS
 - Files with PascalCase names (outside React dirs): ❌ FAIL with error `"File name should be in camelCase or kebabCase"`
@@ -305,15 +308,20 @@ Update `eslint.config.js` to allow both camelCase and kebabCase (PR #273):
 
 ### What Is Enforced vs Convention (Feb 2026 Update)
 
-**Enforced by ESLint (global rule + override):**
-- ✅ React components (.tsx in `**/components/`, `**/pages/`, `**/contexts/`): **Convention documented, not strictly enforced** (override disables rule)
-- ✅ All other files: **camelCase OR kebabCase ALLOWED** (both accepted equally, no preference)
-- ❌ PascalCase outside React directories: **BLOCKED** (global rule flags as violation)
+**Strictly Enforced by ESLint:**
+- ✅ **Global rule** (all files outside React dirs): camelCase OR kebabCase ALLOWED (both equally accepted)
+- ❌ **Global rule** (all files outside React dirs): PascalCase BLOCKED (violates `unicorn/filename-case`)
 
-**Documented Convention (Guidance, Not Enforced):**
-- React Hooks (.ts): Prefer camelCase with `use` prefix (e.g., `useMessages.ts`), but other naming passes linter
-- Backend Services/Middleware/Types (.ts): Either camelCase or kebabCase acceptable; no preference enforced by linter
-- **Rationale**: ESLint rule is disabled for React directories to allow PascalCase (convention-based), while backend allows both camelCase/kebabCase to match actual codebase patterns and minimize refactoring
+**React Directories (components/, pages/, contexts/): Rule Disabled (Convention-Based)**
+- The `unicorn/filename-case` rule is **turned OFF** (`'off'`) for files matching `**/components/**/*.{tsx,ts}`, `**/pages/**/*.{tsx,ts}`, `**/contexts/**/*.{tsx,ts}`
+- Result: PascalCase is **NOT enforced** but is a **documented convention** for React components
+- In practice: `AuthContext.tsx` (PascalCase) and `authContext.tsx` (camelCase) both pass linting in these directories
+
+**Documented Conventions (Guidance, Not Enforced):**
+- **React Hooks** (.ts): Prefer camelCase with `use` prefix (e.g., `useMessages.ts`), but other naming passes linter
+- **React Components/Pages/Contexts** (.tsx): Prefer PascalCase (e.g., `Header.tsx`, `LoginPage.tsx`, `AuthContext.tsx`), but enforcement is disabled; both PascalCase and camelCase pass linter
+- **Backend Services/Middleware/Types** (.ts): Either camelCase or kebabCase acceptable; no preference enforced by linter
+- **Rationale**: Allow flexibility in React directories while maintaining the core principle of preventing PascalCase in backend code (where classes should not match file names)
 
 ### Code Review Checklist
 - [ ] All new files use camelCase OR kebabCase (both acceptable per ESLint rule)
