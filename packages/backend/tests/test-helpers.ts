@@ -252,25 +252,24 @@ export async function seedTestDLQEntry(userId: string): Promise<{ dlqId: string;
     throw new Error('Failed to create test conversation for DLQ seeding');
   }
 
-  // Step 2: Create a test message in that conversation
-  const messageId = uuidv4();
-  const messageResult = await dbClient
-    .insert(messages)
-    .values({
-      conversationId: conversationId,
-      senderId: userId,
-      senderName: 'Test Sender',
-      body: 'Test message for DLQ',
-      direction: 'outbound',
-      status: 'failed', // Mark as failed so it can be moved to DLQ
-    })
-    .returning({ id: messages.id });
+   // Step 2: Create a test message in that conversation
+   const messageResult = await dbClient
+     .insert(messages)
+     .values({
+       conversationId: conversationId,
+       senderId: userId,
+       senderName: 'Test Sender',
+       body: 'Test message for DLQ',
+       direction: 'outbound',
+       status: 'failed', // Mark as failed so it can be moved to DLQ
+     })
+     .returning({ id: messages.id });
 
-  if (!messageResult[0]?.id) {
-    throw new Error('Failed to create test message for DLQ seeding');
-  }
+   if (!messageResult[0]?.id) {
+     throw new Error('Failed to create test message for DLQ seeding');
+   }
 
-  const createdMessageId = messageResult[0].id;
+   const createdMessageId = messageResult[0].id;
 
   // Step 3: Create a DLQ entry referencing that message
   const dlqResult = await dbClient

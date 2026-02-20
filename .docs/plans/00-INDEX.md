@@ -13,7 +13,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 ---
 
 ## Current Delivery Status
-- Phase 1: ⏳ In Progress
+- Phase 1: ⏳ In Progress (IRC integration + DLQ contract hardening)
 - Phase 2: ✅ Completed (collaboration + rules merged)
 - QA: ⏳ Not Started
 
@@ -38,6 +38,13 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - **100% type safety** (no `any` types)
 - **Security hardening** (CRLF injection prevention, message length limits)
 - **EA approved** ✅
+
+### DLQ Contract & RBAC Hardening (Phase 1.5)
+| Task | Status | PR | Notes |
+|------|--------|----|----|
+| **DLQ UUID Contract + Traceability + RBAC** | ⏳ **IN PROGRESS** (PR #272) | #272 | UUID FK enforcement, traceability fields (correlationId, ircProfileId, externalThreadId), RBAC policy (manager=read-only, admin=mutate, super_admin=delete), GOV-028 governance decision |
+| Test Coverage | ⏳ In Progress | #272 | UUID contract tests ≥85%, RBAC tests ≥85% |
+| Governance Documentation | ⏳ In Progress | #272 | GOV-028 created, API docs updated, implementation guide updated |
 
 ## References (Authoritative)
 - Product scope & ACs: `.docs/01-product-specification.md`

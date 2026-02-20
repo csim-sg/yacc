@@ -6,7 +6,7 @@
 **Product Owner:** Product Owner (Pending Approval)  
 **Status:** Implementation in PR #272  
 **Impact Level:** Medium (DLQ critical ops functionality, adds 4 traceability fields)  
-**Database Migration:** 0005-add-dlq-traceability-fields.sql  
+**Database Migration:** `packages/backend/drizzle/0005_add_dlq_traceability_fields.sql`  
 **Review Date:** Upon PR #272 merge  
 
 ---
@@ -144,9 +144,9 @@ await dlqService.moveToDLQ(
 
 **Usage Example** (ops investigating failed Telegram message):
 ```sql
--- Find DLQ entry
+-- Find DLQ entry (using actual table name: dead_letter_queue)
 SELECT id, messageId, conversationId, correlationId, externalThreadId, metadata
-FROM deadLetterQueue
+FROM dead_letter_queue
 WHERE conversationId = 'a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6' AND failureReason = 'api_error'
 ORDER BY movedAt DESC;
 

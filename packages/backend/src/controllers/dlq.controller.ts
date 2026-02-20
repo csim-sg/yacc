@@ -5,7 +5,8 @@
  * 
  * RBAC Policy:
  * - READ endpoints (list, stats): manager, admin, super_admin
- * - MUTATE endpoints (re-queue, delete): admin, super_admin (managers read-only)
+ * - MUTATE endpoints (re-queue): admin, super_admin (manager is read-only)
+ * - DELETE endpoint (delete): super_admin only
  * 
  * Contract:
  * - messageId: UUID FK to messages.id (enforced by dlqService)

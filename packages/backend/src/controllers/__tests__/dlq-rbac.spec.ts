@@ -22,14 +22,10 @@ import { createTestApp, createTestUser, seedTestDLQEntry } from '../../../tests/
 describe('DLQ Controller - RBAC Integration Tests', () => {
   let testApp: Express;
   let managerToken: string;
-  let managerUserId: string;
   let adminToken: string;
-  let adminUserId: string;
   let superAdminToken: string;
-  let superAdminUserId: string;
   let userToken: string;
   let dlqId: string;
-  let dlqConversationId: string;
 
   beforeAll(async () => {
     // Boot Express app with routing-controllers
@@ -65,17 +61,13 @@ describe('DLQ Controller - RBAC Integration Tests', () => {
     });
 
     managerToken = manager.token;
-    managerUserId = manager.id;
     adminToken = admin.token;
-    adminUserId = admin.id;
     superAdminToken = superAdmin.token;
-    superAdminUserId = superAdmin.id;
     userToken = user.token;
 
     // Seed a real DLQ entry for mutate/delete tests
-    const dlqEntry = await seedTestDLQEntry(adminUserId);
+    const dlqEntry = await seedTestDLQEntry(admin.id);
     dlqId = dlqEntry.dlqId;
-    dlqConversationId = dlqEntry.conversationId;
   });
 
   /**
