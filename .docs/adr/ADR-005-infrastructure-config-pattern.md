@@ -458,6 +458,8 @@ export const someService = SomeService.getInstance();
 - **ADR-004**: Logging and Observability Strategy
 - **03-implementation-guide.md**: System architecture and folder structure
 - **PR #152**: BE-003 Authentication implementation (contains violations)
+- **ADR-005-Addendum-1**: Flat Infrastructure + DI Pattern
+- **ADR-005-Addendum-2**: External Platform Adapters in Infrastructure
 
 ---
 

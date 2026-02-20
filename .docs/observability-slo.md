@@ -10,7 +10,7 @@
 
 | Component | SLO | Metric | Target | Notes |
 |-----------|-----|--------|--------|-------|
-| **Inbox API** | Availability | Uptime | 99.5% | Single VPS, no redundancy (Phase 2: multi-region) |
+| **Inbox API** | Availability | Uptime | 99.5% | Single K3s cluster, no redundancy (Phase 2: multi-region) |
 | **Inbox API** | Latency (p50) | Response time | <100ms | GET /conversations, GET /conversations/:id |
 | **Inbox API** | Latency (p99) | Response time | <500ms | Maximum acceptable latency at 99th percentile |
 | **Message Send** | Success rate | Success/Total | 95% | After 3 retries (DLQ captures failures) |

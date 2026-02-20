@@ -431,7 +431,7 @@ describe('Message retry failure flow', () => {
 
 - **No database migrations required** (uses existing schema)
 - **No configuration changes required** (uses existing env vars)
-- **No infrastructure changes required** (single VPS deployment)
+- **No infrastructure changes required** (assumes K3s + Helm baseline per ADR-019)
 - **WebSocket gateway already initialized** (in BE-006 Phase 1-3)
 - **Message queue service already in place** (from previous phases)
 - **Immediate deployment possible** after PR merge

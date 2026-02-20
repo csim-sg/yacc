@@ -1,6 +1,6 @@
 # 06. Issues & User stories
 
-**Last Updated**: February 19, 2026  
+**Last Updated**: February 20, 2026  
 **Status**: ⏳ Phase 1 in progress (IRC admin endpoints); ✅ Phase 2 COMPLETE; ✅ MVP stage  
 **Current focus**: Post-MVP backlog / hardening (GitHub Project is source of truth)  
 **Governance**: ADR-003, ADR-014, ADR-015, GOV-026
@@ -188,6 +188,20 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | DEV-001b | Fix messageRetryWorker.ts import paths and module references | Not Started | P0 | Backend | DEV-001a | Worker imports resolved; tests pass | PVTI_lAHOAB4wV84BNGcwzgldpQ4 | 174 |
 | DEV-001c | Fix TypeScript moduleResolution and tsconfig issues | Not Started | P0 | Backend | DEV-001a | TypeScript config consistent across packages; no resolution errors | PVTI_lAHOAB4wV84BNGcwzgldpRI | 175 |
 | DEV-001d | Standardize logger usage across backend config files | Not Started | P0 | Backend | DEV-001c | Logging uses approved patterns; no console logging in config/infrastructure | PVTI_lAHOAB4wV84BNGcwzgldpRU | 176 |
+| DEV-002 | Consolidate auth services into authentication.service.ts (login/logout/getSession + password reset/validation) | Not Started | P1 | Backend | BE-003, BE-004 | Create `services/authentication.service.ts`; update `controllers/auth.controller.ts` to call it; remove redundant auth-only service files; keep `services/authorization.service.ts` scoped to authZ; tests + lint pass | - | - |
+| DEV-003 | Create gateway-exchange.ts for inbound + outbound orchestration | Not Started | P0 | Backend | - | Add `services/gateway-exchange.ts` as the single orchestration point for inbound/outbound message flow (persist, audit, rules hook, retry enqueue, typed WS emit); no platform-specific mapping in this file; existing flows updated to call gateway-exchange; tests pass | - | - |
+| DEV-004 | Move platform adapters into infrastructure (ADR-005 Addendum-2) | Not Started | P0 | Backend | DEV-003 | Migrate `connectors/*` platform translation to `infrastructure/*.adapter.ts` (e.g. `irc.adapter.ts`, `telegram.adapter.ts`); adapters contain SDK/protocol + mapping only; adapters DO NOT import `services/*` or write DB/emit WS; compilation passes | - | - |
+| DEV-005 | Refactor inbound pipeline to remove service dependencies from adapters | Not Started | P0 | Backend | DEV-004 | IRC inbound no longer calls `irc-ingestion.service.ts` from adapter; instead adapter emits normalized inbound events and `gateway-exchange.ts` handles persistence + side effects; add similar wiring for Telegram inbound when implemented; tests updated/added | - | - |
+| DEV-006 | Standardize adapter registration and outbound dispatch through gateway-exchange | Not Started | P1 | Backend | DEV-003, DEV-004 | `integrations-runtime.service.ts` registers adapters consistently; `message.service.ts` dispatches outbound via `gateway-exchange.ts` (gateway calls adapter send); connectorManager usage updated or replaced; retry worker path remains compatible; tests pass | - | - |
+| DEV-007 | Move backend unit tests out of src/__tests__ into tests/ mirror structure | Not Started | P0 | Backend | - | All backend tests live under `packages/backend/tests/` (same-level as `src/`); folder structure mirrors `src/` (e.g. `tests/services/...`); feature/task tests allowed in `tests/tasks/<TASK-ID>.spec.ts`; remove all `packages/backend/src/**/__tests__/` and `packages/backend/src/**/*.{spec,test}.ts`; test runner config updated if needed; `pnpm --filter @yacc/backend test` passes | - | - |
+| DEV-008 | Add guardrail to prevent new src/__tests__ tests | Not Started | P1 | Backend | DEV-007 | Add a CI/lint check (script or lint rule) that fails if any files exist under `packages/backend/src/**/__tests__/` or match `packages/backend/src/**/*.{spec,test}.ts`; developer docs updated; pipeline passes | - | - |
+| DEV-009 | ADR-018: Bun runtime migration (monorepo) | Not Started | P0 | Architect | - | ADR-018 approved; scope (runtime vs package manager) clarified; rollback plan documented; risks captured | - | - |
+| DEV-010 | Migrate monorepo installs to Bun workspaces | Not Started | P0 | Backend | DEV-009 | `bun install` works at repo root; workspace links resolve; pnpm usage removed or explicitly scoped; lockfile and CI caching updated; `turbo` tasks still run | - | - |
+| DEV-011 | Run backend on Bun in dev and production Docker | Not Started | P0 | Backend | DEV-010 | Backend starts via Bun (local + Docker); health smoke test passes; decorator stack works; no Node runtime requirement for prod container | - | - |
+| DEV-012 | CI/CD update for Bun runtime | Not Started | P1 | Backend | DEV-011 | GitHub Actions uses Bun install/cache; backend/frontend/common build and tests pass in CI; rollback path verified | - | - |
+| DEV-013 | ADR-019: Standardize CI/CD to K3s + Helm | Not Started | P0 | Architect | - | ADR-019 approved; docs updated (technology + implementation + quick reference); environment assumptions documented; rollback approach captured | - | - |
+| DEV-014 | Create Helm charts for YACC + dependencies (MVP) | Not Started | P0 | Backend | DEV-013 | Helm charts exist for backend (and frontend if deployed in-cluster); PostgreSQL + Redis installed via Helm; values separated per env; `helm upgrade --install` is idempotent; smoke deploy works on K3s | - | - |
+| DEV-015 | Update CI pipeline to deploy to K3s using Helm | Not Started | P0 | Backend | DEV-014 | GitHub Actions deploy job uses Helm; deploys to staging namespace; rollback documented; no kubectl imperative drift; pipeline passes | - | - |
 
 ### Frontend Tasks
 
