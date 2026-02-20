@@ -5,7 +5,8 @@
 **Architect:** Enterprise/Solution Architect (Claude Code)  
 **Product Owner:** Product Owner ⏳  
 **Status:** Implementation in PR #272  
-**Impact Level:** Medium (DLQ critical ops functionality, no schema changes)  
+**Impact Level:** Medium (DLQ critical ops functionality, adds 4 traceability fields)  
+**Database Migration:** 0005-add-dlq-traceability-fields.sql  
 **Review Date:** Upon PR #272 merge  
 
 ---
@@ -172,7 +173,7 @@ ORDER BY movedAt DESC;
 | Role | LIST | STATS | RE-QUEUE | DELETE | Notes |
 |------|------|-------|----------|--------|-------|
 | **super_admin** | ✅ | ✅ | ✅ | ✅ | Full access |
-| **admin** | ✅ | ✅ | ✅ | ✅ | Ops team (can retry & delete) |
+| **admin** | ✅ | ✅ | ✅ | ❌ | Ops team (can retry, not delete) |
 | **manager** | ✅ | ✅ | ❌ | ❌ | Oversight only (can view) |
 | **user** | ❌ | ❌ | ❌ | ❌ | No access |
 
@@ -184,7 +185,6 @@ ORDER BY movedAt DESC;
 
 **MUTATE Endpoints** (allowed: admin, super_admin):
 - `POST /api/dlq/:id/re-queue` - Move entry back to retry queue
-- `POST /api/dlq/:id/clear` - Mark entry as processed
 
 **DELETE Endpoints** (allowed: super_admin only):
 - `DELETE /api/dlq/:id` - Permanently remove DLQ entry

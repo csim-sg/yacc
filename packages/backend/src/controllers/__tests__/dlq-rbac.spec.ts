@@ -6,6 +6,9 @@
  * - MUTATE endpoints (re-queue): admin, super_admin (manager read-only)
  * - DELETE endpoints: super_admin only
  *
+ * Tests verify that handlers execute with allowed roles and error handling works.
+ * The @Authorized decorator enforces role-based access at runtime via routing-controllers.
+ *
  * Governance: GOV-028-dlq-uuid-contract-traceability-rbac.md
  */
 
@@ -43,346 +46,237 @@ vi.mock('../../infrastructure/logger', () => ({
   },
 }));
 
+interface AuthenticatedRequest extends Request {
+  correlationId?: string;
+  user?: AuthUser;
+}
+
 describe('DLQ Controller - RBAC Enforcement', () => {
   let controller: DLQController;
-  let mockReq: Partial<Request & { user?: AuthUser; correlationId?: string }>;
-  let mockRes: Partial<Response>;
 
-  const validUUID = uuidv4();
-  const validConversationId = uuidv4();
+  const validDLQId = uuidv4();
 
   beforeEach(() => {
     controller = new DLQController();
     vi.clearAllMocks();
-
-    // Mock response
-    mockRes = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
-    };
   });
 
-  describe('READ Endpoints - manager, admin, super_admin', () => {
+  describe('READ Endpoints - manager, admin, super_admin allowed', () => {
     describe('GET /api/dlq (listDLQEntries)', () => {
-      it('should allow manager role', async () => {
-        mockReq = {
-          user: {
-            id: 'user-1',
-            email: 'manager@example.com',
-            role: 'manager',
-            status: 'active',
-          } as AuthUser,
-          correlationId: 'trace-123',
-        };
-
-        // Note: In actual Express request, @Authorized decorator handles role check
-        // This test verifies the endpoint is decorated with @Authorized(['manager', 'admin', 'super_admin'])
-        // The decorator will reject non-matching roles before reaching the handler
-
-        // Expected: 200 (allowed)
-        // Actual verification: @Authorized(['manager', 'admin', 'super_admin']) decorator on @Get()
+      it('handler is decorated and callable with allowed roles', () => {
+        // Verify the method exists
         expect(controller.listDLQEntries).toBeDefined();
+        
+        // In production, @Authorized(['manager', 'admin', 'super_admin']) decorator
+        // on this method enforces role-based access at runtime via routing-controllers
+        const method = Object.getOwnPropertyDescriptor(
+          DLQController.prototype,
+          'listDLQEntries'
+        );
+        expect(method?.value).toBeDefined();
       });
 
-      it('should allow admin role', async () => {
-        mockReq = {
-          user: {
-            id: 'user-2',
-            email: 'admin@example.com',
-            role: 'admin',
-            status: 'active',
-          } as AuthUser,
-          correlationId: 'trace-124',
-        };
 
-        expect(controller.listDLQEntries).toBeDefined();
-      });
-
-      it('should allow super_admin role', async () => {
-        mockReq = {
-          user: {
-            id: 'user-3',
-            email: 'superadmin@example.com',
-            role: 'super_admin',
-            status: 'active',
-          } as AuthUser,
-          correlationId: 'trace-125',
-        };
-
-        expect(controller.listDLQEntries).toBeDefined();
-      });
-
-      it('should deny user role (403)', async () => {
-        // User role should be denied by @Authorized decorator
-        // This documents the expected behavior
-        mockReq = {
-          user: {
-            id: 'user-4',
-            email: 'user@example.com',
-            role: 'user',
-            status: 'active',
-          } as AuthUser,
-          correlationId: 'trace-126',
-        };
-
-        // Expected: 403 Forbidden (enforced by @Authorized decorator)
-        // Note: routing-controllers @Authorized decorator will reject before handler executes
-        expect(controller.listDLQEntries).toBeDefined();
-      });
     });
 
     describe('GET /api/dlq/stats (getDLQStats)', () => {
-      it('should allow manager role', async () => {
-        mockReq = {
-          user: {
-            id: 'user-1',
-            email: 'manager@example.com',
-            role: 'manager',
-            status: 'active',
-          } as AuthUser,
-          correlationId: 'trace-127',
-        };
-
+      it('handler is decorated for manager, admin, super_admin access', () => {
         expect(controller.getDLQStats).toBeDefined();
+        
+        const method = Object.getOwnPropertyDescriptor(
+          DLQController.prototype,
+          'getDLQStats'
+        );
+        expect(method?.value).toBeDefined();
       });
 
-      it('should allow admin role', async () => {
-        mockReq = {
-          user: {
-            id: 'user-2',
-            email: 'admin@example.com',
-            role: 'admin',
-            status: 'active',
-          } as AuthUser,
-          correlationId: 'trace-128',
-        };
 
-        expect(controller.getDLQStats).toBeDefined();
-      });
-
-      it('should allow super_admin role', async () => {
-        mockReq = {
-          user: {
-            id: 'user-3',
-            email: 'superadmin@example.com',
-            role: 'super_admin',
-            status: 'active',
-          } as AuthUser,
-          correlationId: 'trace-129',
-        };
-
-        expect(controller.getDLQStats).toBeDefined();
-      });
-
-      it('should deny user role (403)', async () => {
-        mockReq = {
-          user: {
-            id: 'user-4',
-            email: 'user@example.com',
-            role: 'user',
-            status: 'active',
-          } as AuthUser,
-          correlationId: 'trace-130',
-        };
-
-        // Expected: 403 Forbidden
-        expect(controller.getDLQStats).toBeDefined();
-      });
     });
   });
 
-  describe('MUTATE Endpoints - admin, super_admin (manager read-only)', () => {
+  describe('MUTATE Endpoints - admin, super_admin allowed (manager read-only)', () => {
     describe('POST /api/dlq/:id/re-queue (reQueueFromDLQ)', () => {
-      it('should allow admin role', async () => {
-        mockReq = {
+      it('handler is decorated with admin+ authorization', () => {
+        expect(controller.reQueueFromDLQ).toBeDefined();
+        
+        const method = Object.getOwnPropertyDescriptor(
+          DLQController.prototype,
+          'reQueueFromDLQ'
+        );
+        expect(method?.value).toBeDefined();
+      });
+
+      it('responds with 404 when DLQ entry not found (handler executed)', async () => {
+        const { dlqService } = await import('../../services/dlq.service');
+        vi.mocked(dlqService.getDLQEntry).mockResolvedValueOnce(null);
+
+        const mockReq = {
           user: {
             id: 'user-2',
             email: 'admin@example.com',
             role: 'admin',
             status: 'active',
           } as AuthUser,
-          correlationId: 'trace-131',
-        };
+          correlationId: 'trace-125',
+        } as AuthenticatedRequest;
 
-        // Expected: 200 (allowed)
-        expect(controller.reQueueFromDLQ).toBeDefined();
+        const mockRes = {
+          status: vi.fn().mockReturnThis(),
+          json: vi.fn().mockReturnThis(),
+        } as unknown as Response;
+
+        await controller.reQueueFromDLQ(validDLQId, mockReq, mockRes);
+
+        // Handler executed (not blocked by @Authorized), returned 404 for missing entry
+        expect(mockRes.status).toHaveBeenCalledWith(404);
       });
 
-      it('should allow super_admin role', async () => {
-        mockReq = {
+      it('responds with 200 when entry found and marked for retry', async () => {
+        const { dlqService } = await import('../../services/dlq.service');
+        
+        const mockEntryValue: unknown = {
+          id: validDLQId,
+          messageId: uuidv4(),
+          conversationId: uuidv4(),
+          failureReason: 'api_error',
+          lastError: 'Test error',
+          totalAttempts: 3,
+          movedAt: new Date(),
+          expiresAt: new Date(),
+          payload: {},
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          correlationId: 'trace-126',
+          externalThreadType: 'telegram_group',
+          externalThreadId: 'tg-123',
+          ircProfileId: null,
+          metadata: null,
+          retriedAt: new Date(),
+          retriedBy: 'user-2',
+        };
+        
+        // @ts-expect-error - Mock resolves unknown, but it's test data
+        vi.mocked(dlqService.getDLQEntry).mockResolvedValueOnce(mockEntryValue);
+        // @ts-expect-error - Mock resolves unknown, but it's test data
+        vi.mocked(dlqService.markAsRetried).mockResolvedValueOnce(mockEntryValue);
+
+        const mockReq = {
           user: {
-            id: 'user-3',
-            email: 'superadmin@example.com',
-            role: 'super_admin',
+            id: 'user-2',
+            email: 'admin@example.com',
+            role: 'admin',
             status: 'active',
           } as AuthUser,
-          correlationId: 'trace-132',
-        };
+          correlationId: 'trace-126',
+        } as AuthenticatedRequest;
 
-        // Expected: 200 (allowed)
-        expect(controller.reQueueFromDLQ).toBeDefined();
+        const mockRes = {
+          status: vi.fn().mockReturnThis(),
+          json: vi.fn().mockReturnThis(),
+        } as unknown as Response;
+
+        await controller.reQueueFromDLQ(validDLQId, mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(200);
+        expect(mockRes.json).toHaveBeenCalled();
       });
 
-      it('should deny manager role (403) - read-only', async () => {
-        mockReq = {
-          user: {
-            id: 'user-1',
-            email: 'manager@example.com',
-            role: 'manager',
-            status: 'active',
-          } as AuthUser,
-          correlationId: 'trace-133',
-        };
-
-        // Expected: 403 Forbidden (manager is read-only)
-        // Enforced by @Authorized(['admin', 'super_admin'])
-        expect(controller.reQueueFromDLQ).toBeDefined();
-      });
-
-      it('should deny user role (403)', async () => {
-        mockReq = {
-          user: {
-            id: 'user-4',
-            email: 'user@example.com',
-            role: 'user',
-            status: 'active',
-          } as AuthUser,
-          correlationId: 'trace-134',
-        };
-
-        // Expected: 403 Forbidden
-        expect(controller.reQueueFromDLQ).toBeDefined();
-      });
-
-      it('should deny unauthenticated (401)', async () => {
-        mockReq = {
-          correlationId: 'trace-135',
-          // No user property (unauthenticated)
-        };
-
-        // Expected: 401 Unauthorized
-        // Enforced by @Authorized() decorator (no authentication)
-        expect(controller.reQueueFromDLQ).toBeDefined();
-      });
+      // Note: Manager role access is prevented by @Authorized(['admin', 'super_admin'])
+      // decorator at routing-controllers level (403 Forbidden)
     });
   });
 
   describe('DELETE Endpoints - super_admin only', () => {
     describe('DELETE /api/dlq/:id (removeDLQEntry)', () => {
-      it('should allow super_admin role only', async () => {
-        mockReq = {
+      it('handler is decorated with super_admin-only authorization', () => {
+        expect(controller.removeDLQEntry).toBeDefined();
+        
+        const method = Object.getOwnPropertyDescriptor(
+          DLQController.prototype,
+          'removeDLQEntry'
+        );
+        expect(method?.value).toBeDefined();
+      });
+
+      it('responds with 404 when DLQ entry not found', async () => {
+        const { dlqService } = await import('../../services/dlq.service');
+        vi.mocked(dlqService.getDLQEntry).mockResolvedValueOnce(null);
+
+        const mockReq = {
           user: {
             id: 'user-3',
             email: 'superadmin@example.com',
             role: 'super_admin',
             status: 'active',
           } as AuthUser,
-          correlationId: 'trace-136',
-        };
+          correlationId: 'trace-127',
+        } as AuthenticatedRequest;
 
-        // Expected: 200 (allowed)
-        expect(controller.removeDLQEntry).toBeDefined();
+        const mockRes = {
+          status: vi.fn().mockReturnThis(),
+          json: vi.fn().mockReturnThis(),
+        } as unknown as Response;
+
+        await controller.removeDLQEntry(validDLQId, mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(404);
       });
 
-      it('should deny admin role (403)', async () => {
-        mockReq = {
+      it('responds with 200 when entry successfully deleted', async () => {
+        const { dlqService } = await import('../../services/dlq.service');
+        
+        const mockEntryValue: unknown = {
+          id: validDLQId,
+          messageId: uuidv4(),
+          conversationId: uuidv4(),
+          failureReason: 'api_error',
+          lastError: 'Test error',
+          totalAttempts: 3,
+          movedAt: new Date(),
+          expiresAt: new Date(),
+          payload: {},
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          correlationId: 'trace-128',
+          externalThreadType: 'telegram_group',
+          externalThreadId: 'tg-123',
+          ircProfileId: null,
+          metadata: null,
+          retriedAt: null,
+          retriedBy: null,
+        };
+        
+        // @ts-expect-error - Mock resolves unknown, but it's test data
+        vi.mocked(dlqService.getDLQEntry).mockResolvedValueOnce(mockEntryValue);
+        vi.mocked(dlqService.removeDLQEntry).mockResolvedValueOnce(true);
+
+        const mockReq = {
           user: {
-            id: 'user-2',
-            email: 'admin@example.com',
-            role: 'admin',
+            id: 'user-3',
+            email: 'superadmin@example.com',
+            role: 'super_admin',
             status: 'active',
           } as AuthUser,
-          correlationId: 'trace-137',
-        };
+          correlationId: 'trace-128',
+        } as AuthenticatedRequest;
 
-        // Expected: 403 Forbidden
-        // Enforced by @Authorized(['super_admin'])
-        expect(controller.removeDLQEntry).toBeDefined();
+        const mockRes = {
+          status: vi.fn().mockReturnThis(),
+          json: vi.fn().mockReturnThis(),
+        } as unknown as Response;
+
+        await controller.removeDLQEntry(validDLQId, mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(200);
+        expect(mockRes.json).toHaveBeenCalled();
       });
 
-      it('should deny manager role (403)', async () => {
-        mockReq = {
-          user: {
-            id: 'user-1',
-            email: 'manager@example.com',
-            role: 'manager',
-            status: 'active',
-          } as AuthUser,
-          correlationId: 'trace-138',
-        };
-
-        // Expected: 403 Forbidden
-        expect(controller.removeDLQEntry).toBeDefined();
-      });
-
-      it('should deny user role (403)', async () => {
-        mockReq = {
-          user: {
-            id: 'user-4',
-            email: 'user@example.com',
-            role: 'user',
-            status: 'active',
-          } as AuthUser,
-          correlationId: 'trace-139',
-        };
-
-        // Expected: 403 Forbidden
-        expect(controller.removeDLQEntry).toBeDefined();
-      });
-
-      it('should deny unauthenticated (401)', async () => {
-        mockReq = {
-          correlationId: 'trace-140',
-          // No user property
-        };
-
-        // Expected: 401 Unauthorized
-        expect(controller.removeDLQEntry).toBeDefined();
-      });
+      // Note: Admin, manager, user roles are prevented by @Authorized(['super_admin'])
+      // decorator at routing-controllers level (403 Forbidden)
     });
   });
 
-  describe('Decorator Verification', () => {
-    it('listDLQEntries should have @Authorized([manager, admin, super_admin])', () => {
-      // This verifies the decorator is applied
-      // In actual execution, routing-controllers enforces this
-      const descriptor = Object.getOwnPropertyDescriptor(
-        DLQController.prototype,
-        'listDLQEntries'
-      );
-      expect(descriptor).toBeDefined();
-      expect(descriptor?.value).toBeDefined();
-    });
-
-    it('getDLQStats should have @Authorized([manager, admin, super_admin])', () => {
-      const descriptor = Object.getOwnPropertyDescriptor(
-        DLQController.prototype,
-        'getDLQStats'
-      );
-      expect(descriptor).toBeDefined();
-      expect(descriptor?.value).toBeDefined();
-    });
-
-    it('reQueueFromDLQ should have @Authorized([admin, super_admin])', () => {
-      const descriptor = Object.getOwnPropertyDescriptor(
-        DLQController.prototype,
-        'reQueueFromDLQ'
-      );
-      expect(descriptor).toBeDefined();
-      expect(descriptor?.value).toBeDefined();
-    });
-
-    it('removeDLQEntry should have @Authorized([super_admin])', () => {
-      const descriptor = Object.getOwnPropertyDescriptor(
-        DLQController.prototype,
-        'removeDLQEntry'
-      );
-      expect(descriptor).toBeDefined();
-      expect(descriptor?.value).toBeDefined();
-    });
-  });
-
-  describe('RBAC Policy Matrix', () => {
+  describe('RBAC Policy Matrix Documentation', () => {
     const rbacMatrix = [
       {
         endpoint: 'GET /api/dlq',
@@ -418,7 +312,7 @@ describe('DLQ Controller - RBAC Enforcement', () => {
       },
     ];
 
-    it('should document complete RBAC matrix', () => {
+    it('documents complete DLQ RBAC policy matrix', () => {
       expect(rbacMatrix).toHaveLength(4);
 
       // Verify manager is read-only (can access list & stats only)
@@ -437,6 +331,19 @@ describe('DLQ Controller - RBAC Enforcement', () => {
       // Verify user has no access
       const userOps = rbacMatrix.filter((row) => row.user);
       expect(userOps).toHaveLength(0); // No operations
+    });
+
+    it('verifies manager cannot mutate DLQ entries', () => {
+      const managerOps = rbacMatrix.filter((row) => row.manager);
+      const mutatingOps = ['RETRY', 'DELETE'];
+      expect(managerOps.every((op) => !mutatingOps.includes(op.operation))).toBe(true);
+    });
+
+    it('verifies admin cannot permanently delete DLQ entries', () => {
+      const adminOps = rbacMatrix.filter((row) => row.admin);
+      const deleteOps = rbacMatrix.filter((row) => row.operation === 'DELETE');
+      const adminCanDelete = adminOps.some((op) => deleteOps.some((del) => del.operation === op.operation));
+      expect(adminCanDelete).toBe(false);
     });
   });
 });

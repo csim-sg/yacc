@@ -1088,9 +1088,9 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 {
   "entries": [
     {
-      "id": "dlq-123",
-      "messageId": "msg-456",
-      "conversationId": "conv-789",
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "messageId": "a1b2c3d4-e5f6-47g8-h9i0-j1k2l3m4n5o6",
+      "conversationId": "b2c3d4e5-f6a7-48h9-i0j1-k2l3m4n5o6p7",
       "failureReason": "api_error",
       "totalAttempts": 3,
       "lastError": "Telegram API returned 500",
@@ -1147,9 +1147,9 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 {
   "message": "Entry marked for manual retry",
   "entry": {
-    "id": "dlq-123",
-    "messageId": "msg-456",
-    "conversationId": "conv-789",
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "messageId": "a1b2c3d4-e5f6-47g8-h9i0-j1k2l3m4n5o6",
+    "conversationId": "b2c3d4e5-f6a7-48h9-i0j1-k2l3m4n5o6p7",
     "failureReason": "api_error"
   }
 }
@@ -1171,9 +1171,9 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 {
   "message": "DLQ entry deleted successfully",
   "deletedEntry": {
-    "id": "dlq-123",
-    "messageId": "msg-456",
-    "conversationId": "conv-789",
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "messageId": "a1b2c3d4-e5f6-47g8-h9i0-j1k2l3m4n5o6",
+    "conversationId": "b2c3d4e5-f6a7-48h9-i0j1-k2l3m4n5o6p7",
     "failureReason": "max_retries_exceeded"
   }
 }

@@ -14,6 +14,7 @@ import { dlqService } from '../dlq.service';
 import { dbClient } from '../../infrastructure/db.client';
 import { v4 as uuidv4 } from 'uuid';
 import type { SendMessageJobPayload } from '../../types/message-queue.types';
+import type { MockedFunction } from 'vitest';
 
 // Mock database client
 vi.mock('../../infrastructure/db.client', () => ({
@@ -29,6 +30,18 @@ vi.mock('../../infrastructure/db.client', () => ({
     },
   },
 }));
+
+// Type definitions for mocked dbClient methods
+interface MockInsertBuilder {
+  values: MockedFunction<(data: Record<string, unknown>) => MockInsertBuilder>;
+  returning: MockedFunction<(data?: Record<string, unknown>) => Promise<Record<string, unknown>[]>>;
+}
+
+interface MockSelectBuilder {
+  from: MockedFunction<(table: string) => MockSelectBuilder>;
+  where: MockedFunction<(condition: unknown) => MockSelectBuilder>;
+  orderBy: MockedFunction<(order: unknown) => Promise<Record<string, unknown>[]>>;
+}
 
 vi.mock('../../infrastructure/logger', () => ({
   logger: {
@@ -65,7 +78,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
   describe('moveToDLQ with valid UUID messageId', () => {
     it('should accept valid UUID messageId', async () => {
       // Setup mock to return a successful insert
-      const mockInsert = {
+      const mockInsert: MockInsertBuilder = {
         values: vi.fn().mockReturnThis(),
         returning: vi.fn().mockResolvedValue([
           {
@@ -87,7 +100,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
         ]),
       };
 
-      (dbClient.insert as any).mockReturnValue(mockInsert);
+      (dbClient.insert as unknown as MockedFunction<typeof dbClient.insert>).mockReturnValue(mockInsert as unknown as ReturnType<typeof dbClient.insert>);
 
       const result = await dlqService.moveToDLQ(
         validUUID,
@@ -125,7 +138,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
     });
 
     it('should store external job IDs in metadata, not as messageId', async () => {
-      const mockInsert = {
+      const mockInsert: MockInsertBuilder = {
         values: vi.fn().mockReturnThis(),
         returning: vi.fn().mockResolvedValue([
           {
@@ -146,7 +159,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
         ]),
       };
 
-      (dbClient.insert as any).mockReturnValue(mockInsert);
+      (dbClient.insert as unknown as MockedFunction<typeof dbClient.insert>).mockReturnValue(mockInsert as unknown as ReturnType<typeof dbClient.insert>);
 
       await dlqService.moveToDLQ(
         validUUID,
@@ -159,16 +172,17 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
         }
       );
 
-      const insertedValues = mockInsert.values.mock.calls[0][0];
+      const insertedValues = mockInsert.values.mock.calls[0][0] as Record<string, unknown>;
       expect(insertedValues.messageId).toBe(validUUID); // Always UUID
       expect(insertedValues.metadata).toBeDefined();
-      expect(insertedValues.metadata.jobId).toBe('msg-payload-abc123'); // Stored in metadata
+      const metadata = insertedValues.metadata as Record<string, string>;
+      expect(metadata.jobId).toBe('msg-payload-abc123'); // Stored in metadata
     });
 
     it('should include traceability fields (correlationId, ircProfileId, externalThreadId)', async () => {
       const ircProfileId = uuidv4();
 
-      const mockInsert = {
+      const mockInsert: MockInsertBuilder = {
         values: vi.fn().mockReturnThis(),
         returning: vi.fn().mockResolvedValue([
           {
@@ -190,7 +204,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
         ]),
       };
 
-      (dbClient.insert as any).mockReturnValue(mockInsert);
+      (dbClient.insert as unknown as MockedFunction<typeof dbClient.insert>).mockReturnValue(mockInsert as unknown as ReturnType<typeof dbClient.insert>);
 
       await dlqService.moveToDLQ(
         validUUID,
@@ -207,7 +221,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
         }
       );
 
-      const insertedValues = mockInsert.values.mock.calls[0][0];
+      const insertedValues = mockInsert.values.mock.calls[0][0] as Record<string, unknown>;
       expect(insertedValues.correlationId).toBe('trace-456');
       expect(insertedValues.ircProfileId).toBe(ircProfileId);
       expect(insertedValues.externalThreadType).toBe('irc_channel');
@@ -215,7 +229,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
     });
 
     it('should handle optional traceability fields gracefully', async () => {
-      const mockInsert = {
+      const mockInsert: MockInsertBuilder = {
         values: vi.fn().mockReturnThis(),
         returning: vi.fn().mockResolvedValue([
           {
@@ -237,7 +251,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
         ]),
       };
 
-      (dbClient.insert as any).mockReturnValue(mockInsert);
+      (dbClient.insert as unknown as MockedFunction<typeof dbClient.insert>).mockReturnValue(mockInsert as unknown as ReturnType<typeof dbClient.insert>);
 
       // Call without traceContext
       await dlqService.moveToDLQ(
@@ -249,7 +263,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
         // No traceContext parameter
       );
 
-      const insertedValues = mockInsert.values.mock.calls[0][0];
+      const insertedValues = mockInsert.values.mock.calls[0][0] as Record<string, unknown>;
       expect(insertedValues.correlationId).toBeUndefined();
       expect(insertedValues.ircProfileId).toBeUndefined();
       expect(insertedValues.externalThreadType).toBeUndefined();
@@ -259,7 +273,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
 
   describe('Database constraints validation', () => {
     it('should enforce 7-day expiration', async () => {
-      const mockInsert = {
+      const mockInsert: MockInsertBuilder = {
         values: vi.fn().mockReturnThis(),
         returning: vi.fn().mockResolvedValue([
           {
@@ -276,7 +290,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
         ]),
       };
 
-      (dbClient.insert as any).mockReturnValue(mockInsert);
+      (dbClient.insert as unknown as MockedFunction<typeof dbClient.insert>).mockReturnValue(mockInsert as unknown as ReturnType<typeof dbClient.insert>);
 
       await dlqService.moveToDLQ(
         validUUID,
@@ -286,8 +300,8 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
         'Test error'
       );
 
-      const insertedValues = mockInsert.values.mock.calls[0][0];
-      const expiresAt = insertedValues.expiresAt;
+      const insertedValues = mockInsert.values.mock.calls[0][0] as Record<string, unknown>;
+      const expiresAt = insertedValues.expiresAt as Date;
       const movedAt = new Date();
 
       // Should be approximately 7 days in the future
@@ -298,7 +312,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
     });
 
     it('should be referenceable by conversation', async () => {
-      const mockSelect = {
+      const mockSelect: MockSelectBuilder = {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
         orderBy: vi.fn().mockResolvedValue([
@@ -312,7 +326,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
         ]),
       };
 
-      (dbClient.select as any).mockReturnValue(mockSelect);
+      (dbClient.select as unknown as MockedFunction<typeof dbClient.select>).mockReturnValue(mockSelect as unknown as ReturnType<typeof dbClient.select>);
 
       const result = await dlqService.getDLQEntriesByConversation(validConversationId);
 
