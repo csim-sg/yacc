@@ -75,7 +75,6 @@ jobs:
         if: needs.changed-files.outputs.backend-files != ''
         run: |
           npx eslint ${{ needs.changed-files.outputs.backend-files }} \
-            --config packages/backend/eslint.config.js \
             --max-warnings 0
 
       - name: Lint skipped (no backend files changed)
