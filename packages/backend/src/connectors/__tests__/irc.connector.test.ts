@@ -995,7 +995,9 @@ describe('IRCConnector', () => {
       
       // Logger should have been called with unique correlationId
       expect(logger.error).toHaveBeenCalled();
-      const errorCall = (logger.error as any).mock.calls.find(
+      // Verify logger was called with an object containing correlationId
+      const loggerCalls = (logger.error as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+      const errorCall = loggerCalls.find(
         (call: unknown[]) => Array.isArray(call) && 
         typeof call[0] === 'object' && 
         'correlationId' in (call[0] as object)
