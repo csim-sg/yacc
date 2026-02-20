@@ -17,17 +17,19 @@ import 'reflect-metadata';
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { Express } from 'express';
 import request from 'supertest';
-import { v4 as uuidv4 } from 'uuid';
-import { createTestApp, createTestUser } from '../../../tests/test-helpers.js';
+import { createTestApp, createTestUser, seedTestDLQEntry } from '../../../tests/test-helpers.js';
 
 describe('DLQ Controller - RBAC Integration Tests', () => {
   let testApp: Express;
   let managerToken: string;
+  let managerUserId: string;
   let adminToken: string;
+  let adminUserId: string;
   let superAdminToken: string;
+  let superAdminUserId: string;
   let userToken: string;
-
-  const testDLQId = uuidv4();
+  let dlqId: string;
+  let dlqConversationId: string;
 
   beforeAll(async () => {
     // Boot Express app with routing-controllers
@@ -63,9 +65,17 @@ describe('DLQ Controller - RBAC Integration Tests', () => {
     });
 
     managerToken = manager.token;
+    managerUserId = manager.id;
     adminToken = admin.token;
+    adminUserId = admin.id;
     superAdminToken = superAdmin.token;
+    superAdminUserId = superAdmin.id;
     userToken = user.token;
+
+    // Seed a real DLQ entry for mutate/delete tests
+    const dlqEntry = await seedTestDLQEntry(adminUserId);
+    dlqId = dlqEntry.dlqId;
+    dlqConversationId = dlqEntry.conversationId;
   });
 
   /**
@@ -96,35 +106,35 @@ describe('DLQ Controller - RBAC Integration Tests', () => {
         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
       });
 
-      it('should NOT return 403 when authenticated as manager (READ allowed)', async () => {
-        const response = await request(testApp)
-          .get('/api/dlq')
-          .set('Authorization', `Bearer ${managerToken}`);
+       it('should return 200 when authenticated as manager (READ allowed)', async () => {
+         const response = await request(testApp)
+           .get('/api/dlq')
+           .set('Authorization', `Bearer ${managerToken}`)
+           .expect(200);
 
-        // Manager has READ access, should not get 403 (forbidden)
-        expect(response.status).not.toBe(403);
-        expect(response.status).not.toBe(401); // Not unauthorized
-      });
+         // Manager has READ access, should get successful response
+         expect(response.body).toBeDefined();
+       });
 
-      it('should NOT return 403 when authenticated as admin (READ allowed)', async () => {
-        const response = await request(testApp)
-          .get('/api/dlq')
-          .set('Authorization', `Bearer ${adminToken}`);
+       it('should return 200 when authenticated as admin (READ allowed)', async () => {
+         const response = await request(testApp)
+           .get('/api/dlq')
+           .set('Authorization', `Bearer ${adminToken}`)
+           .expect(200);
 
-        // Admin has READ access, should not get 403
-        expect(response.status).not.toBe(403);
-        expect(response.status).not.toBe(401);
-      });
+         // Admin has READ access, should get successful response
+         expect(response.body).toBeDefined();
+       });
 
-      it('should NOT return 403 when authenticated as super_admin (READ allowed)', async () => {
-        const response = await request(testApp)
-          .get('/api/dlq')
-          .set('Authorization', `Bearer ${superAdminToken}`);
+       it('should return 200 when authenticated as super_admin (READ allowed)', async () => {
+         const response = await request(testApp)
+           .get('/api/dlq')
+           .set('Authorization', `Bearer ${superAdminToken}`)
+           .expect(200);
 
-        // Super admin has READ access, should not get 403
-        expect(response.status).not.toBe(403);
-        expect(response.status).not.toBe(401);
-      });
+         // Super admin has READ access, should get successful response
+         expect(response.body).toBeDefined();
+       });
     });
 
     describe('GET /api/dlq/stats', () => {
@@ -145,145 +155,148 @@ describe('DLQ Controller - RBAC Integration Tests', () => {
         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
       });
 
-      it('should NOT return 403 when authenticated as manager', async () => {
-        const response = await request(testApp)
-          .get('/api/dlq/stats')
-          .set('Authorization', `Bearer ${managerToken}`);
+       it('should return 200 when authenticated as manager', async () => {
+         const response = await request(testApp)
+           .get('/api/dlq/stats')
+           .set('Authorization', `Bearer ${managerToken}`)
+           .expect(200);
 
-        expect(response.status).not.toBe(403);
-        expect(response.status).not.toBe(401);
-      });
+         expect(response.body).toBeDefined();
+       });
 
-      it('should NOT return 403 when authenticated as admin', async () => {
-        const response = await request(testApp)
-          .get('/api/dlq/stats')
-          .set('Authorization', `Bearer ${adminToken}`);
+       it('should return 200 when authenticated as admin', async () => {
+         const response = await request(testApp)
+           .get('/api/dlq/stats')
+           .set('Authorization', `Bearer ${adminToken}`)
+           .expect(200);
 
-        expect(response.status).not.toBe(403);
-        expect(response.status).not.toBe(401);
-      });
+         expect(response.body).toBeDefined();
+       });
 
-      it('should NOT return 403 when authenticated as super_admin', async () => {
-        const response = await request(testApp)
-          .get('/api/dlq/stats')
-          .set('Authorization', `Bearer ${superAdminToken}`);
+       it('should return 200 when authenticated as super_admin', async () => {
+         const response = await request(testApp)
+           .get('/api/dlq/stats')
+           .set('Authorization', `Bearer ${superAdminToken}`)
+           .expect(200);
 
-        expect(response.status).not.toBe(403);
-        expect(response.status).not.toBe(401);
-      });
+         expect(response.body).toBeDefined();
+       });
     });
   });
 
   /**
-   * MUTATE Endpoints Tests
-   * POST /api/dlq/:id/re-queue
-   * Note: manager is read-only (cannot mutate)
-   */
-  describe('MUTATE Endpoints (admin, super_admin allowed; manager is read-only)', () => {
-    describe('POST /api/dlq/:id/re-queue', () => {
-      it('should return 401 when unauthenticated', async () => {
-        const response = await request(testApp)
-          .post(`/api/dlq/${testDLQId}/re-queue`)
-          .expect(401);
+    * MUTATE Endpoints Tests
+    * POST /api/dlq/:id/re-queue
+    * Note: manager is read-only (cannot mutate)
+    */
+   describe('MUTATE Endpoints (admin, super_admin allowed; manager is read-only)', () => {
+     describe('POST /api/dlq/:id/re-queue', () => {
+       it('should return 401 when unauthenticated', async () => {
+         const response = await request(testApp)
+           .post(`/api/dlq/${dlqId}/re-queue`)
+           .expect(401);
 
-        expect([response.body.error, response.body.name]).toContain('UnauthorizedError');
-      });
+         expect([response.body.error, response.body.name]).toContain('UnauthorizedError');
+       });
 
-      it('should return 403 when authenticated as user', async () => {
-        const response = await request(testApp)
-          .post(`/api/dlq/${testDLQId}/re-queue`)
-          .set('Authorization', `Bearer ${userToken}`)
-          .expect(403);
+       it('should return 403 when authenticated as user', async () => {
+         const response = await request(testApp)
+           .post(`/api/dlq/${dlqId}/re-queue`)
+           .set('Authorization', `Bearer ${userToken}`)
+           .expect(403);
 
-        expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
-      });
+         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
+       });
 
-      it('should return 403 when authenticated as manager (read-only)', async () => {
-        // Manager can view DLQ but cannot mutate (retry)
-        const response = await request(testApp)
-          .post(`/api/dlq/${testDLQId}/re-queue`)
-          .set('Authorization', `Bearer ${managerToken}`)
-          .expect(403);
+       it('should return 403 when authenticated as manager (read-only)', async () => {
+         // Manager can view DLQ but cannot mutate (retry)
+         const response = await request(testApp)
+           .post(`/api/dlq/${dlqId}/re-queue`)
+           .set('Authorization', `Bearer ${managerToken}`)
+           .expect(403);
 
-        expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
-      });
+         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
+       });
 
-      it('should NOT return 403 when authenticated as admin', async () => {
-        const response = await request(testApp)
-          .post(`/api/dlq/${testDLQId}/re-queue`)
-          .set('Authorization', `Bearer ${adminToken}`);
+       it('should return 200 when authenticated as admin', async () => {
+         const response = await request(testApp)
+           .post(`/api/dlq/${dlqId}/re-queue`)
+           .set('Authorization', `Bearer ${adminToken}`)
+           .expect(200);
 
-        // Admin can mutate, should not get 403
-        expect(response.status).not.toBe(403);
-        expect(response.status).not.toBe(401);
-      });
+         // Admin can mutate, should get successful response
+         expect(response.body).toBeDefined();
+         expect(response.body.message).toBeDefined();
+       });
 
-      it('should NOT return 403 when authenticated as super_admin', async () => {
-        const response = await request(testApp)
-          .post(`/api/dlq/${testDLQId}/re-queue`)
-          .set('Authorization', `Bearer ${superAdminToken}`);
+       it('should return 200 when authenticated as super_admin', async () => {
+         const response = await request(testApp)
+           .post(`/api/dlq/${dlqId}/re-queue`)
+           .set('Authorization', `Bearer ${superAdminToken}`)
+           .expect(200);
 
-        // Super admin can mutate, should not get 403
-        expect(response.status).not.toBe(403);
-        expect(response.status).not.toBe(401);
-      });
-    });
-  });
+         // Super admin can mutate, should get successful response
+         expect(response.body).toBeDefined();
+         expect(response.body.message).toBeDefined();
+       });
+     });
+   });
 
   /**
-   * DELETE Endpoints Tests
-   * DELETE /api/dlq/:id
-   * Note: super_admin only (strict access control)
-   */
-  describe('DELETE Endpoints (super_admin only)', () => {
-    describe('DELETE /api/dlq/:id', () => {
-      it('should return 401 when unauthenticated', async () => {
-        const response = await request(testApp)
-          .delete(`/api/dlq/${testDLQId}`)
-          .expect(401);
+    * DELETE Endpoints Tests
+    * DELETE /api/dlq/:id
+    * Note: super_admin only (strict access control)
+    */
+   describe('DELETE Endpoints (super_admin only)', () => {
+     describe('DELETE /api/dlq/:id', () => {
+       it('should return 401 when unauthenticated', async () => {
+         const response = await request(testApp)
+           .delete(`/api/dlq/${dlqId}`)
+           .expect(401);
 
-        expect([response.body.error, response.body.name]).toContain('UnauthorizedError');
-      });
+         expect([response.body.error, response.body.name]).toContain('UnauthorizedError');
+       });
 
-      it('should return 403 when authenticated as user', async () => {
-        const response = await request(testApp)
-          .delete(`/api/dlq/${testDLQId}`)
-          .set('Authorization', `Bearer ${userToken}`)
-          .expect(403);
+       it('should return 403 when authenticated as user', async () => {
+         const response = await request(testApp)
+           .delete(`/api/dlq/${dlqId}`)
+           .set('Authorization', `Bearer ${userToken}`)
+           .expect(403);
 
-        expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
-      });
+         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
+       });
 
-      it('should return 403 when authenticated as manager', async () => {
-        const response = await request(testApp)
-          .delete(`/api/dlq/${testDLQId}`)
-          .set('Authorization', `Bearer ${managerToken}`)
-          .expect(403);
+       it('should return 403 when authenticated as manager', async () => {
+         const response = await request(testApp)
+           .delete(`/api/dlq/${dlqId}`)
+           .set('Authorization', `Bearer ${managerToken}`)
+           .expect(403);
 
-        expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
-      });
+         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
+       });
 
-      it('should return 403 when authenticated as admin (cannot delete)', async () => {
-        // Admin can retry but cannot permanently delete
-        const response = await request(testApp)
-          .delete(`/api/dlq/${testDLQId}`)
-          .set('Authorization', `Bearer ${adminToken}`)
-          .expect(403);
+       it('should return 403 when authenticated as admin (cannot delete)', async () => {
+         // Admin can retry but cannot permanently delete
+         const response = await request(testApp)
+           .delete(`/api/dlq/${dlqId}`)
+           .set('Authorization', `Bearer ${adminToken}`)
+           .expect(403);
 
-        expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
-      });
+         expect([response.body.error, response.body.name]).toContain('AccessDeniedError');
+       });
 
-      it('should NOT return 403 when authenticated as super_admin', async () => {
-        const response = await request(testApp)
-          .delete(`/api/dlq/${testDLQId}`)
-          .set('Authorization', `Bearer ${superAdminToken}`);
+       it('should return 200 when authenticated as super_admin', async () => {
+         const response = await request(testApp)
+           .delete(`/api/dlq/${dlqId}`)
+           .set('Authorization', `Bearer ${superAdminToken}`)
+           .expect(200);
 
-        // Super admin can delete, should not get 403
-        expect(response.status).not.toBe(403);
-        expect(response.status).not.toBe(401);
-      });
-    });
-  });
+         // Super admin can delete, should get successful response
+         expect(response.body).toBeDefined();
+         expect(response.body.message).toBeDefined();
+       });
+     });
+   });
 
   /**
    * RBAC Policy Matrix Validation

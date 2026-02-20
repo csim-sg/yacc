@@ -102,14 +102,14 @@ interface DLQMetadata {
 // When moving Telegram message to DLQ
 await dlqService.moveToDLQ(
   'a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6',  // UUID FK to messages.id
-  'conversation-uuid',
+  'c2d3e4f5-a6b7-48c9-ad0e-f1a2b3c4d5e6',  // UUID FK to conversations.id
   payload,
   'api_error',
   'Failed to send to Telegram',
   {
     metadata: {
-      jobId: 'msg-payload-abc123',           // Store BullMQ job ID here
-      externalMessageId: 'tg-msg-9876543',   // Store Telegram message ID here
+      jobId: 'msg-payload-abc123',           // Store BullMQ job ID here (non-UUID example)
+      externalMessageId: 'tg-msg-9876543',   // Store Telegram message ID here (non-UUID example)
     },
   }
 );
@@ -159,7 +159,7 @@ ORDER BY movedAt DESC;
 -- metadata: { jobId: "msg-payload-xyz", externalMessageId: "tg-msg-789123" }
 
 -- Ops can now:
--- 1. Verify message exists: SELECT * FROM messages WHERE id = 'msg-789'
+-- 1. Verify message exists: SELECT * FROM messages WHERE id = 'b1c2d3e4-f5a6-47b8-9c0d-e1f2a3b4c5d6'
 -- 2. Search request logs: grep trace-abc123 /var/log/yacc/...
 -- 3. Check platform message: curl https://api.telegram.org/.../getMessage?msg_id=tg-msg-789123
 ```

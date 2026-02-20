@@ -213,3 +213,87 @@ export async function seedTestConversations(
 
   return createdConversations;
 }
+
+/**
+ * Seeds a test DLQ entry for RBAC testing.
+ * Creates a real DLQ entry with a real message + conversation so tests don't get 404.
+ *
+ * Flow:
+ * 1. Create a test conversation
+ * 2. Create a test message in that conversation
+ * 3. Create a DLQ entry referencing that message
+ * 4. Return the DLQ entry ID
+ *
+ * @param userId - User ID (for conversation assignment)
+ * @returns { dlqId, conversationId, messageId } for use in DLQ endpoint tests
+ */
+export async function seedTestDLQEntry(userId: string): Promise<{ dlqId: string; conversationId: string; messageId: string }> {
+  const { dbClient } = await import('../src/infrastructure/db.client.js');
+  const { conversations } = await import('../src/schemas/conversation.schema.js');
+  const { messages } = await import('../src/schemas/message.schema.js');
+  const { deadLetterQueue } = await import('../src/schemas/deadLetterQueue.schema.js');
+  const { v4: uuidv4 } = await import('uuid');
+
+  // Step 1: Create a test conversation
+  const conversationResult = await dbClient
+    .insert(conversations)
+    .values({
+      channel: 'telegram',
+      externalThreadId: `test-dlq-${Date.now()}`,
+      title: 'Test DLQ Conversation',
+      status: 'open',
+      priority: 'normal',
+      assignedUserId: userId,
+    })
+    .returning({ id: conversations.id });
+
+  const conversationId = conversationResult[0]?.id;
+  if (!conversationId) {
+    throw new Error('Failed to create test conversation for DLQ seeding');
+  }
+
+  // Step 2: Create a test message in that conversation
+  const messageId = uuidv4();
+  const messageResult = await dbClient
+    .insert(messages)
+    .values({
+      conversationId: conversationId,
+      senderId: userId,
+      senderName: 'Test Sender',
+      body: 'Test message for DLQ',
+      direction: 'outbound',
+      status: 'failed', // Mark as failed so it can be moved to DLQ
+    })
+    .returning({ id: messages.id });
+
+  if (!messageResult[0]?.id) {
+    throw new Error('Failed to create test message for DLQ seeding');
+  }
+
+  const createdMessageId = messageResult[0].id;
+
+  // Step 3: Create a DLQ entry referencing that message
+  const dlqResult = await dbClient
+    .insert(deadLetterQueue)
+    .values({
+      messageId: createdMessageId,
+      conversationId: conversationId,
+      payload: { body: 'Test message for DLQ', direction: 'outbound' },
+      failureReason: 'api_error',
+      lastError: 'Test error for RBAC testing',
+      totalAttempts: 3,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      metadata: {
+        jobId: `job-${uuidv4()}`,
+        externalMessageId: `tg-msg-${Date.now()}`,
+      },
+    })
+    .returning({ id: deadLetterQueue.id });
+
+  const dlqEntryId = dlqResult[0]?.id;
+  if (!dlqEntryId) {
+    throw new Error('Failed to create test DLQ entry');
+  }
+
+  return { dlqId: dlqEntryId, conversationId, messageId: createdMessageId };
+}
