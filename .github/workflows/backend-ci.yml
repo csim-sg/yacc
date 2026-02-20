@@ -1,0 +1,76 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'packages/backend/**'
+      - '.github/workflows/backend-ci.yml'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'packages/backend/**'
+      - '.github/workflows/backend-ci.yml'
+      - 'pnpm-lock.yaml'
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: yacc_user
+          POSTGRES_PASSWORD: yacc_password
+          POSTGRES_DB: yacc_inbox
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint backend
+        run: pnpm --filter @yacc/backend lint
+
+      - name: Run backend tests
+        run: pnpm --filter @yacc/backend test
+        env:
+          DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          NODE_ENV: test
