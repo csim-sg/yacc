@@ -16,6 +16,7 @@
 import { useMemo, type ReactElement } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { IRCProfileSidebar } from './IRCProfileSidebar';
 import {
   getAccessibleNavItems,
   type NavigationItem,
@@ -145,13 +146,20 @@ export function Navigation({
         {/* Navigation items */}
         <div className="flex-1 space-y-2 overflow-y-auto">
           {accessibleItems.length > 0 ? (
-            accessibleItems.map((item) => (
-              <NavItem
-                key={item.id}
-                item={item}
-                isActive={pathname === item.href}
-              />
-            ))
+            <>
+              {accessibleItems.map((item) => (
+                <NavItem
+                  key={item.id}
+                  item={item}
+                  isActive={pathname === item.href}
+                />
+              ))}
+              
+              {/* IRC Profiles Sidebar (INT-014) */}
+              <div className="mt-8 pt-6 border-t border-base-300">
+                <IRCProfileSidebar />
+              </div>
+            </>
           ) : (
             <div className="text-center text-base-content/50 text-sm py-8">
               No accessible items
