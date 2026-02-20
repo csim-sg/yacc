@@ -23,6 +23,7 @@ import { deadLetterQueue } from '../schemas/deadLetterQueue.schema';
 import { integrationConnectionProfiles } from '../schemas/integrationConnectionProfile.schema';
 import { IRCConnector } from '../connectors/irc.connector';
 import { IRCIngestionService } from '../services/irc-ingestion.service';
+import type { IntegrationConnectionProfileInsert } from '../schemas/integrationConnectionProfile.schema';
 
 // Mock logger
 vi.mock('../infrastructure/logger', () => ({
@@ -36,6 +37,7 @@ vi.mock('../infrastructure/logger', () => ({
 
 // Global reference for test IRC client manipulation
 let mockIRCClient: IRCClient | null = null;
+let shouldEmitRegistered = true; // Control whether mock emits 'registered' event
 
 vi.mock('irc-framework', () => {
   const { EventEmitter } = require('events');
@@ -52,9 +54,12 @@ vi.mock('irc-framework', () => {
     connect(options: Record<string, unknown>): void {
       this.options = options;
       // Simulate successful connection after short delay
-      setImmediate(() => {
-        this.emit('registered');
-      });
+      // Only emit if flag is set (allows testing timeout by not emitting)
+      if (shouldEmitRegistered) {
+        setImmediate(() => {
+          this.emit('registered');
+        });
+      }
     }
 
     disconnect(): void {
@@ -101,6 +106,9 @@ describe('IRC Integration Tests (INT-014)', () => {
   let ingestionService: IRCIngestionService;
   const testChannels = ['#integration-test', '#test-dev'];
   const createdConversationIds: string[] = [];
+  const createdProfileIds: number[] = [];
+  let profileId1: number | undefined;
+  let profileId2: number | undefined;
 
   const mockConfig = {
     platform: 'irc' as const,
@@ -109,14 +117,64 @@ describe('IRC Integration Tests (INT-014)', () => {
     nick: 'testbot',
     password: 'testpass',
     channels: testChannels,
-    profileId: 1, // Test with profile ID = 1
+    profileId: 1, // Test with profile ID = 1 (will be created in beforeEach)
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     connector = new IRCConnector();
     ingestionService = new IRCIngestionService();
     mockIRCClient = null;
+    shouldEmitRegistered = true; // Reset flag for each test
     vi.clearAllMocks();
+
+    // Create two IRC profiles for this test (required for profile-scoped conversations)
+    // Profile 1: main test profile
+    const profileData1: IntegrationConnectionProfileInsert = {
+      integrationType: 'irc',
+      name: 'Test IRC Server 1',
+      config: JSON.stringify({
+        server: 'irc.test.local',
+        port: 6667,
+        nick: 'testbot',
+        channels: testChannels,
+      }),
+      encryptedCredentials: '{}', // Empty for test (MVP single-tenant)
+    };
+
+    const [profile1] = await dbClient
+      .insert(integrationConnectionProfiles)
+      .values(profileData1)
+      .returning();
+
+    if (profile1) {
+      createdProfileIds.push(profile1.id);
+      profileId1 = profile1.id;
+      // Update mockConfig to use the created profile ID
+      mockConfig.profileId = profile1.id;
+    }
+
+    // Profile 2: for testing profile-scoped separation
+    const profileData2: IntegrationConnectionProfileInsert = {
+      integrationType: 'irc',
+      name: 'Test IRC Server 2',
+      config: JSON.stringify({
+        server: 'irc.test2.local',
+        port: 6668,
+        nick: 'testbot2',
+        channels: testChannels,
+      }),
+      encryptedCredentials: '{}',
+    };
+
+    const [profile2] = await dbClient
+      .insert(integrationConnectionProfiles)
+      .values(profileData2)
+      .returning();
+
+    if (profile2) {
+      createdProfileIds.push(profile2.id);
+      profileId2 = profile2.id;
+    }
   });
 
   afterEach(async () => {
@@ -130,6 +188,19 @@ describe('IRC Integration Tests (INT-014)', () => {
         .where(eq(conversations.id, convId));
     }
     createdConversationIds.length = 0;
+
+    // Cleanup created profiles
+    for (const profileId of createdProfileIds) {
+      // First delete conversations that reference this profile
+      await dbClient
+        .delete(conversations)
+        .where(eq(conversations.ircProfileId, profileId));
+      // Then delete the profile
+      await dbClient
+        .delete(integrationConnectionProfiles)
+        .where(eq(integrationConnectionProfiles.id, profileId));
+    }
+    createdProfileIds.length = 0;
   });
 
   describe('Connection & Channel Join', () => {
@@ -156,15 +227,24 @@ describe('IRC Integration Tests (INT-014)', () => {
     });
 
     it('should handle connection timeout gracefully', async () => {
-      connector.setConfig(mockConfig);
+      // Temporarily disable automatic 'registered' event emission to test timeout
+      shouldEmitRegistered = false;
+      try {
+        connector.setConfig(mockConfig);
 
-      // Start connection but don't emit registered event
-      const connectPromise = connector.connect();
+        // Start connection without emitting 'registered' event
+        // This will trigger the CONNECT_TIMEOUT_MS timeout
+        const connectPromise = connector.connect();
 
-      // Wait for timeout (30 seconds in production, but test doesn't wait)
-      // Just verify it eventually rejects
-      await expect(connectPromise).rejects.toThrow();
-    });
+        // The performHandshake() should be waiting for 'registered' and will timeout
+        // NOTE: This test needs to account for 30-second timeout (CONNECT_TIMEOUT_MS)
+        // In a real test, you'd use fake timers (vi.useFakeTimers) to speed this up
+        await expect(connectPromise).rejects.toThrow('Connection timeout');
+      } finally {
+        // Re-enable for other tests
+        shouldEmitRegistered = true;
+      }
+    }, 35000); // Increase test timeout to account for CONNECT_TIMEOUT_MS (30s)
 
     it('should handle connection errors and schedule reconnect', async () => {
       connector.setConfig(mockConfig);
@@ -320,13 +400,17 @@ describe('IRC Integration Tests (INT-014)', () => {
 
   describe('Profile-Scoped Conversation Mapping', () => {
     it('should create separate conversations for different IRC profiles on same channel', async () => {
+      if (!profileId1 || !profileId2) {
+        throw new Error('Profile IDs not initialized in beforeEach');
+      }
+
       // Message from profile 1
       const result1 = await ingestionService.ingestInboundMessage({
         channel: '#shared-channel',
         nick: 'alice',
         message: 'Message from profile 1',
         connectorNick: 'testbot',
-        ircProfileId: 1,
+        ircProfileId: profileId1,
       });
 
       expect(result1.success).toBe(true);
@@ -340,7 +424,7 @@ describe('IRC Integration Tests (INT-014)', () => {
         nick: 'bob',
         message: 'Message from profile 2',
         connectorNick: 'testbot',
-        ircProfileId: 2,
+        ircProfileId: profileId2,
       });
 
       expect(result2.success).toBe(true);
@@ -361,8 +445,8 @@ describe('IRC Integration Tests (INT-014)', () => {
         .from(conversations)
         .where(eq(conversations.id, result2.conversationId!));
 
-      expect(convo1[0].ircProfileId).toBe(1);
-      expect(convo2[0].ircProfileId).toBe(2);
+      expect(convo1[0].ircProfileId).toBe(profileId1);
+      expect(convo2[0].ircProfileId).toBe(profileId2);
     });
   });
 
@@ -417,16 +501,8 @@ describe('IRC Integration Tests (INT-014)', () => {
 
   describe('Dead Letter Queue (DLQ)', () => {
     it('should support DLQ entries with correlation ID and IRC profile info', async () => {
-      // This test verifies the schema has the necessary fields
+      // This test verifies the DLQ schema exists and is queryable
       // Actual DLQ insertion happens in message retry worker
-
-      // Verify deadLetterQueue table exists with required fields
-      const schema = deadLetterQueue._ as unknown as {
-        name: string;
-        columns: Record<string, unknown>;
-      };
-
-      expect(schema.name || 'dead_letter_queue').toBeDefined();
 
       // Verify we can query DLQ structure
       const dlqEntries = await dbClient
@@ -434,9 +510,11 @@ describe('IRC Integration Tests (INT-014)', () => {
         .from(deadLetterQueue)
         .limit(1);
 
+      // DLQ should be queryable (may be empty in test)
       // If there were entries, they would have these fields:
-      // correlationId, ircProfileId, externalThreadType, externalThreadId
+      // id, messageId, conversationId, error, retryCount, correlationId, ircProfileId, externalThreadType, externalThreadId
       expect(dlqEntries).toBeDefined();
+      expect(Array.isArray(dlqEntries)).toBe(true);
     });
   });
 
