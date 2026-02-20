@@ -4,6 +4,7 @@ import { TelegramConnector } from '../connectors/telegram.connector';
 import { logger } from '../infrastructure/logger';
 import { connectorManager } from './connector-manager';
 import { connectorStatusWiring } from './connector-status-wiring.service';
+import { resolveIrcConfig, IrcProfileResolutionError } from './ircProfileResolution.service';
 
 export async function initializeIntegrationsRuntime(): Promise<void> {
   // Telegram
@@ -29,38 +30,24 @@ export async function initializeIntegrationsRuntime(): Promise<void> {
     logger.info({ platform: 'telegram' }, 'Telegram connector skipped (missing TELEGRAM_BOT_TOKEN)');
   }
 
-  // IRC
-  if (appConfig.IRC_SERVER && appConfig.IRC_USERNAME) {
-    const channels: string[] = (appConfig.IRC_CHANNELS || '')
-      .split(',')
-      .map((s: string) => s.trim())
-      .filter((s: string) => s.length > 0);
-
-    if (channels.length === 0) {
-      logger.warn(
-        { platform: 'irc' },
-        'IRC connector skipped (missing IRC_CHANNELS)'
-      );
-      return;
-    }
-
-    const invalid: string[] = channels.filter((c: string) => !c.startsWith('#'));
-    if (invalid.length > 0) {
-      logger.warn(
-        { platform: 'irc', invalid },
-        'IRC connector skipped (IRC_CHANNELS contains invalid channel names)'
-      );
-      return;
-    }
+  // IRC: INT-010 DB-first gating logic
+  // Resolve IRC config using DB-first rules:
+  // - If ANY DB profiles exist (enabled OR disabled) → use DB only
+  // - If >1 profiles and none active → 409 irc_profile_not_selected (surface to operator)
+  // - If 1 profile and none active → implicit selection
+  // - If 0 profiles → allow env fallback
+  try {
+    const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000000';
+    const resolvedConfig = await resolveIrcConfig(DEFAULT_TENANT_ID);
 
     const irc = new IRCConnector();
     irc.setConfig({
       platform: 'irc',
-      server: appConfig.IRC_SERVER,
-      port: appConfig.IRC_PORT,
-      nick: appConfig.IRC_USERNAME,
-      password: appConfig.IRC_PASSWORD,
-      channels,
+      server: resolvedConfig.server,
+      port: resolvedConfig.port,
+      nick: resolvedConfig.nick,
+      password: resolvedConfig.password,
+      channels: resolvedConfig.channels,
     });
 
     connectorManager.registerConnector('irc', irc);
@@ -77,10 +64,46 @@ export async function initializeIntegrationsRuntime(): Promise<void> {
         'IRC connector failed to connect (will retry with backoff)'
       );
     });
-  } else {
+
     logger.info(
-      { platform: 'irc' },
-      'IRC connector skipped (missing IRC_SERVER or IRC_USERNAME)'
+      { platform: 'irc', source: resolvedConfig.source },
+      'IRC connector initialized (DB-first resolution)'
+    );
+  } catch (error) {
+    if (error instanceof IrcProfileResolutionError) {
+      if (error.statusCode === 409) {
+        // 409 conflict: multiple profiles or not configured
+        // Do NOT swallow; surface to operator
+        logger.error(
+          {
+            platform: 'irc',
+            code: error.code,
+            message: error.message,
+          },
+          'IRC startup blocked by profile resolution conflict (409)'
+        );
+        // Return early; do not start connector
+        return;
+      }
+      // Other resolution errors (500)
+      logger.error(
+        {
+          platform: 'irc',
+          code: error.code,
+          error: error.message,
+        },
+        'IRC connector initialization failed (resolution error)'
+      );
+      return;
+    }
+
+    // Unexpected error
+    logger.error(
+      {
+        platform: 'irc',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      'IRC connector initialization failed (unexpected error)'
     );
   }
 }

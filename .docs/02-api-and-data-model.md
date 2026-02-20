@@ -665,7 +665,7 @@ CREATE TABLE integration_connection_profiles (
   is_active BOOLEAN NOT NULL DEFAULT false,
   encrypted_credentials TEXT NOT NULL,
   config TEXT NOT NULL,
-  created_by_id TEXT NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+   created_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   updated_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   last_tested_at TIMESTAMP,
   last_test_passed BOOLEAN,

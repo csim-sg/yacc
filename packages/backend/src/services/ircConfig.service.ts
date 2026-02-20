@@ -201,16 +201,14 @@ export class IRCConfigService {
         source: resolved.source,
       };
     } catch (error) {
-      // If profile resolution error (409), re-throw as-is (will be handled by caller)
+      // If profile resolution error, re-throw as-is (will be handled by caller)
       if (error instanceof IrcProfileResolutionError) {
-        if (error.statusCode === 409) {
-          // Not configured yet, return null (allows fallback)
-          logger.debug(
-            { method: 'getStoredConfig', code: error.code },
-            'IRC not yet configured'
-          );
-          return null;
-        }
+        // Re-throw all resolution errors (409 irc_profile_not_selected, 409 irc_not_configured, etc.)
+        // Do NOT swallow them as null; caller must handle the conflict
+        logger.debug(
+          { method: 'getStoredConfig', code: error.code, statusCode: error.statusCode },
+          'IRC profile resolution error'
+        );
         throw error;
       }
 
@@ -276,6 +274,20 @@ export class IRCConfigService {
 
       return config;
     } catch (error) {
+      // If profile resolution error (409), re-throw with proper status
+      if (error instanceof IrcProfileResolutionError) {
+        logger.warn(
+          {
+            platform: 'irc',
+            method: 'checkAndPrepareConnect',
+            code: error.code,
+            statusCode: error.statusCode,
+          },
+          'IRC connection preparation blocked by resolution error'
+        );
+        throw error;
+      }
+
       logger.error(
         {
           platform: 'irc',

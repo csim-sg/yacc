@@ -31,6 +31,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **INT-007** (IRC Connect) | ✅ **COMPLETED** (PR #263 merged) | INT-005 | POST /api/integrations/irc/connect - manual connect via connectorManager (super_admin, body ignored) |
 | **INT-008** (IRC Test) | ✅ **COMPLETED** (PR #263 merged) | INT-005 | POST /api/integrations/irc/test - test connection with 10s timeout, no side effects (super_admin) |
 | **INT-009** (Status Endpoint) | ✅ **COMPLETED** (PR #262 merged) | INT-005 | GET /api/integrations/irc/status endpoint (admin+ RBAC) |
+| **INT-010** (DB Profile Management) | ⏳ **Review (PR #265)** | INT-006-009 | DB-first gating, encrypted credential storage, profile selection logic, deterministic E2E tests, migration & schema alignment |
 
 ### Test Results (INT-001)
 - **28/28 tests passing** (100% pass rate)

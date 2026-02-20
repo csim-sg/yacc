@@ -62,7 +62,8 @@ export async function resolveIrcConfig(
   tenantId: string
 ): Promise<ResolvedIrcConfig> {
   try {
-    // Check for DB profiles (select API - more reliable in test environments)
+    // Check for DB profiles (ANY profiles: enabled OR disabled)
+    // INT-010: DB-first gating requires checking ALL profiles, not just enabled ones
     let dbProfiles: typeof integrationConnectionProfiles.$inferSelect[] = [];
     
     try {
@@ -72,8 +73,8 @@ export async function resolveIrcConfig(
         .where(
           and(
             eq(integrationConnectionProfiles.tenantId, tenantId),
-            eq(integrationConnectionProfiles.integrationType, 'irc'),
-            eq(integrationConnectionProfiles.isEnabled, true) // Only enabled profiles
+            eq(integrationConnectionProfiles.integrationType, 'irc')
+            // Do NOT filter by isEnabled; check ALL profiles (enabled or disabled)
           )
         );
     } catch (dbError) {
@@ -88,10 +89,10 @@ export async function resolveIrcConfig(
 
     logger.debug(
       { tenantId, dbProfileCount: dbProfiles.length },
-      'IRC profile resolution: checking DB profiles'
+      'IRC profile resolution: checking DB profiles (enabled OR disabled)'
     );
 
-    // DB-first: if any profiles exist, use DB only
+    // DB-first: if ANY profiles exist (enabled or disabled), use DB only
     if (dbProfiles.length > 0) {
       // Find active profile
       const activeProfile = dbProfiles.find((p) => p.isActive);
@@ -108,7 +109,7 @@ export async function resolveIrcConfig(
 
       // No active profile: check if we can use single profile implicitly
       if (dbProfiles.length === 1) {
-        // Single enabled profile (disabled not counted): use implicitly
+        // Single profile (enabled or disabled): use implicitly
         logger.info(
           { tenantId, profileId: dbProfiles[0].id, profileName: dbProfiles[0].name },
           'IRC profile resolution: using single DB profile implicitly'
@@ -117,14 +118,14 @@ export async function resolveIrcConfig(
         return resolveProfileToConfig(dbProfiles[0]);
       }
 
-      // Multiple enabled profiles, none active: error
+      // Multiple profiles, none active: error (must select one)
       logger.warn(
         { tenantId, dbProfileCount: dbProfiles.length },
         'IRC profile resolution: multiple profiles exist but none active'
       );
 
       throw new IrcProfileResolutionError(
-        `IRC has ${dbProfiles.length} enabled profiles but none is active. Set one as active via API.`,
+        `IRC has ${dbProfiles.length} profiles but none is active. Set one as active via API.`,
         'irc_profile_not_selected',
         409
       );
