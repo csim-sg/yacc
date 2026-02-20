@@ -13,7 +13,7 @@
  */
 
 import { eq, and } from 'drizzle-orm';
-import type { Client as IRCClient } from 'irc-framework';
+import type { Client as _IRCClient } from 'irc-framework';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { IRCConnector } from '../connectors/irc.connector';
 import { dbClient } from '../infrastructure/db.client';
@@ -35,7 +35,7 @@ vi.mock('../infrastructure/logger', () => ({
 }));
 
 // Global reference for test IRC client manipulation
-let mockIRCClient: IRCClient | null = null;
+let mockIRCClient: _IRCClient | null = null;
 let shouldEmitRegistered = true; // Control whether mock emits 'registered' event
 
 vi.mock('irc-framework', () => {
@@ -48,7 +48,7 @@ vi.mock('irc-framework', () => {
 
     constructor() {
       super();
-      mockIRCClient = this as unknown as IRCClient;
+      mockIRCClient = this as unknown as _IRCClient;
     }
 
     connect(options: Record<string, unknown>): void {
