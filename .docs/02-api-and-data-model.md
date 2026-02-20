@@ -672,17 +672,21 @@ CREATE TABLE integration_connection_profiles (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
 
-  UNIQUE(tenant_id, integration_type, is_active) WHERE is_active = true,
   INDEX(tenant_id, integration_type),
   INDEX(is_active),
   INDEX(created_by_id),
   CONSTRAINT icp_active_implies_enabled CHECK (is_active = false OR is_enabled = true)
 );
+
+-- Partial unique index: at most one active profile per (tenant_id, integration_type)
+CREATE UNIQUE INDEX idx_icp_active_profile 
+  ON integration_connection_profiles(tenant_id, integration_type, is_active) 
+  WHERE is_active = true;
 ```
 
 **Notes on integration_connection_profiles**:
 - **Hard Cap**: Max 10 profiles per tenant+integration (MVP constraint)
-- **Active Constraint**: At most one active profile per (tenant, integration); enforced by partial unique index
+- **Active Constraint**: At most one active profile per (tenant, integration); enforced by partial unique INDEX (`idx_icp_active_profile`)
 - **Encryption**: `encrypted_credentials` is encrypted at rest using AES-256-GCM with `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY`
 - **Format**: Encrypted credentials stored as `iv:encryptedData:authTag` (hex-encoded)
 - **Config**: Stored as JSON string; never includes secrets

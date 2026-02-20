@@ -72,8 +72,9 @@ function generateProfileName(): string {
 
 /**
  * Helper: Get all IRC profiles via API (requires authentication)
+ * Response fields: id (number), isActive (camelCase), etc.
  */
-async function getAllProfiles(page: Page): Promise<Array<{ id: string; name: string; is_active: boolean }>> {
+async function getAllProfiles(page: Page): Promise<Array<{ id: number; name: string; isActive: boolean }>> {
   try {
     const response = await apiRequest(page, {
       method: 'GET',
@@ -86,7 +87,7 @@ async function getAllProfiles(page: Page): Promise<Array<{ id: string; name: str
     
     const data = response.data as unknown;
     if (Array.isArray(data)) {
-      return data as Array<{ id: string; name: string; is_active: boolean }>;
+      return data as Array<{ id: number; name: string; isActive: boolean }>;
     }
     
     return [];
@@ -98,7 +99,7 @@ async function getAllProfiles(page: Page): Promise<Array<{ id: string; name: str
 /**
  * Helper: Delete a profile by ID via API (requires Super Admin auth)
  */
-async function deleteProfileById(page: Page, profileId: string): Promise<boolean> {
+async function deleteProfileById(page: Page, profileId: number): Promise<boolean> {
   try {
     const response = await apiRequest(page, {
       method: 'DELETE',
@@ -113,13 +114,13 @@ async function deleteProfileById(page: Page, profileId: string): Promise<boolean
 
 /**
  * Helper: Disable a profile by ID via API (requires Super Admin auth)
+ * Uses POST /api/integrations/irc/profiles/:id/disable endpoint
  */
-async function disableProfileById(page: Page, profileId: string): Promise<boolean> {
+async function disableProfileById(page: Page, profileId: number): Promise<boolean> {
   try {
     const response = await apiRequest(page, {
-      method: 'PATCH',
-      endpoint: `/integrations/irc/profiles/${profileId}`,
-      body: { is_active: false },
+      method: 'POST',
+      endpoint: `/integrations/irc/profiles/${profileId}/disable`,
     });
     
     return response.status === 200;
@@ -140,7 +141,7 @@ async function cleanupTestProfiles(page: Page, filterPrefix = 'test-irc-') {
   for (const profile of profiles) {
     if (profile.name.startsWith(filterPrefix)) {
       // If profile is active, disable it first
-      if (profile.is_active) {
+      if (profile.isActive) {
         await disableProfileById(page, profile.id);
       }
       // Then delete it
@@ -166,28 +167,17 @@ test.describe('INT-010: IRC Profile Management', () => {
   });
 
   /**
-   * afterEach: Best-effort cleanup (disable + delete any created test profiles)
-   * This ensures profiles don't accumulate even if a test fails partway through.
-   * If the test is already logged out, re-login as Super Admin first.
-   */
+    * afterEach: Always cleanup as Super Admin (deterministic)
+    * This ensures:
+    * - Cleanup always has full permissions (no permission errors)
+    * - Tests don't interfere with each other (test profiles cleaned)
+    * - Simplest approach: always loginAs(super_admin) to avoid probing wrong URLs
+    */
   test.afterEach(async ({ page }) => {
-    try {
-      // Check if we're logged in by trying to access the integrations page
-      const response = await page.request.get(
-        `${API_BASE_URL}/integrations/irc/profiles`,
-        { timeout: 3000 }
-      );
-      
-      // If we get 401, we're logged out; re-login as Super Admin
-      if (response.status() === 401) {
-        await loginAs(page, 'super_admin');
-      }
-    } catch {
-      // If the request fails entirely, assume we're logged out
-      await loginAs(page, 'super_admin');
-    }
+    // Always login as Super Admin (simplest, most deterministic)
+    await loginAs(page, 'super_admin');
     
-    // Clean up test profiles
+    // Clean up all test profiles from this test run
     await cleanupTestProfiles(page);
   });
 
@@ -416,14 +406,14 @@ test.describe('INT-010: IRC Profile Management', () => {
   });
 
   /**
-   * Test: Cannot delete active profile
-   * 
-   * Verifies that:
-   * - Creating and activating a profile works
-   * - Delete button becomes disabled when profile is active
-   * - Disabling the profile re-enables the delete button
-   * - Test teardown (afterEach) disables the profile first, then deletes it
-   */
+    * Test: Cannot delete active profile
+    * 
+    * Verifies that:
+    * - Creating and activating a profile works
+    * - Delete button becomes disabled when profile is active
+    * - API rejects delete if profile is active (409)
+    * - After disabling via POST disable endpoint, delete succeeds
+    */
   test('Super Admin: cannot delete active profile', async ({ page }) => {
     // We're already logged in as Super Admin from beforeEach
     await page.goto(`${BASE_URL}/integrations/irc-profiles`);
@@ -447,7 +437,13 @@ test.describe('INT-010: IRC Profile Management', () => {
     }).first();
     
     const profileCardId = await profileCard.getAttribute('data-testid');
-    const profileId = profileCardId?.replace('profile-card-', '') || '';
+    const profileId = profileCardId?.replace('profile-card-', '');
+    
+    if (!profileId) {
+      throw new Error('Could not extract profile ID from card');
+    }
+    
+    const profileIdNum = parseInt(profileId, 10);
 
     // Activate the profile
     const activateBtn = profileCard.locator(`[data-testid="activate-btn-${profileId}"]`);
@@ -463,8 +459,28 @@ test.describe('INT-010: IRC Profile Management', () => {
     const deleteBtn = profileCard.locator(`[data-testid="delete-btn-${profileId}"]`);
     await expect(deleteBtn).toBeDisabled();
 
-    // Should have a title/aria-label indicating why it's disabled
+    // Verify title explains why it's disabled
     const title = await deleteBtn.getAttribute('title');
-    expect(title || 'Disable before deleting').toContain('Disable');
+    expect(title || '').toContain('Disable');
+
+    // Now disable the profile via API endpoint and verify delete succeeds
+    await disableProfileById(page, profileIdNum);
+
+    // Refresh to see updated state (or wait for WebSocket push)
+    await page.reload();
+    await page.waitForSelector(`text=${profileName}`, { timeout: 10000 });
+
+    // Active badge should be gone
+    const updatedCard = page.locator(`[data-testid^="profile-card-"]`).filter({
+      hasText: profileName,
+    }).first();
+    
+    await expect(
+      updatedCard.locator('[data-testid="active-badge"]')
+    ).not.toBeVisible({ timeout: 5000 });
+
+    // Delete should now succeed via API
+    const deleteSuccess = await deleteProfileById(page, profileIdNum);
+    expect(deleteSuccess).toBe(true);
   });
 });
