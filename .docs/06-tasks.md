@@ -159,6 +159,7 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | BE-014 | Implement exponential backoff for retries (1m, 5m, 30m; 3 attempts max) | **Done** (PR #242 merged) | P0 | Backend | BE-013 | Failed messages retried with correct backoff schedule | PVTI_lAHOAB4wV84BNGcwzgj_55A | 26 |
 | BE-014A | Fix retry queue removal and backoff schedule alignment | **Done** (PR #242 merged) | P0 | Backend | BE-013 | removeFromQueue uses supported job lookup; backoff is 1m/5m/30m | PVTI_lAHOAB4wV84BNGcwzgldpko | 251 |
 | BE-015 | Implement dead-letter queue (DLQ) for failed messages | **Done** (PR #242 merged) | P1 | Backend | BE-014 | Messages with 3 failed attempts moved to DLQ | PVTI_lAHOAB4wV84BNGcwzgkHa9k | 127 |
+| BE-015B | Enforce DLQ `message_id` UUID contract + add traceability fields + RBAC hardening | **Done** (PR #272 merged) | P0 | Backend | BE-015 | DLQ rows always reference `messages.id` (UUID); queue/DLQ endpoints enforce RBAC; traceability fields persisted | PVTI_lAHOAB4wV84BNGcwzgl2YV8 | 270 |
 | BE-016 | Set up Socket.io WebSocket server | **Done** | P0 | Backend | - | WebSocket server running on configured port | PVTI_lAHOAB4wV84BNGcwzgkAl2c | 28 |
 | BE-017 | Implement message.received event (push on inbound message) | **Done** | P0 | Backend | BE-016 | Event emitted when inbound message received | PVTI_lAHOAB4wV84BNGcwzgj_54o | 27 |
 | BE-018 | Implement message.sent event (push on successful delivery) | **Done** | P0 | Backend | BE-016 | Event emitted when message status → sent | PVTI_lAHOAB4wV84BNGcwzgj_54g | 31 |
@@ -354,6 +355,7 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | GH-205 | Migrate websocket connectors to socket-controllers | Not Started | P2 | Backend | - | Connectors use socket-controllers pattern | PVTI_lAHOAB4wV84BNGcwzgldp4E | 205 |
 | GH-206 | Clarify auth endpoint prefix decision (BetterAuth) | Not Started | P2 | Architect | - | Prefix decision recorded; docs aligned | PVTI_lAHOAB4wV84BNGcwzgldp4Y | 206 |
 | GH-207 | Enforce /api prefix on all REST endpoints (health excluded) | Not Started | P2 | Architect | - | Decision recorded; implementation consistent | PVTI_lAHOAB4wV84BNGcwzgldp40 | 207 |
+| GH-275 | Configure branch protection required checks | Not Started | P0 | Architect | - | Required checks set for PRs into `dev` (recommend: lint-changed + test-unit + test-smoke; keep test-full informational until baseline fixed) | PVTI_lAHOAB4wV84BNGcwzgl2YXY | 275 |
 
 ### Success Criteria & Next Steps
 

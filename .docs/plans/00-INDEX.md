@@ -33,6 +33,9 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **INT-009** (Status Endpoint) | ✅ **COMPLETED** (PR #262 merged) | INT-005 | GET /api/integrations/irc/status endpoint (admin+ RBAC) |
 | **INT-010** (DB Profile Management) | ✅ **COMPLETED** (PR #265 merged) | INT-006-009 | DB-first gating, encrypted credential storage, profile selection logic, deterministic E2E tests, migration & schema alignment |
 
+## Recent Merges
+- **PR #272** (Feb 20, 2026): DLQ UUID contract enforcement + traceability fields + RBAC hardening (fixes #270)
+
 ### Test Results (INT-001)
 - **28/28 tests passing** (100% pass rate)
 - **100% type safety** (no `any` types)
