@@ -11,7 +11,8 @@ A single-tenant, cloud-hosted omni-channel social inbox that unifies Telegram, I
 ### Prerequisites
 
 ```bash
-# Node.js v18 or higher
+# Node.js v20+ (required for tooling; lint, test, build)
+# v18 may work for runtime but v20+ recommended for CI/CD
 node --version
 
 # pnpm v9 (if not installed: npm install -g pnpm@9)
@@ -335,7 +336,7 @@ See [AGENTS.md](./AGENTS.md) for role-specific guidelines.
 - **Deployment**: AWS S3 + CloudFront
 
 ### Backend
-- **Runtime**: Node.js 18+
+- **Runtime**: Node.js 20+ (for tooling: linting, testing, building; v18 may work for production)
 - **Framework**: Express
 - **Auth**: BetterAuth
 - **Database**: PostgreSQL + Drizzle ORM

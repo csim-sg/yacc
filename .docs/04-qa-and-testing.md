@@ -28,6 +28,54 @@
 | **Performance** | Search, bulk ops | Custom scripts | Measure response times, throughput |
 | **Security** | Auth, RBAC, SQL injection | Manual + tools | Permission enforcement, input validation |
 
+### PR Gating: Recommended Checks (Interim Policy)
+
+**Status**: ✅ Implemented in PR #274 (GOV-029)
+
+**Backend CI now enforces three recommended checks** for PR review and merge to `dev`:
+
+| Check | Command | Required | Status | Notes |
+|-------|---------|----------|--------|-------|
+| **lint-changed** | `eslint <changed-files>` | ✅ Recommended | Required | New code must be lint-clean (no changed-files lint debt) |
+| **test-unit** | `pnpm test src/services/__tests__/irc-ingestion.service.test.ts` | ✅ Recommended | Required | Curated stable unit tests (IRC ingestion service) |
+| **test-smoke** | `pnpm test tests/QA-001-integration.spec.ts` | ✅ Recommended | Required | Integration test with Supertest against in-process backend + DB + Redis |
+| **test-full** | `pnpm test` (all tests) | ⚠️ NO | Informational | May fail on baseline; shows as RED if failing (not masked); timeout 15m |
+
+**Rationale**: Dev baseline has test instability + lint debt. Recommended checks ensure new code quality while full suite provides signal for baseline issues.
+
+**Branch Ruleset Status**: Branch protection rules do not enforce required status checks yet. See follow-up issue: "Configure branch protection required checks" to formalize enforcement on `dev` branch.
+
+**Exit Plan**: See GOV-029 (two conditions: lint cleanup + test stabilization)
+
+### Unit Test Suite File List
+
+**Curated stable unit tests that must pass before PR merge:**
+
+| File | Purpose | Test Count | Status |
+|------|---------|-----------|--------|
+| `src/services/__tests__/irc-ingestion.service.test.ts` | IRC message ingestion | 17 | ✅ 100% Stable |
+
+**How to add more unit tests to required suite**: 
+- Test only passes reliably on dev baseline
+- No flaky timeouts or platform-specific failures
+- Fast execution (< 100ms per test)
+- Update table above when adding tests
+- Clear exit condition: when test becomes unstable, remove it
+
+### Smoke Suite File List
+
+**Curated tests that must pass before PR merge:**
+
+| File | Purpose | Category |
+|------|---------|----------|
+| `tests/QA-001-integration.spec.ts` | Core integration sanity checks | Smoke/Integration |
+
+**How to add more smoke tests**: 
+- Keep list minimal (< 5 tests) to maintain speed
+- Test critical user flows only (auth → inbox → messaging)
+- All smoke tests must complete in < 2 minutes total
+- Update table above when adding tests
+
 ### Test Data Setup
 
 ```typescript

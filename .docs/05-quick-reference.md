@@ -18,6 +18,7 @@ See [01-product-specification.md](./01-product-specification.md) for full scope 
 - Target runtime: K3s (Kubernetes)
 - Installer: Helm (app charts + dependencies like PostgreSQL/Redis)
 - Architecture decision: `.docs/adr/ADR-019-k3s-helm-cicd-deployment.md`
+- **Node.js v20+** required for CI/CD (linting, testing, building) due to `eslint-plugin-unicorn` dependency
 
 ---
 

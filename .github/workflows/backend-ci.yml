@@ -1,0 +1,281 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'packages/backend/**'
+      - '.github/workflows/backend-ci.yml'
+      - '.github/workflows/lint.yml'
+      - '.github/workflows/tests.yml'
+      - 'eslint.config.js'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'packages/backend/**'
+      - '.github/workflows/backend-ci.yml'
+      - '.github/workflows/lint.yml'
+      - '.github/workflows/tests.yml'
+      - 'eslint.config.js'
+      - 'pnpm-lock.yaml'
+
+jobs:
+  # Compute changed files in packages/backend for linting
+  changed-files:
+    name: collect-changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend-files: ${{ steps.changed-backend.outputs.files }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for diff
+
+      - name: Get changed backend files
+        id: changed-backend
+        run: |
+          # Get diff between base (dev) and head (current PR/push)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            DIFF_RANGE="origin/${{ github.base_ref }}..HEAD"
+          else
+            DIFF_RANGE="${{ github.event.before }}..${{ github.sha }}"
+          fi
+          
+          # Get files changed in packages/backend (src + tests)
+          # --diff-filter=ACMRT: Added, Copied, Modified, Renamed, Type changed (exclude deleted)
+          CHANGED=$(git diff --name-only --diff-filter=ACMRT $DIFF_RANGE -- packages/backend/src packages/backend/tests 2>/dev/null || echo "")
+          if [ -z "$CHANGED" ]; then
+            echo "files=" >> $GITHUB_OUTPUT
+          else
+            # Filter out deleted files and verify file exists
+            FILES=""
+            for FILE in $CHANGED; do
+              if [ -f "$FILE" ]; then
+                FILES="$FILES $FILE"
+              fi
+            done
+            # Trim leading/trailing spaces
+            FILES=$(echo "$FILES" | xargs)
+            echo "files=$FILES" >> $GITHUB_OUTPUT
+          fi
+
+  # Lint only changed backend files (skip if none changed)
+  lint:
+    name: lint-changed
+    needs: changed-files
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint changed backend files
+        if: needs.changed-files.outputs.backend-files != ''
+        run: |
+          npx eslint ${{ needs.changed-files.outputs.backend-files }} \
+            --max-warnings 0
+
+      - name: Lint skipped (no backend files changed)
+        if: needs.changed-files.outputs.backend-files == ''
+        run: echo "✅ No backend files changed, lint skipped"
+
+  # Unit tests (required) - fast, stable subset of curated unit tests
+  test-unit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: yacc_user
+          POSTGRES_PASSWORD: yacc_password
+          POSTGRES_DB: yacc_inbox
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run backend unit tests (curated stable subset)
+        run: pnpm --filter @yacc/backend test src/services/__tests__/irc-ingestion.service.test.ts
+        env:
+          DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          NODE_ENV: test
+
+  # Smoke tests (required) - integration test with in-process backend + DB + Redis
+  test-smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: yacc_user
+          POSTGRES_PASSWORD: yacc_password
+          POSTGRES_DB: yacc_inbox
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run backend smoke tests (integration test with Supertest against in-process backend)
+        run: pnpm --filter @yacc/backend test tests/QA-001-integration.spec.ts
+        env:
+          DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          NODE_ENV: test
+
+  # Full backend test suite (informational only) - may fail on dev baseline
+  # Shows as red (failing check) if tests fail, documenting baseline instability
+  test-full:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x]
+    timeout-minutes: 15
+    if: always()  # Always run, even if previous jobs fail
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: yacc_user
+          POSTGRES_PASSWORD: yacc_password
+          POSTGRES_DB: yacc_inbox
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run full backend test suite
+        run: pnpm --filter @yacc/backend test
+        env:
+          DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          NODE_ENV: test
+
+      - name: Test full suite status (informational)
+        if: always()
+        run: |
+          echo "ℹ️  Full backend test suite is informational only (may fail on baseline debt)"
+          echo "See GOV-029 for exit criteria to make this required"
