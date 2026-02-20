@@ -2,7 +2,7 @@ import { Body, Get, JsonController, Param, Post, QueryParam } from 'routing-cont
 
 import { logger } from '../infrastructure/logger';
 import { messageQueueDLQService } from '../services/message-queue-dlq.service';
-import { messageQueueService } from '../services/messageQueue.service';
+import { messageQueueService } from '../services/message-queue.service';
 import type { QueueStatistics } from '../types/message-queue.types';
 
 /**

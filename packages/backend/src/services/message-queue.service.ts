@@ -16,7 +16,7 @@ import {
   RETRY_CONFIG,
   SendMessageJobPayloadSchema,
 } from '../types/message-queue.types';
-import { queueDatabaseIntegration } from './queueDatabaseIntegration';
+import { queueDatabaseIntegration } from './queue-database-integration';
 
 /**
  * Message Queue Service

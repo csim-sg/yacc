@@ -1,7 +1,7 @@
 import type { DLQEntry } from '../types/message-queue.types';
 
 import { logger } from '../infrastructure/logger';
-import { messageQueueService } from './messageQueue.service';
+import { messageQueueService } from './message-queue.service';
 
 /**
  * Dead-Letter Queue (DLQ) Handler Service

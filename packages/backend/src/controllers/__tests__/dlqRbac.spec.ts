@@ -26,22 +26,8 @@ describe('DLQ Controller - RBAC Integration Tests', () => {
   let superAdminToken: string;
   let userToken: string;
   let dlqId: string;
-  
-  // Track unhandled rejections to suppress expected ones
-  const suppressedErrors: Error[] = [];
-  const unhandledRejectionHandler = (reason: unknown) => {
-    const error = reason instanceof Error ? reason : new Error(String(reason));
-    // Suppress "Cannot set headers after they are sent" errors
-    // which occur when routing-controllers error handler fires after response is sent
-    if (!error.message?.includes('Cannot set headers after they are sent')) {
-      throw error;
-    }
-    suppressedErrors.push(error);
-  };
 
   beforeAll(async () => {
-    // Register handler to suppress expected unhandled rejections
-    process.on('unhandledRejection', unhandledRejectionHandler);
     // Boot Express app with routing-controllers
     testApp = await createTestApp();
 
@@ -85,17 +71,14 @@ describe('DLQ Controller - RBAC Integration Tests', () => {
   });
 
   afterAll(async () => {
-    // Unregister the unhandled rejection handler
-    process.removeListener('unhandledRejection', unhandledRejectionHandler);
-    
-    // Wait for pending async operations to complete before closing
+    // Ensure all pending operations complete before cleanup
+    // This prevents "Cannot set headers after they are sent" errors
     if (testApp) {
+      // Give pending requests time to complete
       await new Promise<void>((resolve) => {
-        setImmediate(() => {
-          setImmediate(() => {
-            resolve();
-          });
-        });
+        setTimeout(() => {
+          resolve();
+        }, 100);
       });
     }
   });

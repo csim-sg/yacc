@@ -3,8 +3,8 @@ import type { BaseConnector } from '../../connectors/base/baseConnector';
 
 import { connectorManager } from '../connector-manager';
 import { messageQueueDLQService } from '../message-queue-dlq.service';
-import { messageQueueService } from '../messageQueue.service';
-import { queueDatabaseIntegration } from '../queueDatabaseIntegration';
+import { messageQueueService } from '../message-queue.service';
+import { queueDatabaseIntegration } from '../queue-database-integration';
 import type { SendMessageJobPayload } from '../../types/message-queue.types';
 import { RETRY_CONFIG } from '../../types/message-queue.types';
 

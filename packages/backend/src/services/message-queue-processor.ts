@@ -5,7 +5,7 @@ import type { Job } from 'bullmq';
 import { logger } from '../infrastructure/logger';
 import type { BaseConnector } from '../connectors/base/baseConnector';
 import type { SendMessageJobPayload } from '../types/message-queue.types';
-import { queueDatabaseIntegration } from './queueDatabaseIntegration';
+import { queueDatabaseIntegration } from './queue-database-integration';
 
 /**
  * Message Queue Processor

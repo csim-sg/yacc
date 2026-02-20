@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SendMessageJobPayload } from '../../types/message-queue.types';
 
 import { connectorManager } from '../connector-manager';
-import { queueDatabaseIntegration } from '../queueDatabaseIntegration';
+import { queueDatabaseIntegration } from '../queue-database-integration';
 
 /**
  * Message Queue Retry Logic - Advanced Failure Scenarios
