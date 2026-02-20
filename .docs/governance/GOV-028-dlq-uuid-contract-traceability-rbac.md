@@ -702,19 +702,17 @@ Tests verify:
 - [ ] API docs updated with RBAC table
 - [ ] Implementation guide updated with contract details
 
-### Approval Signatures
+### Approval Tracking
 
-**Architect Approval:**
-- Name: Pending Architect Approval
-- Date: _________________
-- Status: ⏳ Pending (review in PR #272)
-- Comments: _________________
+**Approval is captured via GitHub PR #272 approval (Architect)**
 
-**Product Owner Approval:**
-- Name: Pending Product Owner Approval
-- Date: _________________
-- Status: ⏳ Required
-- Comments: _________________
+This governance decision is formally approved when:
+1. Architect approves PR #272 with review sign-off
+2. Product Owner approves RBAC policy alignment
+3. All CI checks pass (lint, tests, type-check)
+4. PR is merged to `dev` branch
+
+**Current Status**: ⏳ Pending PR #272 review and approval
 
 ---
 

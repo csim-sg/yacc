@@ -8,8 +8,8 @@ import {
   integer,
   boolean,
 } from 'drizzle-orm/pg-core';
-import { messages } from './message.schema';
 import { conversations } from './conversation.schema';
+import { messages } from './message.schema';
 
 /**
  * Dead Letter Queue table - stores messages that failed after 3 retry attempts

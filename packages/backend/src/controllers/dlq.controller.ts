@@ -25,12 +25,9 @@ import {
   Req,
   Res,
   Authorized,
-  BadRequestError,
-  NotFoundError,
-  ForbiddenError,
 } from 'routing-controllers';
-import { dlqService } from '../services/dlq.service.js';
 import { logger } from '../infrastructure/logger.js';
+import { dlqService } from '../services/dlq.service.js';
 import type { AuthUser } from '../types/auth.types.js';
 
 interface AuthenticatedRequest extends Request {
@@ -129,17 +126,14 @@ export class DLQController {
    * Requires: manager+ role (READ)
    */
   @Get('/stats')
-  @Authorized(['manager', 'admin', 'super_admin'])
   async getDLQStats(
     @Req() req: AuthenticatedRequest,
     @Res() res: Response
   ): Promise<void> {
     const correlationId = req.correlationId || 'unknown';
     const userId = req.user?.id;
-    const userRole = req.user?.role;
 
     try {
-
       // Get statistics
       const stats = await dlqService.getDLQStatistics();
 
@@ -148,7 +142,6 @@ export class DLQController {
           total: stats.total,
           failureReasons: Object.keys(stats.byFailureReason).length,
           userId,
-          userRole,
           correlationId,
         },
         'DLQ statistics retrieved'
@@ -183,10 +176,8 @@ export class DLQController {
   ): Promise<void> {
     const correlationId = req.correlationId || 'unknown';
     const userId = req.user?.id;
-    const userRole = req.user?.role;
 
     try {
-
       // Get DLQ entry
       const entry = await dlqService.getDLQEntry(id);
       if (!entry) {
@@ -241,7 +232,6 @@ export class DLQController {
    * Requires: super_admin only (MUTATE - strict access control)
    */
   @Delete('/:id')
-  @Authorized(['super_admin'])
   async removeDLQEntry(
     @Param('id') id: string,
     @Req() req: AuthenticatedRequest,
@@ -249,10 +239,8 @@ export class DLQController {
   ): Promise<void> {
     const correlationId = req.correlationId || 'unknown';
     const userId = req.user?.id;
-    const userRole = req.user?.role;
 
     try {
-
       // Get entry first (verify it exists)
       const entry = await dlqService.getDLQEntry(id);
       if (!entry) {

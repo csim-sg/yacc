@@ -5,11 +5,11 @@
  * Provides operations for viewing, re-queueing, and cleanup
  */
 
+import { eq, desc, and, lte, count } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client.js';
-import { deadLetterQueue } from '../schemas/deadLetterQueue.schema.js';
 import { logger } from '../infrastructure/logger.js';
-import { eq, desc, and, gte, lte, count, sql } from 'drizzle-orm';
-import type { DeadLetterQueueEntry, DeadLetterQueueInsert } from '../schemas/deadLetterQueue.schema.js';
+import { deadLetterQueue } from '../schemas/deadLetterQueue.schema.js';
+import type { DeadLetterQueueEntry } from '../schemas/deadLetterQueue.schema.js';
 import type { SendMessageJobPayload } from '../types/message-queue.types.js';
 
 interface DLQQueryOptions {
