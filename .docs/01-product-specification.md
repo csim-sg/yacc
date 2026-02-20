@@ -851,31 +851,26 @@ flowchart TD
 
 ---
 
-### Story 16.3: Manage Tenant-Owned Integration Credentials & Connection Profiles
-**As a** tenant super admin  
-**I want** integration credentials and connection details stored in the database per tenant  
-**So that** the tenant can manage many configured connection profiles without relying on environment variables.
+### Story 16.3: Manage Integration Connection Profiles (IRC - MVP Hard Cap)
+**As a** super admin  
+**I want** IRC connection profiles stored in the database  
+**So that** the system can store IRC configuration with encrypted passwords.
 
-**Notes / Decisions Required (blocks implementation)**:
-- Scope: does this apply to IRC only, or to all integrations (IRC + Telegram in MVP)?
-- Within a tenant, do we support multiple profiles per integration (0..N) or exactly one?
-- Some integrations may be technically limited to a single profile (0..1). We need an explicit per-integration policy.
+**MVP Scope Note**: 
+- Single-tenant MVP with hard cap: **max 10 IRC profiles per system**
+- No tenant-configurable policy settings (post-MVP feature)
+- Profiles stored in database with encrypted passwords
+- Tenant settings and profile policy configuration deferred to Phase 2+
 
-**AC (business-level)**:
-- System stores integration connection profiles in DB and scopes them to a tenant
-- Tenant super admins can create/update/delete profiles; other roles are denied (explicit RBAC)
-- Passwords/tokens are encrypted at rest and never returned in API responses
-- Logs and audit trails never include plaintext secrets; audit records secret changes as booleans only
-- System enforces a per-integration **profile policy** stored in settings:
-  - Default policy: multi-profile allowed (0..N)
-  - Integrations that only support a single profile must enforce maxProfiles=1 (0..1)
-  - Tenant settings can only **tighten** limits (reduce maxProfiles); they can never increase beyond the integration hard limit
-  - Attempting to create a profile beyond maxProfiles returns a clear, sanitized validation error
-- If tenant settings are tightened below the current number of existing profiles:
-  - System blocks creating new profiles for that integration until the tenant remediates (disable/delete profiles)
-  - System does not auto-delete or auto-disable profiles
-- Tenant can select which profile is active for connection/sending (behavior defined per integration)
-- Error messages are sanitized and do not leak secrets
+**AC (MVP-locked)**:
+- System stores IRC connection profiles in database with encrypted passwords
+- Super admins can create/update/delete profiles; other roles denied (RBAC enforced)
+- Passwords/tokens encrypted at rest via `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY`
+- Passwords never returned in API responses (only `hasPassword` flag)
+- Hard cap: max 10 profiles total for IRC integration in MVP
+- Attempting to create beyond cap returns: `"Reached maximum of 10 IRC profiles"`
+- Audit logs never include plaintext secrets (recorded as boolean flags only)
+- Error messages sanitized (no secret exposure)
 
 ### Story 17.1: Create Tags On-the-Fly
 **As a** user  
