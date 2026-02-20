@@ -17,7 +17,7 @@ import type { Request, Response } from 'express';
 import { Controller, Get, Post, Res, Req, Authorized, Body } from 'routing-controllers';
 import { logger } from '../infrastructure/logger';
 import { auditService } from '../services/audit.service';
-import { ircConfigService, TestConnectionFailedError } from '../services/ircConfig.service';
+import { ircConfigService } from '../services/ircConfig.service';
 import { ircIntegrationService } from '../services/ircIntegration.service';
 import type { AuthUser } from '../types/auth.types';
 import type {
@@ -28,6 +28,7 @@ import type {
   IRCTestResponse,
   IntegrationErrorResponse,
 } from '../types/ircIntegration.types';
+import { TestConnectionFailedError } from '../types/testConnectionFailedError.class';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;

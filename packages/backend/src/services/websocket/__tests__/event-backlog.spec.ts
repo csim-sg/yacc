@@ -5,6 +5,15 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { redisClient } from '../../../infrastructure/redis.client';
+import {
+  storeEvent,
+  getBacklogForUser,
+  getBacklogForConversation,
+  clearBacklogForUser,
+  getBacklogStats,
+} from '../event-backlog.service';
+
 // Mock logger and redis
 vi.mock('../../../infrastructure/logger', () => ({
   logger: {
@@ -24,15 +33,6 @@ vi.mock('../../../infrastructure/redis.client', () => ({
     keys: vi.fn(),
   },
 }));
-
-import { redisClient } from '../../../infrastructure/redis.client';
-import {
-  storeEvent,
-  getBacklogForUser,
-  getBacklogForConversation,
-  clearBacklogForUser,
-  getBacklogStats,
-} from '../event-backlog.service';
 
 /**
  * Helper to create mock payload

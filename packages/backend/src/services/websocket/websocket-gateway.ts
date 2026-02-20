@@ -212,7 +212,7 @@ export function isSubscribedToConversation(userId: string, conversationId: strin
   try {
     const gateway = getWebSocketGateway();
     return gateway.isSubscribedToConversation(userId, conversationId);
-  } catch (_error) {
+  } catch {
     logger.warn('Failed to check subscription status');
     return false;
   }
@@ -228,7 +228,7 @@ export function getConversationSubscribers(conversationId: string): Set<string> 
   try {
     const gateway = getWebSocketGateway();
     return gateway.getConversationSubscribers(conversationId);
-  } catch (_error) {
+  } catch {
     logger.warn('Failed to get conversation subscribers');
     return new Set();
   }

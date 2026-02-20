@@ -253,7 +253,7 @@ export class RulesEngineService {
   private async applyActions(
     actions: RoutingAction[],
     conversationId: string,
-    userId: string
+    _userId: string
   ): Promise<void> {
     if (actions.length === 0) {
       return;

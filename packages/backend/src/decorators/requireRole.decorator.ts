@@ -1,5 +1,5 @@
-import { createParamDecorator, ForbiddenError } from 'routing-controllers';
 import type { Request } from 'express';
+import { createParamDecorator, ForbiddenError } from 'routing-controllers';
 
 /**
  * User roles in the system

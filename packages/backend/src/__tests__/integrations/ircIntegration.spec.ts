@@ -8,9 +8,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ircStatusClient } from '../../infrastructure/ircStatus.client';
 import { EncryptionService } from '../../services/encryption.service';
-import { ircConfigService, TestConnectionFailedError } from '../../services/ircConfig.service';
+import { ircConfigService } from '../../services/ircConfig.service';
 import { ircIntegrationService } from '../../services/ircIntegration.service';
 import type { IRCConfigRequest } from '../../types/ircIntegration.types';
+import { TestConnectionFailedError } from '../../types/testConnectionFailedError.class';
 
 interface MockListeners {
   [key: string]: Array<() => void>;

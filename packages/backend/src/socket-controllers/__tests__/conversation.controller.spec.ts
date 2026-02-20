@@ -14,16 +14,19 @@ describe('ConversationController', () => {
   let controller: ConversationController;
   let mockSocket: Partial<Socket>;
   let mockAuthSocket: Partial<AuthenticatedSocket>;
+  let emitSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     controller = new ConversationController();
+
+    emitSpy = vi.fn();
 
     // Mock Socket methods
     mockSocket = {
       id: 'test-socket-123',
       join: vi.fn(),
       leave: vi.fn(),
-      emit: vi.fn(),
+      emit: emitSpy,
       to: vi.fn().mockReturnValue({
         emit: vi.fn(),
       }),
@@ -217,8 +220,7 @@ describe('ConversationController', () => {
       }
 
       // Either emit was called or error was thrown (both acceptable)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const emitCalled = (mockSocket.emit as any).mock.calls.length > 0;
+      const emitCalled = emitSpy.mock.calls.length > 0;
       expect(errorThrown || emitCalled).toBe(true);
     });
 

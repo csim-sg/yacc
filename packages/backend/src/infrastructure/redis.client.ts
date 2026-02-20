@@ -65,7 +65,7 @@ export async function checkRedisHealth(): Promise<boolean> {
   try {
     await redis.ping();
     return true;
-  } catch (_error) {
+  } catch {
     return false;
   }
 }

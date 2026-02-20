@@ -1,5 +1,5 @@
-import pinoHttp from 'pino-http';
 import type { Request, Response } from 'express';
+import pinoHttp from 'pino-http';
 import { logger } from '../infrastructure/logger';
 
 /**

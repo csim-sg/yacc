@@ -19,7 +19,7 @@ import { validatePassword } from './passwordValidation.service';
  */
 export async function generateResetToken(
   userId: string,
-  correlationId: string,
+  _correlationId: string,
 ): Promise<string> {
   // Delete any existing valid tokens for this user
   await dbClient
@@ -66,7 +66,7 @@ export async function generateResetToken(
  */
 export async function validateAndGetUserId(
   token: string,
-  correlationId: string,
+  _correlationId: string,
 ): Promise<string> {
   // Basic format check
   if (!token || token.length !== 64 || !/^[a-f0-9]{64}$/.test(token)) {

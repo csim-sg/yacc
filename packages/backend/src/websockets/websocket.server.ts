@@ -6,12 +6,12 @@
  */
 
 import type { Server as HttpServer } from 'http';
-import type { WebSocketEventMap } from '../types/websocket.types';
-import type { AuthenticatedSocket } from './auth.middleware';
 import { Server } from 'socket.io';
 import { appConfig } from '../config/appConfig';
 import { logger } from '../infrastructure/logger';
+import type { WebSocketEventMap } from '../types/websocket.types';
 import { webSocketAuthMiddleware } from './auth.middleware';
+import type { AuthenticatedSocket } from './auth.middleware';
 import { PING_INTERVAL_MS, CONNECTION_TIMEOUT_MS } from './wsConstants';
 
 /**

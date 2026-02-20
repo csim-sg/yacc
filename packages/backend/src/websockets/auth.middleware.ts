@@ -15,7 +15,7 @@ import { users } from '../schemas/user.schema';
 /**
  * Extended Socket interface with authenticated user
  */
-interface AuthenticatedSocket extends Socket {
+export interface AuthenticatedSocket extends Socket {
   userId?: string;
   email?: string;
   role?: string;
@@ -86,8 +86,4 @@ export async function webSocketAuthMiddleware(
     }
   }
 
-/**
- * AuthenticatedSocket type - used for typing WebSocket connections with authentication
- * This is a TypeScript interface re-export, which cannot be replaced with `export const`
- */
-export type { AuthenticatedSocket };
+// AuthenticatedSocket is exported at definition site (interface)

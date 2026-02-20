@@ -8,6 +8,13 @@
 
 import type { Server } from 'socket.io';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { WebSocketEventMap } from '../../../types/websocket.types';
+import {
+  emitEvent,
+  getRegisteredEvents,
+  isEventRegistered,
+} from '../handler-registry';
+
 // Mock logger to avoid appConfig parsing
 vi.mock('../../../infrastructure/logger', () => ({
   logger: {
@@ -18,17 +25,10 @@ vi.mock('../../../infrastructure/logger', () => ({
   },
 }));
 
-import {
-  emitEvent,
-  getRegisteredEvents,
-  isEventRegistered,
-} from '../handler-registry';
-
 /**
  * Test helper to create an object with mismatched type
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function createInvalidPayload(): any {
+function createInvalidPayload(): unknown {
   return {
     messageId: 'invalid-id',
     conversationId: '550e8400-e29b-41d4-a716-446655440001',
@@ -212,14 +212,14 @@ describe('Handler Registry', () => {
     });
 
     it('should reject invalid payload for message.sent', async () => {
-      const payload = createInvalidPayload();
+      const payload = createInvalidPayload() as unknown as WebSocketEventMap['message.sent'];
       await expect(
         emitEvent(mockIO, 'message.sent', payload)
       ).rejects.toThrow();
     });
 
     it('should reject invalid payload for presence.updated', async () => {
-      const payload = createInvalidPayload();
+      const payload = createInvalidPayload() as unknown as WebSocketEventMap['presence.updated'];
       await expect(
         emitEvent(mockIO, 'presence.updated', payload)
       ).rejects.toThrow();

@@ -222,7 +222,6 @@ export async function exportAuditLogs(
     
      // Fetch all matching logs by iterating through pages
      const allItems: AuditLogEntry[] = [];
-     let currentPage = 1;
      const pageSize = 100; // Use max page size for efficiency
     
     // Fetch first page to know total

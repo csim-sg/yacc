@@ -1,5 +1,5 @@
-import { createParamDecorator, ForbiddenError } from 'routing-controllers';
 import type { Request } from 'express';
+import { createParamDecorator, ForbiddenError } from 'routing-controllers';
 import type { AuthUser, Permission } from '../types/auth.types';
 import { PERMISSIONS } from '../types/auth.types';
 

@@ -1,6 +1,9 @@
 import { EventEmitter } from 'events';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
 import type { Client as _IRCClient } from 'irc-framework';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { logger } from '../../infrastructure/logger';
+import { IRCConnector } from '../irc.connector';
 
 // Mock the logger
 vi.mock('../../infrastructure/logger', () => ({
@@ -69,11 +72,6 @@ vi.mock('irc-framework', () => {
     __getLastClient: () => lastCreatedClient,
   };
 });
-
-// eslint-disable-next-line import/order
-import { logger } from '../../infrastructure/logger';
-import { IRCConnector } from '../irc.connector';
-import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
 
 describe('IRCConnector', () => {
   let connector: IRCConnector;
@@ -974,7 +972,7 @@ describe('IRCConnector', () => {
       connector.setConfig(configWithProfile);
       
       // Start connection but don't wait for full handshake
-      const _connectPromise = connector.connect();
+      const connectPromise = connector.connect();
       
       // Emit registered event to complete handshake
       await new Promise(resolve => setImmediate(resolve));
@@ -994,7 +992,7 @@ describe('IRCConnector', () => {
     it('should generate unique correlationId for each connection attempt', async () => {
       connector.setConfig(mockConfig);
       
-      const _connectPromise = connector.connect();
+      const connectPromise = connector.connect();
       
       // Trigger error before handshake completes
       await new Promise(resolve => setImmediate(resolve));
@@ -1017,7 +1015,7 @@ describe('IRCConnector', () => {
     it('should log correlation ID with all error messages', async () => {
       connector.setConfig(mockConfig);
       
-      const _connectPromise = connector.connect();
+      const connectPromise = connector.connect();
       await new Promise(resolve => setImmediate(resolve));
       emitClientEvent('socket close');
       
@@ -1030,7 +1028,7 @@ describe('IRCConnector', () => {
     it('should handle connection errors with proper retry scheduling', async () => {
       connector.setConfig(mockConfig);
       
-      const _connectPromise = connector.connect();
+      const connectPromise = connector.connect();
       await new Promise(resolve => setImmediate(resolve));
       emitClientEvent('error', new Error('Connection refused'));
       
@@ -1052,7 +1050,7 @@ describe('IRCConnector', () => {
       
       // Simulate 5 failed connection attempts
       for (let i = 0; i < 5; i++) {
-        const _connectPromise = connector.connect();
+        const connectPromise = connector.connect();
         await new Promise(resolve => setImmediate(resolve));
         emitClientEvent('error', new Error(`Attempt ${i + 1} failed`));
         try {

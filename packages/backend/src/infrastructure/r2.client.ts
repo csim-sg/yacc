@@ -57,7 +57,7 @@ export async function checkR2Health(): Promise<boolean> {
     // Check if we can access the bucket
     await r2Client.send(new HeadBucketCommand({ Bucket: appConfig.CLOUDFLARE_R2_BUCKET }));
     return true;
-  } catch (_error) {
+  } catch {
     return false;
   }
 }

@@ -215,7 +215,7 @@ export async function currentUserChecker(
      } as AuthUser;
 
       return undefined;
-    } catch (_error) {
-      return undefined;
-    }
+     } catch {
+       return undefined;
+     }
 }

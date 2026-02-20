@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { BaseConnector } from '../../connectors/base/baseConnector';
 import type { SendMessageJobPayload } from '../../types/message-queue.types';
 import { connectorManager } from '../connector-manager';
 import { queueDatabaseIntegration } from '../queue-database-integration';
@@ -20,8 +21,15 @@ import { queueDatabaseIntegration } from '../queue-database-integration';
  */
 
 describe('Message Queue - Retry Logic with Mock Failures', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockConnector: any;
+  type MockConnector = {
+    sendMessage: ReturnType<typeof vi.fn>;
+    connect: ReturnType<typeof vi.fn>;
+    disconnect: ReturnType<typeof vi.fn>;
+    isConnected: ReturnType<typeof vi.fn>;
+    getConnectionStatus: ReturnType<typeof vi.fn>;
+  };
+
+  let mockConnector: MockConnector;
   const basePayload: SendMessageJobPayload = {
     messageId: '550e8400-e29b-41d4-a716-446655440001',
     conversationId: 'conv-123',
@@ -47,7 +55,7 @@ describe('Message Queue - Retry Logic with Mock Failures', () => {
     };
 
     // Register mock connector
-    connectorManager.registerConnector('telegram', mockConnector);
+    connectorManager.registerConnector('telegram', mockConnector as unknown as BaseConnector);
   });
 
   afterEach(() => {

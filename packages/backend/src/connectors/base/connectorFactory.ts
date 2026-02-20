@@ -14,10 +14,16 @@ import type { ValidationError } from '@yacc/common/types/validationError.interfa
 // Placeholder imports (will be replaced when connectors are implemented)
 // ============================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let TelegramConnectorClass: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let IRCConnectorClass: any;
+type TelegramConnectorConstructor = new (
+  config: ConnectorConfig<'telegram'>
+) => IConnector<'telegram'>;
+
+type IRCConnectorConstructor = new (
+  config: ConnectorConfig<'irc'>
+) => IConnector<'irc'>;
+
+let TelegramConnectorClass: TelegramConnectorConstructor | undefined;
+let IRCConnectorClass: IRCConnectorConstructor | undefined;
 
 // ============================================
 // Connector Factory
@@ -113,11 +119,12 @@ export class ConnectorFactory {
   /**
    * Register connector classes (to be called during app initialization)
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  static registerConnectors(telegramConnector: any, ircConnector: any): void {
+  static registerConnectors(
+    telegramConnector: TelegramConnectorConstructor,
+    ircConnector: IRCConnectorConstructor
+  ): void {
     TelegramConnectorClass = telegramConnector;
     IRCConnectorClass = ircConnector;
   }
 }
-
 

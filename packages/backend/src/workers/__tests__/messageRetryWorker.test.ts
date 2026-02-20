@@ -1,6 +1,7 @@
 import type { Job } from 'bullmq';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { SendMessageJobPayload } from '../../types/message-queue.types';
+import { processRetryJob } from '../messageRetryWorker';
 const mocks = vi.hoisted(() => {
   const whereMock = vi.fn().mockResolvedValue(undefined);
   const setMock = vi.fn(() => ({ where: whereMock }));
@@ -64,8 +65,6 @@ vi.mock('../../services/messageStatusTracker.js', () => ({
     trackFailedMessage: mocks.trackFailedMessageMock,
   },
 }));
-
-import { processRetryJob } from '../messageRetryWorker';
 
 describe('messageRetryWorker.processRetryJob', () => {
   beforeEach(() => {

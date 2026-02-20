@@ -18,7 +18,10 @@ import { dbClient } from '../infrastructure/db.client';
 import { ircStatusClient } from '../infrastructure/ircStatus.client';
 import { logger } from '../infrastructure/logger';
 import { integrationConfigs } from '../schemas/integrationConfig.schema';
+import { EncryptionKeyMissingError } from '../types/encryptionKeyMissingError.class';
 import type { IRCConfigRequest, IRCConfigResponseData } from '../types/ircIntegration.types';
+import type { TestConnectionError } from '../types/testConnectionError.type';
+import { TestConnectionFailedError } from '../types/testConnectionFailedError.class';
 import { connectorManager } from './connector-manager';
 import { connectorStatusWiring } from './connector-status-wiring.service';
 import { EncryptionService } from './encryption.service';
@@ -26,31 +29,6 @@ import {
   resolveIrcConfig,
   IrcProfileResolutionError,
 } from './ircProfileResolution.service';
-
-/**
- * Typed errors for INT-008 validation and connection issues
- */
-type TestConnectionError = 
-  | { type: 'validation_error'; message: string }
-  | { type: 'not_configured'; message: string }
-  | { type: 'timeout'; message: string }
-  | { type: 'internal_error'; message: string };
-
-class TestConnectionFailedError extends Error {
-  constructor(public errorInfo: TestConnectionError) {
-    super(errorInfo.message);
-    this.name = 'TestConnectionFailedError';
-  }
-}
-
-class EncryptionKeyMissingError extends Error {
-  public readonly code = 'encryption_key_missing';
-
-  constructor(message: string) {
-    super(message);
-    this.name = 'EncryptionKeyMissingError';
-  }
-}
 
 export class IRCConfigService {
   /**
@@ -671,4 +649,3 @@ export class IRCConfigService {
 }
 
 export const ircConfigService = new IRCConfigService();
-export { TestConnectionFailedError };
