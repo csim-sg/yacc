@@ -20,7 +20,7 @@ const TEST_PASSWORD_HASH = '$2a$10$gS7c7JG.0GKGhZUZkYZu9uTDGjDqzH8s6HGkJKm0hI9G/
 // Test data
 let testUserId: string;
 let testConversationId: string;
-let testTagId: number;
+let _testTagId: number;
 let testRuleId: string;
 
 describe('Routing Rules Service', () => {
@@ -52,15 +52,15 @@ describe('Routing Rules Service', () => {
     testConversationId = convResult[0].id;
 
     // Create test tag
-    const tagResult = await dbClient
-      .insert(tags)
-      .values({
-        name: 'urgent-' + Date.now(),
-        color: '#FF0000',
-        createdById: testUserId,
-      })
-      .returning();
-    testTagId = tagResult[0].id;
+     const tagResult = await dbClient
+       .insert(tags)
+       .values({
+         name: 'urgent-' + Date.now(),
+         color: '#FF0000',
+         createdById: testUserId,
+       })
+       .returning();
+     _testTagId = tagResult[0].id;
   });
 
   afterAll(async () => {
@@ -228,17 +228,17 @@ describe('Routing Rules Service', () => {
       expect(updated.status).toBe('disabled');
     });
 
-    it('should update rule conditions', async () => {
-      const newConditions = [
-        { field: 'channel', operator: 'eq', value: 'irc' },
-      ] as const;
+     it('should update rule conditions', async () => {
+       const newConditions: CreateRoutingRuleRequest['conditions'] = [
+         { field: 'channel', operator: 'eq', value: 'irc' },
+       ];
 
-      const updated = await routingRulesService.updateRule(testUserId, testRuleId, {
-        conditions: newConditions as any,
-      });
+       const updated = await routingRulesService.updateRule(testUserId, testRuleId, {
+         conditions: newConditions,
+       });
 
-      expect(updated.conditions).toBeDefined();
-    });
+       expect(updated.conditions).toBeDefined();
+     });
 
     it('should reject update with invalid conditions', async () => {
       try {

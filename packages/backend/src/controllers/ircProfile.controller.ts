@@ -10,6 +10,7 @@
  * See INT-010: IRC tenant-owned DB connection profiles
  */
 
+import { Socket } from 'net';
 import {
   JsonController,
   Post,
@@ -518,11 +519,10 @@ export class IrcProfileController {
     const timeoutMs = 10000; // 10 second timeout
 
     return new Promise((resolve) => {
-      const startTime = Date.now();
+       const startTime = Date.now();
 
-      // Simple TCP socket connectivity test (no IRC protocol needed for basic test)
-      const net = require('net');
-      const socket = net.createSocket();
+       // Simple TCP socket connectivity test (no IRC protocol needed for basic test)
+       const socket = new Socket();
 
       const handleTimeout = () => {
         socket.destroy();

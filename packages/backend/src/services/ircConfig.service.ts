@@ -520,8 +520,8 @@ export class IRCConfigService {
     password?: string;
   }): Promise<{ success: boolean; message: string }> {
     // Import at method level to avoid circular dependencies
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Client: IRCClient } = require('irc-framework');
+    const module = await import('irc-framework');
+    const Client = (module as unknown as { Client: unknown }).Client as new () => unknown;
 
     // Create timeout promise (10 seconds)
     const timeoutPromise = new Promise<{ success: boolean; message: string }>((_, reject) => {
@@ -533,14 +533,27 @@ export class IRCConfigService {
     // Create connection test promise
     const connectionPromise = new Promise<{ success: boolean; message: string }>((resolve, reject) => {
       try {
-        const testClient = new IRCClient();
+        const testClient = new Client();
+
+        const client = testClient as unknown as {
+          quit(msg: string): void;
+          on(event: string, handler: (data?: unknown) => void): void;
+          connect(options: {
+            host: string;
+            port: number;
+            nick: string;
+            password?: string;
+            gecos: string;
+            tls: boolean;
+          }): void;
+        };
 
         let registered = false;
         let testCompleted = false;
 
         const cleanup = () => {
           try {
-            testClient.quit('Test complete');
+            client.quit('Test complete');
           } catch (err) {
             logger.debug({ error: err }, 'Error during test client cleanup');
           }
@@ -555,7 +568,7 @@ export class IRCConfigService {
         };
 
         // Register event handler BEFORE connecting
-        testClient.on('registered', () => {
+        client.on('registered', () => {
           registered = true;
           finalize({
             success: true,
@@ -563,19 +576,20 @@ export class IRCConfigService {
           });
         });
 
-        testClient.on('error', (error: { message: string }) => {
+        client.on('error', (error: unknown) => {
           if (!testCompleted) {
             testCompleted = true;
             cleanup();
+            const errorMsg = (error as { message?: string }).message || '';
             reject(
               new Error(
-                `IRC connection error: ${(error.message || '').substring(0, 100)}`
+                `IRC connection error: ${errorMsg.substring(0, 100)}`
               )
             );
           }
         });
 
-        testClient.on('close', () => {
+        client.on('close', () => {
           if (!registered && !testCompleted) {
             testCompleted = true;
             reject(new Error('IRC connection closed without registration'));
@@ -583,7 +597,7 @@ export class IRCConfigService {
         });
 
         // Connect with proper settings for test
-        testClient.connect({
+        client.connect({
           host: config.server,
           port: config.port,
           nick: config.username,

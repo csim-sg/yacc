@@ -1,5 +1,6 @@
+import { EventEmitter } from 'events';
+import type { Client as _IRCClient } from 'irc-framework';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { Client as IRCClient } from 'irc-framework';
 
 // Mock the logger
 vi.mock('../../infrastructure/logger', () => ({
@@ -24,7 +25,6 @@ function emitClientEvent(eventName: string, ...args: unknown[]): void {
 }
 
 vi.mock('irc-framework', () => {
-  const { EventEmitter } = require('events');
 
   class MockIRCClient extends EventEmitter {
     public options: Record<string, unknown> | null = null;
@@ -69,9 +69,10 @@ vi.mock('irc-framework', () => {
   };
 });
 
-import { IRCConnector } from '../irc.connector';
-import { logger } from '../../infrastructure/logger';
 import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
+
+import { logger } from '../../infrastructure/logger';
+import { IRCConnector } from '../irc.connector';
 
 describe('IRCConnector', () => {
   let connector: IRCConnector;
