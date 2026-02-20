@@ -29,13 +29,13 @@ import 'reflect-metadata';
  * Global setup function - runs once before all tests
  */
 export async function setup() {
-  console.log('\n🔧 Global Setup: Preparing test environment...\n');
+  console.log('\n[SETUP] Preparing test environment...\n');
 
   try {
     // Import database client AFTER env vars are set
     const { dbClient } = await import('../src/infrastructure/db.client.js');
 
-    console.log('📦 Verifying database connection...');
+    console.log('[SETUP] Verifying database connection...');
 
     // Simple test query to verify connection
     const result = await dbClient.execute('SELECT NOW() as now');
@@ -47,17 +47,17 @@ export async function setup() {
         const firstRow = rows[0];
         if (firstRow && typeof firstRow === 'object' && 'now' in firstRow) {
           const timestamp = firstRow.now;
-          console.log(`✅ Database connection successful (${timestamp})\n`);
+          console.log(`[SETUP] Database connection successful (${timestamp})\n`);
         } else {
-          console.log('✅ Database connection verified\n');
+          console.log('[SETUP] Database connection verified\n');
         }
       }
     } else {
-      console.log('✅ Database connection verified\n');
+      console.log('[SETUP] Database connection verified\n');
     }
 
     // Run migrations to ensure schema is up-to-date
-    console.log('📦 Running migrations...');
+    console.log('[SETUP] Running migrations...');
     try {
       const { migrate } = await import('drizzle-orm/node-postgres/migrator');
       const { Pool } = await import('pg');
@@ -70,70 +70,83 @@ export async function setup() {
       await migrate(migrationClient, { migrationsFolder: './drizzle' });
       
       await pool.end();
-      console.log('✅ Migrations applied\n');
+      console.log('[SETUP] Migrations applied\n');
     } catch (migrationError: unknown) {
       const migrationMsg = migrationError instanceof Error ? migrationError.message : String(migrationError);
-      console.warn('⚠️ Migration warning (continuing):', migrationMsg, '\n');
+      console.warn('[SETUP] Migration warning (continuing):', migrationMsg, '\n');
       // Continue even if migrations fail - they may already be applied
     }
 
-    console.log('✅ Test environment ready\n');
+    console.log('[SETUP] Test environment ready\n');
   } catch (error: unknown) {
     // Safely handle error without using 'any'
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('❌ Global setup failed:', errorMessage);
-    console.error('Make sure PostgreSQL is running and migrations have been applied');
+    console.error('[SETUP] FAILED:', errorMessage);
+    console.error('[SETUP] Make sure PostgreSQL is running and migrations have been applied');
     throw error;
   }
 }
 
 /**
  * Global teardown function - runs once after all tests
- * CRITICAL: Closes all open connections to prevent "close timed out" hangs
+ * CRITICAL: All connections must be properly closed or tests will hang
+ * Order matters: close queue/worker BEFORE Redis, database last
  */
 export async function teardown() {
-  console.log('\n🧹 Global Teardown: Cleaning up...\n');
+  console.log('\n[TEARDOWN] Cleaning up resources...\n');
 
+  const errors: string[] = [];
+
+  // Close retry worker first (depends on Redis connection)
   try {
-    // Close database connection pool
-    try {
-      const { closeDatabase } = await import('../src/infrastructure/db.client.js');
-      await closeDatabase();
-      console.log('✅ Database connection pool closed');
-    } catch (dbError: unknown) {
-      const dbErrorMsg = dbError instanceof Error ? dbError.message : String(dbError);
-      console.warn(`⚠️ Database cleanup warning: ${dbErrorMsg}`);
-      // Continue to Redis cleanup even if DB cleanup fails
-    }
-
-    // Close Redis connection
-    try {
-      const { redisClient } = await import('../src/infrastructure/redis.client.js');
-      if (redisClient && typeof redisClient === 'object') {
-        // ioredis disconnect returns void or Promise<void> depending on version
-        const result = (redisClient as unknown as { disconnect(): unknown }).disconnect();
-        if (result instanceof Promise) {
-          await result;
-        }
-        console.log('✅ Redis connection closed');
-      }
-    } catch (redisError: unknown) {
-      const redisErrorMsg = redisError instanceof Error ? redisError.message : String(redisError);
-      console.warn(`⚠️ Redis cleanup warning: ${redisErrorMsg}`);
-      // Continue to completion even if Redis cleanup fails
-    }
-
-    // Give any pending timers time to settle, then exit cleanly
-    await new Promise<void>((resolve) => {
-      setTimeout(() => {
-        console.log('✅ Test suite cleanup completed\n');
-        resolve();
-      }, 100);
-    });
+    const { closeRetryWorker } = await import('../src/workers/messageRetryWorker.js');
+    await closeRetryWorker();
+    console.log('[TEARDOWN] Retry worker closed');
   } catch (error: unknown) {
-    // Safely handle error without using 'any'
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('⚠️ Teardown warning:', errorMessage);
-    // Don't fail on teardown errors
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[TEARDOWN] Worker close failed:', msg);
+    errors.push(`Worker close: ${msg}`);
+  }
+
+  // Close message retry queue (depends on Redis connection)
+  try {
+    const { closeRetryQueue } = await import('../src/infrastructure/queues.client.js');
+    await closeRetryQueue();
+    console.log('[TEARDOWN] Message retry queue closed');
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[TEARDOWN] Queue close failed:', msg);
+    errors.push(`Queue close: ${msg}`);
+  }
+
+  // Close Redis client (after queue/worker which depend on it)
+  try {
+    const { closeRedisClient } = await import('../src/infrastructure/redis.client.js');
+    await closeRedisClient();
+    console.log('[TEARDOWN] Redis connection closed');
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[TEARDOWN] Redis close failed:', msg);
+    errors.push(`Redis close: ${msg}`);
+  }
+
+  // Close database connection last (independent)
+  try {
+    const { closeDatabase } = await import('../src/infrastructure/db.client.js');
+    await closeDatabase();
+    console.log('[TEARDOWN] Database connection closed');
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[TEARDOWN] Database close failed:', msg);
+    errors.push(`Database close: ${msg}`);
+  }
+
+  console.log('[TEARDOWN] Test suite cleanup completed\n');
+
+  // Fail if any cleanup operations failed
+  if (errors.length > 0) {
+    const errorSummary = errors.join('; ');
+    console.error(`[TEARDOWN] FAILED with ${errors.length} error(s): ${errorSummary}`);
+    throw new Error(`Teardown failed: ${errorSummary}`);
   }
 }

@@ -36,7 +36,6 @@ export async function checkDatabaseConnection(): Promise<boolean> {
 
 /**
  * Close database connection pool
- * Used in test teardown to prevent hanging handles
  */
 export async function closeDatabase(): Promise<void> {
   await pool.end();
