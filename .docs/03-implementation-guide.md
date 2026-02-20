@@ -212,7 +212,7 @@ Each workspace:
 
 ## 3. Core Components Guide
 
-### 3.1 Message Retry Queue (Redis + BullMQ)
+### 3.1 Message Retry Queue & DLQ (Redis + BullMQ)
 
 **When to use**: Outbound message fails to deliver to platform
 
@@ -224,7 +224,8 @@ Message send fails
   → Worker picks up job, attempts delivery
   → Success: mark message status = sent
   → Failure: retry with backoff (5 min, 30 min)
-  → After 3 failures: move to DLQ for ops
+  → After 3 failures: move to DLQ for ops review
+  → Ops retry or delete via DLQ API
 ```
 
 **Configuration**:
@@ -252,6 +253,51 @@ messageRetryQueue.process(async (job) => {
   await connector.sendMessage(...);
 });
 ```
+
+### 3.1.1 DLQ (Dead Letter Queue) Contract
+
+**Message ID Contract**:
+- `messageId` is always a UUID and references `messages.id`
+- External job/platform IDs are **never** used as messageId
+- Enforced by dlqService.moveToDLQ() validation
+
+**Example** (moving failed Telegram message to DLQ):
+```typescript
+// ✅ CORRECT: UUID messageId, external ID in metadata
+await dlqService.moveToDLQ(
+  'a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6',  // UUID FK
+  conversationId,
+  payload,
+  'api_error',
+  'Failed to send to Telegram',
+  {
+    metadata: {
+      jobId: 'msg-payload-abc123',           // BullMQ job ID
+      externalMessageId: 'tg-msg-9876543'    // Telegram message ID
+    }
+  }
+);
+```
+
+**Traceability Fields** (for ops investigation):
+- `correlationId`: End-to-end trace ID (search logs with this)
+- `ircProfileId`: IRC profile UUID (if applicable)
+- `externalThreadType`: Platform (telegram_group, irc_channel)
+- `externalThreadId`: Specific thread (tg-group-123, #general)
+- `metadata`: Job ID, external message ID, custom data
+
+**RBAC Policy** (ops access control):
+- **manager**: LIST, STATS (read-only, oversight)
+- **admin**: LIST, STATS, RE-QUEUE (ops can retry)
+- **super_admin**: LIST, STATS, RE-QUEUE, DELETE (full access)
+- **user**: NO ACCESS (restricted)
+
+**Ops Workflow**:
+1. Ops views DLQ: `GET /api/dlq`
+2. Ops checks failed message: `SELECT * FROM messages WHERE id = '{messageId}'`
+3. Ops investigates root cause (check logs with correlationId)
+4. Ops retries: `POST /api/dlq/:id/re-queue` (admin+)
+5. Ops deletes after resolution: `DELETE /api/dlq/:id` (super_admin only)
 
 ---
 

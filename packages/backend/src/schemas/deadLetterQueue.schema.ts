@@ -8,8 +8,8 @@ import {
   integer,
   boolean,
 } from 'drizzle-orm/pg-core';
-import { messages } from './message.schema';
 import { conversations } from './conversation.schema';
+import { messages } from './message.schema';
 
 /**
  * Dead Letter Queue table - stores messages that failed after 3 retry attempts
@@ -37,6 +37,12 @@ export const deadLetterQueue = pgTable(
     totalAttempts: integer('total_attempts').notNull().default(3),
     lastError: text('last_error').notNull(),
     
+    // Traceability fields for ops investigation
+    correlationId: text('correlation_id'), // Request correlation ID for tracing async delivery
+    ircProfileId: uuid('irc_profile_id'), // For IRC-specific context (optional)
+    externalThreadType: text('external_thread_type'), // e.g., 'telegram_group', 'irc_channel'
+    externalThreadId: text('external_thread_id'), // External platform's thread/conversation ID
+    
     // Timestamps
     movedAt: timestamp('moved_at').notNull().defaultNow(),
     expiresAt: timestamp('expires_at').notNull(), // Set to NOW() + 7 days
@@ -46,7 +52,8 @@ export const deadLetterQueue = pgTable(
     retriedAt: timestamp('retried_at'),
     retriedBy: uuid('retried_by'), // User who retried
     
-    // Metadata
+    // Metadata: stores external/job IDs and other context
+    // Example: { jobId: "msg-...", externalMessageId: "...", platform: "telegram" }
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -58,6 +65,8 @@ export const deadLetterQueue = pgTable(
     index('dlq_expires_at_idx').on(table.expiresAt), // For cleanup queries
     index('dlq_failure_reason_idx').on(table.failureReason),
     index('dlq_retry_attempt_idx').on(table.retryAttempt),
+    index('dlq_correlation_id_idx').on(table.correlationId), // For tracing async delivery
+    index('dlq_irc_profile_id_idx').on(table.ircProfileId), // For IRC-specific queries
   ]
 );
 

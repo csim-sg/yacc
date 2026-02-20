@@ -29,17 +29,17 @@ import 'reflect-metadata';
  * Global setup function - runs once before all tests
  */
 export async function setup() {
-  console.log('\n🔧 Global Setup: Preparing test environment...\n');
+  process.stdout.write('\n[SETUP] Preparing test environment...\n\n');
 
   try {
     // Import database client AFTER env vars are set
     const { dbClient } = await import('../src/infrastructure/db.client.js');
 
-    console.log('📦 Verifying database connection...');
+    process.stdout.write('[SETUP] Verifying database connection...\n');
 
     // Simple test query to verify connection
     const result = await dbClient.execute('SELECT NOW() as now');
-    
+
     // Safely extract timestamp without using 'any'
     if (result && typeof result === 'object' && 'rows' in result) {
       const rows = result.rows;
@@ -47,59 +47,106 @@ export async function setup() {
         const firstRow = rows[0];
         if (firstRow && typeof firstRow === 'object' && 'now' in firstRow) {
           const timestamp = firstRow.now;
-          console.log(`✅ Database connection successful (${timestamp})\n`);
+          process.stdout.write(`[SETUP] Database connection successful (${timestamp})\n\n`);
         } else {
-          console.log('✅ Database connection verified\n');
+          process.stdout.write('[SETUP] Database connection verified\n\n');
         }
       }
     } else {
-      console.log('✅ Database connection verified\n');
+      process.stdout.write('[SETUP] Database connection verified\n\n');
     }
 
     // Run migrations to ensure schema is up-to-date
-    console.log('📦 Running migrations...');
+    process.stdout.write('[SETUP] Running migrations...\n');
     try {
       const { migrate } = await import('drizzle-orm/node-postgres/migrator');
       const { Pool } = await import('pg');
-      
+
       const pool = new Pool({
         connectionString: process.env.DATABASE_URL,
       });
-      
+
       const migrationClient = (await import('drizzle-orm/node-postgres')).drizzle(pool);
       await migrate(migrationClient, { migrationsFolder: './drizzle' });
-      
+
       await pool.end();
-      console.log('✅ Migrations applied\n');
+      process.stdout.write('[SETUP] Migrations applied\n\n');
     } catch (migrationError: unknown) {
       const migrationMsg = migrationError instanceof Error ? migrationError.message : String(migrationError);
-      console.warn('⚠️ Migration warning (continuing):', migrationMsg, '\n');
+      process.stderr.write(`[SETUP] Migration warning (continuing): ${migrationMsg}\n\n`);
       // Continue even if migrations fail - they may already be applied
     }
 
-    console.log('✅ Test environment ready\n');
+    process.stdout.write('[SETUP] Test environment ready\n\n');
   } catch (error: unknown) {
     // Safely handle error without using 'any'
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('❌ Global setup failed:', errorMessage);
-    console.error('Make sure PostgreSQL is running and migrations have been applied');
+    process.stderr.write(`[SETUP] FAILED: ${errorMessage}\n`);
+    process.stderr.write('[SETUP] Make sure PostgreSQL is running and migrations have been applied\n');
     throw error;
   }
 }
 
 /**
  * Global teardown function - runs once after all tests
+ * CRITICAL: All connections must be properly closed or tests will hang
+ * Order matters: close queue/worker BEFORE Redis, database last
  */
 export async function teardown() {
-  console.log('\n🧹 Global Teardown: Cleaning up...\n');
+  process.stdout.write('\n[TEARDOWN] Cleaning up resources...\n\n');
 
+  const errors: string[] = [];
+
+  // Close retry worker first (depends on Redis connection)
   try {
-    // For now, just log completion
-    console.log('✅ Test suite cleanup completed\n');
+    const { closeRetryWorker } = await import('../src/workers/messageRetryWorker.js');
+    await closeRetryWorker();
+    process.stdout.write('[TEARDOWN] Retry worker closed\n');
   } catch (error: unknown) {
-    // Safely handle error without using 'any'
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('⚠️ Teardown warning:', errorMessage);
-    // Don't fail on teardown errors
+    const msg = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`[TEARDOWN] Worker close failed: ${msg}\n`);
+    errors.push(`Worker close: ${msg}`);
+  }
+
+  // Close message retry queue (depends on Redis connection)
+  try {
+    const { closeRetryQueue } = await import('../src/infrastructure/queues.client.js');
+    await closeRetryQueue();
+    process.stdout.write('[TEARDOWN] Message retry queue closed\n');
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`[TEARDOWN] Queue close failed: ${msg}\n`);
+    errors.push(`Queue close: ${msg}`);
+  }
+
+  // Close Redis client (after queue/worker which depend on it)
+  try {
+    const { closeRedisClient } = await import('../src/infrastructure/redis.client.js');
+    await closeRedisClient();
+    process.stdout.write('[TEARDOWN] Redis connection closed\n');
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`[TEARDOWN] Redis close failed: ${msg}\n`);
+    errors.push(`Redis close: ${msg}`);
+  }
+
+  // Close database connection last (independent)
+  try {
+    const { closeDatabase } = await import('../src/infrastructure/db.client.js');
+    await closeDatabase();
+    process.stdout.write('[TEARDOWN] Database connection closed\n');
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`[TEARDOWN] Database close failed: ${msg}\n`);
+    errors.push(`Database close: ${msg}`);
+  }
+
+  process.stdout.write('[TEARDOWN] Test suite cleanup completed\n\n');
+
+  // Fail if any cleanup operations failed
+  if (errors.length > 0) {
+    const errorSummary = errors.join('; ');
+    process.stderr.write(`[TEARDOWN] FAILED with ${errors.length} error(s): ${errorSummary}\n`);
+    throw new Error(`Teardown failed: ${errorSummary}`);
   }
 }

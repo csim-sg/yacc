@@ -5,11 +5,11 @@
  * Provides operations for viewing, re-queueing, and cleanup
  */
 
+import { eq, desc, and, lte, count } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client.js';
-import { deadLetterQueue } from '../schemas/deadLetterQueue.schema.js';
 import { logger } from '../infrastructure/logger.js';
-import { eq, desc, and, gte, lte, count, sql } from 'drizzle-orm';
-import type { DeadLetterQueueEntry, DeadLetterQueueInsert } from '../schemas/deadLetterQueue.schema.js';
+import { deadLetterQueue } from '../schemas/deadLetterQueue.schema.js';
+import type { DeadLetterQueueEntry } from '../schemas/deadLetterQueue.schema.js';
 import type { SendMessageJobPayload } from '../types/message-queue.types.js';
 
 interface DLQQueryOptions {
@@ -32,19 +32,50 @@ export class DLQService {
   /**
    * Move a failed message to the Dead Letter Queue
    *
-   * Called after 3 failed retry attempts
+   * Called after 3 failed retry attempts.
+   * Ensures message_id is a valid UUID FK to messages.id.
+   * External/job IDs are stored in metadata, not as messageId.
+   *
+   * @param messageId - UUID of message (from messages.id, required for FK)
+   * @param conversationId - UUID of conversation
+   * @param payload - Original message job payload
+   * @param failureReason - Reason for failure
+   * @param lastError - Error message from last attempt
+   * @param traceContext - Traceability context (correlationId, ircProfileId, externalThreadType, externalThreadId)
    */
   async moveToDLQ(
     messageId: string,
     conversationId: string,
     payload: SendMessageJobPayload,
     failureReason: string,
-    lastError: string
+    lastError: string,
+    traceContext?: {
+      correlationId?: string;
+      ircProfileId?: string;
+      externalThreadType?: string;
+      externalThreadId?: string;
+      jobId?: string;
+    }
   ): Promise<DeadLetterQueueEntry> {
     try {
+      // Validate messageId is a UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(messageId)) {
+        throw new Error(
+          `Invalid messageId: "${messageId}". DLQ entries must use message.id (UUID FK), not job IDs. ` +
+          `Store external IDs in metadata.`
+        );
+      }
+
       // Calculate expiration date (7 days from now)
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
+
+      // Build metadata with external/job IDs
+      const metadata = {
+        ...(payload.metadata || {}),
+        ...(traceContext?.jobId && { jobId: traceContext.jobId }),
+      };
 
       const entry = await dbClient
         .insert(deadLetterQueue)
@@ -56,6 +87,13 @@ export class DLQService {
           totalAttempts: payload.retryCount || 3,
           lastError,
           expiresAt,
+          // Traceability fields
+          correlationId: traceContext?.correlationId,
+          ircProfileId: traceContext?.ircProfileId,
+          externalThreadType: traceContext?.externalThreadType,
+          externalThreadId: traceContext?.externalThreadId,
+          // Metadata stores additional context
+          metadata: Object.keys(metadata).length > 0 ? metadata : null,
         })
         .returning();
 
@@ -65,9 +103,11 @@ export class DLQService {
           conversationId,
           failureReason,
           totalAttempts: payload.retryCount || 3,
+          correlationId: traceContext?.correlationId,
+          externalThreadId: traceContext?.externalThreadId,
           expiresAt,
         },
-        'Message moved to Dead Letter Queue'
+        'Message moved to Dead Letter Queue (UUID contract enforced)'
       );
 
       return entry[0];
