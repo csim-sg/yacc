@@ -2,7 +2,15 @@
  * Dead Letter Queue Controller
  * 
  * API endpoints for ops to view and manage dead letter queue
- * All endpoints require manager+ role
+ * 
+ * RBAC Policy:
+ * - READ endpoints (list, stats): manager, admin, super_admin
+ * - MUTATE endpoints (re-queue, delete): admin, super_admin (managers read-only)
+ * 
+ * Contract:
+ * - messageId: UUID FK to messages.id (enforced by dlqService)
+ * - External/job IDs: stored in metadata, not as messageId
+ * - Traceability: correlationId, ircProfileId, externalThreadId, externalThreadType
  */
 
 import type { Request, Response } from 'express';
@@ -36,37 +44,24 @@ interface DLQQueryParams {
 }
 
 @JsonController('/api/dlq')
-@Authorized()
 export class DLQController {
   /**
-   * GET /dlq
+   * GET /api/dlq
    * List dead letter queue entries with pagination
-   * Requires: manager+ role
+   * Requires: manager+ role (READ)
    */
   @Get()
+  @Authorized(['manager', 'admin', 'super_admin'])
   async listDLQEntries(
     @QueryParams() query: DLQQueryParams,
     @Req() req: AuthenticatedRequest,
     @Res() res: Response
   ): Promise<void> {
     const correlationId = req.correlationId || 'unknown';
+    const userId = req.user?.id;
     const userRole = req.user?.role;
 
     try {
-      // Check authorization (manager+)
-      const allowedRoles = ['manager', 'admin', 'super_admin'];
-      if (!allowedRoles.includes(userRole || '')) {
-        logger.warn(
-          {
-            correlationId,
-            userId: req.user?.id,
-            userRole,
-          },
-          'Unauthorized DLQ list attempt'
-        );
-        res.status(403).json({ error: 'Only managers and above can view DLQ' });
-        return;
-      }
 
       // Parse pagination parameters
       const page = query.page ? parseInt(query.page, 10) : 1;
@@ -100,6 +95,8 @@ export class DLQController {
           limit,
           total: result.total,
           failureReason: query.failureReason,
+          userId,
+          userRole,
           correlationId,
         },
         'DLQ entries retrieved'
@@ -115,7 +112,7 @@ export class DLQController {
       logger.error(
         {
           correlationId,
-          userId: req.user?.id,
+          userId,
           error: error instanceof Error ? error.message : 'Unknown error',
         },
         'Failed to list DLQ entries'
@@ -126,33 +123,21 @@ export class DLQController {
   }
 
   /**
-   * GET /dlq/stats
+   * GET /api/dlq/stats
    * Get DLQ statistics (counts by failure reason, etc.)
-   * Requires: manager+ role
+   * Requires: manager+ role (READ)
    */
   @Get('/stats')
+  @Authorized(['manager', 'admin', 'super_admin'])
   async getDLQStats(
     @Req() req: AuthenticatedRequest,
     @Res() res: Response
   ): Promise<void> {
     const correlationId = req.correlationId || 'unknown';
+    const userId = req.user?.id;
     const userRole = req.user?.role;
 
     try {
-      // Check authorization
-      const allowedRoles = ['manager', 'admin', 'super_admin'];
-      if (!allowedRoles.includes(userRole || '')) {
-        logger.warn(
-          {
-            correlationId,
-            userId: req.user?.id,
-            userRole,
-          },
-          'Unauthorized DLQ stats attempt'
-        );
-        res.status(403).json({ error: 'Only managers and above can view DLQ stats' });
-        return;
-      }
 
       // Get statistics
       const stats = await dlqService.getDLQStatistics();
@@ -161,6 +146,8 @@ export class DLQController {
         {
           total: stats.total,
           failureReasons: Object.keys(stats.byFailureReason).length,
+          userId,
+          userRole,
           correlationId,
         },
         'DLQ statistics retrieved'
@@ -171,7 +158,7 @@ export class DLQController {
       logger.error(
         {
           correlationId,
-          userId: req.user?.id,
+          userId,
           error: error instanceof Error ? error.message : 'Unknown error',
         },
         'Failed to get DLQ statistics'
@@ -182,11 +169,12 @@ export class DLQController {
   }
 
   /**
-   * POST /dlq/:id/re-queue
+   * POST /api/dlq/:id/re-queue
    * Move DLQ entry back to retry queue for manual retry
-   * Requires: manager+ role
+   * Requires: admin+ role (MUTATE - manager read-only)
    */
   @Post('/:id/re-queue')
+  @Authorized(['admin', 'super_admin'])
   async reQueueFromDLQ(
     @Param('id') id: string,
     @Req() req: AuthenticatedRequest,
@@ -197,21 +185,6 @@ export class DLQController {
     const userRole = req.user?.role;
 
     try {
-      // Check authorization
-      const allowedRoles = ['manager', 'admin', 'super_admin'];
-      if (!allowedRoles.includes(userRole || '')) {
-        logger.warn(
-          {
-            correlationId,
-            userId,
-            userRole,
-            dlqId: id,
-          },
-          'Unauthorized DLQ re-queue attempt'
-        );
-        res.status(403).json({ error: 'Only managers and above can re-queue from DLQ' });
-        return;
-      }
 
       // Get DLQ entry
       const entry = await dlqService.getDLQEntry(id);
@@ -262,11 +235,12 @@ export class DLQController {
   }
 
   /**
-   * DELETE /dlq/:id
+   * DELETE /api/dlq/:id
    * Remove DLQ entry (after ops review/resolution)
-   * Requires: super_admin only (strict access control)
+   * Requires: super_admin only (MUTATE - strict access control)
    */
   @Delete('/:id')
+  @Authorized(['super_admin'])
   async removeDLQEntry(
     @Param('id') id: string,
     @Req() req: AuthenticatedRequest,
@@ -277,20 +251,6 @@ export class DLQController {
     const userRole = req.user?.role;
 
     try {
-      // Check authorization (super_admin only)
-      if (userRole !== 'super_admin') {
-        logger.warn(
-          {
-            correlationId,
-            userId,
-            userRole,
-            dlqId: id,
-          },
-          'Unauthorized DLQ delete attempt'
-        );
-        res.status(403).json({ error: 'Only super admins can delete DLQ entries' });
-        return;
-      }
 
       // Get entry first (verify it exists)
       const entry = await dlqService.getDLQEntry(id);
