@@ -875,7 +875,7 @@ Resets user password using a valid reset token.
 
 ### Conversations
 
-#### `GET /conversations`
+#### `GET /api/conversations`
 **Query**: `page`, `pageSize`, `channel`, `tag`, `assignee`, `status`, `priority`, `search`, `dateFrom`, `dateTo`, `unread`
 
 **Response:**
@@ -890,7 +890,7 @@ Resets user password using a valid reset token.
 
 ---
 
-#### `GET /conversations/:id`
+#### `GET /api/conversations/:id`
 **Response:**
 ```json
 { "data": { /* Conversation Detail model */ } }
@@ -898,7 +898,7 @@ Resets user password using a valid reset token.
 
 ---
 
-#### `PATCH /conversations/:id`
+#### `PATCH /api/conversations/:id`
 **Request:**
 ```json
 {
@@ -966,7 +966,7 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 
 ### Messages
 
-#### `GET /conversations/:id/messages`
+#### `GET /api/conversations/:id/messages`
 **Query**: `page`, `pageSize`
 
 **Response:**
@@ -981,7 +981,7 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 
 ---
 
-#### `POST /conversations/:id/messages`
+#### `POST /api/conversations/:id/messages`
 **Request:**
 ```json
 {
@@ -999,7 +999,7 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 
 ---
 
-#### `POST /conversations/:id/messages/:msgId/retry`
+#### `POST /api/conversations/:id/messages/:msgId/retry`
 **Response:**
 ```json
 { "data": { /* Message model (updated status) */ } }
@@ -1009,7 +1009,7 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 
 ---
 
-#### `GET /conversations/:id/messages/:messageId/status`
+#### `GET /api/conversations/:id/messages/:messageId/status`
 **Response:**
 ```json
 {
@@ -1289,7 +1289,7 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 
 ### Attachments
 
-#### `POST /conversations/:id/attachments`
+#### `POST /api/conversations/:id/attachments`
 **Request**: `multipart/form-data` with `file` field
 
 **Response:**

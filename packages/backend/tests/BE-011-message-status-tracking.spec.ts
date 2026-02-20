@@ -48,7 +48,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
     it('should return message status after sending', async () => {
       // Send a message
       const sendResponse = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Test message for status check' });
 
@@ -60,7 +60,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
       // Get message status
       const statusResponse = await request(app)
-        .get(`/conversations/${conversationId}/messages/${messageId}/status`)
+        .get(`/api/conversations/${conversationId}/messages/${messageId}/status`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(statusResponse.status).toBe(200);
@@ -74,7 +74,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
     it('should return 404 if conversation does not exist', async () => {
       const statusResponse = await request(app)
-        .get('/conversations/nonexistent/messages/msg123/status')
+        .get('/api/conversations/nonexistent/messages/msg123/status')
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(statusResponse.status).toBe(404);
@@ -85,7 +85,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
     it('should return 404 if message does not exist', async () => {
       const statusResponse = await request(app)
-        .get(`/conversations/${conversationId}/messages/nonexistent/status`)
+        .get(`/api/conversations/${conversationId}/messages/nonexistent/status`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(statusResponse.status).toBe(404);
@@ -101,7 +101,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
       // Send a message in the first conversation
       const sendResponse = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Test message' });
 
@@ -110,7 +110,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
       // Try to get status from the other conversation
       const statusResponse = await request(app)
-        .get(`/conversations/${otherConversationId}/messages/${messageId}/status`)
+        .get(`/api/conversations/${otherConversationId}/messages/${messageId}/status`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(statusResponse.status).toBe(404);
@@ -124,7 +124,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
     it('should require authentication', async () => {
       const sendResponse = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Test message' });
 
@@ -132,7 +132,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
       const messageId = sendResponse.body.id;
 
       const statusResponse = await request(app)
-        .get(`/conversations/${conversationId}/messages/${messageId}/status`);
+        .get(`/api/conversations/${conversationId}/messages/${messageId}/status`);
 
       expect(statusResponse.status).toBe(403);
     });
@@ -141,7 +141,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
   describe('Message Status Transitions', () => {
     it('should track status as pending -> sent for successful send', async () => {
       const sendResponse = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Message for status tracking' });
 
@@ -156,7 +156,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
       // Status should transition to sent
       const statusResponse = await request(app)
-        .get(`/conversations/${conversationId}/messages/${messageId}/status`)
+        .get(`/api/conversations/${conversationId}/messages/${messageId}/status`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(statusResponse.status).toBe(200);
@@ -165,7 +165,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
     it('should update message timestamps on status change', async () => {
       const sendResponse = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Message for timestamp tracking' });
 
@@ -178,7 +178,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
       // Get updated message
       const statusResponse = await request(app)
-        .get(`/conversations/${conversationId}/messages/${messageId}/status`)
+        .get(`/api/conversations/${conversationId}/messages/${messageId}/status`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(statusResponse.status).toBe(200);
@@ -192,7 +192,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
     it('should return message status in conversation message list', async () => {
       // Send a message
       const sendResponse = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Message for list status check' });
 
@@ -204,7 +204,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
       // Get messages list
       const listResponse = await request(app)
-        .get(`/conversations/${conversationId}/messages`)
+        .get(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(listResponse.status).toBe(200);
@@ -219,7 +219,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
     it('should preserve message status across multiple queries', async () => {
       // Send a message
       const sendResponse = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Message for status persistence' });
 
@@ -231,7 +231,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
       // Query status endpoint
       const statusResponse1 = await request(app)
-        .get(`/conversations/${conversationId}/messages/${messageId}/status`)
+        .get(`/api/conversations/${conversationId}/messages/${messageId}/status`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(statusResponse1.status).toBe(200);
@@ -241,7 +241,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       const statusResponse2 = await request(app)
-        .get(`/conversations/${conversationId}/messages/${messageId}/status`)
+        .get(`/api/conversations/${conversationId}/messages/${messageId}/status`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(statusResponse2.status).toBe(200);
@@ -257,7 +257,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
     it('manager should be able to send messages and track status', async () => {
       // Send a message as manager
       const sendResponse = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${managerToken}`)
         .send({ body: 'Message from manager' });
 
@@ -271,7 +271,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
       // Check status
       const statusResponse = await request(app)
-        .get(`/conversations/${conversationId}/messages/${messageId}/status`)
+        .get(`/api/conversations/${conversationId}/messages/${messageId}/status`)
         .set('Authorization', `Bearer ${managerToken}`);
 
       expect(statusResponse.status).toBe(200);
@@ -283,7 +283,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
     it('should track status independently for multiple messages', async () => {
       // Send first message
       const msg1Response = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'First message' });
 
@@ -292,7 +292,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
       // Send second message
       const msg2Response = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Second message' });
 
@@ -304,11 +304,11 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
       // Check both statuses
       const status1Response = await request(app)
-        .get(`/conversations/${conversationId}/messages/${messageId1}/status`)
+        .get(`/api/conversations/${conversationId}/messages/${messageId1}/status`)
         .set('Authorization', `Bearer ${authToken}`);
 
       const status2Response = await request(app)
-        .get(`/conversations/${conversationId}/messages/${messageId2}/status`)
+        .get(`/api/conversations/${conversationId}/messages/${messageId2}/status`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(status1Response.status).toBe(200);
@@ -323,7 +323,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
   describe('Message metadata and status', () => {
     it('should return complete message data with status via GET endpoint', async () => {
       const sendResponse = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Test message with full metadata' });
 
@@ -335,7 +335,7 @@ describe('BE-011: Message Status Tracking (MessageStatusTracker Integration)', (
 
       // Get full message
       const messageResponse = await request(app)
-        .get(`/conversations/${conversationId}/messages?limit=1`)
+        .get(`/api/conversations/${conversationId}/messages?limit=1`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(messageResponse.status).toBe(200);
