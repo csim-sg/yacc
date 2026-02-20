@@ -54,7 +54,7 @@ export class DLQService {
     lastError: string,
     traceContext?: {
       correlationId?: string;
-      ircProfileId?: string;
+      ircProfileId?: number;
       externalThreadType?: string;
       externalThreadId?: string;
       jobId?: string;
@@ -74,23 +74,13 @@ export class DLQService {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
-      // Extract tracing fields from payload or traceContext
-      const correlationId = traceContext?.correlationId || payload.correlationId || messageId;
-      const ircProfileId = traceContext?.ircProfileId
-        ? Number(traceContext.ircProfileId)
-        : payload.platformType === 'irc' && payload.metadata?.ircProfileId
-          ? Number(payload.metadata.ircProfileId)
-          : null;
-      const externalThreadId = traceContext?.externalThreadId || payload.recipientId;
-      // Determine thread type based on recipient format or use explicit type:
-      // IRC channels start with # or &, DMs are usernames
-      const externalThreadType = traceContext?.externalThreadType || (
-        payload.platformType === 'irc'
-          ? externalThreadId?.startsWith('#') || externalThreadId?.startsWith('&')
-            ? 'channel'
-            : 'dm'
-          : 'unknown'
-      );
+       // Extract tracing fields from traceContext only
+      // Caller is responsible for providing traceContext with explicit values
+      // No fallback logic - caller must be explicit about thread type and ID
+      const correlationId = traceContext?.correlationId;
+      const ircProfileId = traceContext?.ircProfileId;
+      const externalThreadId = traceContext?.externalThreadId;
+      const externalThreadType = traceContext?.externalThreadType;
 
       // Build metadata with external/job IDs
       const metadata = {
