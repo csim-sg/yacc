@@ -1059,25 +1059,65 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 
 ### Dead Letter Queue (DLQ)
 
-#### `GET /api/dlq`
-**Query**: `page`, `limit`, `failureReason`
+**Contract**: messageId is always a UUID FK to messages.id; external job IDs stored in metadata. (See GOV-028)
 
-**Auth**: Manager+ only
+**RBAC Policy**:
+| Endpoint | Operation | manager | admin | super_admin | user |
+|----------|-----------|---------|-------|-------------|------|
+| GET /api/dlq | READ | ✅ | ✅ | ✅ | ❌ |
+| GET /api/dlq/stats | READ | ✅ | ✅ | ✅ | ❌ |
+| POST /api/dlq/:id/re-queue | MUTATE | ❌ | ✅ | ✅ | ❌ |
+| DELETE /api/dlq/:id | DELETE | ❌ | ❌ | ✅ | ❌ |
+
+**Traceability Fields**:
+- `messageId` (UUID FK): Internal message identifier
+- `conversationId` (UUID FK): Scope reference
+- `correlationId` (optional): End-to-end trace ID
+- `ircProfileId` (optional, UUID): IRC profile if applicable
+- `externalThreadType` (optional): Platform (telegram_group, irc_channel)
+- `externalThreadId` (optional): Platform thread (#general, tg-group-123)
+- `metadata` (optional, JSON): jobId, externalMessageId, custom data
+
+#### `GET /api/dlq`
+**Authorization**: manager, admin, super_admin (READ access)
+
+**Query**: `page`, `limit`, `failureReason`
 
 **Response:**
 ```json
 {
-  "entries": [/* DLQ Entry models */],
+  "entries": [
+    {
+      "id": "dlq-123",
+      "messageId": "msg-456",
+      "conversationId": "conv-789",
+      "failureReason": "api_error",
+      "totalAttempts": 3,
+      "lastError": "Telegram API returned 500",
+      "movedAt": "2026-02-20T10:30:00Z",
+      "correlationId": "trace-abc123",
+      "externalThreadId": "tg-group-456123",
+      "metadata": {
+        "jobId": "msg-payload-xyz",
+        "externalMessageId": "tg-msg-789123"
+      }
+    }
+  ],
   "page": 1,
   "limit": 25,
   "total": 150
 }
 ```
 
+**Errors**:
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: User role not permitted (must be manager+)
+- `400 Bad Request`: Invalid pagination
+
 ---
 
 #### `GET /api/dlq/stats`
-**Auth**: Manager+ only
+**Authorization**: manager, admin, super_admin (READ access)
 
 **Response:**
 ```json
@@ -1093,36 +1133,57 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 }
 ```
 
+**Errors**:
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: User role not permitted (must be manager+)
+
 ---
 
-#### `POST /dlq/:id/re-queue`
-**Auth**: Manager+ only
+#### `POST /api/dlq/:id/re-queue`
+**Authorization**: admin, super_admin (MUTATE access, manager is read-only)
 
 **Response:**
 ```json
 {
   "message": "Entry marked for manual retry",
-  "entry": {/* DLQ Entry model (updated) */}
+  "entry": {
+    "id": "dlq-123",
+    "messageId": "msg-456",
+    "conversationId": "conv-789",
+    "failureReason": "api_error"
+  }
 }
 ```
 
+**Errors**:
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: User role not permitted (must be admin+)
+- `404 Not Found`: DLQ entry not found
+- `500 Internal Server Error`: Failed to re-queue
+
 ---
 
-#### `DELETE /dlq/:id`
-**Auth**: super_admin only (strict access control)
+#### `DELETE /api/dlq/:id`
+**Authorization**: super_admin only (DELETE access, strict control)
 
 **Response:**
 ```json
 {
   "message": "DLQ entry deleted successfully",
   "deletedEntry": {
-    "id": "uuid",
-    "messageId": "uuid",
-    "conversationId": "uuid",
+    "id": "dlq-123",
+    "messageId": "msg-456",
+    "conversationId": "conv-789",
     "failureReason": "max_retries_exceeded"
   }
 }
 ```
+
+**Errors**:
+- `401 Unauthorized`: Not authenticated
+- `403 Forbidden`: User role not permitted (must be super_admin)
+- `404 Not Found`: DLQ entry not found
+- `500 Internal Server Error`: Failed to delete
 
 ---
 
