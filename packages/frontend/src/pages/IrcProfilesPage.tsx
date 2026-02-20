@@ -25,8 +25,9 @@ export function IrcProfilesPage() {
   const [testingProfileId, setTestingProfileId] = useState<number | null>(null);
   const [testResult, setTestResult] = useState<{
     profileId: number;
-    success: boolean;
-    message: string;
+    passed: boolean;
+    reason?: string;
+    duration: number;
   } | null>(null);
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
@@ -62,8 +63,9 @@ export function IrcProfilesPage() {
     } catch (err) {
       setTestResult({
         profileId,
-        success: false,
-        message: err instanceof Error ? err.message : 'Test failed',
+        passed: false,
+        reason: err instanceof Error ? err.message : 'Test failed',
+        duration: 0,
       });
     } finally {
       setTestingProfileId(null);
@@ -227,17 +229,27 @@ export function IrcProfilesPage() {
                     </div>
                   )}
 
-                  {/* Test Result Alert */}
-                  {testResult?.profileId === profile.id && (
-                    <div
-                      className={`alert mb-4 ${
-                        testResult.success ? 'alert-success' : 'alert-error'
-                      }`}
-                      data-testid={`test-result-${profile.id}`}
-                    >
-                      <span>{testResult.message}</span>
-                    </div>
-                  )}
+                   {/* Test Result Alert */}
+                   {testResult?.profileId === profile.id && (
+                     <div
+                       className={`alert mb-4 ${
+                         testResult.passed ? 'alert-success' : 'alert-error'
+                       }`}
+                       data-testid={`test-result-${profile.id}`}
+                     >
+                       <div className="flex flex-col">
+                         <span className="font-semibold">
+                           {testResult.passed ? '✓ Connection Successful' : '✗ Connection Failed'}
+                         </span>
+                         {testResult.reason && (
+                           <span className="text-sm mt-1">{testResult.reason}</span>
+                         )}
+                         {testResult.duration > 0 && (
+                           <span className="text-sm mt-1">Duration: {testResult.duration}ms</span>
+                         )}
+                       </div>
+                     </div>
+                   )}
 
                   {/* Action Buttons */}
                   {isSuperAdmin && (

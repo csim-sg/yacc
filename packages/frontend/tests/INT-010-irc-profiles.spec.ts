@@ -236,9 +236,8 @@ test.describe('INT-010: IRC Profile Management', () => {
       route.fulfill({
         status: 200,
         body: JSON.stringify({
-          success: true,
-          message: 'Connection successful',
-          testedAt: new Date().toISOString(),
+          passed: true,
+          duration: 1234,
         }),
       });
     });
@@ -247,10 +246,10 @@ test.describe('INT-010: IRC Profile Management', () => {
     await expect(testBtn).toBeVisible();
     await testBtn.click();
 
-    // Wait for success toast deterministically (UI re-render after mocked API response)
-    // Timeout: 5s allows for API mock response + UI state update + toast animation
+    // Wait for success message in test result alert (UI re-render after mocked API response)
+    // Timeout: 5s allows for API mock response + UI state update + alert animation
     await expect(
-      page.locator('[data-testid="toast"]').filter({ hasText: /success|passed/i })
+      page.locator('[data-testid="test-result-' + profileId + '"]').filter({ hasText: /successful|passed/i })
     ).toBeVisible({ timeout: 5000 });
 
     // Activate profile

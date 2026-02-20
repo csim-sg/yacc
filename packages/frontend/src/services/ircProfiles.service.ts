@@ -51,9 +51,9 @@ export interface UpdateIrcProfileRequest {
 }
 
 export interface TestConnectionResult {
-  success: boolean;
-  message: string;
-  testedAt: string;
+  passed: boolean;
+  reason?: string;
+  duration: number;
 }
 
 class IrcProfilesService {
