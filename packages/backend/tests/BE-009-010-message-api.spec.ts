@@ -6,7 +6,7 @@ import { dbClient } from '../src/infrastructure/db.client.js';
 import { messages, type Message } from '../src/schemas/message.schema.js';
 import { eq } from 'drizzle-orm';
 
-describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conversations/:id/messages)', () => {
+describe('BE-009/010: Message API (GET /api/conversations/:id/messages, POST /api/conversations/:id/messages)', () => {
   let app: Express;
   let authToken: string;
   let testUserId: string;
@@ -54,16 +54,16 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
     }
   });
 
-  describe('GET /conversations/:id/messages - Message Retrieval', () => {
+  describe('GET /api/conversations/:id/messages - Message Retrieval', () => {
     it('should return 401 without authorization token', async () => {
-      const res = await request(app).get(`/conversations/${conversationId}/messages`);
+      const res = await request(app).get(`/api/conversations/${conversationId}/messages`);
 
       expect(res.status).toBe(401);
     });
 
     it('should return empty messages for new conversation', async () => {
       const res = await request(app)
-        .get(`/conversations/${conversationId}/messages`)
+        .get(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
@@ -76,7 +76,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
     it('should return 404 for non-existent conversation', async () => {
       const fakeId = '00000000-0000-0000-0000-000000000000';
       const res = await request(app)
-        .get(`/conversations/${fakeId}/messages`)
+        .get(`/api/conversations/${fakeId}/messages`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(404);
@@ -85,7 +85,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
     it('should return 400 for invalid page parameter', async () => {
       const res = await request(app)
-        .get(`/conversations/${conversationId}/messages?page=invalid`)
+        .get(`/api/conversations/${conversationId}/messages?page=invalid`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
@@ -94,7 +94,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
     it('should return 400 for invalid limit parameter', async () => {
       const res = await request(app)
-        .get(`/conversations/${conversationId}/messages?limit=150`)
+        .get(`/api/conversations/${conversationId}/messages?limit=150`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
@@ -103,7 +103,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
     it('should return 400 for invalid direction parameter', async () => {
       const res = await request(app)
-        .get(`/conversations/${conversationId}/messages?direction=invalid`)
+        .get(`/api/conversations/${conversationId}/messages?direction=invalid`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(400);
@@ -124,7 +124,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
       }
 
       const res = await request(app)
-        .get(`/conversations/${conversationId}/messages?page=1&limit=5`)
+        .get(`/api/conversations/${conversationId}/messages?page=1&limit=5`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
@@ -135,7 +135,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
       // Test page 2
       const res2 = await request(app)
-        .get(`/conversations/${conversationId}/messages?page=2&limit=5`)
+        .get(`/api/conversations/${conversationId}/messages?page=2&limit=5`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res2.status).toBe(200);
@@ -170,7 +170,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
         .returning();
 
       const inboundRes = await request(app)
-        .get(`/conversations/${conversationId}/messages?direction=inbound`)
+        .get(`/api/conversations/${conversationId}/messages?direction=inbound`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(inboundRes.status).toBe(200);
@@ -178,7 +178,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
       expect(inboundMessages.every((m: Message) => m.direction === 'inbound')).toBe(true);
 
       const outboundRes = await request(app)
-        .get(`/conversations/${conversationId}/messages?direction=outbound`)
+        .get(`/api/conversations/${conversationId}/messages?direction=outbound`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(outboundRes.status).toBe(200);
@@ -188,7 +188,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
     it('should return messages ordered chronologically (oldest first)', async () => {
       const res = await request(app)
-        .get(`/conversations/${conversationId}/messages?limit=100`)
+        .get(`/api/conversations/${conversationId}/messages?limit=100`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(res.status).toBe(200);
@@ -206,7 +206,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
   describe('POST /conversations/:id/messages - Message Sending', () => {
     it('should return 401 without authorization token', async () => {
       const res = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .send({ body: 'Test message' });
 
       expect(res.status).toBe(401);
@@ -214,7 +214,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
     it('should send a message successfully as user', async () => {
       const res = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Hello, World!' });
 
@@ -230,7 +230,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
     it('should send a message successfully as manager', async () => {
       const res = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${managerToken}`)
         .send({ body: 'Manager message' });
 
@@ -241,7 +241,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
     it('should reject empty message body', async () => {
       const res = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: '' });
 
@@ -252,7 +252,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
     it('should reject message exceeding max length (10000 chars)', async () => {
       const longBody = 'a'.repeat(10001);
       const res = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: longBody });
 
@@ -263,7 +263,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
     it('should accept message at max length boundary (10000 chars)', async () => {
       const maxBody = 'a'.repeat(10000);
       const res = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: maxBody });
 
@@ -274,7 +274,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
     it('should return 404 for non-existent conversation', async () => {
       const fakeId = '00000000-0000-0000-0000-000000000000';
       const res = await request(app)
-        .post(`/conversations/${fakeId}/messages`)
+        .post(`/api/conversations/${fakeId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Test message' });
 
@@ -284,7 +284,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
     it('should reject admin user from sending messages (role-based access control)', async () => {
       const res = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ body: 'Admin message' });
 
@@ -294,7 +294,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
     it('should reject message with missing body', async () => {
       const res = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({});
 
@@ -304,7 +304,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
     it('should persist message to database', async () => {
       const sendRes = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Persisted message' });
 
@@ -328,7 +328,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
       for (let i = 0; i < 5; i++) {
         promises.push(
           request(app)
-            .post(`/conversations/${conversationId}/messages`)
+            .post(`/api/conversations/${conversationId}/messages`)
             .set('Authorization', `Bearer ${authToken}`)
             .send({ body: `Concurrent message ${i}` })
         );
@@ -341,7 +341,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
       // Verify all messages were persisted
       const msgRes = await request(app)
-        .get(`/conversations/${conversationId}/messages?limit=100`)
+        .get(`/api/conversations/${conversationId}/messages?limit=100`)
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(msgRes.body.total).toBeGreaterThanOrEqual(5);
@@ -349,7 +349,7 @@ describe('BE-009/010: Message API (GET /conversations/:id/messages, POST /conver
 
     it('should set sender name from user email', async () => {
       const res = await request(app)
-        .post(`/conversations/${conversationId}/messages`)
+        .post(`/api/conversations/${conversationId}/messages`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ body: 'Message with sender name' });
 
