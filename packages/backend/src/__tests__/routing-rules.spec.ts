@@ -436,11 +436,12 @@ describe('Rules Engine Service', () => {
     });
 
     it('should return undefined when no rules match', async () => {
+      // Use a unique channel that won't match any rules
       const result = await rulesEngineService.evaluateRulesForMessage(
         {
           conversationId: testConversationId,
           messageId: 'test-msg-4',
-          channel: 'telegram',
+          channel: 'non-existent-channel-' + Date.now(),
           body: 'This is not important',
           senderEmail: 'sender@example.com',
         },

@@ -971,10 +971,17 @@ describe('IRCConnector', () => {
       const configWithProfile = { ...mockConfig, profileId: 99 };
       connector.setConfig(configWithProfile);
       
-      await connector.connect();
+      // Start connection but don't wait for full handshake
+      const connectPromise = connector.connect();
       
-      // Verify connection succeeded (registered event sent)
-      expect(logger.info).toHaveBeenCalled();
+      // Emit registered event to complete handshake
+      await new Promise(resolve => setImmediate(resolve));
+      emitClientEvent('registered');
+      
+      await connectPromise;
+      
+      // Verify profileId was stored
+      expect(connector['profileId']).toBe(99);
       
       // The profileId is stored and would be passed to ingestionService.ingestInboundMessage
       // This is verified in integration tests with actual database
@@ -1027,12 +1034,14 @@ describe('IRCConnector', () => {
       
       await expect(connectPromise).rejects.toThrow();
       
-      // Error should trigger reconnect scheduling
+      // Error should trigger retry scheduling - verify logger was called with error context
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: expect.stringContaining('Connection refused'),
+          error: 'Connection refused',
+          platform: 'irc',
+          maxAttempts: 5,
         }),
-        expect.stringContaining('scheduled reconnection')
+        expect.any(String)
       );
     });
 

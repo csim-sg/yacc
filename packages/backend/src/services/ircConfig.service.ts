@@ -425,27 +425,41 @@ export class IRCConfigService {
         );
       } else {
         // Empty body: use stored config (DB or env)
-        const storedConfig = await this.getStoredConfig();
-        if (!storedConfig) {
-          throw new TestConnectionFailedError({
-            type: 'not_configured',
-            message: 'IRC not configured. Provide server, port, and username in request body or save config first.',
-          });
+        try {
+          const storedConfig = await this.getStoredConfig();
+          if (!storedConfig) {
+            throw new TestConnectionFailedError({
+              type: 'not_configured',
+              message: 'IRC not configured. Provide server, port, and username in request body or save config first.',
+            });
+          }
+
+          config = {
+            server: storedConfig.server,
+            port: storedConfig.port,
+            username: storedConfig.username,
+            password: storedConfig.password,
+            source: storedConfig.source,
+          };
+          source = storedConfig.source as 'db' | 'env';
+
+          logger.debug(
+            { platform: 'irc', method: 'testConnection', source },
+            'Testing with stored config'
+          );
+        } catch (error) {
+          // If profile resolution fails or no config available, treat as not configured
+          if (error instanceof TestConnectionFailedError) {
+            throw error;
+          }
+          if (error instanceof IrcProfileResolutionError) {
+            throw new TestConnectionFailedError({
+              type: 'not_configured',
+              message: 'IRC not configured. Provide server, port, and username in request body or save config first.',
+            });
+          }
+          throw error;
         }
-
-        config = {
-          server: storedConfig.server,
-          port: storedConfig.port,
-          username: storedConfig.username,
-          password: storedConfig.password,
-          source: storedConfig.source,
-        };
-        source = storedConfig.source as 'db' | 'env';
-
-        logger.debug(
-          { platform: 'irc', method: 'testConnection', source },
-          'Testing with stored config'
-        );
       }
 
       logger.info(
