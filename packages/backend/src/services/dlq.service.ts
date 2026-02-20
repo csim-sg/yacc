@@ -33,6 +33,11 @@ export class DLQService {
    * Move a failed message to the Dead Letter Queue
    *
    * Called after 3 failed retry attempts
+   * Populates tracing fields for debugging and audit:
+   * - correlationId: end-to-end request tracing
+   * - ircProfileId: for IRC-specific DLQ queries
+   * - externalThreadType: platform-specific thread type (channel vs DM)
+   * - externalThreadId: the target thread identifier
    */
   async moveToDLQ(
     messageId: string,
@@ -46,6 +51,21 @@ export class DLQService {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
+      // Extract tracing fields from payload
+      const correlationId = payload.correlationId || messageId; // Fallback to messageId if no correlation ID
+      const ircProfileId = payload.platformType === 'irc' && payload.metadata?.ircProfileId
+        ? Number(payload.metadata.ircProfileId)
+        : null;
+      const externalThreadId = payload.recipientId;
+      // Determine thread type based on recipient format:
+      // IRC channels start with # or &, DMs are usernames
+      const externalThreadType =
+        payload.platformType === 'irc'
+          ? externalThreadId?.startsWith('#') || externalThreadId?.startsWith('&')
+            ? 'channel'
+            : 'dm'
+          : 'unknown';
+
       const entry = await dbClient
         .insert(deadLetterQueue)
         .values({
@@ -56,6 +76,11 @@ export class DLQService {
           totalAttempts: payload.retryCount || 3,
           lastError,
           expiresAt,
+          // INT-012: Populate tracing fields
+          correlationId,
+          ircProfileId,
+          externalThreadType,
+          externalThreadId,
         })
         .returning();
 
@@ -66,8 +91,12 @@ export class DLQService {
           failureReason,
           totalAttempts: payload.retryCount || 3,
           expiresAt,
+          correlationId,
+          ircProfileId,
+          externalThreadType,
+          externalThreadId,
         },
-        'Message moved to Dead Letter Queue'
+        'Message moved to Dead Letter Queue (INT-012: tracing fields populated)'
       );
 
       return entry[0];
