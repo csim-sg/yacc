@@ -22,14 +22,13 @@ export async function generateResetToken(
   userId: string,
   _correlationId: string,
 ): Promise<string> {
-  // Delete any existing valid tokens for this user
+  // Delete any existing valid (unexpired) unused tokens for this user
   await dbClient
     .delete(passwordResetTokens)
     .where(
       and(
         eq(passwordResetTokens.userId, userId),
         isNull(passwordResetTokens.usedAt),
-        lt(passwordResetTokens.expiresAt, new Date()),
       ),
     );
 
@@ -52,7 +51,7 @@ export async function generateResetToken(
   // Log action
   await auditService.logAction({
     action: 'password.reset_token_generated',
-    entityType: 'conversation',
+    entityType: 'user',
     entityId: userId,
     metadata: { expiresAt: expiresAt.toISOString() },
   });
@@ -91,12 +90,12 @@ export async function validateAndGetUserId(
           throw new Error('Invalid or expired token');
         }
 
-        // Log validation
-        await auditService.logAction({
-          action: 'password.reset_token_validated',
-          entityType: 'conversation',
-          entityId: record.userId,
-        });
+         // Log validation
+         await auditService.logAction({
+           action: 'password.reset_token_validated',
+           entityType: 'user',
+           entityId: record.userId,
+         });
 
         return record.userId;
       }
@@ -168,10 +167,10 @@ export async function resetPassword(
       .where(eq(passwordResetTokens.id, record[0].id));
   }
 
-  // Log successful reset
-  await auditService.logAction({
-    action: 'password.reset_successful',
-    entityType: 'conversation',
-    entityId: userId,
-  });
+   // Log successful reset
+   await auditService.logAction({
+     action: 'password.reset_successful',
+     entityType: 'user',
+     entityId: userId,
+   });
 }
