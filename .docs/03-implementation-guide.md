@@ -592,6 +592,65 @@ socket.on('presence.updated', (payload) => {
 });
 ```
 
+#### 3.5.1 WebSocket Observability
+
+All WebSocket metrics are emitted via the `MetricsSink` interface. By default, metrics are logged to console as JSON.
+
+**SLO Targets** (from GOV-030):
+- Connection Success Rate: ≥99.5%
+- Event Latency P95: <100ms
+- Reconnection Success Rate: ≥95%
+- Backlog Replay: <5s per 100 events
+
+**Metrics Architecture**:
+```typescript
+// Abstract interface for pluggable metrics
+interface MetricsSink {
+  counter(name: string, value: number, tags?: MetricsSinkTags): void;
+  histogram(name: string, value: number, tags?: MetricsSinkTags): void;
+  gauge(name: string, value: number, tags?: MetricsSinkTags): void;
+  timer<T>(name: string, fn: () => T, tags?: MetricsSinkTags): T;
+}
+
+// Default implementation logs to console as JSON
+class ConsoleMetricsSink implements MetricsSink { ... }
+
+// No-op implementation for testing
+class NoOpMetricsSink implements MetricsSink { ... }
+```
+
+**8 Metrics Emitted**:
+| Metric | Type | Purpose |
+|--------|------|---------|
+| `ws.connection.attempt` | Counter | Track connection attempts |
+| `ws.connection.success` | Counter | Calculate success rate SLO |
+| `ws.connection.failure` | Counter | Diagnose failure modes |
+| `ws.reconnection.attempt` | Counter | Track reconnection efficiency |
+| `ws.event.received` | Counter | Track event volume |
+| `ws.event.processed` | Histogram | Calculate latency P95 |
+| `ws.event.error` | Counter | Surface handler bugs |
+| `ws.backlog.replay` | Counter | Track reconnection efficiency |
+
+**SLO Monitoring**:
+```typescript
+// Get current SLO metrics
+const metrics = wsClient.getSLOMetrics();
+// Returns: { connectionSuccessRate, eventLatencyP95, reconnectionSuccessRate, backlogReplayEfficiency }
+
+// Warnings are automatically logged when SLO breaches occur
+// [SLO] Connection success rate 98.50% below threshold (99%)
+```
+
+**Integration**:
+```typescript
+import { WebSocketClient, createWebSocketClient } from '@/services/websocket';
+import { defaultMetricsSink } from '@/services/observability/ConsoleMetricsSink';
+
+const wsClient = createWebSocketClient(WS_URL, authToken, userId, defaultMetricsSink);
+```
+
+See **GOV-030** for full metrics definitions and measurement methodology.
+
 ---
 
 ### 3.6 Routing Rules Engine
