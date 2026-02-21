@@ -8,8 +8,8 @@
 import { SocketController, OnConnect, OnDisconnect, OnMessage } from 'socket-controllers';
 import type { Socket } from 'socket.io';
 import { logger } from '../infrastructure/logger';
-import type { AuthenticatedSocket } from '../websockets/auth.middleware';
 import type { ConversationUpdatedPayload } from '../types/websocket.types';
+import type { AuthenticatedSocket } from '../websockets/auth.middleware';
 
 @SocketController()
 export class ConversationController {

@@ -1,3 +1,4 @@
+import type { Request } from 'express';
 import { createParamDecorator, ForbiddenError } from 'routing-controllers';
 
 /**
@@ -41,7 +42,7 @@ export function RequireRole(roles: UserRole | UserRole[]) {
   return createParamDecorator({
     required: true,
     value: (action) => {
-      const user = (action.request as any).user;
+      const user = (action.request as Request).user;
       
       // Check if authenticated
       if (!user) {

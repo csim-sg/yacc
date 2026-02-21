@@ -7,8 +7,13 @@
  * NOTE: These tests mock logger to avoid appConfig environment variable requirements
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Server } from 'socket.io';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { handleConversationUpdated } from '../conversation.handler';
+import { handleMessageSent, handleMessageFailed } from '../message.handler';
+import { handlePresenceUpdated } from '../presence.handler';
+import { handleReactionAdded, handleReactionRemoved } from '../reaction.handler';
+import { handleTypingStarted, handleTypingStopped } from '../typing.handler';
 
 // Mock logger to avoid appConfig parsing
 vi.mock('../../../infrastructure/logger', () => ({
@@ -19,12 +24,6 @@ vi.mock('../../../infrastructure/logger', () => ({
     warn: vi.fn(),
   },
 }));
-
-import { handleConversationUpdated } from '../conversation.handler';
-import { handleMessageSent, handleMessageFailed } from '../message.handler';
-import { handleTypingStarted, handleTypingStopped } from '../typing.handler';
-import { handlePresenceUpdated } from '../presence.handler';
-import { handleReactionAdded, handleReactionRemoved } from '../reaction.handler';
 
 /**
  * Mock Socket.io server

@@ -1,5 +1,5 @@
-import { logger } from '../infrastructure/logger';
 import type { BaseConnector } from '../connectors/base/baseConnector';
+import { logger } from '../infrastructure/logger';
 
 /**
  * Connector Manager

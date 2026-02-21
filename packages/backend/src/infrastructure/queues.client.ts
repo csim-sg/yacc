@@ -6,10 +6,10 @@
  */
 
 import { Queue } from 'bullmq';
-import { getRedisClient } from './redis.client';
-import { logger } from './logger';
 import type { SendMessageJobPayload } from '../types/message-queue.types';
 import { QUEUE_NAMES, RETRY_CONFIG } from '../types/message-queue.types';
+import { logger } from './logger';
+import { getRedisClient } from './redis.client';
 
 // Singleton: Initialize queue connection once at module load
 const redisConnection = getRedisClient();

@@ -4,17 +4,17 @@
  * First-match-wins strategy: stops at first rule that matches all conditions
  */
 
-import { eq, and } from 'drizzle-orm';
-import type { RoutingCondition, RoutingAction, RuleEvaluationContext, RuleMatchResult } from '../types/routingRules.types';
+import { eq } from 'drizzle-orm';
+import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
+import { conversations } from '../schemas/conversation.schema';
 import type { RoutingRule } from '../schemas/routingRule.schema';
 import { routingRules } from '../schemas/routingRule.schema';
 import { routingRuleExecutions } from '../schemas/routingRuleExecution.schema';
-import { conversations } from '../schemas/conversation.schema';
 import { tags } from '../schemas/tag.schema';
 import { users } from '../schemas/user.schema';
-import { dbClient } from '../infrastructure/db.client';
+import type { RoutingCondition, RoutingAction, RuleEvaluationContext, RuleMatchResult } from '../types/routingRules.types';
 import { auditService } from './audit.service';
-import { logger } from '../infrastructure/logger';
 
 /**
  * Rules Engine Service
@@ -25,11 +25,11 @@ export class RulesEngineService {
    * Evaluate all active rules for a message and apply first match
    * Returns the matched rule result if any rule matches, undefined otherwise
    */
-  async evaluateRulesForMessage(
-    context: RuleEvaluationContext,
-    userId: string
-  ): Promise<RuleMatchResult | undefined> {
-    const { conversationId, messageId, channel, body, senderEmail } = context;
+   async evaluateRulesForMessage(
+     context: RuleEvaluationContext,
+     userId: string
+   ): Promise<RuleMatchResult | undefined> {
+     const { conversationId, messageId, channel: _channel, body: _body, senderEmail: _senderEmail } = context;
 
     try {
       // Fetch all active rules ordered by priority (ascending = lower number = higher priority)
@@ -202,13 +202,12 @@ export class RulesEngineService {
             logger.warn({ field, operator }, 'Invalid operator for tag field');
             return false;
           }
-          // Check if conversation has this tag
-          const { conversationId } = context;
-          const result = await dbClient
-            .select()
-            .from(tags)
-            .where(eq(tags.id, value as any)) // Tag ID from condition
-            .limit(1);
+           // Check if conversation has this tag
+           const result = await dbClient
+             .select()
+             .from(tags)
+             .where(eq(tags.id, typeof value === 'number' ? value : parseInt(String(value), 10))) // Tag ID from condition
+             .limit(1);
           return result.length > 0;
         }
 
@@ -254,7 +253,7 @@ export class RulesEngineService {
   private async applyActions(
     actions: RoutingAction[],
     conversationId: string,
-    userId: string
+    _userId: string
   ): Promise<void> {
     if (actions.length === 0) {
       return;
@@ -327,10 +326,10 @@ export class RulesEngineService {
             throw new Error(`Invalid priority: ${value}`);
           }
 
-          await dbClient
-            .update(conversations)
-            .set({ priority: value as any })
-            .where(eq(conversations.id, conversationId));
+           await dbClient
+             .update(conversations)
+             .set({ priority: value as 'low' | 'normal' | 'high' | 'urgent' })
+             .where(eq(conversations.id, conversationId));
 
           logger.info(
             { conversationId, priority: value },
@@ -358,12 +357,12 @@ export class RulesEngineService {
     appliedActions: RoutingAction[]
   ): Promise<void> {
     try {
-      await dbClient.insert(routingRuleExecutions).values({
-        ruleId,
-        conversationId,
-        matchedConditions: matchedConditions as any,
-        appliedActions: appliedActions as any,
-      });
+       await dbClient.insert(routingRuleExecutions).values({
+         ruleId,
+         conversationId,
+         matchedConditions: matchedConditions as unknown,
+         appliedActions: appliedActions as unknown,
+       });
 
       logger.debug(
         { ruleId, conversationId },

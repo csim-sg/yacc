@@ -12,46 +12,23 @@
  * - Never returns/logs plaintext passwords
  */
 
-import { eq } from 'drizzle-orm';
-import { appConfig } from '../config/appConfig';
+
+import { IRCConnector } from '../connectors/irc.connector';
 import { dbClient } from '../infrastructure/db.client';
 import { ircStatusClient } from '../infrastructure/ircStatus.client';
 import { logger } from '../infrastructure/logger';
 import { integrationConfigs } from '../schemas/integrationConfig.schema';
+import { EncryptionKeyMissingError } from '../types/encryptionKeyMissingError.class';
 import type { IRCConfigRequest, IRCConfigResponseData } from '../types/ircIntegration.types';
-import { EncryptionService } from './encryption.service';
+import type { TestConnectionError } from '../types/testConnectionError.type';
+import { TestConnectionFailedError } from '../types/testConnectionFailedError.class';
 import { connectorManager } from './connector-manager';
-import { IRCConnector } from '../connectors/irc.connector';
 import { connectorStatusWiring } from './connector-status-wiring.service';
+import { EncryptionService } from './encryption.service';
 import {
   resolveIrcConfig,
   IrcProfileResolutionError,
 } from './ircProfileResolution.service';
-
-/**
- * Typed errors for INT-008 validation and connection issues
- */
-type TestConnectionError = 
-  | { type: 'validation_error'; message: string }
-  | { type: 'not_configured'; message: string }
-  | { type: 'timeout'; message: string }
-  | { type: 'internal_error'; message: string };
-
-class TestConnectionFailedError extends Error {
-  constructor(public errorInfo: TestConnectionError) {
-    super(errorInfo.message);
-    this.name = 'TestConnectionFailedError';
-  }
-}
-
-class EncryptionKeyMissingError extends Error {
-  public readonly code = 'encryption_key_missing';
-
-  constructor(message: string) {
-    super(message);
-    this.name = 'EncryptionKeyMissingError';
-  }
-}
 
 export class IRCConfigService {
   /**
@@ -425,27 +402,41 @@ export class IRCConfigService {
         );
       } else {
         // Empty body: use stored config (DB or env)
-        const storedConfig = await this.getStoredConfig();
-        if (!storedConfig) {
-          throw new TestConnectionFailedError({
-            type: 'not_configured',
-            message: 'IRC not configured. Provide server, port, and username in request body or save config first.',
-          });
+        try {
+          const storedConfig = await this.getStoredConfig();
+          if (!storedConfig) {
+            throw new TestConnectionFailedError({
+              type: 'not_configured',
+              message: 'IRC not configured. Provide server, port, and username in request body or save config first.',
+            });
+          }
+
+          config = {
+            server: storedConfig.server,
+            port: storedConfig.port,
+            username: storedConfig.username,
+            password: storedConfig.password,
+            source: storedConfig.source,
+          };
+          source = storedConfig.source as 'db' | 'env';
+
+          logger.debug(
+            { platform: 'irc', method: 'testConnection', source },
+            'Testing with stored config'
+          );
+        } catch (error) {
+          // If profile resolution fails or no config available, treat as not configured
+          if (error instanceof TestConnectionFailedError) {
+            throw error;
+          }
+          if (error instanceof IrcProfileResolutionError) {
+            throw new TestConnectionFailedError({
+              type: 'not_configured',
+              message: 'IRC not configured. Provide server, port, and username in request body or save config first.',
+            });
+          }
+          throw error;
         }
-
-        config = {
-          server: storedConfig.server,
-          port: storedConfig.port,
-          username: storedConfig.username,
-          password: storedConfig.password,
-          source: storedConfig.source,
-        };
-        source = storedConfig.source as 'db' | 'env';
-
-        logger.debug(
-          { platform: 'irc', method: 'testConnection', source },
-          'Testing with stored config'
-        );
       }
 
       logger.info(
@@ -506,8 +497,8 @@ export class IRCConfigService {
     password?: string;
   }): Promise<{ success: boolean; message: string }> {
     // Import at method level to avoid circular dependencies
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Client: IRCClient } = require('irc-framework');
+    const module = await import('irc-framework');
+    const Client = (module as unknown as { Client: unknown }).Client as new () => unknown;
 
     // Create timeout promise (10 seconds)
     const timeoutPromise = new Promise<{ success: boolean; message: string }>((_, reject) => {
@@ -519,14 +510,27 @@ export class IRCConfigService {
     // Create connection test promise
     const connectionPromise = new Promise<{ success: boolean; message: string }>((resolve, reject) => {
       try {
-        const testClient = new IRCClient();
+        const testClient = new Client();
+
+        const client = testClient as unknown as {
+          quit(msg: string): void;
+          on(event: string, handler: (data?: unknown) => void): void;
+          connect(options: {
+            host: string;
+            port: number;
+            nick: string;
+            password?: string;
+            gecos: string;
+            tls: boolean;
+          }): void;
+        };
 
         let registered = false;
         let testCompleted = false;
 
         const cleanup = () => {
           try {
-            testClient.quit('Test complete');
+            client.quit('Test complete');
           } catch (err) {
             logger.debug({ error: err }, 'Error during test client cleanup');
           }
@@ -541,7 +545,7 @@ export class IRCConfigService {
         };
 
         // Register event handler BEFORE connecting
-        testClient.on('registered', () => {
+        client.on('registered', () => {
           registered = true;
           finalize({
             success: true,
@@ -549,19 +553,20 @@ export class IRCConfigService {
           });
         });
 
-        testClient.on('error', (error: { message: string }) => {
+        client.on('error', (error: unknown) => {
           if (!testCompleted) {
             testCompleted = true;
             cleanup();
+            const errorMsg = (error as { message?: string }).message || '';
             reject(
               new Error(
-                `IRC connection error: ${(error.message || '').substring(0, 100)}`
+                `IRC connection error: ${errorMsg.substring(0, 100)}`
               )
             );
           }
         });
 
-        testClient.on('close', () => {
+        client.on('close', () => {
           if (!registered && !testCompleted) {
             testCompleted = true;
             reject(new Error('IRC connection closed without registration'));
@@ -569,7 +574,7 @@ export class IRCConfigService {
         });
 
         // Connect with proper settings for test
-        testClient.connect({
+        client.connect({
           host: config.server,
           port: config.port,
           nick: config.username,
@@ -644,5 +649,3 @@ export class IRCConfigService {
 }
 
 export const ircConfigService = new IRCConfigService();
-export { TestConnectionFailedError };
-export type { TestConnectionError };

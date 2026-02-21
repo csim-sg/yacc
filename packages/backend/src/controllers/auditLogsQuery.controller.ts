@@ -5,16 +5,15 @@
  * RBAC: manager+ only for viewing, admin+ for export
  */
 
-import type { Request } from 'express';
+import type { Request , Response } from 'express';
 import { JsonController, Get, Post, Param, QueryParam, Req, Res, Authorized, CurrentUser, Body, BadRequestError } from 'routing-controllers';
-import type { Response } from 'express';
+import { logger } from '../infrastructure/logger';
 import {
   queryAuditLogs,
   queryConversationAuditLogs,
   exportAuditLogs,
 } from '../services/auditLogsQuery.service';
 import type { AuditLogQueryFilters, AuditLogExportRequest } from '../types/auditLogsQuery.types';
-import { logger } from '../infrastructure/logger';
 import type { AuthUser } from '../types/auth.types';
 
 interface AuthenticatedRequest extends Request {

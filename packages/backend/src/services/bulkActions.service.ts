@@ -16,34 +16,16 @@
 
 import { eq, and } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
 import { conversations } from '../schemas/conversation.schema';
 import { conversationTags } from '../schemas/conversationTag.schema';
 import { tags } from '../schemas/tag.schema';
-import { auditService } from './audit.service';
 import type { BulkActionResponse, BulkActionFailure, ConversationStatus } from '../types/bulkActions.types';
-import { logger } from '../infrastructure/logger';
+import { auditService } from './audit.service';
 
 const MAX_BULK_SIZE = 100;
 
-/**
- * Map internal errors to safe client-facing messages
- * Never expose database/system internals to API clients
- * Log detailed errors server-side with correlationId for debugging
- */
-function getSafeErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    const msg = error.message.toLowerCase();
-    // Map specific known errors to safe generic messages
-    if (msg.includes('foreign key') || msg.includes('constraint')) {
-      return 'Invalid reference: resource not found';
-    }
-    if (msg.includes('not found')) {
-      return 'Resource not found';
-    }
-    // Default safe message for any other database/system error
-  }
-  return 'Operation failed';
-}
+
 
 /**
  * Bulk assign conversations to a user

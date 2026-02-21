@@ -1,11 +1,11 @@
 import { eq, and } from 'drizzle-orm';
-import type { CreateTagRequest, AttachTagRequest } from '../types/tags.types';
-import { auditService } from './audit.service';
+import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
 import { conversations } from '../schemas/conversation.schema';
 import { conversationTags } from '../schemas/conversationTag.schema';
 import { tags } from '../schemas/tag.schema';
-import { dbClient } from '../infrastructure/db.client';
-import { logger } from '../infrastructure/logger';
+import type { CreateTagRequest, AttachTagRequest } from '../types/tags.types';
+import { auditService } from './audit.service';
 
 interface LogTagAuditParams {
   actorId: string;

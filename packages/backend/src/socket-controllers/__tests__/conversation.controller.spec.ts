@@ -5,25 +5,28 @@
  * Uses Vitest with mocked Socket.io interfaces
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ConversationController } from '../conversation.controller';
 import type { Socket } from 'socket.io';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AuthenticatedSocket } from '../../websockets/auth.middleware';
+import { ConversationController } from '../conversation.controller';
 
 describe('ConversationController', () => {
   let controller: ConversationController;
   let mockSocket: Partial<Socket>;
   let mockAuthSocket: Partial<AuthenticatedSocket>;
+  let emitSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     controller = new ConversationController();
+
+    emitSpy = vi.fn();
 
     // Mock Socket methods
     mockSocket = {
       id: 'test-socket-123',
       join: vi.fn(),
       leave: vi.fn(),
-      emit: vi.fn(),
+      emit: emitSpy,
       to: vi.fn().mockReturnValue({
         emit: vi.fn(),
       }),
@@ -217,7 +220,7 @@ describe('ConversationController', () => {
       }
 
       // Either emit was called or error was thrown (both acceptable)
-      const emitCalled = (mockSocket.emit as any).mock.calls.length > 0;
+      const emitCalled = emitSpy.mock.calls.length > 0;
       expect(errorThrown || emitCalled).toBe(true);
     });
 

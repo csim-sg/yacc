@@ -5,7 +5,7 @@
  * Follows ADR-005: Infrastructure folder for client initialization
  */
 
-import { S3Client, HeadBucketCommand, ListObjectsV2Command, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, HeadBucketCommand, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import type { S3ClientConfig } from '@aws-sdk/client-s3';
 import { appConfig } from '../config/appConfig';
 
@@ -57,7 +57,7 @@ export async function checkR2Health(): Promise<boolean> {
     // Check if we can access the bucket
     await r2Client.send(new HeadBucketCommand({ Bucket: appConfig.CLOUDFLARE_R2_BUCKET }));
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -70,40 +70,32 @@ export async function uploadFile(
   body: Buffer | string,
   contentType: string
 ): Promise<{ url: string; key: string }> {
-  try {
-     await r2Client.send(new PutObjectCommand({
-       Bucket: appConfig.CLOUDFLARE_R2_BUCKET,
-       Key: key,
-       Body: body,
-       ContentType: contentType,
-     }));
+  await r2Client.send(new PutObjectCommand({
+    Bucket: appConfig.CLOUDFLARE_R2_BUCKET,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+  }));
 
-    return {
-      url: getPublicUrl(key),
-      key,
-    };
-  } catch (error) {
-    throw error;
-  }
+  return {
+    url: getPublicUrl(key),
+    key,
+  };
 }
 
 /**
  * Download file from R2
  */
 export async function downloadFile(key: string): Promise<Buffer> {
-  try {
-     const result = await r2Client.send(new GetObjectCommand({
-       Bucket: appConfig.CLOUDFLARE_R2_BUCKET,
-       Key: key,
-     }));
+  const result = await r2Client.send(new GetObjectCommand({
+    Bucket: appConfig.CLOUDFLARE_R2_BUCKET,
+    Key: key,
+  }));
 
-    if (!result.Body) {
-      throw new Error('Empty response from R2');
-    }
-
-    const buffer = await result.Body.transformToByteArray();
-    return Buffer.from(buffer);
-  } catch (error) {
-    throw error;
+  if (!result.Body) {
+    throw new Error('Empty response from R2');
   }
+
+  const buffer = await result.Body.transformToByteArray();
+  return Buffer.from(buffer);
 }

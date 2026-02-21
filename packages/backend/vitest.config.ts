@@ -67,8 +67,8 @@ export default defineConfig({
     // Setup files (runs before each test file)
     setupFiles: ['./tests/setup.ts'],
 
-    // Ignore patterns
-    exclude: ['node_modules', 'dist', '.idea', '.git', '.cache'],
+    // Ignore patterns - exclude build artifacts and TypeScript declaration files
+    exclude: ['node_modules', 'dist', 'dist-tmp', '.idea', '.git', '.cache', '**/*.d.ts'],
 
     // Enable globals (describe, it, expect, etc.)
     globals: true,

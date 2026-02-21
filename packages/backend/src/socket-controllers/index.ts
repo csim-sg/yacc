@@ -13,12 +13,12 @@
  * - ConnectorController: External platform integration events (Telegram, IRC)
  */
 
+import { ConnectorController } from './connector.controller';
 import { ConversationController } from './conversation.controller';
 import { MessageController } from './message.controller';
-import { TypingController } from './typing.controller';
 import { PresenceController } from './presence.controller';
 import { ReactionController } from './reaction.controller';
-import { ConnectorController } from './connector.controller';
+import { TypingController } from './typing.controller';
 
 export const socketControllers = [
   ConversationController,

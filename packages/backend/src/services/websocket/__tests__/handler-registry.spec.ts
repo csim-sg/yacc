@@ -6,8 +6,14 @@
  * NOTE: These tests mock logger to avoid appConfig environment variable requirements
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Server } from 'socket.io';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { WebSocketEventMap } from '../../../types/websocket.types';
+import {
+  emitEvent,
+  getRegisteredEvents,
+  isEventRegistered,
+} from '../handler-registry';
 
 // Mock logger to avoid appConfig parsing
 vi.mock('../../../infrastructure/logger', () => ({
@@ -19,11 +25,17 @@ vi.mock('../../../infrastructure/logger', () => ({
   },
 }));
 
-import {
-  emitEvent,
-  getRegisteredEvents,
-  isEventRegistered,
-} from '../handler-registry';
+/**
+ * Test helper to create an object with mismatched type
+ */
+function createInvalidPayload(): unknown {
+  return {
+    messageId: 'invalid-id',
+    conversationId: '550e8400-e29b-41d4-a716-446655440001',
+    status: 'sent',
+    sentAt: new Date().toISOString(),
+  };
+}
 
 /**
  * Mock Socket.io server
@@ -200,24 +212,17 @@ describe('Handler Registry', () => {
     });
 
     it('should reject invalid payload for message.sent', async () => {
-      const payload = {
-        messageId: 'invalid-id',
-        conversationId: '550e8400-e29b-41d4-a716-446655440001',
-        status: 'sent' as const,
-        sentAt: new Date().toISOString(),
-      };
-
-      await expect(emitEvent(mockIO, 'message.sent', payload as any)).rejects.toThrow();
+      const payload = createInvalidPayload() as unknown as WebSocketEventMap['message.sent'];
+      await expect(
+        emitEvent(mockIO, 'message.sent', payload)
+      ).rejects.toThrow();
     });
 
     it('should reject invalid payload for presence.updated', async () => {
-      const payload = {
-        userId: '550e8400-e29b-41d4-a716-446655440000',
-        status: 'away',
-        lastSeen: new Date().toISOString(),
-      };
-
-      await expect(emitEvent(mockIO, 'presence.updated', payload as any)).rejects.toThrow();
+      const payload = createInvalidPayload() as unknown as WebSocketEventMap['presence.updated'];
+      await expect(
+        emitEvent(mockIO, 'presence.updated', payload)
+      ).rejects.toThrow();
     });
   });
 

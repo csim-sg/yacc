@@ -3,14 +3,12 @@
  * Handles tag creation and conversation tag management
  */
 
-import { dbClient } from '../infrastructure/db.client';
-import { tags } from '../schemas/tag.schema';
-import { conversationTags } from '../schemas/conversationTag.schema';
-import { conversations } from '../schemas/conversation.schema';
 import { eq, and } from 'drizzle-orm';
-import { auditService } from './audit.service';
-import { emitToConversation, isWebSocketGatewayAvailable } from './websocket/websocket-gateway';
+import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
+import { conversations } from '../schemas/conversation.schema';
+import { conversationTags } from '../schemas/conversationTag.schema';
+import { tags } from '../schemas/tag.schema';
 import type {
   CreateTagParams,
   AddTagToConversationParams,
@@ -18,6 +16,8 @@ import type {
   TagServiceResult,
   ConversationTag,
 } from '../types/tag.types';
+import { auditService } from './audit.service';
+import { emitToConversation, isWebSocketGatewayAvailable } from './websocket/websocket-gateway';
 
 export class TagService {
   /**

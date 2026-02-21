@@ -281,7 +281,7 @@ await dlqService.moveToDLQ(
 
 **Traceability Fields** (for ops investigation):
 - `correlationId`: End-to-end trace ID (search logs with this)
-- `ircProfileId`: IRC profile UUID (if applicable)
+- `ircProfileId`: IRC profile ID (integer, if applicable)
 - `externalThreadType`: Platform (telegram_group, irc_channel)
 - `externalThreadId`: Specific thread (tg-group-123, #general)
 - `metadata`: Job ID, external message ID, custom data

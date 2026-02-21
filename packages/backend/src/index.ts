@@ -1,30 +1,26 @@
 import 'reflect-metadata';
 import 'dotenv/config';
-import express from 'express';
 import http from 'http';
+import express from 'express';
 import { useExpressServer } from 'routing-controllers';
 import { SocketControllers } from 'socket-controllers';
+import { appConfig } from './config/appConfig';
+import { controllers } from './controllers';
 import { checkDatabaseConnection } from './infrastructure/db.client';
-import { authorizationChecker, currentUserChecker } from './middleware/routingControllersAuth';
+import { logger } from './infrastructure/logger';
+import { bodyParserMiddleware } from './middleware/bodyParser.middleware';
 import { correlationIdMiddleware } from './middleware/correlationId.middleware';
 import { requestLoggingMiddleware } from './middleware/requestLogging.middleware';
-import { bodyParserMiddleware } from './middleware/bodyParser.middleware';
-import { controllers } from './controllers';
+import { authorizationChecker, currentUserChecker } from './middleware/routingControllersAuth';
+import { initializeIntegrationsRuntime } from './services/integrations-runtime.service';
+import { setWebSocketGateway } from './services/websocket/websocket-gateway';
 import { socketControllers } from './socket-controllers';
-import { appConfig } from './config/appConfig';
-import { logger } from './infrastructure/logger';
 import { wsGateway } from './websockets/gateway';
 import { WebSocketServer } from './websockets/websocket.server';
-import { setWebSocketGateway } from './services/websocket/websocket-gateway';
-import { initializeIntegrationsRuntime } from './services/integrations-runtime.service';
 import { getRetryWorker, closeRetryWorker } from './workers/messageRetryWorker';
 
 // ===== EXPRESS APP =====
 const app = express();
-
-// Register body parser middleware BEFORE routing-controllers
-// This ensures request.body is available in all route handlers
-app.use(bodyParserMiddleware);
 
 useExpressServer(app, {
   controllers: controllers,
@@ -42,6 +38,7 @@ useExpressServer(app, {
     exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
   },
   middlewares: [
+    bodyParserMiddleware,
     correlationIdMiddleware,
     requestLoggingMiddleware,
   ],
@@ -55,10 +52,14 @@ const io = webSocketServer.getServer();
 // ===== DATABASE AND STARTUP =====
 export async function start(): Promise<void> {
   try {
-    console.log('✓ Configuration validated successfully');
-    console.log(`  - Environment: ${appConfig.APP_ENV}`);
-    console.log(`  - Port: ${appConfig.APP_PORT}`);
-    console.log(`  - Log Level: ${appConfig.LOG_LEVEL}`);
+    logger.info(
+      {
+        env: appConfig.APP_ENV,
+        port: appConfig.APP_PORT,
+        logLevel: appConfig.LOG_LEVEL,
+      },
+      'Configuration validated'
+    );
 
     // Check database connection
     const dbConnected = await checkDatabaseConnection();
@@ -137,14 +138,20 @@ export async function start(): Promise<void> {
 
     // Start server
     server.listen(appConfig.APP_PORT, () => {
-      console.log(`🚀 Server running on port ${appConfig.APP_PORT}`);
-      console.log(`📍 API: http://localhost:${appConfig.APP_PORT}/api`);
-      console.log(`🔗 WebSocket: ws://localhost:${appConfig.APP_PORT}`);
-      logger.info(`Server started on port ${appConfig.APP_PORT}`);
+      logger.info(
+        {
+          port: appConfig.APP_PORT,
+          apiBaseUrl: `http://localhost:${appConfig.APP_PORT}/api`,
+          wsUrl: `ws://localhost:${appConfig.APP_PORT}`,
+        },
+        'Server started'
+      );
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    logger.error({ error }, 'Failed to start server');
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error) },
+      'Failed to start server'
+    );
     process.exit(1);
   }
 }

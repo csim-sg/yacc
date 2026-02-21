@@ -8,8 +8,8 @@
 import { SocketController, OnMessage } from 'socket-controllers';
 import type { Socket, Server } from 'socket.io';
 import { logger } from '../infrastructure/logger';
-import type { AuthenticatedSocket } from '../websockets/auth.middleware';
 import type { PresenceUpdatedPayload } from '../types/websocket.types';
+import type { AuthenticatedSocket } from '../websockets/auth.middleware';
 
 @SocketController()
 export class PresenceController {
@@ -182,10 +182,8 @@ export class PresenceController {
    */
   private async getOnlineUsers(socket: Socket): Promise<string[]> {
     try {
-      // Get all connected sockets using the io instance from socket.nsp.server
-      // socket.nsp.server is the Socket.IO Server instance
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const io: Server = (socket.nsp as any).server;
+      // Get all connected sockets using the Socket.IO server instance
+      const io: Server = socket.nsp.server;
       const sockets = await io.fetchSockets();
       const onlineUserIds = new Set<string>();
 

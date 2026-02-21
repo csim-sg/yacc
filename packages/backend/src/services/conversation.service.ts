@@ -1,11 +1,11 @@
-import { dbClient } from '../infrastructure/db.client';
-import { conversations } from '../schemas/conversation.schema';
-import { messages } from '../schemas/message.schema';
-import { conversationTags } from '../schemas/conversationTag.schema';
-import { tags } from '../schemas/tag.schema';
-import { users } from '../schemas/user.schema';
 import { eq, and, desc, asc, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
+import { dbClient } from '../infrastructure/db.client';
+import { conversations } from '../schemas/conversation.schema';
+import { conversationTags } from '../schemas/conversationTag.schema';
+import { messages } from '../schemas/message.schema';
+import { tags } from '../schemas/tag.schema';
+import { users } from '../schemas/user.schema';
 import { auditService } from './audit.service';
 
 export interface ListConversationsParams {
@@ -69,7 +69,7 @@ export class ConversationService {
       whereClauses.push(eq(conversations.assignedUserId, assignedUserId));
     }
 
-    if (tagId != null && tagId > 0) {
+    if (tagId !== null && tagId !== undefined && tagId > 0) {
       whereClauses.push(
         sql`EXISTS (
           SELECT 1 FROM ${conversationTags}
@@ -259,13 +259,6 @@ export class ConversationService {
     if (!convo.length) {
       throw new Error('Conversation not found');
     }
-
-    // Get all messages
-    const convMessages = await dbClient
-      .select()
-      .from(messages)
-      .where(eq(messages.conversationId, id))
-      .orderBy(asc(messages.createdAt));
 
     // Get tags
     const convoTags = await dbClient

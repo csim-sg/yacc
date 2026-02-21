@@ -145,13 +145,15 @@ export function Navigation({
         {/* Navigation items */}
         <div className="flex-1 space-y-2 overflow-y-auto">
           {accessibleItems.length > 0 ? (
-            accessibleItems.map((item) => (
-              <NavItem
-                key={item.id}
-                item={item}
-                isActive={pathname === item.href}
-              />
-            ))
+            <>
+              {accessibleItems.map((item) => (
+                <NavItem
+                  key={item.id}
+                  item={item}
+                  isActive={pathname === item.href}
+                />
+              ))}
+            </>
           ) : (
             <div className="text-center text-base-content/50 text-sm py-8">
               No accessible items
@@ -163,9 +165,7 @@ export function Navigation({
         <div className="pt-6 border-t border-base-300">
           <button
             onClick={() => {
-              logout().catch((err) => {
-                console.error('Logout failed:', err);
-              });
+              void logout();
             }}
             className="btn btn-outline btn-block gap-2"
             aria-label="Sign out from application"

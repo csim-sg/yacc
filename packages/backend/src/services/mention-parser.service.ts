@@ -1,7 +1,7 @@
 import { ilike } from 'drizzle-orm';
-import { users } from '../schemas/user.schema';
 import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
+import { users } from '../schemas/user.schema';
 
 /**
  * Mention Parser Service

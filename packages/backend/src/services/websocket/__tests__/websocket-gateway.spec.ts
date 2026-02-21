@@ -4,7 +4,7 @@
  * Tests the gateway initialization, event emission, and room subscription methods
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { WebSocketServer } from '../../../websockets/websocket.server';
 import {
   setWebSocketGateway,

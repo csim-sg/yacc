@@ -16,11 +16,9 @@ import {
   Authorized,
   HttpCode,
   BadRequestError,
-  NotFoundError,
-  ForbiddenError,
 } from 'routing-controllers';
-import { messageService } from '../services/message.service.js';
 import { logger } from '../infrastructure/logger.js';
+import { messageService } from '../services/message.service.js';
 import type { AuthUser } from '../types/auth.types.js';
 import type { GetMessagesQuery, SendMessageRequestBody } from '../types/message.types.js';
 import { SendMessageRequestSchema } from '../types/message.types.js';
@@ -30,7 +28,7 @@ interface AuthenticatedRequest extends Request {
   user?: AuthUser;
 }
 
-function parsePositiveInt(value: unknown, name: string): number | undefined {
+function parsePositiveInt(value: unknown, _name: string): number | undefined {
   if (value === undefined || value === '') return undefined;
   const n = Number(value);
   if (!Number.isInteger(n) || n < 1) return undefined;

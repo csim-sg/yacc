@@ -10,6 +10,8 @@
  * See INT-010: IRC tenant-owned DB connection profiles
  */
 
+import { Socket } from 'net';
+import type { Request, Response } from 'express';
 import {
   JsonController,
   Post,
@@ -22,7 +24,8 @@ import {
   Req,
   HttpCode,
 } from 'routing-controllers';
-import type { Request, Response } from 'express';
+import { logger } from '../infrastructure/logger';
+import type { User } from '../schemas/user.schema';
 import {
   createIrcProfile,
   listIrcProfiles,
@@ -41,8 +44,6 @@ import type {
 } from '../types/ircProfile.types';
 import { IrcProfileErrorCode } from '../types/ircProfile.types';
 import { IrcProfileError } from '../types/ircProfileError.types';
-import type { User } from '../schemas/user.schema';
-import { logger } from '../infrastructure/logger';
 
 /**
  * Custom Request type with user context
@@ -518,11 +519,10 @@ export class IrcProfileController {
     const timeoutMs = 10000; // 10 second timeout
 
     return new Promise((resolve) => {
-      const startTime = Date.now();
+       const startTime = Date.now();
 
-      // Simple TCP socket connectivity test (no IRC protocol needed for basic test)
-      const net = require('net');
-      const socket = net.createSocket();
+       // Simple TCP socket connectivity test (no IRC protocol needed for basic test)
+       const socket = new Socket();
 
       const handleTimeout = () => {
         socket.destroy();

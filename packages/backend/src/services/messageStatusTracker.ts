@@ -5,16 +5,16 @@
  * Persists status to database and emits WebSocket events for real-time updates
  */
 
-import { eq } from 'drizzle-orm';
 import type { Platform } from '@yacc/common/types/platform.type';
+import { eq } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client.js';
-import { enqueueRetry } from '../infrastructure/queues.client.js';
 import { logger } from '../infrastructure/logger.js';
-import { messages } from '../schemas/message.schema.js';
+import { enqueueRetry } from '../infrastructure/queues.client.js';
 import { conversations } from '../schemas/conversation.schema.js';
-import { dlqService } from './dlq.service.js';
+import { messages } from '../schemas/message.schema.js';
 import type { SendMessageJobPayload } from '../types/message-queue.types.js';
 import { MessageEvents } from '../websockets/wsConstants.js';
+import { dlqService } from './dlq.service.js';
 
 // ============================================
 // Message Status Type
@@ -337,25 +337,37 @@ class MessageStatusTrackerService {
           });
 
           // Create payload for DLQ
-          const dlqPayload: SendMessageJobPayload = {
-            messageId: update.messageId,
-            conversationId: update.conversationId,
-            recipientId: dlqConversation?.externalThreadId || update.conversationId, // IRC: #channel, Telegram: chat_id
-            body: message.body,
-            direction: message.direction as 'inbound' | 'outbound',
-            platformType: update.platform,
-            retryCount: MAX_ATTEMPTS,
-            lastError: update.error,
-          };
+           const dlqPayload: SendMessageJobPayload = {
+             messageId: update.messageId,
+             conversationId: update.conversationId,
+             recipientId: dlqConversation?.externalThreadId || update.conversationId, // IRC: #channel, Telegram: chat_id
+             body: message.body,
+             direction: message.direction as 'inbound' | 'outbound',
+             platformType: update.platform,
+             retryCount: MAX_ATTEMPTS,
+             lastError: update.error,
+           };
 
-         // Move to DLQ
-         await dlqService.moveToDLQ(
-           update.messageId,
-           update.conversationId,
-           dlqPayload,
-           'max_retries_exceeded',
-           update.error || 'Unknown error after max attempts'
-         );
+           // Move to DLQ with explicit traceability fields
+          // Determine thread type (for IRC: channels start with # or &, otherwise DM)
+          const externalThreadType = dlqConversation?.externalThreadId
+            ? (dlqConversation.externalThreadId.startsWith('#') || dlqConversation.externalThreadId.startsWith('&')
+              ? 'channel'
+              : 'dm')
+            : undefined;
+
+          await dlqService.moveToDLQ(
+            update.messageId,
+            update.conversationId,
+            dlqPayload,
+            'max_retries_exceeded',
+            update.error || 'Unknown error after max attempts',
+            {
+              ircProfileId: dlqConversation?.ircProfileId ?? undefined,
+              externalThreadType,
+              externalThreadId: dlqConversation?.externalThreadId,
+            }
+          );
 
          logger.info(
            {

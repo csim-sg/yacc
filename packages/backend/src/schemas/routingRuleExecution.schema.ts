@@ -1,6 +1,6 @@
 import { pgTable, uuid, serial, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
-import { routingRules } from './routingRule.schema';
 import { conversations } from './conversation.schema';
+import { routingRules } from './routingRule.schema';
 
 /**
  * RoutingRuleExecutions table - audit trail of rule executions
