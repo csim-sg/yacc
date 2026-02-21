@@ -7,7 +7,6 @@ class EmailService {
   async sendEmail(email: { to: string; subject: string; html: string }): Promise<void> {
     logger.info(
       {
-        to: email.to,
         subject: email.subject,
       },
       'Sending email (placeholder)'
