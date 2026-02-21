@@ -1,9 +1,9 @@
 # 06. Issues & User stories
 
-**Last Updated**: February 21, 2026  
+**Last Updated**: February 22, 2026  
 **Status**: ✅ Phase 1 P0 Core Complete (auth + inbox + messaging + IRC + WebSocket); ⏳ Phase 2 pending (collaboration + rules)  
 **Current focus**: Phase 1.4+ refinements (attachments, audit logs, admin panels) + Phase 2 execution (tags/notes/rules)  
-**Latest**: PR #293 (P0 Frontend Option 2) merged to dev — forgot/reset password, message status + retry, auth guards, RBAC UI, notifications integration  
+**Latest**: PR #297 (FE-017 IRC Test Button) and PR #298 (FE-019 Users List) merged to dev  
 **Governance**: ADR-003, ADR-014, ADR-015, GOV-026
 
 ---
@@ -227,9 +227,9 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | FE-012A | Implement WebSocket client with one-definition-per-file structure | Deferred | P0 | Frontend | FE-012, GOV-005 | Follow GOV-005 guidance for constants, types, and service file structure. Blocked: WebSocket client not implemented yet | PVTI_lAHOAB4wV84BNGcwzgldplA | 252 |
 | FE-012B | Implement WebSocket client observability (metrics, traces, SLO) | Deferred | P0 | Frontend | FE-012, GOV-005 | Emit all required metrics per GOV-005; define SLOs in governance log. Blocked: WebSocket client not implemented yet | PVTI_lAHOAB4wV84BNGcwzgldplY | 253 |
 | FE-016 | Implement admin panel - IRC configuration (server, port, username, password inputs) | Not Started | P0 | Frontend | FE-002, BE-026 | Form to save IRC credentials, validation working | PVTI_lAHOAB4wV84BNGcwzgj_6No | 54 |
-| FE-017 | Implement IRC connection test button (connects to server, shows success/error) | Not Started | P0 | Frontend | FE-016, BE-027 | Button triggers test, displays result message | PVTI_lAHOAB4wV84BNGcwzgj_6Nk | 66 |
+| FE-017 | Implement IRC connection test button (connects to server, shows success/error) | **Done** (PR #297 merged) | P0 | Frontend | FE-016, BE-027 | Button triggers test, displays result message | PVTI_lAHOAB4wV84BNGcwzgj_6Nk | 66 |
 | FE-018 | Implement IRC connection status display (connected/retrying/disconnected/failed) | Not Started | P0 | Frontend | FE-016 | Status badge visible in admin panel, updates in real-time | PVTI_lAHOAB4wV84BNGcwzgj_6MA | 47 |
-| FE-019 | Implement admin panel - users list (table with email, role, status, edit/delete actions) | Not Started | P1 | Frontend | FE-002, BE-006 | Users table functional, CRUD operations working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_6L4 | 52 |
+| FE-019 | Implement admin panel - users list (table with email, role, status, edit/delete actions) | **Done** (PR #298 merged) | P1 | Frontend | FE-002, BE-006 | Users table functional, CRUD operations working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_6L4 | 52 |
 | FE-020 | Implement authentication guards (redirect to login if unauthenticated) | **Done** (PR #293 merged) | P0 | Frontend | FE-005 | Protected pages redirect unauthenticated users, 401/403 error handling | PVTI_lAHOAB4wV84BNGcwzgj_6NM | 48 |
 | FE-021 | Implement role-based UI (hide admin features from non-admin users) | **Done** (PR #293 merged) | P0 | Frontend | FE-020 | Admin panel hidden from non-admins, deep links show permission denied, RBAC enforced | PVTI_lAHOAB4wV84BNGcwzgj_6Ng | 56 |
 
