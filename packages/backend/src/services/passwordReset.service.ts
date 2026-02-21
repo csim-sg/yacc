@@ -5,11 +5,13 @@
 
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
-import { eq, isNull, and, lt } from 'drizzle-orm';
+import { logger } from '../infrastructure/logger';
 import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
 import { passwordResetTokens } from '../schemas/passwordReset.schema';
 import { users } from '../schemas/user.schema';
+import { eq, isNull, and } from 'drizzle-orm';
+import { validatePassword } from './passwordValidation.service';
 import { auditService } from './audit.service';
 import { validatePassword } from './passwordValidation.service';
 
@@ -22,7 +24,7 @@ export async function generateResetToken(
   userId: string,
   _correlationId: string,
 ): Promise<string> {
-  // Delete any existing valid (unexpired) unused tokens for this user
+  // Delete any existing unused tokens for this user (enforces one active token)
   await dbClient
     .delete(passwordResetTokens)
     .where(
@@ -50,10 +52,12 @@ export async function generateResetToken(
 
   // Log action
   await auditService.logAction({
+    actorId: userId,
     action: 'password.reset_token_generated',
     entityType: 'user',
     entityId: userId,
     metadata: { expiresAt: expiresAt.toISOString() },
+    correlationId,
   });
 
   // Return raw token (only shown once)
@@ -90,12 +94,14 @@ export async function validateAndGetUserId(
           throw new Error('Invalid or expired token');
         }
 
-         // Log validation
-         await auditService.logAction({
-           action: 'password.reset_token_validated',
-           entityType: 'user',
-           entityId: record.userId,
-         });
+        // Log validation
+        await auditService.logAction({
+          actorId: record.userId,
+          action: 'password.reset_token_validated',
+          entityType: 'user',
+          entityId: record.userId,
+          correlationId,
+        });
 
         return record.userId;
       }
@@ -167,10 +173,12 @@ export async function resetPassword(
       .where(eq(passwordResetTokens.id, record[0].id));
   }
 
-   // Log successful reset
-   await auditService.logAction({
-     action: 'password.reset_successful',
-     entityType: 'user',
-     entityId: userId,
-   });
+  // Log successful reset
+  await auditService.logAction({
+    action: 'password.reset_successful',
+    actorId: userId,
+    entityType: 'user',
+    entityId: userId,
+    correlationId,
+  });
 }

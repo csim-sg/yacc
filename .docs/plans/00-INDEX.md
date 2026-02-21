@@ -32,10 +32,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **INT-008** (IRC Test) | ✅ **COMPLETED** (PR #263 merged) | INT-005 | POST /api/integrations/irc/test - test connection with 10s timeout, no side effects (super_admin) |
 | **INT-009** (Status Endpoint) | ✅ **COMPLETED** (PR #262 merged) | INT-005 | GET /api/integrations/irc/status endpoint (admin+ RBAC) |
 | **INT-010** (DB Profile Management) | ✅ **COMPLETED** (PR #265 merged) | INT-006-009 | DB-first gating, encrypted credential storage, profile selection logic, deterministic E2E tests, migration & schema alignment |
-| **INT-011** (Profile-Scoped IRC Mapping) | 🔄 **IN PROGRESS** (Feb 20, 2026) | INT-010 | Backend: add ircProfileId to conversations; profile-scoped uniqueness (profileId, channel); DM support deferred to Phase 2 |
-| **INT-012** (Error Handling & DLQ) | 🔄 **IN PROGRESS** (Feb 20, 2026) | INT-003 | DLQ enhanced with correlationId, ircProfileId, externalThreadType, externalThreadId for tracing + debugging |
-| **INT-013** (Unit Tests ≥90%) | 🔄 **IN PROGRESS** (Feb 20, 2026) | INT-011,012 | Add 15+ unit tests for profile-scoped mapping, error handling, correlation ID logging |
-| **INT-014** (Integration Tests & FE) | 🔄 **IN PROGRESS** (Feb 20, 2026) | INT-011,013 | E2E integration tests (mock IRC server) + frontend IRC sidebar component with profile accordion grouping |
+| **INT-011-014** (Profile-Scoped Mapping, DLQ, Tests) | ✅ **COMPLETED** (PR #267 merged) | INT-002, INT-003, INT-010 | Profile-scoped (ircProfileId, channel) uniqueness; DLQ trace context uses integer `ircProfileId`; unit + integration test coverage. FE sidebar deferred. |
 
 ## Recent Merges
 - **PR #272** (Feb 20, 2026): DLQ UUID contract enforcement + traceability fields + RBAC hardening (fixes #270)
