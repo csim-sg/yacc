@@ -46,7 +46,46 @@ All roles and data access are scoped to a **tenant (organization)** unless expli
 
 ## 3. MVP Scope
 
-### Core Features (Required)
+### P0 Frontend Option 2 Scope (Phase 1.2 Implementation)
+
+**Definition**: P0 Frontend Option 2 is a **focused Phase 1 subset** delivering core user workflows to unblock integration testing. Deferred items are not removed from MVP; they ship in Phase 2 + post-MVP as originally planned.
+
+**P0 Implemented Features**:
+- ✅ **Auth**: Login, session management, logout, forgot password, password reset
+- ✅ **Account Recovery**: Email-based password reset with token expiry (single-use)
+- ✅ **Core Inbox Workflow**: View conversations → open conversation → reply + delivery status tracking
+- ✅ **Manual Message Retry**: One-click retry on failed message (exactly once per message, RBAC-gated)
+- ✅ **Real-Time Updates**: WebSocket listeners for conversation/message updates; reconnect indicator + REST refresh
+- ✅ **Notifications**: Bell icon with unread badge; assignment-only filtering; click-through navigation; mark-read action
+- ✅ **E2E Tests**: Playwright test suite covering auth, recovery, workflow, real-time, notifications
+
+**P0 Locked Defaults**:
+- **Role Reply/Retry**: Super Admin, Admin, Manager can view/reply/retry on all conversations. User can only view/reply/retry on assigned conversations
+- **Reset Password Behavior**: Reset redirects to login page (no auto-login); invalidates all existing sessions
+- **Retry Exactly Once**: Manual retry button visible once per failed message; disabled after 1 attempt
+- **Notifications Assignment-Only**: P0 shows only assignment notifications (no @mention notifications yet)
+- **REST Refresh on WS Reconnect**: Upon reconnect, client calls REST to refresh inbox + current conversation
+
+**Deferred from P0 (Phase 2 + Post-MVP)**:
+- Tags, notes, assignments (collaborative features)
+- @mention notifications
+- Routing rules (auto-assign, auto-tag)
+- Audit logging
+- Search (full-text)
+- Attachments
+- Bulk actions
+- Email notifications
+- Presence indicators (online/offline)
+- Typing indicators
+- Status changes (open/pending/resolved)
+- WhatsApp, WeChat, Meta, X integrations
+- External credential vault
+- Elasticsearch (use PostgreSQL FTS)
+- RTL support
+
+---
+
+### Core Features (Required for MVP)
 **MVP Definition**: MVP includes **Phase 1 + Phase 2** (collaboration + rules). Additional external platforms are post-MVP.
 
 **MVP Platform Scope**: Telegram + IRC (additional platforms: WhatsApp/WeChat/Meta/X are post-MVP).
@@ -367,61 +406,87 @@ flowchart TD
 
 ## 8. User Stories with Acceptance Criteria
 
-### Story 1.1: Login
+### Story 1.1: Login (P0 ✅)
 **As a** user  
 **I want** to log in with email/password  
 **So that** I can access the unified inbox.
 
-**AC:**
+**AC (P0)**:
 - Valid credentials create authenticated session + return JWT
-- Invalid credentials return clear error message
+- Invalid credentials return clear error message (no enumeration: "Email or password is incorrect")
 - User lands on inbox after successful login
-- Session persists across page refresh
+- Session persists across page refresh (via HttpOnly refresh token cookie)
 - Locked/disabled users cannot login (error: "Account disabled")
+- Session shows authenticated user info in header
+
+**Test Coverage**: `p0-frontend-option2.spec.ts` - AUTH-001, AUTH-003
 
 ---
 
-### Story 1.2: Forgot Password
+### Story 1.2: Forgot Password (P0 ✅)
 **As a** user  
 **I want** to reset my password  
 **So that** I can regain access if I forget it.
 
-**AC:**
-- User can request reset using email
-- Reset email contains time-limited token link (TTL: 30–60 mins)
+**AC (P0)**:
+- User navigates to forgot password page from login
+- Entering valid email initiates reset flow (returns 200 + success message)
+- Reset email contains time-limited token link (TTL: 60 mins)
 - Token allows setting new password once (invalidates after use)
-- Success redirects to login
-- Non-existent emails still return success message (no user enumeration)
+- Non-existent emails still return 200 with identical message (no enumeration)
+- Entering used/expired token shows "Invalid or expired token" error (generic message)
+- Success redirects to login page (no auto-login)
+- New password reset invalidates all previous sessions (security hardening)
+- New password must meet requirements: 8+ chars, 1 uppercase, 1 number
+
+**Test Coverage**: `p0-frontend-option2.spec.ts` - RECOVERY-001, RECOVERY-002, RECOVERY-003, RECOVERY-004
 
 ---
 
-### Story 1.3: Role-Based Access
+### Story 1.3: Role-Based Access (P0 ✅)
 **As a** super admin  
 **I want** role-based access enforced  
 **So that** users only see what they're allowed to see.
 
-**AC:**
-- Each API request checks role permissions
-- Restricted pages inaccessible to unauthorized roles (403)
-- Role matrix supports super admin, admin, manager, user
+**AC (P0)**:
+- Super Admin, Admin, Manager can view/reply/retry on all conversations
+- User role can only view/reply/retry on assigned conversations
+- Unassigned conversations show as read-only (reply button disabled)
+- Retry button disabled for User if not assigned
+- Each API request validates role permissions (401/403 on failure)
+- Restricted pages inaccessible to unauthorized roles (redirect to inbox)
+- Role matrix enforced on reply + retry endpoints
+
+**Locked P0 Role Matrix**:
+| Action | Super Admin | Admin | Manager | User |
+|--------|-------------|-------|---------|------|
+| View all conversations | ✅ | ✅ | ✅ | ❌ (assigned only) |
+| Reply on conversation | ✅ | ✅ | ✅ | ✅ (if assigned) |
+| Retry failed message | ✅ | ✅ | ✅ | ✅ (if assigned) |
+
+**Test Coverage**: `p0-frontend-option2.spec.ts` - AUTH-004, WORKFLOW-006
 
 ---
 
-### Story 2.1: Inbox List
+### Story 2.1: Inbox List (P0 Core ✅)
 **As a** user  
 **I want** to see all conversations in one list  
 **So that** I can handle messages efficiently.
 
-**AC:**
-- Inbox shows all channels in single queue
-- Conversations display: channel, latest message, timestamp, assignee
+**AC (P0)**:
+- Inbox loads on successful login
+- Conversations display: channel badge (Telegram/IRC), latest message preview, sender, timestamp
 - Sorting defaults to newest activity
-- Unread count displayed per conversation
-- Priority badge visible (low/normal/high/urgent)
+- Pagination or virtualization for many conversations
+- Empty state shows "No conversations" when inbox is empty
+- List refreshes automatically via WebSocket (new messages update in place)
+- Manual refresh button available for REST refresh
+
+**Test Coverage**: `p0-frontend-option2.spec.ts` - WORKFLOW-001
 
 ---
 
-### Story 2.2: Filters
+### Story 2.2: Filters (Deferred to Phase 2)
 **As a** user  
 **I want** to filter conversations  
 **So that** I can focus on specific workloads.
@@ -433,19 +498,28 @@ flowchart TD
 - Clear all filters button exists
 - Selected filters shown as removable chips
 
+**P0 Status**: Deferred; Phase 2 scope
+
 ---
 
-### Story 2.3: Conversation View
+### Story 2.3: Conversation View (P0 Core ✅)
 **As a** user  
 **I want** to open a conversation  
 **So that** I can read history and respond.
 
-**AC:**
+**AC (P0)**:
+- Clicking conversation opens detail view with message timeline
 - Timeline displays inbound and outbound messages
-- Channel metadata visible (channel name, participant names)
+- Channel metadata visible (channel name e.g., "#general")
 - Messages ordered chronologically (oldest first)
-- Message metadata visible (sender, timestamp, status)
-- Conversation status visible in header (open/pending/resolved)
+- Message metadata visible (sender name, timestamp in relative format "2 hours ago")
+- Conversation status visible in header as read-only badge (open/pending/resolved)
+- Status change controls hidden in P0 (deferred)
+- Reply composer visible at bottom (enabled if user has permission)
+
+**Test Coverage**: `p0-frontend-option2.spec.ts` - WORKFLOW-002
+
+---
 
 ---
 
@@ -490,31 +564,79 @@ flowchart TD
 
 ---
 
-### Story 4.1: Reply to Conversation
+### Story 4.1: Reply to Conversation (P0 Core ✅)
 **As a** user  
 **I want** to reply from the conversation view  
 **So that** I can respond without leaving the inbox.
 
-**AC:**
-- Reply sends to original channel
-- Only managers and users can reply
-- Outbound messages appear in timeline with status (pending/sent/failed)
-- Errors shown if delivery fails
-- Can attach files to reply (max 5 MB per file)
+**AC (P0)**:
+- Super Admin, Admin, Manager can reply on all conversations
+- User can reply only on assigned conversations (button disabled otherwise)
+- Reply text input appears in composer at bottom of conversation
+- Submit button sends message to original channel (Telegram/IRC)
+- Outbound messages appear immediately in timeline with status badge
+- Status transitions: pending → sent (green) or failed (red)
+- Failed message shows retry button (see Story 4.3)
+- Error messages display clearly below composer
+- Attachments deferred to Phase 2
+
+**Locked P0 Behavior**:
+- No inline file upload in P0
+- Retry button available for exactly 1 attempt per failed message
+- Reply button grayed out if user not assigned (shows "Not assigned" tooltip)
+
+**Test Coverage**: `p0-frontend-option2.spec.ts` - WORKFLOW-003, WORKFLOW-006
 
 ---
 
-### Story 4.2: Real-Time Updates
+### Story 4.3: Manual Message Retry (P0 New ✅)
+**As a** user  
+**I want** to manually retry a failed message  
+**So that** I can resend without re-typing.
+
+**AC (P0)**:
+- Failed outbound messages show retry button
+- Clicking retry queues message for re-delivery (one attempt)
+- Button disables immediately after click (prevents double-retry)
+- Status updates from failed → pending → sent/failed
+- Retry inherits original message text + metadata
+- Retry audits as `message.retry` action (logged for admin)
+- RBAC enforced: User can retry only on assigned conversations
+
+**Locked P0 Behavior**:
+- Exactly one retry per message (no infinite retries)
+- No automatic retry in P0 (manual only; exponential backoff queueing handled by backend)
+- Retry endpoint: `POST /api/conversations/:conversationId/messages/:messageId/retry`
+- Returns updated message model with new status
+
+**Test Coverage**: `p0-frontend-option2.spec.ts` - WORKFLOW-004, WORKFLOW-005
+
+---
+
+### Story 4.2: Real-Time Updates (P0 Core ✅)
 **As a** user  
 **I want** live updates in the inbox  
 **So that** I see new messages immediately.
 
-**AC:**
-- New inbound messages appear without refresh (<1 second)
-- Assignment/tag changes update live
-- WebSocket reconnects on disconnect (receives backlog from last 1 hour)
-- Typing indicators appear in real-time
-- Presence updates (online/offline) in real-time
+**AC (P0)**:
+- New inbound messages appear in open conversation timeline via WebSocket (<500ms)
+- New inbound messages update inbox list via WebSocket (<500ms)
+- Message status changes (pending → sent/failed) update via WebSocket
+- WebSocket reconnect shows visual indicator (e.g., "Reconnecting..." banner)
+- On reconnect success, REST refresh fetches:
+  - Latest conversation list (replaces in-memory cache)
+  - Latest messages for currently open conversation
+- Backlog on reconnect: client receives missed events from last 1 hour (handled by backend)
+- Client connects WebSocket after successful login (not before)
+- Client properly unregisters WebSocket listeners on logout
+
+**Locked P0 Behavior**:
+- No typing indicators in P0 (deferred)
+- No presence updates in P0 (deferred)
+- REST refresh on reconnect is mandatory (not optional)
+- Reconnect indicator shows for 3 seconds or until refresh completes
+
+**Test Coverage**: `p0-frontend-option2.spec.ts` - WORKFLOW-007, WORKFLOW-008
 
 ---
 
@@ -545,6 +667,36 @@ flowchart TD
 - Replies from inbox delivered to IRC
 - Auto-reconnect on disconnect (exponential backoff)
 - Error handling for auth/connection failures
+
+---
+
+### Story 5.3: Notifications - Assignment (P0 Core ✅)
+**As a** user  
+**I want** to be notified when assigned a conversation  
+**So that** I can prioritize work.
+
+**AC (P0)**:
+- Bell icon appears in header with unread count badge
+- Clicking bell opens notification panel (overlay or dropdown)
+- Notification shows: "You were assigned to conversation" + conversation preview
+- Only assignment notifications visible in P0 (no @mention notifications yet)
+- Each unique assignment creates one notification per user
+- Clicking notification:
+  - Marks notification as read
+  - Navigates to that conversation
+  - Closes notification panel
+- Notification panel has "Mark All as Read" button
+- Unread badge clears when all notifications marked read
+- Notifications persist in database + show on reconnect
+- Notifications delivered via WebSocket for real-time delivery
+
+**Locked P0 Behavior**:
+- Assignment-only notifications (no @mention, no status change notifications)
+- No email notifications in P0 (deferred to Phase 2)
+- No dismiss action in P0 (only mark read)
+- Notification appears immediately on assignment via WebSocket
+
+**Test Coverage**: `p0-frontend-option2.spec.ts` - NOTIFICATION-001, NOTIFICATION-002, NOTIFICATION-003
 
 ---
 

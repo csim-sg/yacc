@@ -10,22 +10,27 @@
  * - TanStack Query for data fetching (FE-004)
  */
 
-import { useState, type ReactElement } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { Navigation } from './components/Navigation';
+import { useState, useEffect, type ReactElement } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Header } from './components/Header';
+import { Navigation } from './components/Navigation';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { ReconnectingIndicator } from './components/ReconnectingIndicator';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { logger } from './lib/logger';
+import { queryClient } from './lib/queryClient';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { ConversationPage } from './pages/ConversationPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { InboxPage } from './pages/InboxPage';
 import { IrcProfilesPage } from './pages/IrcProfilesPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/registerPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { RoutingRulesPage } from './pages/RoutingRulesPage';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { queryClient } from './lib/queryClient';
+import { registerSocketListeners, unregisterSocketListeners } from './services/socketListeners';
+import { webSocketService } from './services/websocket.service';
 
 /**
  * Public Route wrapper
@@ -88,6 +93,54 @@ function MainLayout({ children }: { children: ReactElement }): ReactElement {
 }
 
 /**
+ * WebSocket Initializer Component
+ * Initializes WebSocket after authentication and sets up event listeners
+ * P0: Implements reconnect indicator and REST refresh on reconnect
+ */
+function WebSocketInitializer(): null {
+  const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      // Disconnect WebSocket when user logs out
+      unregisterSocketListeners();
+      webSocketService.disconnect();
+      return;
+    }
+
+    // Initialize WebSocket service once
+    webSocketService.initialize();
+
+    // Connect to WebSocket
+    webSocketService.connect();
+
+    // Register all centralized event listeners
+    registerSocketListeners();
+
+    // P0: Setup reconnect handler for REST refresh
+    const onReconnect = () => {
+      logger.info('[App] WebSocket reconnected, refreshing conversation data');
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversation'] });
+      queryClient.invalidateQueries({ queryKey: ['conversationMessages'] });
+    };
+
+    webSocketService.on('connect', onReconnect);
+
+    logger.info('[App] WebSocket initialized for authenticated user');
+
+    return () => {
+      // Unregister listeners on cleanup (logout or unmount in strict mode)
+      webSocketService.off('connect', onReconnect);
+      unregisterSocketListeners();
+      webSocketService.disconnect();
+    };
+  }, [isAuthenticated]);
+
+  return null;
+}
+
+/**
  * App Routes Component
  * Separated from App to have access to AuthProvider context
  */
@@ -108,6 +161,7 @@ function AppRoutes(): ReactElement {
 
   return (
     <>
+      <WebSocketInitializer />
       <ReconnectingIndicator />
       <Routes>
       {/* Public routes (no layout) */}
@@ -124,6 +178,22 @@ function AppRoutes(): ReactElement {
         element={
           <PublicRoute>
             <RegisterPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPasswordPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <PublicRoute>
+            <ResetPasswordPage />
           </PublicRoute>
         }
       />

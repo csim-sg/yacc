@@ -1,7 +1,7 @@
 # Execution Status Index
 
-**Last Updated**: 2026-02-20  
-**Status**: ⏳ Phase 1 in progress (IRC integration)
+**Last Updated**: 2026-02-21  
+**Status**: ⏳ Phase 1 in progress (P0 Frontend Option 2 + IRC integration)
 
 ---
 
@@ -13,9 +13,52 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 ---
 
 ## Current Delivery Status
-- Phase 1: ⏳ In Progress (IRC integration + DLQ contract hardening)
+- Phase 1 Backend: ⏳ In Progress (IRC integration + DLQ contract hardening)
+- Phase 1 Frontend (P0 Option 2): ⏳ In Progress (core workflow + account recovery)
 - Phase 2: ✅ Completed (collaboration + rules merged)
 - QA: ⏳ Not Started
+
+## P0 Frontend Option 2 Status (FE-001-021)
+
+**Branch**: `feature/p0-frontend-option2-core-workflow`  
+**Target Delivery**: Sprint end (1-2 days)
+**Code Review Status**: ⏳ Fixing blockers from ea-architecture-validator (6 blockers)
+
+### Implementation Summary
+| Component | Status | Details |
+|-----------|--------|---------|
+| **Auth** | ✅ DONE | Login, session, logout + protected routes + RBAC-safe navigation |
+| **Account Recovery** | ✅ DONE | Forgot password (no enumeration) + Reset password (token expiry, single-use) |
+| **Core Workflow** | ⏳ In Progress (Blocker Fixes) | Inbox → conversation → reply; message delivery status + manual retry (exactly once, RBAC-gated) |
+| **Real-Time** | ⏳ In Progress (Blocker Fixes) | WS listeners properly managed (no double-registration); REST refresh on reconnect |
+| **Notifications** | ⏳ In Progress (Blocker Fixes) | Bell mounted in Header; assignment-only filtering; click-through + mark-read navigation |
+| **Tests** | ✅ DONE | Playwright E2E tests for auth, recovery, workflow, real-time, notifications (25+ scenarios) |
+| **Docs** | ⏳ In Progress | Update spec, API docs, QA strategy, task list |
+
+### Blocker Fixes In Progress
+1. ✅ **Manual retry endpoint**: Implemented `POST /api/conversations/:id/messages/:msgId/retry` in backend
+2. ✅ **Exactly-once UI behavior**: Track attempted retries per message, disable button after first click
+3. ✅ **WebSocket double-registration**: Properly unregister listeners in cleanup, handle React strict mode
+4. ✅ **Reconnect REST refresh**: Invalidate conversation caches on reconnect transition
+5. ✅ **RBAC gating**: Hide/disable reply + retry for USER if not assigned; clear permission message
+6. ✅ **Notifications integration**: Mount NotificationCenter in Header, filter to assignment-only, implement click-through navigation
+
+### Key Files Changed
+- `packages/frontend/src/pages/ForgotPasswordPage.tsx` (NEW)
+- `packages/frontend/src/pages/ResetPasswordPage.tsx` (NEW)
+- `packages/frontend/src/App.tsx` (updated: routes + WebSocket init)
+- `packages/frontend/src/pages/ConversationPage.tsx` (updated: message retry)
+- `packages/frontend/src/services/conversations.service.ts` (updated: add retryMessage)
+- `packages/frontend/src/pages/LoginPage.tsx` (updated: test IDs)
+- `packages/frontend/tests/acceptance/phase1/p0-frontend-option2.spec.ts` (NEW: 25+ tests)
+
+### Next Steps (Before Merge)
+1. ✅ Code review (ea-architecture-validator)
+2. ⏳ Update `.docs/02-api-and-data-model.md` (API response shapes for reset, retry endpoints)
+3. ⏳ Update `.docs/01-product-specification.md` (P0 scope confirmation)
+4. ⏳ Update `.docs/04-qa-and-testing.md` (E2E test cases)
+5. ⏳ Update `.docs/05-quick-reference.md` (role matrix + P0 features)
+6. ⏳ Update `.docs/06-tasks.md` (mark FE tasks complete)
 
 ## Current Integration Task Status (Phase 1)
 

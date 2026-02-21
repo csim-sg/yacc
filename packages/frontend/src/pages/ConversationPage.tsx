@@ -44,14 +44,15 @@ const STATUS_BADGE: Record<ConversationStatus, string> = {
 };
 
 export function ConversationPage() {
-  const { user, logout, isLoading: authLoading } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { id } = useParams();
+   const { user, logout, isLoading: authLoading } = useAuth();
+   const [sidebarOpen, setSidebarOpen] = useState(false);
+   const [retriedMessageIds, setRetriedMessageIds] = useState<Set<string>>(new Set());
+   const { id } = useParams();
 
-  const conversationId = useMemo(() => {
-    // IDs are UUID strings, not numbers
-    return id && id.length > 0 ? id : null;
-  }, [id]);
+   const conversationId = useMemo(() => {
+     // IDs are UUID strings, not numbers
+     return id && id.length > 0 ? id : null;
+   }, [id]);
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -141,32 +142,84 @@ export function ConversationPage() {
     });
   };
 
-   const renderMessageBubble = (message: ConversationMessage) => {
-     const isInbound = message.direction === 'inbound';
+    const handleMessageRetry = async (messageId: string) => {
+       try {
+         // P0: Track that user has clicked retry for this message (exactly once)
+         setRetriedMessageIds((prev) => new Set([...prev, messageId]));
+         await conversationsService.retryMessage(conversationId as string, messageId);
+         // Message status will be updated via WebSocket event (message.sent/failed)
+       } catch (error) {
+         console.error('Retry failed:', error instanceof Error ? error.message : String(error));
+       }
+    };
 
-     return (
-       <div
-         key={message.id}
-         className={`flex ${isInbound ? 'justify-start' : 'justify-end'}`}
-       >
+    // P0: Check if user can reply + retry (RBAC)
+    const canReplyAndRetry = (): boolean => {
+       if (!user) return false;
+       const role = user.role;
+       // super_admin, admin, manager can reply+retry on all conversations
+       if (['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role)) {
+         return true;
+       }
+       // USER role can only reply+retry if assigned to this conversation
+       if (role === 'USER') {
+         return conversation?.assignedUserId === user.id;
+       }
+       return false;
+    };
+
+    const renderMessageBubble = (message: ConversationMessage) => {
+       const isInbound = message.direction === 'inbound';
+       const isFailed = message.status === 'failed';
+       const hasAlreadyRetried = retriedMessageIds.has(message.id);
+       const canRetry = canReplyAndRetry() && !hasAlreadyRetried;
+
+       return (
          <div
-           className={`max-w-[80%] rounded-lg px-4 py-3 shadow-sm ${
-             isInbound ? 'bg-base-100 border border-base-200' : 'bg-primary text-primary-content'
-           }`}
+           key={message.id}
+           className={`flex ${isInbound ? 'justify-start' : 'justify-end'}`}
          >
-           <div className="flex items-center gap-2 text-xs opacity-70 mb-1">
-             <span data-testid="message-sender">{message.senderName || (isInbound ? 'Inbound' : 'Agent')}</span>
-             <span>•</span>
-             <span>{formatTimestamp(message.createdAt)}</span>
-             <span className="badge badge-xs badge-outline">
-               {message.status}
-             </span>
+           <div
+             className={`max-w-[80%] rounded-lg px-4 py-3 shadow-sm ${
+               isInbound ? 'bg-base-100 border border-base-200' : 'bg-primary text-primary-content'
+             }`}
+           >
+             <div className="flex items-center gap-2 text-xs opacity-70 mb-1">
+               <span data-testid="message-sender">{message.senderName || (isInbound ? 'Inbound' : 'Agent')}</span>
+               <span>•</span>
+               <span>{formatTimestamp(message.createdAt)}</span>
+               <span className="badge badge-xs badge-outline">
+                 {message.status}
+               </span>
+             </div>
+             <p className="text-sm whitespace-pre-wrap" data-testid="message-body">{message.body}</p>
+             
+             {/* P0: Retry button for failed outbound messages (exactly once per message) */}
+             {!isInbound && isFailed && (
+               <div className="mt-2 flex gap-2">
+                 {canRetry ? (
+                   <button
+                     onClick={() => handleMessageRetry(message.id)}
+                     className="btn btn-xs btn-outline"
+                     data-testid={`message-retry-${message.id}`}
+                   >
+                     Retry
+                   </button>
+                 ) : hasAlreadyRetried ? (
+                   <button disabled className="btn btn-xs btn-outline opacity-50">
+                     Retry Sent
+                   </button>
+                 ) : (
+                   <div className="text-xs text-base-content/60">
+                     You don't have permission to retry this message
+                   </div>
+                 )}
+               </div>
+             )}
            </div>
-           <p className="text-sm whitespace-pre-wrap" data-testid="message-body">{message.body}</p>
          </div>
-       </div>
-     );
-   };
+       );
+     };
 
   return (
     <div className="h-screen flex flex-col bg-base-200">
@@ -469,25 +522,34 @@ export function ConversationPage() {
 
                             <div className="divider"></div>
 
-                            {/* Reply Composer */}
-                            <div>
-                              <h3 className="text-lg font-semibold mb-4">Reply</h3>
-                              <ReplyComposer
-                                onSend={async (body) => {
-                                  await sendMessageMutation.mutateAsync(body);
-                                }}
-                                isSending={sendMessageMutation.isPending}
-                                error={
-                                  sendMessageMutation.error instanceof Error
-                                    ? sendMessageMutation.error.message
-                                    : sendMessageMutation.error
-                                      ? String(sendMessageMutation.error)
-                                      : undefined
-                                }
-                                showError={true}
-                                onErrorDismiss={() => sendMessageMutation.reset()}
-                              />
-                            </div>
+                             {/* Reply Composer */}
+                             <div>
+                               <h3 className="text-lg font-semibold mb-4">Reply</h3>
+                               {canReplyAndRetry() ? (
+                                 <ReplyComposer
+                                   onSend={async (body) => {
+                                     await sendMessageMutation.mutateAsync(body);
+                                   }}
+                                   isSending={sendMessageMutation.isPending}
+                                   error={
+                                     sendMessageMutation.error instanceof Error
+                                       ? sendMessageMutation.error.message
+                                       : sendMessageMutation.error
+                                         ? String(sendMessageMutation.error)
+                                         : undefined
+                                   }
+                                   showError={true}
+                                   onErrorDismiss={() => sendMessageMutation.reset()}
+                                 />
+                               ) : (
+                                 <div className="alert alert-warning">
+                                   <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4v2m0 0v2m0-6v-2m0 0V7m0 6h2m-2 0h-2" />
+                                   </svg>
+                                   <span>You don't have permission to reply to this conversation. Contact your admin if you need access.</span>
+                                 </div>
+                               )}
+                             </div>
                           </div>
                         )}
                       </div>

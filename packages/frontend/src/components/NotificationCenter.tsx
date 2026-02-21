@@ -5,12 +5,13 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { logger } from '../lib/logger';
+import type { Notification } from '../stores/notifications.store';
 import {
   useNotifications,
-  useUnreadCount,
   useNotificationsStore,
 } from '../stores/notifications.store';
-import { logger } from '../lib/logger';
 
 interface NotificationCenterProps {
   /** Optional CSS class */
@@ -20,11 +21,19 @@ interface NotificationCenterProps {
 /**
  * Single notification item in the center
  */
-const NotificationItem: React.FC<{
-  notification: any;
+interface NotificationItemProps {
+  notification: Notification;
   onMarkAsRead: (id: string) => void;
   onDismiss: (id: string) => void;
-}> = ({ notification, onMarkAsRead, onDismiss }) => {
+  onClickThrough?: () => void;
+}
+
+const NotificationItem: React.FC<NotificationItemProps> = ({
+  notification,
+  onMarkAsRead,
+  onDismiss,
+  onClickThrough,
+}) => {
   const getIcon = () => {
     switch (notification.type) {
       case 'assignment':
@@ -58,12 +67,20 @@ const NotificationItem: React.FC<{
     }
   };
 
-  return (
-    <div
-      className={`px-4 py-3 border-b border-base-200 hover:bg-base-100 transition-colors ${
-        !notification.isRead ? 'bg-primary/5' : ''
-      }`}
-    >
+   return (
+     <div
+       className={`px-4 py-3 border-b border-base-200 hover:bg-base-100 transition-colors cursor-pointer ${
+         !notification.isRead ? 'bg-primary/5' : ''
+       }`}
+       onClick={() => {
+         if (!notification.isRead) {
+           onMarkAsRead(notification.id);
+         }
+         if (onClickThrough) {
+           onClickThrough();
+         }
+       }}
+     >
       <div className="flex items-start gap-3">
         {/* Icon */}
         <div className="text-primary flex-shrink-0 mt-0.5">{getIcon()}</div>
@@ -133,15 +150,19 @@ const NotificationItem: React.FC<{
 /**
  * NotificationCenter Component
  * Dropdown bell icon with notification list
+ * P0: Filter to assignment-only notifications
  */
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ className = '' }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+   const [isOpen, setIsOpen] = useState(false);
+   const menuRef = useRef<HTMLDivElement>(null);
+   const buttonRef = useRef<HTMLButtonElement>(null);
+   const navigate = useNavigate();
 
-  const notifications = useNotifications();
-  const unreadCount = useUnreadCount();
-  const { removeNotification, markAsRead, markAllAsRead } = useNotificationsStore();
+   const allNotifications = useNotifications();
+   // P0: Filter to assignment notifications only
+   const notifications = allNotifications.filter((n) => n.type === 'assignment');
+   const unreadCount = notifications.filter((n) => !n.isRead).length;
+   const { removeNotification, markAsRead, markAllAsRead } = useNotificationsStore();
 
   // Close on outside click
   useEffect(() => {
@@ -226,23 +247,30 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
               <p className="text-sm">No notifications yet</p>
             </div>
           ) : (
-            <div role="list">
-              {notifications.map((notification) => (
-                <div key={notification.id} role="listitem">
-                  <NotificationItem
-                    notification={notification}
-                    onMarkAsRead={() => {
-                      markAsRead(notification.id);
-                      logger.debug('Marked notification as read', { id: notification.id });
-                    }}
-                    onDismiss={() => {
-                      removeNotification(notification.id);
-                      logger.debug('Dismissed notification', { id: notification.id });
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
+             <div role="list">
+               {notifications.map((notification) => (
+                 <div key={notification.id} role="listitem">
+                   <NotificationItem
+                     notification={notification}
+                     onMarkAsRead={() => {
+                       markAsRead(notification.id);
+                       logger.debug('Marked notification as read', { id: notification.id });
+                     }}
+                     onDismiss={() => {
+                       removeNotification(notification.id);
+                       logger.debug('Dismissed notification', { id: notification.id });
+                     }}
+                     onClickThrough={() => {
+                       // P0: Click notification marks as read and navigates to conversation
+                       if (notification.conversationId) {
+                         setIsOpen(false);
+                         navigate(`/conversations/${notification.conversationId}`);
+                       }
+                     }}
+                   />
+                 </div>
+               ))}
+             </div>
           )}
 
           {/* Footer */}

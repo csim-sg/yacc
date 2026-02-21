@@ -9,9 +9,11 @@
  * - Accessibility features
  */
 
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { useState, type ReactElement } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { logger } from '../lib/logger';
+import { NotificationCenter } from './NotificationCenter';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -45,7 +47,9 @@ export function Header({ onMenuClick }: HeaderProps): ReactElement {
       // Redirect handled by AuthContext, but navigate just in case
       navigate('/login');
     } catch (error: unknown) {
-      console.error('Logout failed:', error instanceof Error ? error.message : String(error));
+      logger.error('[Header] Logout failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       setIsLoggingOut(false);
     }
   };
@@ -94,49 +98,52 @@ export function Header({ onMenuClick }: HeaderProps): ReactElement {
               <span className="text-xl font-bold text-base-content hidden sm:inline">YACC</span>
             </div>
 
-            {/* User Section */}
-            <div className="flex items-center gap-4">
-              {/* User Info */}
-              {user && (
-                <div className="hidden sm:flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-base-content">{user.name || user.email}</p>
-                    <p className="text-xs text-base-content/60">{user.role.replace(/_/g, ' ')}</p>
-                  </div>
-                  {/* Avatar */}
-                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                    <span className="text-primary-content text-sm font-bold">
-                      {(user.name || user.email)[0].toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-              )}
+             {/* User Section */}
+             <div className="flex items-center gap-3">
+               {/* Notification Bell (P0: assignment only) */}
+               <NotificationCenter />
 
-              {/* Logout Button */}
-              <button
-                onClick={handleLogout}
-                disabled={isLoading || isLoggingOut}
-                className="btn btn-sm btn-ghost"
-                aria-label="Logout"
-                title="Sign out"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="w-5 h-5"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8.603 3.799A4.49 4.49 0 0112 2.25c2.498 0 4.741 1.571 5.603 3.799m0 0A5.989 5.989 0 0116.5 12a5.989 5.989 0 01-.9 3.201m0 0A4.49 4.49 0 0112 21.75c-2.498 0-4.741-1.571-5.603-3.799m0 0A5.989 5.989 0 015.5 12c0-1.156.3-2.25.9-3.201m0 0A4.49 4.49 0 0112 2.25c2.498 0 4.741 1.571 5.603 3.799"
-                  />
-                </svg>
-                <span className="hidden sm:inline">Logout</span>
-              </button>
-            </div>
+               {/* User Info */}
+               {user && (
+                 <div className="hidden sm:flex items-center gap-3">
+                   <div className="text-right">
+                     <p className="text-sm font-medium text-base-content">{user.name || user.email}</p>
+                     <p className="text-xs text-base-content/60">{user.role.replace(/_/g, ' ')}</p>
+                   </div>
+                   {/* Avatar */}
+                   <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                     <span className="text-primary-content text-sm font-bold">
+                       {(user.name || user.email)[0].toUpperCase()}
+                     </span>
+                   </div>
+                 </div>
+               )}
+
+               {/* Logout Button */}
+               <button
+                 onClick={handleLogout}
+                 disabled={isLoading || isLoggingOut}
+                 className="btn btn-sm btn-ghost"
+                 aria-label="Logout"
+                 title="Sign out"
+               >
+                 <svg
+                   xmlns="http://www.w3.org/2000/svg"
+                   fill="none"
+                   viewBox="0 0 24 24"
+                   strokeWidth={1.5}
+                   stroke="currentColor"
+                   className="w-5 h-5"
+                 >
+                   <path
+                     strokeLinecap="round"
+                     strokeLinejoin="round"
+                     d="M8.603 3.799A4.49 4.49 0 0112 2.25c2.498 0 4.741 1.571 5.603 3.799m0 0A5.989 5.989 0 0116.5 12a5.989 5.989 0 01-.9 3.201m0 0A4.49 4.49 0 0112 21.75c-2.498 0-4.741-1.571-5.603-3.799m0 0A5.989 5.989 0 015.5 12c0-1.156.3-2.25.9-3.201m0 0A4.49 4.49 0 0112 2.25c2.498 0 4.741 1.571 5.603 3.799"
+                   />
+                 </svg>
+                 <span className="hidden sm:inline">Logout</span>
+               </button>
+             </div>
           </div>
         </div>
       </header>

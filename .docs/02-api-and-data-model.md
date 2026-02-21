@@ -6,6 +6,9 @@
 
 ## Phase Scope Notes
 - **Phase 1** includes WebSocket gateway + message retry queue delivery + Telegram + IRC integration, including Telegram/IRC messaging endpoints. Phase 1 UI filters must only show Telegram + IRC despite forward-compatible enums.
+- **P0 Frontend Option 2** (Phase 1.2) is a **focused Phase 1 subset** delivering: auth + account recovery + core workflow (inbox → reply → retry) + real-time updates + assignment-only notifications. This unblocks integration testing without waiting for Phase 2 completion.
+  - **Implemented in P0**: Login, logout, forgot password, reset password, inbox view, conversation view, reply, manual message retry (exactly once), WebSocket updates with REST refresh on reconnect, assignment notifications (assignment-only, not @mentions)
+  - **Deferred from P0**: Tags, notes, assignments, @mention notifications, routing rules, audit logs, search, attachments, bulk actions, user management, status changes
 - **Phase 2** includes collaboration + rules (tags, notes, assignments, routing rules, notifications, bulk actions, audit query/export).
 - **Post-MVP** includes additional platforms (WhatsApp, WeChat, Meta, X).
 - Channel enums remain inclusive of future platforms (WhatsApp, WeChat, Meta, X, email, slack) for forward compatibility.
@@ -1014,13 +1017,47 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 
 ---
 
-#### `POST /api/conversations/:id/messages/:msgId/retry`
-**Response:**
+#### `POST /api/conversations/:conversationId/messages/:messageId/retry` (P0 ✅)
+
+**Purpose**: User-initiated manual retry for failed outbound messages (exactly one attempt per message).
+
+**Authorization**: User can retry only on assigned conversations; Manager+ can retry on any conversation.
+
+**Request:**
 ```json
-{ "data": { /* Message model (updated status) */ } }
+{}
 ```
 
-**Note**: User-initiated retry (one additional attempt)
+**Response (200):**
+```json
+{
+  "data": {
+    "id": "message-uuid",
+    "conversationId": "conv-uuid",
+    "body": "Original message text",
+    "status": "pending",
+    "direction": "outbound",
+    "createdAt": "2026-01-16T10:00:00Z",
+    "updatedAt": "2026-01-16T10:05:00Z"
+  }
+}
+```
+
+**Behavior**:
+- Message status transitions from `failed` → `pending` atomically
+- Backend enqueues message for re-delivery (exponential backoff: 1m, 5m, 30m; max 3 total attempts including initial)
+- Retry inherits original message text, metadata, attachments
+- Button disabled immediately after click on frontend (prevents double-click)
+- Fires WebSocket event `message.sent/failed` when delivery completes
+- Audit logs as `message.retry` action
+
+**Errors**:
+- `404`: Conversation not found, message not found, or message doesn't belong to conversation
+- `400`: Message status is not `failed` (cannot retry non-failed messages)
+- `403`: User not assigned to conversation and role is `user`
+- `401`: Unauthorized (invalid/expired token)
+
+**P0 Locked Behavior**: Exactly one manual retry per message (button disabled after 1 click)
 
 ---
 
@@ -2170,6 +2207,137 @@ Client connects with auth token in handshake:
 
 ---
 
+### P0 Frontend Option 2 - WebSocket Reconnect Behavior (✅)
+
+**Overview**: When WebSocket disconnects, client shows reconnect indicator and performs REST refresh on successful reconnection.
+
+**Client Reconnect Flow**:
+1. **Disconnection**: WS connection drops (network loss, server restart, etc.)
+2. **Visual Indicator**: "Reconnecting..." banner/spinner shown to user
+3. **Auto-Reconnect**: Socket.io attempts reconnection (exponential backoff)
+4. **Success**: On successful reconnect, client immediately:
+   - **REST Refresh**: Fetch latest conversation list + currently open conversation
+   - **Cache Invalidate**: Replace in-memory cache with fresh data
+   - **Backlog**: Receive missed events from last 1 hour (handled by backend)
+5. **Indicator Clear**: Banner disappears after reconnect completes or 3 seconds timeout
+
+**Implementation Details**:
+- Backend maintains event backlog in database (1 hour retention)
+- On reconnect, server delivers stored events + establishes new connection
+- Client does NOT replay queued events from local memory (REST refresh is source of truth)
+- REST refresh endpoints: `GET /api/conversations` + `GET /api/conversations/:id/messages`
+
+**P0 Locked Behavior**:
+- REST refresh on reconnect is mandatory (not optional)
+- Reconnect indicator shows for 3 seconds minimum or until refresh completes
+- No typing indicators in P0 reconnect (deferred)
+
+**Test Coverage**: `p0-frontend-option2.spec.ts` - WORKFLOW-007, WORKFLOW-008
+
+---
+
+### P0 Frontend Option 2 - Notification Endpoints
+
+#### `GET /api/notifications` (P0 ✅)
+
+**Purpose**: Fetch user's notifications (assignment-only in P0).
+
+**Authorization**: Authenticated users only; returns notifications for current user.
+
+**Query Parameters**:
+- `status` (optional): `unread` | `read` | `all` (default: `all`)
+- `limit` (optional): Max results (default: 20)
+- `offset` (optional): Pagination offset (default: 0)
+
+**Response (200)**:
+```json
+{
+  "data": [
+    {
+      "id": "notification-uuid",
+      "userId": "user-uuid",
+      "type": "assignment",
+      "conversationId": "conv-uuid",
+      "actorId": "actor-uuid",
+      "actorName": "John Doe",
+      "conversationPreview": {
+        "id": "conv-uuid",
+        "channel": "telegram",
+        "latestMessage": "Hello from customer",
+        "senderName": "Customer Name"
+      },
+      "isRead": false,
+      "createdAt": "2026-01-16T10:00:00Z",
+      "readAt": null
+    }
+  ],
+  "total": 42,
+  "unreadCount": 5
+}
+```
+
+**Behavior**:
+- P0 returns only `type: "assignment"` notifications
+- @mention notifications deferred to Phase 2
+- Unreadcount includes all unread notifications
+
+---
+
+#### `PUT /api/notifications/:notificationId/mark-read` (P0 ✅)
+
+**Purpose**: Mark individual notification as read.
+
+**Authorization**: Authenticated user; can mark only own notifications.
+
+**Request**: 
+```json
+{}
+```
+
+**Response (200)**:
+```json
+{
+  "data": {
+    "id": "notification-uuid",
+    "isRead": true,
+    "readAt": "2026-01-16T10:05:00Z"
+  }
+}
+```
+
+**Errors**:
+- `404`: Notification not found
+- `403`: User trying to mark other user's notification
+
+---
+
+#### `PUT /api/notifications/mark-all-read` (P0 ✅)
+
+**Purpose**: Mark all unread notifications as read for current user.
+
+**Authorization**: Authenticated user only.
+
+**Request**:
+```json
+{}
+```
+
+**Response (200)**:
+```json
+{
+  "data": {
+    "markedCount": 5
+  }
+}
+```
+
+**Behavior**:
+- Updates all unread notifications to read status
+- Returns count of updated notifications
+- Broadcasts via WebSocket to update badge count in real-time
+
+---
+
 ### WebSocket Configuration
 
 | Setting | Value | Notes |
@@ -2178,6 +2346,7 @@ Client connects with auth token in handshake:
 | **Message Backlog** | 1 hour | Client receives missed events on reconnect |
 | **Reconnect Attempts** | 5 | Max attempts before giving up |
 | **Reconnect Backoff** | Exponential (1s → 60s max) | Start 1s, double each attempt, max 60s |
+| **P0 Reconnect Behavior** | REST refresh on reconnect | Client invalidates cache and fetches latest data from REST |
 
 ---
 

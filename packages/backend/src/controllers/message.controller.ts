@@ -268,6 +268,148 @@ export class MessageController {
    }
 
    /**
+    * POST /conversations/:conversationId/messages/:messageId/retry
+    * User-initiated retry of a failed message
+    * P0: Manual retry exactly once per message
+    * Role: super_admin, admin, manager, user (if assigned)
+    */
+   @Post('/:messageId/retry')
+   @Authorized()
+   @HttpCode(200)
+   async retryMessage(
+     @Param('conversationId') conversationId: string,
+     @Param('messageId') messageId: string,
+     @Req() req: AuthenticatedRequest,
+     @Res() res: Response
+   ): Promise<void> {
+     const correlationId = req.correlationId || 'unknown';
+     const userId = req.user?.id;
+     const userRole = req.user?.role;
+
+     try {
+       // Validate user is authenticated
+       if (!userId) {
+         logger.warn(
+           {
+             conversationId,
+             messageId,
+             correlationId,
+           },
+           'Unauthenticated retry attempt'
+         );
+         res.status(401).json({ error: 'User not authenticated' });
+         return;
+       }
+
+       // Verify conversation exists
+       const conversationExists = await messageService.conversationExists(conversationId);
+       if (!conversationExists) {
+         logger.warn(
+           {
+             conversationId,
+             messageId,
+             userId,
+             correlationId,
+           },
+           'Conversation not found for retry'
+         );
+         res.status(404).json({ error: 'Conversation not found' });
+         return;
+       }
+
+       // Get message
+       const message = await messageService.getMessage(messageId);
+       if (!message) {
+         logger.warn(
+           {
+             conversationId,
+             messageId,
+             userId,
+             correlationId,
+           },
+           'Message not found for retry'
+         );
+         res.status(404).json({ error: 'Message not found' });
+         return;
+       }
+
+       // Verify message belongs to conversation
+       if (message.conversationId !== conversationId) {
+         logger.warn(
+           {
+             conversationId,
+             messageId,
+             actualConversationId: message.conversationId,
+             userId,
+             correlationId,
+           },
+           'Message does not belong to conversation'
+         );
+         res.status(404).json({ error: 'Message not found' });
+         return;
+       }
+
+       // RBAC: Only super_admin/admin/manager can retry any message, or user if assigned
+       const canRetry =
+         ['super_admin', 'admin', 'manager'].includes(userRole || '') ||
+         (userRole === 'user' &&
+           (await messageService.isUserAssignedToConversation(conversationId, userId)));
+
+       if (!canRetry) {
+         logger.warn(
+           {
+             conversationId,
+             messageId,
+             userId,
+             userRole,
+             correlationId,
+           },
+           'User not authorized to retry this message'
+         );
+         res.status(403).json({
+           error: 'You do not have permission to retry this message',
+         });
+         return;
+       }
+
+       // Retry the message via queue service
+       const retriedMessage = await messageService.retryMessage(messageId, userId, correlationId);
+
+       logger.info(
+         {
+           messageId,
+           conversationId,
+           userId,
+           userRole,
+           status: retriedMessage.status,
+           correlationId,
+         },
+         'Message retry initiated'
+       );
+
+       res.status(200).json({ data: retriedMessage });
+     } catch (error) {
+       if (error instanceof BadRequestError) {
+         res.status(400).json({ error: error.message });
+         return;
+       }
+
+       logger.error(
+         {
+           conversationId,
+           messageId,
+           userId,
+           correlationId,
+           error: error instanceof Error ? error.message : 'Unknown error',
+         },
+         'Failed to retry message'
+       );
+
+       res.status(500).json({ error: 'Failed to retry message' });
+     }
+   }
+
+   /**
     * GET /conversations/:conversationId/messages/:messageId/status
     * Get the status of a specific message
     */

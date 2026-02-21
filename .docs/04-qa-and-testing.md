@@ -96,6 +96,67 @@ export const ircConv = { channel: 'irc', externalThreadId: 'irc-456' };
 - Telegram and IRC integration testing are both Phase 1 scope.
 - Phase 1 UI channel filters must show Telegram + IRC only.
 
+### P0 Frontend Option 2 Test Cases (Phase 1.2)
+
+**Playwright E2E Specification**: `packages/frontend/tests/acceptance/phase1/p0-frontend-option2.spec.ts`
+
+**Test Coverage** (25+ scenarios):
+
+#### Auth Tests
+- `AUTH-001`: User can login and access inbox
+- `AUTH-002`: Protected routes redirect unauthenticated users to login
+- `AUTH-003`: User can logout and session is invalidated
+- `AUTH-004`: RBAC - User role controls UI visibility
+
+#### Account Recovery Tests
+- `RECOVERY-001`: User can access forgot password page from login
+- `RECOVERY-002`: Forgot password email sent + reset link works
+- `RECOVERY-003`: Reset password redirects to login (no auto-login)
+- `RECOVERY-004`: Expired/invalid reset token shows generic error
+
+#### Core Workflow Tests
+- `WORKFLOW-001`: Inbox loads with conversations list
+- `WORKFLOW-002`: User can open conversation and view message timeline
+- `WORKFLOW-003`: Manager can reply on all conversations
+- `WORKFLOW-004`: Failed message shows retry button (appears once)
+- `WORKFLOW-005`: Retry button disabled after first click
+- `WORKFLOW-006`: User role cannot reply on unassigned conversations
+- `WORKFLOW-007`: WebSocket reconnect indicator shows
+- `WORKFLOW-008`: REST refresh on reconnect fetches latest data
+
+#### Notification Tests
+- `NOTIFICATION-001`: Bell icon shows unread count badge
+- `NOTIFICATION-002`: Clicking notification navigates to conversation
+- `NOTIFICATION-003`: Mark all as read clears badge
+
+#### Negative Cases
+- `NEGATIVE-001`: Invalid credentials show error (no enumeration)
+- `NEGATIVE-002`: Non-existent email in forgot password returns generic message
+- `NEGATIVE-003`: Unauthorized deep link to conversation shows error
+- `NEGATIVE-004`: Retry disabled message prevents button clicks
+- `NEGATIVE-005`: WS reconnect shows indicator for disconnection
+- `NEGATIVE-006`: Expired token redirects to login
+
+**Execution**:
+```bash
+# Run P0 frontend tests only
+pnpm --filter @yacc/frontend exec playwright test packages/frontend/tests/acceptance/phase1/p0-frontend-option2.spec.ts
+
+# Run with UI
+pnpm --filter @yacc/frontend exec playwright test --ui packages/frontend/tests/acceptance/phase1/p0-frontend-option2.spec.ts
+
+# Run specific test
+pnpm --filter @yacc/frontend exec playwright test -g "AUTH-001"
+```
+
+**Prerequisites**:
+- Backend running on `http://localhost:3000`
+- Frontend running on `http://localhost:5173`
+- Test database seeded with users: test@example.com, manager@example.com
+- IRC/Telegram test fixtures configured
+
+---
+
 ### Phase 1 Runnable Test Checklist
 
 #### Prereqs
