@@ -11,7 +11,7 @@
  * @module @yacc/frontend/components/admin
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   useUsers,
@@ -67,6 +67,16 @@ export function UsersTable({ className = '' }: UsersTableProps): JSX.Element {
   // Search debounce state
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState<string | undefined>();
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup search timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Queries and mutations
   const { data, isLoading, error, refetch } = useUsers(
@@ -84,8 +94,14 @@ export function UsersTable({ className = '' }: UsersTableProps): JSX.Element {
   // Handle search input change with debounce
   const handleSearchChange = useCallback((value: string) => {
     setSearchInput(value);
-    // Debounce search
-    setTimeout(() => {
+    
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Set new timeout for debounced search
+    searchTimeoutRef.current = setTimeout(() => {
       setDebouncedSearch(value || undefined);
       setPage(1); // Reset to first page on search
     }, 300);
