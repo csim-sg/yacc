@@ -80,6 +80,7 @@ export function LoginPage(): JSX.Element {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={isLoading}
+                    data-testid="login-email"
                   />
                 </div>
 
@@ -97,6 +98,7 @@ export function LoginPage(): JSX.Element {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       disabled={isLoading}
+                      data-testid="login-password"
                     />
                     <button
                       type="button"
@@ -126,6 +128,7 @@ export function LoginPage(): JSX.Element {
                   type="submit"
                   className="btn btn-primary w-full"
                   disabled={isLoading}
+                  data-testid="login-submit"
                 >
                   {isLoading ? (
                     <>

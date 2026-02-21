@@ -141,32 +141,55 @@ export function ConversationPage() {
     });
   };
 
-   const renderMessageBubble = (message: ConversationMessage) => {
-     const isInbound = message.direction === 'inbound';
-
-     return (
-       <div
-         key={message.id}
-         className={`flex ${isInbound ? 'justify-start' : 'justify-end'}`}
-       >
-         <div
-           className={`max-w-[80%] rounded-lg px-4 py-3 shadow-sm ${
-             isInbound ? 'bg-base-100 border border-base-200' : 'bg-primary text-primary-content'
-           }`}
-         >
-           <div className="flex items-center gap-2 text-xs opacity-70 mb-1">
-             <span data-testid="message-sender">{message.senderName || (isInbound ? 'Inbound' : 'Agent')}</span>
-             <span>•</span>
-             <span>{formatTimestamp(message.createdAt)}</span>
-             <span className="badge badge-xs badge-outline">
-               {message.status}
-             </span>
-           </div>
-           <p className="text-sm whitespace-pre-wrap" data-testid="message-body">{message.body}</p>
-         </div>
-       </div>
-     );
+   const handleMessageRetry = async (messageId: string) => {
+      try {
+        await conversationsService.retryMessage(messageId);
+        // Message status will be updated via WebSocket event (message.sent/failed)
+      } catch (error) {
+        console.error('Retry failed:', error instanceof Error ? error.message : String(error));
+      }
    };
+
+   const renderMessageBubble = (message: ConversationMessage) => {
+      const isInbound = message.direction === 'inbound';
+      const isFailed = message.status === 'failed';
+
+      return (
+        <div
+          key={message.id}
+          className={`flex ${isInbound ? 'justify-start' : 'justify-end'}`}
+        >
+          <div
+            className={`max-w-[80%] rounded-lg px-4 py-3 shadow-sm ${
+              isInbound ? 'bg-base-100 border border-base-200' : 'bg-primary text-primary-content'
+            }`}
+          >
+            <div className="flex items-center gap-2 text-xs opacity-70 mb-1">
+              <span data-testid="message-sender">{message.senderName || (isInbound ? 'Inbound' : 'Agent')}</span>
+              <span>•</span>
+              <span>{formatTimestamp(message.createdAt)}</span>
+              <span className="badge badge-xs badge-outline">
+                {message.status}
+              </span>
+            </div>
+            <p className="text-sm whitespace-pre-wrap" data-testid="message-body">{message.body}</p>
+            
+            {/* P0: Retry button for failed outbound messages (exactly once per message) */}
+            {!isInbound && isFailed && (
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => handleMessageRetry(message.id)}
+                  className="btn btn-xs btn-outline"
+                  data-testid={`message-retry-${message.id}`}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
 
   return (
     <div className="h-screen flex flex-col bg-base-200">

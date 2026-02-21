@@ -1,7 +1,7 @@
 # Execution Status Index
 
-**Last Updated**: 2026-02-20  
-**Status**: ⏳ Phase 1 in progress (IRC integration)
+**Last Updated**: 2026-02-21  
+**Status**: ⏳ Phase 1 in progress (P0 Frontend Option 2 + IRC integration)
 
 ---
 
@@ -13,9 +13,43 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 ---
 
 ## Current Delivery Status
-- Phase 1: ⏳ In Progress (IRC integration + DLQ contract hardening)
+- Phase 1 Backend: ⏳ In Progress (IRC integration + DLQ contract hardening)
+- Phase 1 Frontend (P0 Option 2): ⏳ In Progress (core workflow + account recovery)
 - Phase 2: ✅ Completed (collaboration + rules merged)
 - QA: ⏳ Not Started
+
+## P0 Frontend Option 2 Status (FE-001-021)
+
+**Branch**: `feature/p0-frontend-option2-core-workflow`  
+**Target Delivery**: Sprint end (1-2 days)
+
+### Implementation Summary
+| Component | Status | Details |
+|-----------|--------|---------|
+| **Auth** | ✅ DONE | Login, session, logout + protected routes + RBAC-safe navigation |
+| **Account Recovery** | ✅ DONE | Forgot password (no enumeration) + Reset password (token expiry, single-use) |
+| **Core Workflow** | ✅ DONE | Inbox → conversation → reply; message delivery status (pending/sent/failed) + manual retry (exactly once per message) |
+| **Real-Time** | ✅ DONE | WS initialized after auth; reconnect indicator; REST refresh on reconnect (no 1-hour replay in P0) |
+| **Notifications** | ✅ DONE | Bell + unread badge + persistence + mark read/dismiss + click-through (assignment only; @mention deferred) |
+| **Tests** | ✅ DONE | Playwright E2E tests for auth, recovery, workflow, real-time, notifications (25+ scenarios) |
+| **Docs** | ⏳ In Progress | Update spec, API docs, QA strategy, task list |
+
+### Key Files Changed
+- `packages/frontend/src/pages/ForgotPasswordPage.tsx` (NEW)
+- `packages/frontend/src/pages/ResetPasswordPage.tsx` (NEW)
+- `packages/frontend/src/App.tsx` (updated: routes + WebSocket init)
+- `packages/frontend/src/pages/ConversationPage.tsx` (updated: message retry)
+- `packages/frontend/src/services/conversations.service.ts` (updated: add retryMessage)
+- `packages/frontend/src/pages/LoginPage.tsx` (updated: test IDs)
+- `packages/frontend/tests/acceptance/phase1/p0-frontend-option2.spec.ts` (NEW: 25+ tests)
+
+### Next Steps (Before Merge)
+1. ✅ Code review (ea-architecture-validator)
+2. ⏳ Update `.docs/02-api-and-data-model.md` (API response shapes for reset, retry endpoints)
+3. ⏳ Update `.docs/01-product-specification.md` (P0 scope confirmation)
+4. ⏳ Update `.docs/04-qa-and-testing.md` (E2E test cases)
+5. ⏳ Update `.docs/05-quick-reference.md` (role matrix + P0 features)
+6. ⏳ Update `.docs/06-tasks.md` (mark FE tasks complete)
 
 ## Current Integration Task Status (Phase 1)
 

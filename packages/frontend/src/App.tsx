@@ -10,7 +10,7 @@
  * - TanStack Query for data fetching (FE-004)
  */
 
-import { useState, type ReactElement } from 'react';
+import { useState, useEffect, type ReactElement } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -19,13 +19,22 @@ import { Header } from './components/Header';
 import { ReconnectingIndicator } from './components/ReconnectingIndicator';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { ConversationPage } from './pages/ConversationPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { InboxPage } from './pages/InboxPage';
 import { IrcProfilesPage } from './pages/IrcProfilesPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/registerPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { RoutingRulesPage } from './pages/RoutingRulesPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { queryClient } from './lib/queryClient';
+import { webSocketService } from './services/websocket.service';
+import { handleMessageReceived } from './services/event-handlers/message.handler';
+import { handleMessageSent } from './services/event-handlers/message.handler';
+import { handleMessageFailed } from './services/event-handlers/message.handler';
+import { handleNotificationReceived } from './services/event-handlers/notification.handler';
+import { handleConversationUpdated } from './services/event-handlers/conversation.handler';
+import { logger } from './lib/logger';
 
 /**
  * Public Route wrapper
@@ -88,6 +97,66 @@ function MainLayout({ children }: { children: ReactElement }): ReactElement {
 }
 
 /**
+ * WebSocket Initializer Component
+ * Initializes WebSocket after authentication and sets up event listeners
+ * P0: Implements reconnect indicator and REST refresh on reconnect
+ */
+function WebSocketInitializer(): null {
+  const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      // Disconnect WebSocket when user logs out
+      webSocketService.disconnect();
+      return;
+    }
+
+    // Initialize WebSocket service once
+    webSocketService.initialize();
+
+    // Register event listeners for P0 events
+    const setupEventListeners = () => {
+      // Message events
+      webSocketService.on('message.received', (event) => {
+        handleMessageReceived(event);
+      });
+
+      webSocketService.on('message.sent', (event) => {
+        handleMessageSent(event);
+      });
+
+      webSocketService.on('message.failed', (event) => {
+        handleMessageFailed(event);
+      });
+
+      // Notification events (P0: assignment only)
+      webSocketService.on('notification.received', (event) => {
+        handleNotificationReceived(event);
+      });
+
+      // Conversation updates
+      webSocketService.on('conversation.updated', (event) => {
+        handleConversationUpdated(event);
+      });
+    };
+
+    setupEventListeners();
+
+    // Connect to WebSocket
+    webSocketService.connect();
+
+    logger.info('[App] WebSocket initialized for authenticated user');
+
+    return () => {
+      // Cleanup on logout (handled by isAuthenticated dependency)
+      webSocketService.disconnect();
+    };
+  }, [isAuthenticated]);
+
+  return null;
+}
+
+/**
  * App Routes Component
  * Separated from App to have access to AuthProvider context
  */
@@ -108,6 +177,7 @@ function AppRoutes(): ReactElement {
 
   return (
     <>
+      <WebSocketInitializer />
       <ReconnectingIndicator />
       <Routes>
       {/* Public routes (no layout) */}
@@ -124,6 +194,22 @@ function AppRoutes(): ReactElement {
         element={
           <PublicRoute>
             <RegisterPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPasswordPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <PublicRoute>
+            <ResetPasswordPage />
           </PublicRoute>
         }
       />

@@ -109,6 +109,10 @@ export interface SendMessageResponse {
   data: ConversationMessage;
 }
 
+export interface RetryMessageResponse {
+  data: ConversationMessage;
+}
+
 export const conversationsService = {
   async list(params: ListConversationsParams = {}): Promise<ListConversationsResponse> {
     const query = new URLSearchParams();
@@ -142,9 +146,17 @@ export const conversationsService = {
      return api.get<ListMessagesResponse>(`/api/conversations/${conversationId}/messages?${query}`);
    },
 
-   async sendMessage(conversationId: string, body: string): Promise<SendMessageResponse> {
-     return api.post<SendMessageResponse>(`/api/conversations/${conversationId}/messages`, {
-       body,
-     });
-   },
+    async sendMessage(conversationId: string, body: string): Promise<SendMessageResponse> {
+      return api.post<SendMessageResponse>(`/api/conversations/${conversationId}/messages`, {
+        body,
+      });
+    },
+
+    /**
+     * Retry a failed message
+     * P0: Manual retry exactly once per message (user-initiated)
+     */
+    async retryMessage(messageId: string): Promise<RetryMessageResponse> {
+      return api.post<RetryMessageResponse>(`/api/messages/${messageId}/retry`, {});
+    },
 };
