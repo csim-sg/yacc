@@ -59,18 +59,52 @@ pnpm --filter @yacc/common lint       # Common package linter
 
 ---
 
+## P0 Frontend Option 2 - Feature Checklist
+
+**Status**: ✅ Complete + E2E tested  
+**Scope**: Auth, account recovery, core workflow, real-time, notifications (assignment-only)  
+
+| Feature | Status | Implementation | Test |
+|---------|--------|-----------------|------|
+| **Login/Logout** | ✅ | BetterAuth + JWT | AUTH-001, AUTH-003 |
+| **Forgot Password** | ✅ | Email token (60m TTL) | RECOVERY-001 |
+| **Reset Password** | ✅ | Redirect to login, invalidate sessions | RECOVERY-002, RECOVERY-003 |
+| **RBAC Reply/Retry** | ✅ | Super Admin/Admin/Manager=all, User=assigned | AUTH-004, WORKFLOW-006 |
+| **Retry Exactly Once** | ✅ | Button disabled after 1 click | WORKFLOW-004, WORKFLOW-005 |
+| **WebSocket Reconnect** | ✅ | Show indicator, REST refresh on reconnect | WORKFLOW-007, WORKFLOW-008 |
+| **Assignment Notifications** | ✅ | Bell icon, unread badge, mark-read | NOTIFICATION-001, NOTIFICATION-002 |
+
+---
+
+## P0 Role Matrix (Locked)
+
+| Capability | Super Admin | Admin | Manager | User |
+|-----------|------------|-------|---------|------|
+| **View all conversations** | ✅ | ✅ | ✅ | ❌ (assigned only) |
+| **View assigned conversations** | ✅ | ✅ | ✅ | ✅ |
+| **Reply on conversation** | ✅ | ✅ | ✅ | ✅ (if assigned) |
+| **Retry failed message** | ✅ | ✅ | ✅ | ✅ (if assigned) |
+| **See all notifications** | ✅ | ✅ | ✅ | ✅ |
+| **Mark notifications read** | ✅ | ✅ | ✅ | ✅ |
+
+---
+
 ## Common Gotchas
 
-| Gotcha | Solution |
-|--------|----------|
-| **Retry loops**: User hits retry multiple times | Disable retry button after 1 attempt, show timeout |
-| **Notification spam**: Same conversation assigned twice | Dedup by (user_id, conversation_id, type) |
-| **Search lag**: Message not searchable immediately | Index in real-time or batch every 5 minutes |
-| **Status confusion**: Conversation auto-reopens | Show reason in UI: "Reopened: new message from customer" |
-| **Bulk failure silent**: 50 of 100 fail without feedback | Always return failure list with reasons |
-| **Group threading wrong**: Messages in separate conversations | Design: one conversation per group (Telegram group ID) |
-| **Role check missing**: User can do admin action | Enforce RBAC on every endpoint via middleware |
-| **Attachment not deleted**: R2 grows unbounded | Manual cleanup or archival policy (post-MVP) |
+| Gotcha | Solution | P0 Status |
+|--------|----------|-----------|
+| **Retry loops**: User hits retry multiple times | Disable retry button after 1 attempt, show timeout | ✅ Implemented |
+| **Reset auto-login**: User expects auto-login after reset | Reset redirects to Login page (no auto-login) | ✅ Locked |
+| **Notification spam**: Same conversation assigned twice | Dedup by (user_id, conversation_id, type) | ✅ P0 (assignment-only) |
+| **WS no reconnect indicator**: User thinks stuck | Show "Reconnecting..." banner, REST refresh on success | ✅ Implemented |
+| **Search lag**: Message not searchable immediately | Index in real-time or batch every 5 minutes | 🚫 Deferred Phase 2 |
+| **Status confusion**: Conversation auto-reopens | Show reason in UI: "Reopened: new message from customer" | 🚫 Deferred Phase 2 |
+| **Bulk failure silent**: 50 of 100 fail without feedback | Always return failure list with reasons | 🚫 Deferred Phase 2 |
+| **Group threading wrong**: Messages in separate conversations | Design: one conversation per group (Telegram group ID) | ✅ Backend |
+| **Role check missing**: User can do admin action | Enforce RBAC on every endpoint via middleware | ✅ Implemented |
+| **Attachment not deleted**: R2 grows unbounded | Manual cleanup or archival policy (post-MVP) | 🚫 Deferred Phase 2 |
+| **@mention notifications**: Only assignment notifications in P0 | Filter to assignment-only, defer @mentions to Phase 2 | ✅ P0 Locked |
+| **Status changes in P0**: Read-only badge only | No status-change controls in P0, show as read-only | ✅ Implemented |
 
 ---
 
