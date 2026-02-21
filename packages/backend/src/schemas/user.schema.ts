@@ -7,6 +7,8 @@ import { userStatusEnum } from '../enums/userStatus.enum';
  * 
  * Note: ID is TEXT (not UUID) because BetterAuth generates text-based user IDs.
  * BetterAuth Drizzle adapter expects this format.
+ * 
+ * Soft delete: deletedAt column used for soft deletes (user not removed from DB)
  */
 export const users = pgTable(
   'users',
@@ -22,11 +24,13 @@ export const users = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
     lastLoginAt: timestamp('last_login_at'),
+    deletedAt: timestamp('deleted_at'),
   },
   (table) => [
     index('users_email_idx').on(table.email),
     index('users_role_idx').on(table.role),
     index('users_status_idx').on(table.status),
+    index('users_deleted_at_idx').on(table.deletedAt),
   ]
 );
 
