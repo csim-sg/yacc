@@ -4,9 +4,10 @@
  * @module @yacc/frontend/services/websocket/__tests__
  */
 
+import type { MetricsSink, MetricsSinkTags } from '../../observability/MetricsSink';
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WebSocketLogger } from '../WebSocketLogger';
-import type { MetricsSink, MetricsSinkTags } from '../../observability/MetricsSink';
 
 /** Mock MetricsSink for testing metric emission */
 class MockMetricsSink implements MetricsSink {

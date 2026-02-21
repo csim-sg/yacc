@@ -10,12 +10,14 @@
  * @module @yacc/frontend/services/websocket
  */
 
-import { WebSocketConnectionManager } from './WebSocketConnectionManager';
-import { WebSocketEventHandler, type EventCallback } from './WebSocketEventHandler';
-import { WebSocketLogger } from './WebSocketLogger';
 import type { MetricsSink } from '../observability/MetricsSink';
-import { defaultMetricsSink } from '../observability/ConsoleMetricsSink';
 import type { SLOMetrics } from '../observability/SLOMonitor';
+import type { EventCallback } from './WebSocketEventHandler';
+
+import { WebSocketConnectionManager } from './WebSocketConnectionManager';
+import { WebSocketEventHandler } from './WebSocketEventHandler';
+import { WebSocketLogger } from './WebSocketLogger';
+import { defaultMetricsSink } from '../observability/ConsoleMetricsSink';
 
 /**
  * WebSocket Client
