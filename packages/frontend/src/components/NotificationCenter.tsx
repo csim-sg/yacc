@@ -6,11 +6,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-   useNotifications,
-   useNotificationsStore,
- } from '../stores/notifications.store';
 import { logger } from '../lib/logger';
+import type { Notification } from '../stores/notifications.store';
+import {
+  useNotifications,
+  useNotificationsStore,
+} from '../stores/notifications.store';
 
 interface NotificationCenterProps {
   /** Optional CSS class */
@@ -20,12 +21,19 @@ interface NotificationCenterProps {
 /**
  * Single notification item in the center
  */
-const NotificationItem: React.FC<{
-   notification: any;
-   onMarkAsRead: (id: string) => void;
-   onDismiss: (id: string) => void;
-   onClickThrough?: () => void;
- }> = ({ notification, onMarkAsRead, onDismiss, onClickThrough }) => {
+interface NotificationItemProps {
+  notification: Notification;
+  onMarkAsRead: (id: string) => void;
+  onDismiss: (id: string) => void;
+  onClickThrough?: () => void;
+}
+
+const NotificationItem: React.FC<NotificationItemProps> = ({
+  notification,
+  onMarkAsRead,
+  onDismiss,
+  onClickThrough,
+}) => {
   const getIcon = () => {
     switch (notification.type) {
       case 'assignment':

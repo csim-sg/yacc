@@ -10,13 +10,16 @@
  * - TanStack Query for data fetching (FE-004)
  */
 
+import { QueryClientProvider } from '@tanstack/react-query';
 import { useState, useEffect, type ReactElement } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { Navigation } from './components/Navigation';
 import { Header } from './components/Header';
+import { Navigation } from './components/Navigation';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { ReconnectingIndicator } from './components/ReconnectingIndicator';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { logger } from './lib/logger';
+import { queryClient } from './lib/queryClient';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { ConversationPage } from './pages/ConversationPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
@@ -26,15 +29,8 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/registerPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { RoutingRulesPage } from './pages/RoutingRulesPage';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { queryClient } from './lib/queryClient';
+import { registerSocketListeners, unregisterSocketListeners } from './services/socketListeners';
 import { webSocketService } from './services/websocket.service';
-import { handleMessageReceived } from './services/event-handlers/message.handler';
-import { handleMessageSent } from './services/event-handlers/message.handler';
-import { handleMessageFailed } from './services/event-handlers/message.handler';
-import { handleNotificationReceived } from './services/event-handlers/notification.handler';
-import { handleConversationUpdated } from './services/event-handlers/conversation.handler';
-import { logger } from './lib/logger';
 
 /**
  * Public Route wrapper
@@ -102,58 +98,46 @@ function MainLayout({ children }: { children: ReactElement }): ReactElement {
  * P0: Implements reconnect indicator and REST refresh on reconnect
  */
 function WebSocketInitializer(): null {
-   const { isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
 
-   useEffect(() => {
-     if (!isAuthenticated) {
-       // Disconnect WebSocket when user logs out
-       webSocketService.disconnect();
-       return;
-     }
+  useEffect(() => {
+    if (!isAuthenticated) {
+      // Disconnect WebSocket when user logs out
+      unregisterSocketListeners();
+      webSocketService.disconnect();
+      return;
+    }
 
-     // Initialize WebSocket service once
-     webSocketService.initialize();
+    // Initialize WebSocket service once
+    webSocketService.initialize();
 
-     // Connect to WebSocket
-     webSocketService.connect();
+    // Connect to WebSocket
+    webSocketService.connect();
 
-     // Create stable handler refs to prevent double-registration
-     const onMessageReceived = (event: any) => handleMessageReceived(event);
-     const onMessageSent = (event: any) => handleMessageSent(event);
-     const onMessageFailed = (event: any) => handleMessageFailed(event);
-     const onNotificationReceived = (event: any) => handleNotificationReceived(event);
-     const onConversationUpdated = (event: any) => handleConversationUpdated(event);
-     const onReconnect = () => {
-       // P0: REST refresh on reconnect - invalidate conversation caches
-       logger.info('[App] WebSocket reconnected, refreshing conversation data');
-       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-       queryClient.invalidateQueries({ queryKey: ['conversation'] });
-       queryClient.invalidateQueries({ queryKey: ['conversationMessages'] });
-     };
+    // Register all centralized event listeners
+    registerSocketListeners();
 
-     // Register event listeners for P0 events
-     webSocketService.on('message.received', onMessageReceived);
-     webSocketService.on('message.sent', onMessageSent);
-     webSocketService.on('message.failed', onMessageFailed);
-     webSocketService.on('notification.received', onNotificationReceived);
-     webSocketService.on('conversation.updated', onConversationUpdated);
-     webSocketService.on('connect', onReconnect);
+    // P0: Setup reconnect handler for REST refresh
+    const onReconnect = () => {
+      logger.info('[App] WebSocket reconnected, refreshing conversation data');
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversation'] });
+      queryClient.invalidateQueries({ queryKey: ['conversationMessages'] });
+    };
 
-     logger.info('[App] WebSocket initialized for authenticated user');
+    webSocketService.on('connect', onReconnect);
 
-     return () => {
-       // Unregister listeners on cleanup (logout or unmount in strict mode)
-       webSocketService.off('message.received', onMessageReceived);
-       webSocketService.off('message.sent', onMessageSent);
-       webSocketService.off('message.failed', onMessageFailed);
-       webSocketService.off('notification.received', onNotificationReceived);
-       webSocketService.off('conversation.updated', onConversationUpdated);
-       webSocketService.off('connect', onReconnect);
-       webSocketService.disconnect();
-     };
-   }, [isAuthenticated]);
+    logger.info('[App] WebSocket initialized for authenticated user');
 
-   return null;
+    return () => {
+      // Unregister listeners on cleanup (logout or unmount in strict mode)
+      webSocketService.off('connect', onReconnect);
+      unregisterSocketListeners();
+      webSocketService.disconnect();
+    };
+  }, [isAuthenticated]);
+
+  return null;
 }
 
 /**

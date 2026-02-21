@@ -9,9 +9,10 @@
  * - Accessibility features
  */
 
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { useState, type ReactElement } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { logger } from '../lib/logger';
 import { NotificationCenter } from './NotificationCenter';
 
 interface HeaderProps {
@@ -46,7 +47,9 @@ export function Header({ onMenuClick }: HeaderProps): ReactElement {
       // Redirect handled by AuthContext, but navigate just in case
       navigate('/login');
     } catch (error: unknown) {
-      console.error('Logout failed:', error instanceof Error ? error.message : String(error));
+      logger.error('[Header] Logout failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       setIsLoggingOut(false);
     }
   };
