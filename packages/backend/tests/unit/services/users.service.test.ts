@@ -432,6 +432,27 @@ describe('UsersService', () => {
         usersService.updateUser(userToUpdate.id, { email: 'invalid-email' }, superAdminUser)
       ).rejects.toThrow('Invalid email format');
     });
+
+    it('should throw error for updating soft-deleted user', async () => {
+      // Create and soft-delete a user
+      const deletedUser = await createTestUserInDB({
+        id: `test-deleted-update-${Date.now()}`,
+        email: `deleted-update-${Date.now()}@test.com`,
+        name: 'Deleted Update User',
+        role: 'user',
+      });
+
+      // Soft delete the user
+      await dbClient
+        .update(users)
+        .set({ deletedAt: new Date() })
+        .where(eq(users.id, deletedUser.id));
+
+      // Try to update the deleted user
+      await expect(
+        usersService.updateUser(deletedUser.id, { name: 'Updated Name' }, superAdminUser)
+      ).rejects.toThrow('Cannot update a deleted user');
+    });
   });
 
   describe('deleteUser', () => {

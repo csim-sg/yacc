@@ -102,10 +102,6 @@ const ROLE_DEFINITIONS = [
   },
 ];
 
-interface RequestWithCorrelationId {
-  correlationId?: string;
-}
-
 /**
  * Users Controller
  * Provides CRUD operations for user management

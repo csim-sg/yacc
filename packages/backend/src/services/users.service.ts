@@ -79,7 +79,9 @@ export class UsersService {
       }
 
       if (search) {
-        conditions.push(ilike(users.email, `%${search}%`));
+        // Escape special LIKE pattern characters to prevent DoS via complex patterns
+        const escapedSearch = search.replace(/[%_\\]/g, '\\$&');
+        conditions.push(ilike(users.email, `%${escapedSearch}%`));
       }
 
       const whereClause = and(...conditions);
@@ -325,6 +327,11 @@ export class UsersService {
       }
 
       const user = existingUser[0];
+
+      // Check if user is soft-deleted
+      if (user.deletedAt) {
+        throw new BadRequestError('Cannot update a deleted user');
+      }
 
       // Check email uniqueness if changing
       if (body.email && body.email.toLowerCase() !== user.email.toLowerCase()) {
