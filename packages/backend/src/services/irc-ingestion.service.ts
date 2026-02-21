@@ -61,9 +61,17 @@ export class IRCIngestionService {
     // Collapse consecutive whitespace characters (including newlines) to single space
     sanitized = sanitized.replace(/\s+/g, ' ');
 
-    // Remove control characters (null to backspace, vertical tab, form feed, shift out to unit separator, delete)
-    // eslint-disable-next-line no-control-regex
-    sanitized = sanitized.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+    // Remove control characters (ASCII < 0x20) and DEL (0x7F)
+    // Note: whitespace has already been normalized to spaces above.
+    let filtered = '';
+    for (const ch of sanitized) {
+      const code = ch.charCodeAt(0);
+      if (code >= 0x20 && code !== 0x7f) {
+        filtered += ch;
+      }
+    }
+
+    sanitized = filtered;
 
     return sanitized;
   }

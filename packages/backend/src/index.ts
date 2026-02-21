@@ -55,10 +55,14 @@ const io = webSocketServer.getServer();
 // ===== DATABASE AND STARTUP =====
 export async function start(): Promise<void> {
   try {
-    console.log('✓ Configuration validated successfully');
-    console.log(`  - Environment: ${appConfig.APP_ENV}`);
-    console.log(`  - Port: ${appConfig.APP_PORT}`);
-    console.log(`  - Log Level: ${appConfig.LOG_LEVEL}`);
+    logger.info(
+      {
+        env: appConfig.APP_ENV,
+        port: appConfig.APP_PORT,
+        logLevel: appConfig.LOG_LEVEL,
+      },
+      'Configuration validated'
+    );
 
     // Check database connection
     const dbConnected = await checkDatabaseConnection();
@@ -137,14 +141,20 @@ export async function start(): Promise<void> {
 
     // Start server
     server.listen(appConfig.APP_PORT, () => {
-      console.log(`🚀 Server running on port ${appConfig.APP_PORT}`);
-      console.log(`📍 API: http://localhost:${appConfig.APP_PORT}/api`);
-      console.log(`🔗 WebSocket: ws://localhost:${appConfig.APP_PORT}`);
-      logger.info(`Server started on port ${appConfig.APP_PORT}`);
+      logger.info(
+        {
+          port: appConfig.APP_PORT,
+          apiBaseUrl: `http://localhost:${appConfig.APP_PORT}/api`,
+          wsUrl: `ws://localhost:${appConfig.APP_PORT}`,
+        },
+        'Server started'
+      );
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    logger.error({ error }, 'Failed to start server');
+    logger.error(
+      { error: error instanceof Error ? error.message : String(error) },
+      'Failed to start server'
+    );
     process.exit(1);
   }
 }

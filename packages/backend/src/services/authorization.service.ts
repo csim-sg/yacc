@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
 import { conversations } from '../schemas/conversation.schema';
 import type { AuthUser } from '../types/auth.types';
 
@@ -55,9 +56,9 @@ export class AuthorizationService {
 
         return conversation.assignedUserId === user.id;
       } catch (error) {
-        console.error(
-          '❌ Authorization check failed for conversation access:',
-          error
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error), conversationId, userId: user.id },
+          'Authorization check failed for conversation access'
         );
         return false; // Deny on error (fail-closed security)
       }

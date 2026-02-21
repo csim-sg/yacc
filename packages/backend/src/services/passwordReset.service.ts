@@ -7,6 +7,7 @@ import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { eq, isNull, and, lt } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
 import { passwordResetTokens } from '../schemas/passwordReset.schema';
 import { users } from '../schemas/user.schema';
 import { auditService } from './audit.service';
@@ -128,10 +129,14 @@ export async function resetPassword(
   // Validate password requirements
   const validation = validatePassword(newPassword);
   if (!validation.valid) {
-    console.error(`Password validation failed for user ${userId}`, {
-      correlationId,
-      error: validation.error,
-    });
+    logger.warn(
+      {
+        correlationId,
+        userId,
+        error: validation.error,
+      },
+      'Password validation failed'
+    );
     throw new Error(validation.error);
   }
 

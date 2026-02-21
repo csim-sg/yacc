@@ -1,5 +1,6 @@
 import { desc, eq, and } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
 import { auditLogs } from '../schemas/auditLog.schema';
 
 /**
@@ -36,10 +37,7 @@ export class AuditService {
       // Validate entityType
       const validEntityTypes = ['conversation', 'rule', 'user', 'message', 'notification', 'tag', 'integration'];
       if (!validEntityTypes.includes(entityType)) {
-        console.error(
-          '❌ Audit log error: invalid entityType:',
-          entityType,
-        );
+        logger.error({ entityType }, 'Audit log error: invalid entityType');
         return { success: false, error: `Invalid entityType: ${entityType}` };
       }
 
@@ -55,11 +53,20 @@ export class AuditService {
 
        return { success: true };
      } catch (error: unknown) {
-       console.error('❌ Failed to log audit action:', error);
        const message = error instanceof Error ? error.message : 'Unknown error';
-       // Don't throw - audit failures shouldn't break application
-       return { success: false, error: message };
-     }
+       logger.error(
+         {
+           error: message,
+           action,
+           entityType,
+           entityId,
+           actorId,
+         },
+         'Failed to log audit action'
+       );
+        // Don't throw - audit failures shouldn't break application
+        return { success: false, error: message };
+      }
    }
 
   /**
@@ -103,8 +110,11 @@ export class AuditService {
         },
       };
     } catch (error: unknown) {
-      console.error('❌ Failed to query audit logs:', error);
       const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(
+        { error: message, conversationId },
+        'Failed to query audit logs'
+      );
       throw new Error(message);
     }
   }

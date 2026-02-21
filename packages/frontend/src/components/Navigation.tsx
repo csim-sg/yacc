@@ -16,7 +16,6 @@
 import { useMemo, type ReactElement } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { IRCProfileSidebar } from './IRCProfileSidebar';
 import {
   getAccessibleNavItems,
   type NavigationItem,
@@ -154,11 +153,6 @@ export function Navigation({
                   isActive={pathname === item.href}
                 />
               ))}
-              
-              {/* IRC Profiles Sidebar (INT-014) */}
-              <div className="mt-8 pt-6 border-t border-base-300">
-                <IRCProfileSidebar />
-              </div>
             </>
           ) : (
             <div className="text-center text-base-content/50 text-sm py-8">
@@ -171,9 +165,7 @@ export function Navigation({
         <div className="pt-6 border-t border-base-300">
           <button
             onClick={() => {
-              logout().catch((err) => {
-                console.error('Logout failed:', err);
-              });
+              void logout();
             }}
             className="btn btn-outline btn-block gap-2"
             aria-label="Sign out from application"

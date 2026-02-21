@@ -15,28 +15,28 @@ vi.mock('../../infrastructure/logger', () => ({
   },
 }));
 
+type EmitCapable = { emit: (name: string, ...args: unknown[]) => boolean };
+
 // Mock IRC framework with proper event emitter
-// Using unknown type here to avoid any, but @ts-ignore on usages is necessary due to vitest mock hoisting
-let lastCreatedClient: unknown = null;
+let lastCreatedClient: EmitCapable | null = null;
 
 // Helper function to safely emit events on mock client (typed approach to avoid any casts)
 function emitClientEvent(eventName: string, ...args: unknown[]): void {
-  if (lastCreatedClient && typeof lastCreatedClient === 'object' && 'emit' in lastCreatedClient) {
-    const client = lastCreatedClient as { emit: (name: string, ...a: unknown[]) => boolean };
-    client.emit(eventName, ...args);
+  if (lastCreatedClient) {
+    lastCreatedClient.emit(eventName, ...args);
   }
 }
 
 vi.mock('irc-framework', () => {
-
   class MockIRCClient extends EventEmitter {
+    public static lastInstance: MockIRCClient | null = null;
     public options: Record<string, unknown> | null = null;
 
     constructor() {
       super();
       // Store reference for test access
-      // eslint-disable-next-line @typescript-eslint/no-this-alias
-      lastCreatedClient = this;
+      MockIRCClient.lastInstance = this;
+      lastCreatedClient = MockIRCClient.lastInstance;
     }
 
     connect(options: Record<string, unknown>): void {
@@ -69,7 +69,7 @@ vi.mock('irc-framework', () => {
 
   return {
     Client: MockIRCClient,
-    __getLastClient: () => lastCreatedClient,
+    __getLastClient: () => MockIRCClient.lastInstance,
   };
 });
 
