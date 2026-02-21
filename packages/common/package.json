@@ -11,7 +11,9 @@
     "./requests": "./dist/requests/index.js",
     "./requests/*": "./dist/requests/*.js",
     "./responses": "./dist/responses/index.js",
-    "./responses/*": "./dist/responses/*.js"
+    "./responses/*": "./dist/responses/*.js",
+    "./websocket/constants/*": "./dist/websocket/constants/*.js",
+    "./websocket/types/*": "./dist/websocket/types/*.js"
   },
   "scripts": {
     "build": "tsc",
