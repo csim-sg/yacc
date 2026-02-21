@@ -1,0 +1,172 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      // Or ["bun", "x", "my-mcp-command"]
+      "command": ["npx", "@playwright/mcp@latest"],
+      "enabled": true,
+      "environment": {
+        "MY_ENV_VAR": "my_env_var_value",
+      },
+      
+    },
+    "daisyUI": {
+     "type": "remote",
+     "url": "https://gitmcp.io/saadeghi/daisyui"
+    }
+  },
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen3-coder:30b": {
+          "name": "Qwen 3 Coder"
+        },
+        "gpt-oss:20b": {
+          "name": "GPT OSS 20B"
+        }
+      }
+    }
+  },
+  "agent": {
+    "fullstack-developer": {
+      "description": "Fullstack developer specialist for YACC project. Implements features across backend (Node.js/Express) and frontend (React/TanStack Start) following project standards. Performs impact analysis before starting, delegates to QA after completion, follows detailed PR workflow. Use proactively for feature implementation, bug fixes, and refactoring tasks.",
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/fullstack-developer.md}",
+      "model": "zai-org/GLM-4.7",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "read": true,
+        "grep": true,
+        "task": true,
+        "webfetch": true,
+        "todowrite": true,
+        "todoread": true,
+        "skill": true
+      },
+      "permission": {
+        "bash": {
+          "gh project *":"allow",
+          "gh *":"allow",
+          "gh issue *":"deny",
+          "gh project close *": "deny"
+        },
+        "github_*": {
+          "*": "allow",
+        }
+      }
+    },
+    "product-owner": {
+      "description": "Product owner of this project, maintain biz requirement and biz documents. Analyze requirement with users & architect on any new request. Help answer any biz related issues from developers and architect.",
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/product-owner.md}",
+      // "model": "openai/gpt-5.2",
+      "model": "anthropic/claude-haiku-4-5-20251001",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "read": true,
+        "grep": true,
+        "task": true,
+        "webfetch": true,
+        "todowrite": true,
+        "todoread": true,
+        "skill": true
+      },
+      "permission": {
+        "edit": {
+          ".docs/*.md": "allow",
+        },
+        "grep": {
+          ".docs/*.md": "allow",
+        },
+        "write": {
+          ".docs/*.md": "allow",
+        },
+        "read": {
+          ".docs/*.md": "allow",
+          
+        },
+        "bash": {
+          "rm .docs/*": "allow",
+          "gh *":"allow",
+          "gh issue *":"deny",
+          "gh project close *": "deny",
+          "rm -Rf /*": "deny",
+          "rm -Rf /": "deny",
+          "*": "allow"
+        },
+        "github_*": {
+          "*": "allow",
+        }
+      }
+    },
+    "ea-architecture-validator": {      
+      "description": "Enterprise Architecture solution validator and Product Owner. Validates architectural decisions against ADRs, project constraints, EA principles, and governance standards. Ensures 95%+ requirement coverage before development. Use proactively when making architectural changes, introducing new patterns, before major refactoring, during PR reviews, or when capturing user requirements and ensuring documentation completeness.",
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/architect.md}",
+      "model": "anthropic/claude-haiku-4-5-20251001",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "read": true,
+        "grep": true,
+        "task": true,
+        "webfetch": true,
+        "todowrite": true,
+        "todoread": true,
+        "skill": true
+      },
+      "permission": {
+        "edit": {
+          ".docs/*.md": "allow",
+        },
+        "grep": {
+          ".docs/*.md": "allow",
+        },
+        "write": {
+          ".docs/*.md": "allow",
+        },
+        "read": {
+          ".docs/*.md": "allow",
+        },
+        "bash": {          
+          "gh issue *":"deny",
+          "gh project close *": "deny",
+          "rm -Rf /*": "deny",
+          "rm -Rf /": "deny",
+          "*": "allow"
+        },
+        "github_*": {
+          "*": "allow",
+        }
+      }
+    },
+    "code-reviewer": {
+      "description": "Expert code review specialist. Proactively reviews code for quality, security, maintainability, and strict adherence to YACC project constraints. Use immediately after writing or modifying code, before creating PRs.",
+      "mode": "all",
+      "prompt": "{file:./.opencode/prompts/code-reviewer.md}",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "read": true,
+        "grep": true,
+        "task": true,
+        "webfetch": true,
+        "todowrite": true,
+        "todoread": true,
+        "skill": true
+      }
+    }
+  }
+}
