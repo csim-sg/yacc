@@ -1,8 +1,9 @@
 # 06. Issues & User stories
 
 **Last Updated**: February 21, 2026  
-**Status**: ⏳ Phase 1 in progress (IRC admin endpoints); ✅ Phase 2 COMPLETE; ✅ MVP stage  
-**Current focus**: Post-MVP backlog / hardening (GitHub Project is source of truth)  
+**Status**: ✅ Phase 1 P0 Core Complete (auth + inbox + messaging + IRC + WebSocket); ⏳ Phase 2 pending (collaboration + rules)  
+**Current focus**: Phase 1.4+ refinements (attachments, audit logs, admin panels) + Phase 2 execution (tags/notes/rules)  
+**Latest**: PR #293 (P0 Frontend Option 2) merged to dev — forgot/reset password, message status + retry, auth guards, RBAC UI, notifications integration  
 **Governance**: ADR-003, ADR-014, ADR-015, GOV-026
 
 ---
