@@ -15,6 +15,7 @@
  * - AuditController: Audit logging endpoints
  * - HealthController: Health check endpoints
  * - QueueController: Message queue status endpoints
+ * - UsersController: User management endpoints (CRUD)
  */
 
 import { AssignmentsController } from './assignments.controller.js';
@@ -32,6 +33,7 @@ import { NotificationsController } from './notifications.controller.js';
 import { QueueController } from './queue.controller.js';
 import { RoutingRulesController } from './routing-rules.controller.js';
 import { TagsController } from './tags.controller.js';
+import { UsersController } from './users.controller.js';
 
 export const controllers = [
   AssignmentsController,
@@ -49,4 +51,5 @@ export const controllers = [
   QueueController,
   RoutingRulesController,
   TagsController,
+  UsersController,
 ];
