@@ -54,7 +54,7 @@ export class AuthController {
 
       // IMPORTANT: Always return success to prevent email enumeration
       if (!user) {
-        logger.debug('Forgot password attempt with non-existent email - correlationId: %s, email: %s', correlationId, email);
+        logger.debug('Forgot password attempt with non-existent email - correlationId: %s', correlationId);
         return {
           message: 'If an email exists, a password reset link has been sent',
         };
