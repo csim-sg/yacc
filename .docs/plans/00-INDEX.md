@@ -22,17 +22,26 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 
 **Branch**: `feature/p0-frontend-option2-core-workflow`  
 **Target Delivery**: Sprint end (1-2 days)
+**Code Review Status**: ⏳ Fixing blockers from ea-architecture-validator (6 blockers)
 
 ### Implementation Summary
 | Component | Status | Details |
 |-----------|--------|---------|
 | **Auth** | ✅ DONE | Login, session, logout + protected routes + RBAC-safe navigation |
 | **Account Recovery** | ✅ DONE | Forgot password (no enumeration) + Reset password (token expiry, single-use) |
-| **Core Workflow** | ✅ DONE | Inbox → conversation → reply; message delivery status (pending/sent/failed) + manual retry (exactly once per message) |
-| **Real-Time** | ✅ DONE | WS initialized after auth; reconnect indicator; REST refresh on reconnect (no 1-hour replay in P0) |
-| **Notifications** | ✅ DONE | Bell + unread badge + persistence + mark read/dismiss + click-through (assignment only; @mention deferred) |
+| **Core Workflow** | ⏳ In Progress (Blocker Fixes) | Inbox → conversation → reply; message delivery status + manual retry (exactly once, RBAC-gated) |
+| **Real-Time** | ⏳ In Progress (Blocker Fixes) | WS listeners properly managed (no double-registration); REST refresh on reconnect |
+| **Notifications** | ⏳ In Progress (Blocker Fixes) | Bell mounted in Header; assignment-only filtering; click-through + mark-read navigation |
 | **Tests** | ✅ DONE | Playwright E2E tests for auth, recovery, workflow, real-time, notifications (25+ scenarios) |
 | **Docs** | ⏳ In Progress | Update spec, API docs, QA strategy, task list |
+
+### Blocker Fixes In Progress
+1. ✅ **Manual retry endpoint**: Implemented `POST /api/conversations/:id/messages/:msgId/retry` in backend
+2. ✅ **Exactly-once UI behavior**: Track attempted retries per message, disable button after first click
+3. ✅ **WebSocket double-registration**: Properly unregister listeners in cleanup, handle React strict mode
+4. ✅ **Reconnect REST refresh**: Invalidate conversation caches on reconnect transition
+5. ✅ **RBAC gating**: Hide/disable reply + retry for USER if not assigned; clear permission message
+6. ✅ **Notifications integration**: Mount NotificationCenter in Header, filter to assignment-only, implement click-through navigation
 
 ### Key Files Changed
 - `packages/frontend/src/pages/ForgotPasswordPage.tsx` (NEW)

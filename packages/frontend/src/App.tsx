@@ -102,58 +102,58 @@ function MainLayout({ children }: { children: ReactElement }): ReactElement {
  * P0: Implements reconnect indicator and REST refresh on reconnect
  */
 function WebSocketInitializer(): null {
-  const { isAuthenticated } = useAuth();
+   const { isAuthenticated } = useAuth();
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      // Disconnect WebSocket when user logs out
-      webSocketService.disconnect();
-      return;
-    }
+   useEffect(() => {
+     if (!isAuthenticated) {
+       // Disconnect WebSocket when user logs out
+       webSocketService.disconnect();
+       return;
+     }
 
-    // Initialize WebSocket service once
-    webSocketService.initialize();
+     // Initialize WebSocket service once
+     webSocketService.initialize();
 
-    // Register event listeners for P0 events
-    const setupEventListeners = () => {
-      // Message events
-      webSocketService.on('message.received', (event) => {
-        handleMessageReceived(event);
-      });
+     // Connect to WebSocket
+     webSocketService.connect();
 
-      webSocketService.on('message.sent', (event) => {
-        handleMessageSent(event);
-      });
+     // Create stable handler refs to prevent double-registration
+     const onMessageReceived = (event: any) => handleMessageReceived(event);
+     const onMessageSent = (event: any) => handleMessageSent(event);
+     const onMessageFailed = (event: any) => handleMessageFailed(event);
+     const onNotificationReceived = (event: any) => handleNotificationReceived(event);
+     const onConversationUpdated = (event: any) => handleConversationUpdated(event);
+     const onReconnect = () => {
+       // P0: REST refresh on reconnect - invalidate conversation caches
+       logger.info('[App] WebSocket reconnected, refreshing conversation data');
+       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+       queryClient.invalidateQueries({ queryKey: ['conversation'] });
+       queryClient.invalidateQueries({ queryKey: ['conversationMessages'] });
+     };
 
-      webSocketService.on('message.failed', (event) => {
-        handleMessageFailed(event);
-      });
+     // Register event listeners for P0 events
+     webSocketService.on('message.received', onMessageReceived);
+     webSocketService.on('message.sent', onMessageSent);
+     webSocketService.on('message.failed', onMessageFailed);
+     webSocketService.on('notification.received', onNotificationReceived);
+     webSocketService.on('conversation.updated', onConversationUpdated);
+     webSocketService.on('connect', onReconnect);
 
-      // Notification events (P0: assignment only)
-      webSocketService.on('notification.received', (event) => {
-        handleNotificationReceived(event);
-      });
+     logger.info('[App] WebSocket initialized for authenticated user');
 
-      // Conversation updates
-      webSocketService.on('conversation.updated', (event) => {
-        handleConversationUpdated(event);
-      });
-    };
+     return () => {
+       // Unregister listeners on cleanup (logout or unmount in strict mode)
+       webSocketService.off('message.received', onMessageReceived);
+       webSocketService.off('message.sent', onMessageSent);
+       webSocketService.off('message.failed', onMessageFailed);
+       webSocketService.off('notification.received', onNotificationReceived);
+       webSocketService.off('conversation.updated', onConversationUpdated);
+       webSocketService.off('connect', onReconnect);
+       webSocketService.disconnect();
+     };
+   }, [isAuthenticated]);
 
-    setupEventListeners();
-
-    // Connect to WebSocket
-    webSocketService.connect();
-
-    logger.info('[App] WebSocket initialized for authenticated user');
-
-    return () => {
-      // Cleanup on logout (handled by isAuthenticated dependency)
-      webSocketService.disconnect();
-    };
-  }, [isAuthenticated]);
-
-  return null;
+   return null;
 }
 
 /**

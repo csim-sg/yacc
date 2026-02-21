@@ -152,11 +152,11 @@ export const conversationsService = {
       });
     },
 
-    /**
-     * Retry a failed message
-     * P0: Manual retry exactly once per message (user-initiated)
-     */
-    async retryMessage(messageId: string): Promise<RetryMessageResponse> {
-      return api.post<RetryMessageResponse>(`/api/messages/${messageId}/retry`, {});
-    },
+     /**
+      * Retry a failed message
+      * P0: Manual retry exactly once per message (user-initiated)
+      */
+     async retryMessage(conversationId: string, messageId: string): Promise<RetryMessageResponse> {
+       return api.post<RetryMessageResponse>(`/api/conversations/${conversationId}/messages/${messageId}/retry`, {});
+     },
 };
