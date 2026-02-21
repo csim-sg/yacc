@@ -108,6 +108,30 @@ pnpm --filter @yacc/common lint       # Common package linter
 
 ---
 
+## WebSocket SLO Targets (GOV-030)
+
+| Metric | Target | Alert |
+|--------|--------|-------|
+| Connection Success Rate | ≥99.5% | <99% |
+| Event Latency P95 | <100ms | >150ms |
+| Reconnection Success | ≥95% | <90% |
+| Backlog Replay | <5s per 100 events | >5s |
+
+### 8 Metrics Emitted
+
+| Metric | Type | Purpose |
+|--------|------|---------|
+| `ws.connection.attempt` | Counter | Track connection attempts |
+| `ws.connection.success` | Counter | Calculate success rate SLO |
+| `ws.connection.failure` | Counter | Diagnose failure modes |
+| `ws.reconnection.attempt` | Counter | Track reconnection efficiency |
+| `ws.event.received` | Counter | Track event volume |
+| `ws.event.processed` | Histogram | Calculate latency P95 |
+| `ws.event.error` | Counter | Surface handler bugs |
+| `ws.backlog.replay` | Counter | Track reconnection efficiency |
+
+---
+
 ## Checklist for Dev Kickoff
 
 - [ ] Read 01-product-specification.md (features + user stories)

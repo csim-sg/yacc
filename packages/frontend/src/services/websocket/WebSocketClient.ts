@@ -5,6 +5,7 @@
  * - ConnectionManager for lifecycle
  * - EventHandler for pub/sub
  * - Logger for observability
+ * - MetricsSink for SLO tracking
  *
  * @module @yacc/frontend/services/websocket
  */
@@ -12,6 +13,9 @@
 import { WebSocketConnectionManager } from './WebSocketConnectionManager';
 import { WebSocketEventHandler, type EventCallback } from './WebSocketEventHandler';
 import { WebSocketLogger } from './WebSocketLogger';
+import type { MetricsSink } from '../observability/MetricsSink';
+import { defaultMetricsSink } from '../observability/ConsoleMetricsSink';
+import type { SLOMetrics } from '../observability/SLOMonitor';
 
 /**
  * WebSocket Client
@@ -30,9 +34,15 @@ export class WebSocketClient {
    * @param serverUrl - WebSocket server URL
    * @param authToken - Authentication token
    * @param userId - Optional user ID for logging
+   * @param metricsSink - Optional metrics sink for observability (defaults to ConsoleMetricsSink)
    */
-  constructor(serverUrl: string, authToken: string, userId?: string) {
-    this.logger = new WebSocketLogger(userId);
+  constructor(
+    serverUrl: string,
+    authToken: string,
+    userId?: string,
+    metricsSink: MetricsSink = defaultMetricsSink
+  ) {
+    this.logger = new WebSocketLogger(userId, undefined, metricsSink);
 
     this.connectionManager = new WebSocketConnectionManager(
       serverUrl,
@@ -148,6 +158,19 @@ export class WebSocketClient {
   }
 
   // ========================================================================
+  // SLO Metrics API
+  // ========================================================================
+
+  /**
+   * Get current SLO metrics
+   *
+   * @returns Current SLO metrics snapshot
+   */
+  getSLOMetrics(): SLOMetrics {
+    return this.logger.getSLOMetrics();
+  }
+
+  // ========================================================================
   // Private Methods
   // ========================================================================
 
@@ -235,6 +258,14 @@ export class WebSocketClient {
   getLogger(): WebSocketLogger {
     return this.logger;
   }
+
+  /**
+   * Destroy the client and clean up resources
+   */
+  destroy(): void {
+    this.disconnect();
+    this.logger.destroy();
+  }
 }
 
 /**
@@ -243,10 +274,12 @@ export class WebSocketClient {
  * @param serverUrl - WebSocket server URL
  * @param authToken - Authentication token
  * @param userId - Optional user ID
+ * @param metricsSink - Optional metrics sink
  * @returns WebSocketClient instance
  */
 export const createWebSocketClient = (
   serverUrl: string,
   authToken: string,
-  userId?: string
-): WebSocketClient => new WebSocketClient(serverUrl, authToken, userId);
+  userId?: string,
+  metricsSink?: MetricsSink
+): WebSocketClient => new WebSocketClient(serverUrl, authToken, userId, metricsSink);
