@@ -5,10 +5,11 @@
 
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
+import { logger } from '../infrastructure/logger';
 import { dbClient } from '../infrastructure/db.client';
 import { passwordResetTokens } from '../schemas/passwordReset.schema';
 import { users } from '../schemas/user.schema';
-import { eq, isNull, and, lt } from 'drizzle-orm';
+import { eq, isNull, and } from 'drizzle-orm';
 import { validatePassword } from './passwordValidation.service';
 import { auditService } from './audit.service';
 
@@ -21,14 +22,13 @@ export async function generateResetToken(
   userId: string,
   correlationId: string,
 ): Promise<string> {
-  // Delete any existing valid tokens for this user
+  // Delete any existing unused tokens for this user (enforces one active token)
   await dbClient
     .delete(passwordResetTokens)
     .where(
       and(
         eq(passwordResetTokens.userId, userId),
         isNull(passwordResetTokens.usedAt),
-        lt(passwordResetTokens.expiresAt, new Date()),
       ),
     );
 
@@ -50,10 +50,12 @@ export async function generateResetToken(
 
   // Log action
   await auditService.logAction({
+    actorId: userId,
     action: 'password.reset_token_generated',
-    entityType: 'conversation',
+    entityType: 'user',
     entityId: userId,
     metadata: { expiresAt: expiresAt.toISOString() },
+    correlationId,
   });
 
   // Return raw token (only shown once)
@@ -92,9 +94,11 @@ export async function validateAndGetUserId(
 
         // Log validation
         await auditService.logAction({
+          actorId: record.userId,
           action: 'password.reset_token_validated',
-          entityType: 'conversation',
+          entityType: 'user',
           entityId: record.userId,
+          correlationId,
         });
 
         return record.userId;
@@ -128,10 +132,14 @@ export async function resetPassword(
   // Validate password requirements
   const validation = validatePassword(newPassword);
   if (!validation.valid) {
-    console.error(`Password validation failed for user ${userId}`, {
-      correlationId,
-      error: validation.error,
-    });
+    logger.warn(
+      {
+        correlationId,
+        userId,
+        error: validation.error,
+      },
+      'Password validation failed'
+    );
     throw new Error(validation.error);
   }
 
@@ -166,7 +174,9 @@ export async function resetPassword(
   // Log successful reset
   await auditService.logAction({
     action: 'password.reset_successful',
-    entityType: 'conversation',
+    actorId: userId,
+    entityType: 'user',
     entityId: userId,
+    correlationId,
   });
 }

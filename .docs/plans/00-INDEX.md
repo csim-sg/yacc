@@ -32,6 +32,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **INT-008** (IRC Test) | ✅ **COMPLETED** (PR #263 merged) | INT-005 | POST /api/integrations/irc/test - test connection with 10s timeout, no side effects (super_admin) |
 | **INT-009** (Status Endpoint) | ✅ **COMPLETED** (PR #262 merged) | INT-005 | GET /api/integrations/irc/status endpoint (admin+ RBAC) |
 | **INT-010** (DB Profile Management) | ✅ **COMPLETED** (PR #265 merged) | INT-006-009 | DB-first gating, encrypted credential storage, profile selection logic, deterministic E2E tests, migration & schema alignment |
+| **INT-011-014** (Profile-Scoped Mapping, DLQ, Tests) | ✅ **COMPLETED** (PR #267 merged) | INT-002, INT-003, INT-010 | Profile-scoped (ircProfileId, channel) uniqueness; DLQ trace context uses integer `ircProfileId`; unit + integration test coverage. FE sidebar deferred. |
 
 ## Recent Merges
 - **PR #272** (Feb 20, 2026): DLQ UUID contract enforcement + traceability fields + RBAC hardening (fixes #270)
