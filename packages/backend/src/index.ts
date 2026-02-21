@@ -22,10 +22,6 @@ import { getRetryWorker, closeRetryWorker } from './workers/messageRetryWorker';
 // ===== EXPRESS APP =====
 const app = express();
 
-// Register body parser middleware BEFORE routing-controllers
-// This ensures request.body is available in all route handlers
-app.use(bodyParserMiddleware);
-
 useExpressServer(app, {
   controllers: controllers,
   authorizationChecker: authorizationChecker,
@@ -42,6 +38,7 @@ useExpressServer(app, {
     exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
   },
   middlewares: [
+    bodyParserMiddleware,
     correlationIdMiddleware,
     requestLoggingMiddleware,
   ],
