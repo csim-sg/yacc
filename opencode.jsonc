@@ -38,7 +38,7 @@
       "description": "Fullstack developer specialist for YACC project. Implements features across backend (Node.js/Express) and frontend (React/TanStack Start) following project standards. Performs impact analysis before starting, delegates to QA after completion, follows detailed PR workflow. Use proactively for feature implementation, bug fixes, and refactoring tasks.",
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/fullstack-developer.md}",
-      "model": "zai-org/GLM-4.7",
+      "model": "z-ai/glm-4.7",
       "tools": {
         "write": true,
         "edit": true,
