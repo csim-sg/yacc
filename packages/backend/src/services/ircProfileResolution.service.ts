@@ -11,10 +11,10 @@
  */
 
 import { and, eq } from 'drizzle-orm';
-import { dbClient } from '../infrastructure/db.client';
-import { integrationConnectionProfiles } from '../schemas/integrationConnectionProfile.schema';
 import { appConfig } from '../config/appConfig';
+import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
+import { integrationConnectionProfiles } from '../schemas/integrationConnectionProfile.schema';
 import { EncryptionService } from './encryption.service';
 
 /**

@@ -30,19 +30,22 @@ interface DLQStatistics {
  */
 export class DLQService {
   /**
-   * Move a failed message to the Dead Letter Queue
-   *
-   * Called after 3 failed retry attempts.
-   * Ensures message_id is a valid UUID FK to messages.id.
-   * External/job IDs are stored in metadata, not as messageId.
-   *
-   * @param messageId - UUID of message (from messages.id, required for FK)
-   * @param conversationId - UUID of conversation
-   * @param payload - Original message job payload
-   * @param failureReason - Reason for failure
-   * @param lastError - Error message from last attempt
-   * @param traceContext - Traceability context (correlationId, ircProfileId, externalThreadType, externalThreadId)
-   */
+    * Move a failed message to the Dead Letter Queue
+    *
+    * Called after 3 failed retry attempts
+    * Populates tracing fields for debugging and audit:
+    * - correlationId: end-to-end request tracing
+    * - ircProfileId: for IRC-specific DLQ queries
+    * - externalThreadType: platform-specific thread type (channel vs DM)
+    * - externalThreadId: the target thread identifier
+    *
+    * @param messageId - UUID of message (from messages.id, required for FK)
+    * @param conversationId - UUID of conversation
+    * @param payload - Original message job payload
+    * @param failureReason - Reason for failure
+    * @param lastError - Error message from last attempt
+    * @param traceContext - Traceability context (correlationId, ircProfileId, externalThreadType, externalThreadId)
+    */
   async moveToDLQ(
     messageId: string,
     conversationId: string,
@@ -51,7 +54,7 @@ export class DLQService {
     lastError: string,
     traceContext?: {
       correlationId?: string;
-      ircProfileId?: string;
+      ircProfileId?: number;
       externalThreadType?: string;
       externalThreadId?: string;
       jobId?: string;
@@ -71,6 +74,14 @@ export class DLQService {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
+       // Extract tracing fields from traceContext only
+      // Caller is responsible for providing traceContext with explicit values
+      // No fallback logic - caller must be explicit about thread type and ID
+      const correlationId = traceContext?.correlationId;
+      const ircProfileId = traceContext?.ircProfileId;
+      const externalThreadId = traceContext?.externalThreadId;
+      const externalThreadType = traceContext?.externalThreadType;
+
       // Build metadata with external/job IDs
       const metadata = {
         ...(payload.metadata || {}),
@@ -87,11 +98,11 @@ export class DLQService {
           totalAttempts: payload.retryCount || 3,
           lastError,
           expiresAt,
-          // Traceability fields
-          correlationId: traceContext?.correlationId,
-          ircProfileId: traceContext?.ircProfileId,
-          externalThreadType: traceContext?.externalThreadType,
-          externalThreadId: traceContext?.externalThreadId,
+          // INT-012: Populate tracing fields
+          correlationId,
+          ircProfileId,
+          externalThreadType,
+          externalThreadId,
           // Metadata stores additional context
           metadata: Object.keys(metadata).length > 0 ? metadata : null,
         })
@@ -103,11 +114,13 @@ export class DLQService {
           conversationId,
           failureReason,
           totalAttempts: payload.retryCount || 3,
-          correlationId: traceContext?.correlationId,
-          externalThreadId: traceContext?.externalThreadId,
+          correlationId,
+          ircProfileId,
+          externalThreadType,
+          externalThreadId,
           expiresAt,
         },
-        'Message moved to Dead Letter Queue (UUID contract enforced)'
+        'Message moved to Dead Letter Queue (INT-012: tracing fields populated)'
       );
 
       return entry[0];

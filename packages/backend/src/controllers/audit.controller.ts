@@ -3,6 +3,7 @@
  * Handles conversation-scoped audit log queries
  */
 
+import type { GetConversationAuditLogsRequest } from '@yacc/common/requests/audit/getConversationAuditLogs.request';
 import {
   JsonController,
   Get,
@@ -11,7 +12,6 @@ import {
   Param,
 } from 'routing-controllers';
 import { auditService } from '../services/audit.service';
-import { GetConversationAuditLogsRequest } from '@yacc/common/requests/audit/getConversationAuditLogs.request';
 
 /**
  * Audit logs are conversation-scoped only

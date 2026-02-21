@@ -5,16 +5,16 @@
  * Implements exponential backoff retry strategy.
  */
 
+import type { Platform } from '@yacc/common/types/platform.type';
 import { Worker, type Job } from 'bullmq';
 import { eq } from 'drizzle-orm';
-import type { Platform } from '@yacc/common/types/platform.type';
 import { dbClient } from '../infrastructure/db.client.js';
 import { logger } from '../infrastructure/logger.js';
 import { redisClient } from '../infrastructure/redis.client.js';
 import { conversations } from '../schemas/conversation.schema.js';
 import { messages } from '../schemas/message.schema.js';
-import { MessageStatusTracker } from '../services/messageStatusTracker.js';
 import { connectorManager } from '../services/connector-manager.js';
+import { MessageStatusTracker } from '../services/messageStatusTracker.js';
 import type { SendMessageJobPayload } from '../types/message-queue.types.js';
 
 // ============================================

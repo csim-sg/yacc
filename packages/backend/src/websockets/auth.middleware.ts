@@ -5,18 +5,17 @@
  * Validates sessions and attaches user info to socket
  */
 
-import { Socket } from 'socket.io';
-import { dbClient } from '../infrastructure/db.client';
-import { users } from '../schemas/user.schema';
 import { eq } from 'drizzle-orm';
-import { logger } from '../infrastructure/logger';
-import { appConfig } from '../config/appConfig';
+import type { Socket } from 'socket.io';
 import { betterAuthClient } from '../infrastructure/better-auth.client';
+import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
+import { users } from '../schemas/user.schema';
 
 /**
  * Extended Socket interface with authenticated user
  */
-interface AuthenticatedSocket extends Socket {
+export interface AuthenticatedSocket extends Socket {
   userId?: string;
   email?: string;
   role?: string;
@@ -44,10 +43,11 @@ export async function webSocketAuthMiddleware(
        return next(new Error('Authentication token required'));
      }
 
-      // Validate session with BetterAuth
-      const session = await betterAuthClient.api.getSession({
-       headers: socket.handshake.headers as any,
-     });
+       // Validate session with BetterAuth
+       type HeadersRecord = Record<string, string | string[] | undefined>;
+       const session = await betterAuthClient.api.getSession({
+         headers: socket.handshake.headers as HeadersRecord,
+       });
 
      if (!session) {
        logger.warn('WebSocket connection rejected: Invalid session with socketId: %s', socket.id);
@@ -82,8 +82,8 @@ export async function webSocketAuthMiddleware(
      next();
    } catch (error) {
      logger.error('WebSocket authentication failed - socketId: %s, error: %s', socket.id, error instanceof Error ? error.message : String(error));
-     next(new Error('Authentication failed'));
-   }
-}
+      next(new Error('Authentication failed'));
+    }
+  }
 
-export type { AuthenticatedSocket };
+// AuthenticatedSocket is exported at definition site (interface)

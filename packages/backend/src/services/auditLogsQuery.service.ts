@@ -7,6 +7,7 @@
 
 import { and, desc, gte, lte, eq, count, type SQL } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
 import { auditLogs } from '../schemas/auditLog.schema';
 import type {
   AuditLogQueryFilters,
@@ -15,7 +16,6 @@ import type {
   AuditLogExportResponse,
   AuditLogEntry,
 } from '../types/auditLogsQuery.types';
-import { logger } from '../infrastructure/logger';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
@@ -220,10 +220,9 @@ export async function exportAuditLogs(
   try {
     const filters = request.filters || {};
     
-    // Fetch all matching logs by iterating through pages
-    const allItems: AuditLogEntry[] = [];
-    let currentPage = 1;
-    const pageSize = 100; // Use max page size for efficiency
+     // Fetch all matching logs by iterating through pages
+     const allItems: AuditLogEntry[] = [];
+     const pageSize = 100; // Use max page size for efficiency
     
     // Fetch first page to know total
     const firstPageResponse = await queryAuditLogs(

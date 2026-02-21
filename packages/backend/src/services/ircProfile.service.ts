@@ -15,23 +15,24 @@
  * See INT-010: IRC tenant-owned DB connection profiles
  */
 
-import { dbClient } from '../infrastructure/db.client';
-import { integrationConnectionProfiles } from '../schemas/integrationConnectionProfile.schema';
 import { eq, and } from 'drizzle-orm';
+import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
-import { EncryptionService } from './encryption.service';
-import { auditService } from './audit.service';
-import {
+import { integrationConnectionProfiles } from '../schemas/integrationConnectionProfile.schema';
+import type { User } from '../schemas/user.schema';
+import type {
   CreateIrcProfileRequest,
   UpdateIrcProfileRequest,
   IrcProfileResponse,
   IrcProfileWithSecrets,
-  IrcProfileErrorCode,
   IrcProfileConfig,
-  IrcProfileSecrets,
+  IrcProfileSecrets} from '../types/ircProfile.types';
+import {
+  IrcProfileErrorCode
 } from '../types/ircProfile.types';
 import { IrcProfileError } from '../types/ircProfileError.types';
-import { User } from '../schemas/user.schema';
+import { auditService } from './audit.service';
+import { EncryptionService } from './encryption.service';
 
 /**
  * Hard cap for IRC profiles (MVP constraint)
@@ -41,7 +42,7 @@ const IRC_PROFILE_CAP = 10;
 /**
  * Default tenant ID (MVP single-tenant)
  */
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000000';
+const _DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
 /**
  * Create a new IRC profile

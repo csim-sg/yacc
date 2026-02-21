@@ -10,6 +10,14 @@ export interface Conversation extends Timestamp {
   id: string;
   channel: Channel;
   externalThreadId: string;
+  /**
+   * IRC Profile ID (for profile-scoped conversation mapping)
+   * - Set for IRC conversations (channels and DMs)
+   * - Null for Telegram conversations (single-tenant MVP)
+   * - Used to uniquely identify (profile, channel) pairs
+   */
+  ircProfileId?: number;
+  title?: string;
   status: ConversationStatus;
   priority: Priority;
   assignedUserId?: string;

@@ -7,8 +7,10 @@ import {
   index,
   integer,
   boolean,
+  varchar,
 } from 'drizzle-orm/pg-core';
 import { conversations } from './conversation.schema';
+import { integrationConnectionProfiles } from './integrationConnectionProfile.schema';
 import { messages } from './message.schema';
 
 /**
@@ -17,6 +19,11 @@ import { messages } from './message.schema';
  * Purpose: Persistent storage for failed messages requiring ops investigation and manual intervention
  * Retention: 7 days (auto-cleanup via scheduled job)
  * Access: Manager+ roles only
+ *
+ * INT-012 Requirements:
+ * - Includes correlationId for end-to-end tracing
+ * - Includes ircProfileId + externalThreadType + externalThreadId for IRC-specific debugging
+ * - Supports audit logging and permission enforcement (Manager+ only)
  */
 export const deadLetterQueue = pgTable(
   'dead_letter_queue',
@@ -32,16 +39,38 @@ export const deadLetterQueue = pgTable(
     // Original message payload for re-sending
     payload: jsonb('payload').notNull(),
     
+    // INT-012: Tracing and debugging fields
+    /**
+     * Correlation ID for end-to-end tracing (e.g., from outbound request through retry chain)
+     * Used to trace failures back to original send request
+     */
+    correlationId: text('correlation_id'),
+    
+    /**
+     * IRC-specific: Profile ID of the IRC connection (for profile-scoped DLQ querying)
+     * Null for non-IRC platforms
+     */
+    ircProfileId: integer('irc_profile_id').references(
+      () => integrationConnectionProfiles.id,
+      { onDelete: 'set null' }
+    ),
+    
+    /**
+     * External thread type (e.g., 'channel' vs 'dm' for IRC)
+     * Used for platform-specific DLQ management
+     */
+    externalThreadType: varchar('external_thread_type', { length: 50 }),
+    
+    /**
+     * External thread ID (e.g., '#channel' for IRC channels, 'user' for DMs)
+     * Used to identify the target thread for re-queueing
+     */
+    externalThreadId: varchar('external_thread_id', { length: 255 }),
+    
     // Failure tracking
     failureReason: text('failure_reason').notNull(), // 'max_retries_exceeded', 'validation_error', 'platform_error', 'network_error', 'unknown'
     totalAttempts: integer('total_attempts').notNull().default(3),
     lastError: text('last_error').notNull(),
-    
-    // Traceability fields for ops investigation
-    correlationId: text('correlation_id'), // Request correlation ID for tracing async delivery
-    ircProfileId: uuid('irc_profile_id'), // For IRC-specific context (optional)
-    externalThreadType: text('external_thread_type'), // e.g., 'telegram_group', 'irc_channel'
-    externalThreadId: text('external_thread_id'), // External platform's thread/conversation ID
     
     // Timestamps
     movedAt: timestamp('moved_at').notNull().defaultNow(),
@@ -65,8 +94,8 @@ export const deadLetterQueue = pgTable(
     index('dlq_expires_at_idx').on(table.expiresAt), // For cleanup queries
     index('dlq_failure_reason_idx').on(table.failureReason),
     index('dlq_retry_attempt_idx').on(table.retryAttempt),
-    index('dlq_correlation_id_idx').on(table.correlationId), // For tracing async delivery
-    index('dlq_irc_profile_id_idx').on(table.ircProfileId), // For IRC-specific queries
+    index('dlq_correlation_id_idx').on(table.correlationId), // INT-012: trace failures
+    index('dlq_irc_profile_id_idx').on(table.ircProfileId), // INT-012: IRC-specific queries
   ]
 );
 

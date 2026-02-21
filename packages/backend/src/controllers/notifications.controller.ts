@@ -21,9 +21,9 @@ import {
   QueryParam,
 } from 'routing-controllers';
 import { logger } from '../infrastructure/logger';
+import { notificationsService } from '../services/notifications.service';
 import type { AuthUser } from '../types/auth.types';
 import type { MarkNotificationReadRequest } from '../types/notifications.types';
-import { notificationsService } from '../services/notifications.service';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;

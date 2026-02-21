@@ -10,9 +10,9 @@
  *   await ws.emitToConversation('conversation-id', 'message.sent', payload);
  */
 
-import type { WebSocketServer } from '../../websockets/websocket.server';
-import type { WebSocketEventMap } from '../../types/websocket.types';
 import { logger } from '../../infrastructure/logger';
+import type { WebSocketEventMap } from '../../types/websocket.types';
+import type { WebSocketServer } from '../../websockets/websocket.server';
 import { storeEvent } from './event-backlog.service';
 
 /**
@@ -212,7 +212,7 @@ export function isSubscribedToConversation(userId: string, conversationId: strin
   try {
     const gateway = getWebSocketGateway();
     return gateway.isSubscribedToConversation(userId, conversationId);
-  } catch (error) {
+  } catch {
     logger.warn('Failed to check subscription status');
     return false;
   }
@@ -228,7 +228,7 @@ export function getConversationSubscribers(conversationId: string): Set<string> 
   try {
     const gateway = getWebSocketGateway();
     return gateway.getConversationSubscribers(conversationId);
-  } catch (error) {
+  } catch {
     logger.warn('Failed to get conversation subscribers');
     return new Set();
   }

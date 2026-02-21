@@ -4,8 +4,6 @@
  */
 
 import type { Request } from 'express';
-import type { AuthUser } from '../types/auth.types';
-import type { CreateTagRequest, AttachTagRequest } from '../types/tags.types';
 import {
   JsonController,
   Get,
@@ -20,8 +18,10 @@ import {
   BadRequestError,
   NotFoundError,
 } from 'routing-controllers';
-import { tagsService } from '../services/tags.service';
 import { logger } from '../infrastructure/logger';
+import { tagsService } from '../services/tags.service';
+import type { AuthUser } from '../types/auth.types';
+import type { CreateTagRequest, AttachTagRequest } from '../types/tags.types';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;

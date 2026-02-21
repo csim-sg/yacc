@@ -11,31 +11,19 @@
  * for forgot-password and reset-password endpoints.
  */
 
-import { All, JsonController, Post, Req, Res, Body, BadRequestError, UseBefore } from 'routing-controllers';
+import { eq } from 'drizzle-orm';
 import type { Request, Response } from 'express';
+import { All, JsonController, Post, Req, Res, Body, BadRequestError, UseBefore } from 'routing-controllers';
 import { betterAuthClient } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
-import { users } from '../schemas/user.schema';
-import { eq } from 'drizzle-orm';
-import { generateResetToken, resetPassword } from '../services/passwordReset.service';
 import { logger } from '../infrastructure/logger';
-import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
 import { loginRateLimiter, passwordResetRateLimiter } from '../middleware/rateLimit.middleware';
+import { users } from '../schemas/user.schema';
+import { generateResetToken, resetPassword } from '../services/passwordReset.service';
+import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;
-}
-
-interface BetterAuthRequest {
-  correlationId?: string;
-  protocol: string;
-  host: string;
-  originalUrl: string;
-  url: string;
-  method: string;
-  headers: Record<string, string | string[] | undefined>;
-  body?: unknown;
-  get(header: string): string | undefined;
 }
 
 // TODO: Implement EmailService in infrastructure layer
@@ -66,18 +54,18 @@ export class AuthController {
 
       // IMPORTANT: Always return success to prevent email enumeration
       if (!user) {
-        logger.debug('Forgot password attempt with non-existent email - correlationId: %s, email: %s', correlationId, email);
+        logger.debug('Forgot password attempt with non-existent email - correlationId: %s', correlationId);
         return {
           message: 'If an email exists, a password reset link has been sent',
         };
       }
 
-       // Generate token using password reset service
-       const token = await generateResetToken(user.id, correlationId);
+        // Generate token using password reset service
+        const _token = await generateResetToken(user.id, correlationId);
 
-        // TODO: Send email via emailService when implemented
-        // const resetLink = `${appConfig.APP_FRONTEND_URL}/reset-password?token=${token}`;
-        // await emailService.sendPasswordResetEmail(email, resetLink);
+         // TODO: Send email via emailService when implemented
+         // const resetLink = `${appConfig.APP_FRONTEND_URL}/reset-password?token=${_token}`;
+         // await emailService.sendPasswordResetEmail(email, resetLink);
 
        logger.info('Password reset token generated and email sent - correlationId: %s, userId: %s', correlationId, user.id);
 
@@ -142,7 +130,7 @@ export class AuthController {
    */
   @Post('/sign-in/email')
   @UseBefore(loginRateLimiter)
-  async handleSignInEmail(@Req() req: BetterAuthRequest, @Res() res: Response): Promise<void> {
+  async handleSignInEmail(@Req() req: Request, @Res() res: Response): Promise<void> {
     return this.delegateToAuth(req, res);
   }
 
@@ -159,16 +147,16 @@ export class AuthController {
     * - /refresh-token (token refresh with Bearer plugin)
     */
    @All('/*')
-   async handleAuth(@Req() req: any, @Res() res: Response): Promise<void> {
-     return this.delegateToAuth(req, res);
-   }
+    async handleAuth(@Req() req: Request, @Res() res: Response): Promise<void> {
+      return this.delegateToAuth(req, res);
+    }
 
-   /**
-    * Helper method to delegate requests to BetterAuth handler
-    * Reads body from request and converts to BetterAuth format
-    * @private
-    */
-   private async delegateToAuth(req: any, res: Response): Promise<void> {
+    /**
+     * Helper method to delegate requests to BetterAuth handler
+     * Reads body from request and converts to BetterAuth format
+     * @private
+     */
+    private async delegateToAuth(req: Request, res: Response): Promise<void> {
      const correlationId = req.correlationId || 'unknown';
 
      try {

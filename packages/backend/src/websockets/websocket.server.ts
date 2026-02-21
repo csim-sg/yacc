@@ -5,12 +5,14 @@
  * Manages client connections, room subscriptions, and event broadcasting
  */
 
-import { Server, Socket } from 'socket.io';
-import { webSocketAuthMiddleware } from './auth.middleware';
-import { logger } from '../infrastructure/logger';
+import type { Server as HttpServer } from 'http';
+import { Server } from 'socket.io';
 import { appConfig } from '../config/appConfig';
-import { PING_INTERVAL_MS, CONNECTION_TIMEOUT_MS } from './wsConstants';
+import { logger } from '../infrastructure/logger';
 import type { WebSocketEventMap } from '../types/websocket.types';
+import { webSocketAuthMiddleware } from './auth.middleware';
+import type { AuthenticatedSocket } from './auth.middleware';
+import { PING_INTERVAL_MS, CONNECTION_TIMEOUT_MS } from './wsConstants';
 
 /**
  * WebSocket server class
@@ -24,7 +26,7 @@ export class WebSocketServer {
   /**
    * Initialize WebSocket server
    */
-   constructor(httpServer: any) {
+   constructor(httpServer: HttpServer) {
      this.io = new Server(httpServer, {
        cors: {
          origin: appConfig.APP_FRONTEND_URL,
@@ -59,8 +61,8 @@ export class WebSocketServer {
   /**
    * Setup core connection event handlers
    */
-  private setupEventHandlers(): void {
-    this.io.on('connection', (socket: any) => {
+   private setupEventHandlers(): void {
+     this.io.on('connection', (socket: AuthenticatedSocket) => {
       logger.info({
         socketId: socket.id,
         userId: socket.userId,
@@ -122,10 +124,10 @@ export class WebSocketServer {
     this.connectedClients.get(userId)!.add(socketId);
   }
 
-  /**
-   * Handle client disconnection
-   */
-  private handleDisconnect(socket: any, reason: string): void {
+   /**
+    * Handle client disconnection
+    */
+   private handleDisconnect(socket: AuthenticatedSocket, reason: string): void {
     logger.info({
       socketId: socket.id,
       userId: socket.userId,
@@ -168,19 +170,19 @@ export class WebSocketServer {
    * @param event - Event name
    * @param data - Event data
    */
-  sendToUser(userId: string, event: string, data: any): void {
-    const room = `user:${userId}`;
-    this.io.to(room).emit(event, data);
-    logger.debug({ userId, event }, 'Sent event to user');
-  }
+   sendToUser(userId: string, event: string, data: unknown): void {
+     const room = `user:${userId}`;
+     this.io.to(room).emit(event, data);
+     logger.debug({ userId, event }, 'Sent event to user');
+   }
 
-  /**
-   * Broadcast event to all connected clients
-   *
-   * @param event - Event name
-   * @param data - Event data
-   */
-  broadcast(event: string, data: any): void {
+   /**
+    * Broadcast event to all connected clients
+    *
+    * @param event - Event name
+    * @param data - Event data
+    */
+   broadcast(event: string, data: unknown): void {
     this.io.emit(event, data);
     logger.debug({ event }, 'Broadcasted event to all clients');
   }

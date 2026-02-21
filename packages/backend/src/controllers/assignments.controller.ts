@@ -18,9 +18,9 @@ import {
   ForbiddenError,
 } from 'routing-controllers';
 import { logger } from '../infrastructure/logger';
-import type { AuthUser } from '../types/auth.types';
-import type { AssignConversationRequest } from '../types/assignments.types';
 import { assignmentsService } from '../services/assignments.service';
+import type { AssignConversationRequest } from '../types/assignments.types';
+import type { AuthUser } from '../types/auth.types';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;

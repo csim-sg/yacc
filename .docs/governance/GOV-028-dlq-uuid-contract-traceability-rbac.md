@@ -133,7 +133,7 @@ await dlqService.moveToDLQ(
 | `messageId` | UUID | ✅ Yes | FK to messages.id (internal identifier) |
 | `conversationId` | UUID | ✅ Yes | FK to conversations.id (scope) |
 | `correlationId` | string | ❌ No | Trace ID for end-to-end debugging |
-| `ircProfileId` | UUID | ❌ No | IRC profile (if applicable) |
+| `ircProfileId` | integer | ❌ No | IRC profile ID (if applicable) |
 | `externalThreadType` | string | ❌ No | Platform type (telegram_group, irc_channel) |
 | `externalThreadId` | string | ❌ No | Platform thread ID (#general, tg-group-123) |
 | `metadata` | JSON | ❌ No | Job ID, external message ID, custom data |
@@ -251,7 +251,7 @@ async removeDLQEntry(...) { ... }
 
 **Traceability Fields**:
 - `correlationId`: End-to-end trace ID (optional, for debugging)
-- `ircProfileId`: IRC profile UUID (optional, if applicable)
+- `ircProfileId`: IRC profile ID (integer, optional, if applicable)
 - `externalThreadType`: Platform type (telegram_group, irc_channel)
 - `externalThreadId`: Platform thread ID (e.g., "tg-group-123")
 - `metadata`: External tracking IDs, job ID, custom data
@@ -471,7 +471,7 @@ await dlqService.moveToDLQ(
 
 **Fields for ops investigation**:
 - `correlationId`: End-to-end trace ID (search logs with this)
-- `ircProfileId`: IRC profile if applicable
+- `ircProfileId`: IRC profile ID (integer) if applicable
 - `externalThreadType`: Platform (telegram_group, irc_channel)
 - `externalThreadId`: Specific thread (tg-group-123, #general)
 - `metadata`: Job ID, external message ID, custom data

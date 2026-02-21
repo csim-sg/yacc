@@ -9,7 +9,6 @@
 import { SocketController, OnMessage } from 'socket-controllers';
 import type { Socket } from 'socket.io';
 import { logger } from '../infrastructure/logger';
-import type { ConnectorEventMap } from '@yacc/common/types/connectorEventMap.type';
 
 /**
  * Payload types for connector events

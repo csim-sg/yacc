@@ -1,12 +1,12 @@
 import { eq, desc } from 'drizzle-orm';
-import type { CreateNoteRequest, NoteResponse, NoteCreationResult } from '../types/notes.types';
-import { auditService } from './audit.service';
-import { mentionParserService } from './mention-parser.service';
+import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
 import { conversations } from '../schemas/conversation.schema';
 import { notes } from '../schemas/note.schema';
 import { notifications } from '../schemas/notification.schema';
-import { dbClient } from '../infrastructure/db.client';
-import { logger } from '../infrastructure/logger';
+import type { CreateNoteRequest, NoteResponse, NoteCreationResult } from '../types/notes.types';
+import { auditService } from './audit.service';
+import { mentionParserService } from './mention-parser.service';
 
 /**
  * Notes Service

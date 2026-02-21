@@ -6,16 +6,16 @@
  */
 
 import { EventEmitter } from 'events';
-import type { Platform } from '@yacc/common/types/platform.type';
-import type { ConnectorStatus } from '@yacc/common/types/connectorStatus.type';
 import type { ConnectionInfo } from '@yacc/common/types/connectionInfo.interface';
+import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
+import type { ConnectorEventMap } from '@yacc/common/types/connectorEventMap.type';
+import type { ConnectorMessage } from '@yacc/common/types/connectorMessage.interface';
+import type { ConnectorStatus } from '@yacc/common/types/connectorStatus.type';
+import type { MessageSendError } from '@yacc/common/types/messageSendError.interface';
+import type { Platform } from '@yacc/common/types/platform.type';
 import type { SendMessageRequest } from '@yacc/common/types/sendMessageRequest.interface';
 import type { SendMessageResponse } from '@yacc/common/types/sendMessageResponse.interface';
-import type { ConnectorEventMap } from '@yacc/common/types/connectorEventMap.type';
 import type { ValidationError } from '@yacc/common/types/validationError.interface';
-import type { ConnectorMessage } from '@yacc/common/types/connectorMessage.interface';
-import type { MessageSendError } from '@yacc/common/types/messageSendError.interface';
-import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
 import { MessageStatusTracker } from '../../services/messageStatusTracker';
 
 // ============================================
@@ -29,18 +29,21 @@ import { MessageStatusTracker } from '../../services/messageStatusTracker';
 export abstract class BaseConnector<
   T extends Platform = Platform,
   TConfig extends ConnectorConfig<T> = ConnectorConfig<T>,
-  TEvents extends ConnectorEventMap = ConnectorEventMap
+  _TEvents extends ConnectorEventMap = ConnectorEventMap
 > extends EventEmitter {
   // ==========================================
   // Properties
   // ==========================================
 
-   public readonly platform: T;
-   protected config: TConfig | null = null;
-   protected connectionStatus: ConnectorStatus = 'disconnected';
-   protected reconnectAttempts: number = 0;
-   protected maxReconnectAttempts: number = 10;
-   protected reconnectBackoffMs: number[] = [1000, 2000, 4000, 8000, 16000, 30000];
+  public readonly platform: T;
+  protected config: TConfig | null = null;
+  protected connectionStatus: ConnectorStatus = 'disconnected';
+  protected reconnectAttempts: number = 0;
+  protected maxReconnectAttempts: number = 10;
+  protected reconnectBackoffMs: number[] = [1000, 2000, 4000, 8000, 16000, 30000];
+  protected _lastConnectedAt?: Date;
+  protected _lastDisconnectedAt?: Date;
+  protected _errorMessage?: string;
 
    // ==========================================
    // Constructor
@@ -78,15 +81,15 @@ export abstract class BaseConnector<
    * Get current connection status
    */
    public getConnectionStatus(): ConnectionInfo {
-     return {
-       platform: this.platform as unknown as string,
-       status: this.connectionStatus,
-       connectedAt: this.getLastConnectedAt(),
-       disconnectedAt: this.getLastDisconnectedAt(),
-       reconnectAttempts: this.reconnectAttempts,
-       error: this.getErrorMessage(),
-     };
-   }
+      return {
+        platform: String(this.platform),
+        status: this.connectionStatus,
+        connectedAt: this.getLastConnectedAt(),
+        disconnectedAt: this.getLastDisconnectedAt(),
+        reconnectAttempts: this.reconnectAttempts,
+        error: this.getErrorMessage(),
+      };
+    }
 
   /**
    * Update connection status with status tracking
@@ -193,47 +196,47 @@ export abstract class BaseConnector<
     }
   }
 
-  /**
-   * Get last connected timestamp
-   */
-  protected getLastConnectedAt(): Date | undefined {
-    return (this as any)._lastConnectedAt;
-  }
+   /**
+    * Get last connected timestamp
+    */
+   protected getLastConnectedAt(): Date | undefined {
+     return this._lastConnectedAt;
+   }
 
-  /**
-   * Get last disconnected timestamp
-   */
-  protected getLastDisconnectedAt(): Date | undefined {
-    return (this as any)._lastDisconnectedAt;
-  }
+   /**
+    * Get last disconnected timestamp
+    */
+   protected getLastDisconnectedAt(): Date | undefined {
+     return this._lastDisconnectedAt;
+   }
 
-  /**
-   * Get error message
-   */
-  protected getErrorMessage(): string | undefined {
-    return (this as any)._errorMessage;
-  }
+   /**
+    * Get error message
+    */
+   protected getErrorMessage(): string | undefined {
+     return this._errorMessage;
+   }
 
-  /**
-   * Set last connected timestamp
-   */
-  protected setLastConnectedAt(timestamp: Date): void {
-    (this as any)._lastConnectedAt = timestamp;
-  }
+   /**
+    * Set last connected timestamp
+    */
+   protected setLastConnectedAt(timestamp: Date): void {
+     this._lastConnectedAt = timestamp;
+   }
 
-  /**
-   * Set last disconnected timestamp
-   */
-  protected setLastDisconnectedAt(timestamp: Date): void {
-    (this as any)._lastDisconnectedAt = timestamp;
-  }
+   /**
+    * Set last disconnected timestamp
+    */
+   protected setLastDisconnectedAt(timestamp: Date): void {
+     this._lastDisconnectedAt = timestamp;
+   }
 
-  /**
-   * Set error message
-   */
-  protected setErrorMessage(message: string): void {
-    (this as any)._errorMessage = message;
-  }
+   /**
+    * Set error message
+    */
+   protected setErrorMessage(message: string): void {
+     this._errorMessage = message;
+   }
 
   // ==========================================
   // Abstract Methods (to be implemented by subclasses)

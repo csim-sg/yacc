@@ -3,13 +3,16 @@
  * Handles conversation CRUD and updates with routing-controllers
  */
 
+import type { AssignRequest } from '@yacc/common/requests/conversations/assign.request';
+import type { ListConversationsRequest } from '@yacc/common/requests/conversations/listConversations.request';
+import type { UpdatePriorityRequest } from '@yacc/common/requests/conversations/updatePriority.request';
+import type { UpdateStatusRequest } from '@yacc/common/requests/conversations/updateStatus.request';
 import type { Request } from 'express';
 import {
   JsonController,
   Get,
   Post,
   Patch,
-  Delete,
   Param,
   Body,
   Req,
@@ -19,13 +22,9 @@ import {
   BadRequestError,
   NotFoundError,
 } from 'routing-controllers';
-import { conversationService } from '../services/conversation.service';
-import { auditService } from '../services/audit.service';
 import { logger } from '../infrastructure/logger';
-import { ListConversationsRequest } from '@yacc/common/requests/conversations/listConversations.request';
-import { UpdateStatusRequest } from '@yacc/common/requests/conversations/updateStatus.request';
-import { UpdatePriorityRequest } from '@yacc/common/requests/conversations/updatePriority.request';
-import { AssignRequest } from '@yacc/common/requests/conversations/assign.request';
+import { auditService } from '../services/audit.service';
+import { conversationService } from '../services/conversation.service';
 import type { AuthUser } from '../types/auth.types';
 
 interface AuthenticatedRequest extends Request {
@@ -38,7 +37,7 @@ const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
 const VALID_SORT_BY = ['lastActivity', 'created', 'priority'] as const;
 const VALID_SORT_ORDER = ['asc', 'desc'] as const;
 
-function parsePositiveInt(value: unknown, name: string): number | undefined {
+function parsePositiveInt(value: unknown, _name: string): number | undefined {
   if (value === undefined || value === '') return undefined;
   const n = Number(value);
   if (!Number.isInteger(n) || n < 1) return undefined;

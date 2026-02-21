@@ -4,15 +4,13 @@
  * Tests message event handling and delivery
  */
 
+import type { Socket } from 'socket.io';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MessageController } from '../message.controller';
-import type { Socket } from 'socket.io';
-import type { AuthenticatedSocket } from '../../websockets/auth.middleware';
 
 describe('MessageController', () => {
   let controller: MessageController;
   let mockSocket: Partial<Socket>;
-  let mockAuthSocket: Partial<AuthenticatedSocket>;
 
   beforeEach(() => {
     controller = new MessageController();
@@ -28,12 +26,6 @@ describe('MessageController', () => {
         emit: vi.fn(),
       }),
     } as unknown as Partial<Socket>;
-
-    mockAuthSocket = {
-      ...mockSocket,
-      userId: 'user-789',
-      role: 'user',
-    };
   });
 
   describe('onMessageSent', () => {

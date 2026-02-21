@@ -5,12 +5,13 @@
 
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
+import { eq, isNull, and, lt } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
+import { logger } from '../infrastructure/logger';
 import { passwordResetTokens } from '../schemas/passwordReset.schema';
 import { users } from '../schemas/user.schema';
-import { eq, isNull, and, lt } from 'drizzle-orm';
-import { validatePassword } from './passwordValidation.service';
 import { auditService } from './audit.service';
+import { validatePassword } from './passwordValidation.service';
 
 /**
  * Generate a password reset token for user
@@ -19,16 +20,15 @@ import { auditService } from './audit.service';
  */
 export async function generateResetToken(
   userId: string,
-  correlationId: string,
+  _correlationId: string,
 ): Promise<string> {
-  // Delete any existing valid tokens for this user
+  // Delete any existing valid (unexpired) unused tokens for this user
   await dbClient
     .delete(passwordResetTokens)
     .where(
       and(
         eq(passwordResetTokens.userId, userId),
         isNull(passwordResetTokens.usedAt),
-        lt(passwordResetTokens.expiresAt, new Date()),
       ),
     );
 
@@ -51,7 +51,7 @@ export async function generateResetToken(
   // Log action
   await auditService.logAction({
     action: 'password.reset_token_generated',
-    entityType: 'conversation',
+    entityType: 'user',
     entityId: userId,
     metadata: { expiresAt: expiresAt.toISOString() },
   });
@@ -66,7 +66,7 @@ export async function generateResetToken(
  */
 export async function validateAndGetUserId(
   token: string,
-  correlationId: string,
+  _correlationId: string,
 ): Promise<string> {
   // Basic format check
   if (!token || token.length !== 64 || !/^[a-f0-9]{64}$/.test(token)) {
@@ -90,12 +90,12 @@ export async function validateAndGetUserId(
           throw new Error('Invalid or expired token');
         }
 
-        // Log validation
-        await auditService.logAction({
-          action: 'password.reset_token_validated',
-          entityType: 'conversation',
-          entityId: record.userId,
-        });
+         // Log validation
+         await auditService.logAction({
+           action: 'password.reset_token_validated',
+           entityType: 'user',
+           entityId: record.userId,
+         });
 
         return record.userId;
       }
@@ -128,10 +128,14 @@ export async function resetPassword(
   // Validate password requirements
   const validation = validatePassword(newPassword);
   if (!validation.valid) {
-    console.error(`Password validation failed for user ${userId}`, {
-      correlationId,
-      error: validation.error,
-    });
+    logger.warn(
+      {
+        correlationId,
+        userId,
+        error: validation.error,
+      },
+      'Password validation failed'
+    );
     throw new Error(validation.error);
   }
 
@@ -163,10 +167,10 @@ export async function resetPassword(
       .where(eq(passwordResetTokens.id, record[0].id));
   }
 
-  // Log successful reset
-  await auditService.logAction({
-    action: 'password.reset_successful',
-    entityType: 'conversation',
-    entityId: userId,
-  });
+   // Log successful reset
+   await auditService.logAction({
+     action: 'password.reset_successful',
+     entityType: 'user',
+     entityId: userId,
+   });
 }

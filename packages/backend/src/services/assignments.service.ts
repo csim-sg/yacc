@@ -9,8 +9,8 @@ import { logger } from '../infrastructure/logger';
 import { conversations } from '../schemas/conversation.schema';
 import { notifications } from '../schemas/notification.schema';
 import { users } from '../schemas/user.schema';
-import { auditService } from './audit.service';
 import type { AssignmentResponse } from '../types/assignments.types';
+import { auditService } from './audit.service';
 
 export class AssignmentsService {
   /**

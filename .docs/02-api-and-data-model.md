@@ -229,7 +229,7 @@ bulk_action_applied
   "totalAttempts": 3,
   "lastError": "Error details",
   "correlationId": "optional-trace-id",
-  "ircProfileId": "uuid or null",
+  "ircProfileId": "integer or null",
   "externalThreadType": "telegram_group | irc_channel | null",
   "externalThreadId": "platform-specific-id or null",
   "movedAt": "2026-01-16T10:00:00Z",
@@ -1073,7 +1073,7 @@ Bulk action endpoint for assign, tag, or status update on multiple conversations
 - `messageId` (UUID FK): Internal message identifier
 - `conversationId` (UUID FK): Scope reference
 - `correlationId` (optional): End-to-end trace ID
-- `ircProfileId` (optional, UUID): IRC profile if applicable
+- `ircProfileId` (optional, integer): IRC profile ID if applicable
 - `externalThreadType` (optional): Platform (telegram_group, irc_channel)
 - `externalThreadId` (optional): Platform thread (#general, tg-group-123)
 - `metadata` (optional, JSON): jobId, externalMessageId, custom data

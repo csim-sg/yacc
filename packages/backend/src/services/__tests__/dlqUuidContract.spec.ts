@@ -180,7 +180,7 @@ describe('DLQ Service - UUID Contract Enforcement', () => {
     });
 
     it('should include traceability fields (correlationId, ircProfileId, externalThreadId)', async () => {
-      const ircProfileId = uuidv4();
+      const ircProfileId = 42; // IRC profile ID is a numeric database ID
 
       const mockInsert: MockInsertBuilder = {
         values: vi.fn().mockReturnThis(),

@@ -10,10 +10,11 @@
  * - Error handling
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { eq } from 'drizzle-orm';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { dbClient } from '../../infrastructure/db.client';
 import { conversations } from '../../schemas/conversation.schema';
+import type { Conversation } from '../../schemas/conversation.schema';
 import { conversationTags } from '../../schemas/conversationTag.schema';
 import { tags } from '../../schemas/tag.schema';
 import { users } from '../../schemas/user.schema';
@@ -23,7 +24,6 @@ import {
   bulkTag,
   bulkUpdateStatus,
 } from '../../services/bulkActions.service';
-import type { Conversation } from '../../schemas/conversation.schema';
 
 // Mock audit service
 vi.mock('../../services/audit.service', () => ({

@@ -4,9 +4,9 @@
  * Tests emoji reaction events
  */
 
+import type { Socket } from 'socket.io';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ReactionController } from '../reaction.controller';
-import type { Socket } from 'socket.io';
 
 describe('ReactionController', () => {
   let controller: ReactionController;

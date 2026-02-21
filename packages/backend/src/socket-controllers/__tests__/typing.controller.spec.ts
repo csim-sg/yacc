@@ -4,15 +4,13 @@
  * Tests typing indicator events and timeouts
  */
 
+import type { Socket } from 'socket.io';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TypingController } from '../typing.controller';
-import type { Socket } from 'socket.io';
-import type { AuthenticatedSocket } from '../../websockets/auth.middleware';
 
 describe('TypingController', () => {
   let controller: TypingController;
   let mockSocket: Partial<Socket>;
-  let mockAuthSocket: Partial<AuthenticatedSocket>;
 
   beforeEach(() => {
     controller = new TypingController();
@@ -28,12 +26,6 @@ describe('TypingController', () => {
         to: vi.fn().mockReturnValue({ emit: vi.fn() }),
       },
     } as unknown as Partial<Socket>;
-
-    mockAuthSocket = {
-      ...mockSocket,
-      userId: 'user-999',
-      role: 'user',
-    };
   });
 
   describe('onTypingStarted', () => {

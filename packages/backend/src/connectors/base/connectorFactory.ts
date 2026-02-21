@@ -4,18 +4,26 @@
  * Factory pattern for creating platform connector instances.
  */
 
-import type { Platform } from '@yacc/common/types/platform.type';
+import { ConnectionError } from '@yacc/common/types/connectionError.class';
 import type { ConnectorConfig } from '@yacc/common/types/connectorConfig.type';
 import type { IConnector } from '@yacc/common/types/iConnector.interface';
+import type { Platform } from '@yacc/common/types/platform.type';
 import type { ValidationError } from '@yacc/common/types/validationError.interface';
-import { ConnectionError } from '@yacc/common/types/connectionError.class';
 
 // ============================================
 // Placeholder imports (will be replaced when connectors are implemented)
 // ============================================
 
-let TelegramConnectorClass: any;
-let IRCConnectorClass: any;
+type TelegramConnectorConstructor = new (
+  config: ConnectorConfig<'telegram'>
+) => IConnector<'telegram'>;
+
+type IRCConnectorConstructor = new (
+  config: ConnectorConfig<'irc'>
+) => IConnector<'irc'>;
+
+let TelegramConnectorClass: TelegramConnectorConstructor | undefined;
+let IRCConnectorClass: IRCConnectorConstructor | undefined;
 
 // ============================================
 // Connector Factory
@@ -111,10 +119,12 @@ export class ConnectorFactory {
   /**
    * Register connector classes (to be called during app initialization)
    */
-  static registerConnectors(telegramConnector: any, ircConnector: any): void {
+  static registerConnectors(
+    telegramConnector: TelegramConnectorConstructor,
+    ircConnector: IRCConnectorConstructor
+  ): void {
     TelegramConnectorClass = telegramConnector;
     IRCConnectorClass = ircConnector;
   }
 }
-
 

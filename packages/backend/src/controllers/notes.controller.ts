@@ -4,8 +4,6 @@
  */
 
 import type { Request } from 'express';
-import type { AuthUser } from '../types/auth.types';
-import type { CreateNoteRequest } from '../types/notes.types';
 import {
   JsonController,
   Get,
@@ -20,8 +18,10 @@ import {
   NotFoundError,
   QueryParam,
 } from 'routing-controllers';
-import { notesService } from '../services/notes.service';
 import { logger } from '../infrastructure/logger';
+import { notesService } from '../services/notes.service';
+import type { AuthUser } from '../types/auth.types';
+import type { CreateNoteRequest } from '../types/notes.types';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;
