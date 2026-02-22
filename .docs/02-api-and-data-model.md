@@ -39,17 +39,119 @@
 - **Timestamps**: ISO-8601 strings (UTC)
 - **IDs**: UUID strings (unless noted)
 
-### Pagination
-- **Query Params**: `page` (default 1), `pageSize` (default 20)
-- **Response**:
-  ```json
-  {
-    "data": [...],
-    "page": 1,
-    "pageSize": 20,
-    "total": 150
+### Pagination (Standard Contract)
+
+All list/search endpoints MUST use the standard request/response contracts from `@yacc/common`.
+
+#### BaseListRequest (Request Shape)
+
+All list requests extend `BaseListRequest` from `@yacc/common/requests/base-list.request`:
+
+```typescript
+class BaseListRequest {
+  page?: number = 0;       // 0-indexed internally
+  limit?: number = 15;     // Default page size
+  searchText?: string;     // Optional search term
+
+  getPage(): number;       // Validated page number
+  getLimit(): number;      // Validated limit (must be in allowed set)
+  getSearch(): string;     // Search text or empty string
+  getOffset(): number;     // Calculated offset (page * limit)
+}
+```
+
+**Extending for Feature-Specific Filters:**
+```typescript
+// Example: ListConversationsRequest extends BaseListRequest
+class ListConversationsRequest extends BaseListRequest {
+  channel?: 'telegram' | 'irc';
+  status?: 'open' | 'pending' | 'resolved';
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  assignedUserId?: string;
+  tagId?: number;
+  // ... additional filters
+}
+```
+
+#### BaseListResponse<T> (Response Shape)
+
+All list endpoints return `BaseListResponse<T>` from `@yacc/common/responses/base-list.response`:
+
+```typescript
+class BaseListResponse<T> {
+  data: T[];      // Array of items
+  page: number;   // Current page (1-indexed for API consumers)
+  limit: number;  // Items per page
+  total: number;  // Total count of items matching filters
+}
+```
+
+**Standard Response Example:**
+```json
+{
+  "data": [...],
+  "page": 1,
+  "limit": 20,
+  "total": 150
+}
+```
+
+#### Rules
+
+1. **Backend Controllers**: MUST return `BaseListResponse<T>` or extension
+2. **Frontend API Calls**: MUST expect `BaseListResponse<T>` shape
+3. **No Ad-Hoc Shapes**: Don't create custom pagination response structures
+4. **Extension Only If Needed**: Only extend `BaseListResponse<T>` if additional metadata required
+
+#### Backend PaginationRequest Helper
+
+Backend controllers use `PaginationRequest` (extends `BaseListRequest`) with Drizzle ORM helpers:
+
+```typescript
+// packages/backend/src/utilities/pagination.ts
+class PaginationRequest extends BaseListRequest {
+  applyToQuery<T extends PgSelect>(query: T): T;  // Base: applies .limit().offset()
+  getOffset(): number;                             // page * limit
+}
+```
+
+**Feature-specific query classes override `applyToQuery()` to add BOTH filtering AND pagination:**
+
+```typescript
+// packages/backend/src/types/conversations.types.ts
+class ListConversationsQuery extends PaginationRequest {
+  channel?: 'telegram' | 'irc';
+  status?: 'open' | 'pending' | 'resolved';
+  // ... filters
+
+  override applyToQuery<T extends PgSelect>(query: T): T {
+    // Build where conditions from filters
+    const conditions = [];
+    if (this.channel) conditions.push(eq(conversations.channel, this.channel));
+    if (this.status) conditions.push(eq(conversations.status, this.status));
+
+    // Apply where + pagination in one call
+    let result = query;
+    if (conditions.length > 0) {
+      result = result.where(and(...conditions)) as T;
+    }
+    return super.applyToQuery(result); // Adds .limit().offset()
   }
-  ```
+}
+```
+
+**Controller Usage (single applyToQuery call):**
+```typescript
+@Get()
+async listConversations(
+  @QueryParams() query: ListConversationsQuery
+): Promise<BaseListResponse<Conversation>> {
+  // applyToQuery handles BOTH filtering AND pagination
+  const results = await query.applyToQuery(db.select().from(conversations));
+  const total = await conversationService.count(query);
+  return new BaseListResponse(results, total, query);
+}
+```
 
 ### Error Handling
 ```json

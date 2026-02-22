@@ -3,7 +3,7 @@
 **Last Updated**: February 22, 2026  
 **Status**: ✅ Phase 1.4 Complete (BE-006, FE-012A/B, FE-016/017/019); ⏳ Phase 2 pending (collaboration + rules)  
 **Current focus**: Phase 2 execution (tags/notes/assignments/rules) OR Phase 1.4 refinements (attachments, audit logs, status display)  
-**Latest**: ✅ All 6 tasks merged (PR #294, #295, #296, #297, #298); 350+ tests passing; 85%+ coverage  
+**Latest**: ✅ All 6 tasks merged (PR #294, #295, #296, #297, #298); 350+ tests passing; 85%+ coverage; DEV-016/017/018 created for API hygiene (endpoint alignment + list contracts)  
 **Governance**: ADR-003, ADR-005, ADR-014, ADR-015, GOV-005, GOV-026, GOV-030
 
 ---
@@ -204,6 +204,9 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | DEV-013 | ADR-019: Standardize CI/CD to K3s + Helm | Not Started | P0 | Architect | - | ADR-019 approved; docs updated (technology + implementation + quick reference); environment assumptions documented; rollback approach captured | PVTI_lAHOAB4wV84BNGcwzgl42n4 | 287 |
 | DEV-014 | Create Helm charts for YACC + dependencies (MVP) | Not Started | P0 | Backend | DEV-013 | Helm charts exist for backend (and frontend if deployed in-cluster); PostgreSQL + Redis installed via Helm; values separated per env; `helm upgrade --install` is idempotent; smoke deploy works on K3s | PVTI_lAHOAB4wV84BNGcwzgl42oQ | 288 |
 | DEV-015 | Update CI pipeline to deploy to K3s using Helm | Not Started | P0 | Backend | DEV-014 | GitHub Actions deploy job uses Helm; deploys to staging namespace; rollback documented; no kubectl imperative drift; pipeline passes | PVTI_lAHOAB4wV84BNGcwzgl42ok | 289 |
+| DEV-016 | Align controller names with endpoint paths (code hygiene) | Not Started | P1 | Backend | - | Controller file names match endpoint base paths; `assignments.controller.ts` → `/api/assignments`; `bulkActions.controller.ts` → `/api/bulk-actions`; remove duplicate `tags.controller.ts`; `conversationId` in body/query not path params; API docs updated; frontend calls updated | - | 300 |
+| DEV-017 | Standardize list request/response contracts (BaseListRequest/Response) | Not Started | P1 | Backend, Frontend | - | All list endpoints return `BaseListResponse<T>`; all list requests extend `BaseListRequest`; frontend expects consistent `{ data, page, limit, total }` shape; remove `IListResponse` interface; common package exports updated | - | 301 |
+| DEV-018 | Create PaginationRequest helper for Drizzle ORM query building | Not Started | P1 | Backend | DEV-017 | `PaginationRequest` class in `utilities/pagination.ts`; base `applyToQuery()` applies .limit().offset(); feature query classes override `applyToQuery()` to add where conditions + pagination; single `query.applyToQuery(baseSelect)` call in controllers; no manual offset/limit/where in controllers; unit tests | - | 302 |
 
 ### Frontend Tasks
 
@@ -413,35 +416,6 @@ This document provides the complete execution plan for all 22 P0 Backend issues 
 **Timeline**: 3 weeks (15 business days)
 **Team**: Backend Developer(s)
 **Scope**: Authentication, RBAC, Core APIs, Real-Time WebSocket, Message Retry Queue
-
----
-
-## Quick Reference: Issue Status
-
-| Issue ID | Title | Status | Dependencies | Week |
-|----------|-------|--------|--------------|------|
-| **BE-028** | Create shared types package | **Done** | None | 1 |
-| **BE-026** | Create environment configuration scaffolding | **Ready** | None | 1 |
-| **BE-001** | Set up PostgreSQL + Drizzle ORM | **Done** | None | 1 |
-| **BE-002** | Define database schema (11 tables) | **Done** | BE-001 | 1 |
-| **BE-027** | Set up structured logging infrastructure | **Ready** | BE-026 | 1 |
-| **BE-020** | Set up Cloudflare R2 storage | **Ready** | None | 1 |
-| **BE-025** | Set up email service (Nodemailer/SendGrid) | **Ready** | BE-026 | 1 |
-| **BE-003** | Implement BetterAuth for authentication | **Ready** | BE-002, BE-025 | 1 |
-| **BE-004** | Implement forgot password flow | **Ready** | BE-003, BE-025 | 1 |
-| **BE-005** | Implement RBAC middleware | **Ready** | BE-002, BE-003 | 1 |
-| **BE-016** | Set up Socket.io WebSocket server | **Ready** | BE-003, BE-026 | 1 |
-| **BE-013** | Set up Redis + BullMQ for message retry queue | **Done** | None | 2 |
-| **BE-007** | Implement inbox API | **Done** (PR #227 merged) | BE-002, BE-005 | 2 |
-| **BE-008** | Implement conversation detail endpoint | **Done** (PR #227 merged) | BE-007 | 2 |
-| **BE-009** | Implement message retrieval endpoint | **Done** (PR #240 merged) | BE-002, BE-003, BE-008 | 2 |
-| **BE-010** | Implement send message endpoint | **Done** (PR #240 merged) | BE-008, BE-013, BE-020 | 2 |
-| **BE-014** | Implement exponential backoff for retries | **Done** (PR #242 merged) | BE-013 | 3 |
-| **BE-011** | Implement message status tracking | **Done** (PR #241) | BE-010 | 3 |
-| **BE-012** | Implement message retry endpoint | Ready | BE-011 | 3 |
-| **BE-017** | Implement message.received event | Ready | BE-016, BE-008 | 3 |
-| **BE-018** | Implement message.sent event | Ready | BE-016, BE-008, BE-010 | 3 |
-| **BE-019** | Implement message.failed event | Ready | BE-016, BE-008, BE-010 | 3 |
 
 ---
 
