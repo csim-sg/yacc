@@ -1,10 +1,10 @@
 # 06. Issues & User stories
 
 **Last Updated**: February 22, 2026  
-**Status**: ✅ Phase 1 P0 Core Complete (auth + inbox + messaging + IRC + WebSocket); ⏳ Phase 2 pending (collaboration + rules)  
-**Current focus**: Phase 1.4+ refinements (attachments, audit logs, admin panels) + Phase 2 execution (tags/notes/rules)  
-**Latest**: PR #297 (FE-017 IRC Test Button) and PR #298 (FE-019 Users List) merged to dev  
-**Governance**: ADR-003, ADR-014, ADR-015, GOV-026
+**Status**: ✅ Phase 1.4 Complete (BE-006, FE-012A/B, FE-016/017/019); ⏳ Phase 2 pending (collaboration + rules)  
+**Current focus**: Phase 2 execution (tags/notes/assignments/rules) OR Phase 1.4 refinements (attachments, audit logs, status display)  
+**Latest**: ✅ All 6 tasks merged (PR #294, #295, #296, #297, #298); 350+ tests passing; 85%+ coverage  
+**Governance**: ADR-003, ADR-005, ADR-014, ADR-015, GOV-005, GOV-026, GOV-030
 
 ---
 
@@ -149,7 +149,7 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | BE-003 | Implement BetterAuth for authentication (email/password, session/JWT) | **Done** | P0 | Backend | BE-002 | Login endpoint working, JWT/session management functional, rate limiting added, 194 tests passing | PVTI_lAHOAB4wV84BNGcwzgj_5rc | 18 |
 | BE-004 | Implement forgot password flow (reset token, email sending) | **Done** | P1 | Backend | BE-003 | POST /auth/forgot-password and /reset-password working | PVTI_lAHOAB4wV84BNGcwzgj_5sM | 19 |
 | BE-005 | Implement RBAC middleware (4 roles: Super Admin, Admin, Manager, User) | **Done** | P0 | Backend | BE-002, BE-003 | Permission checks working for all role-based endpoints | PVTI_lAHOAB4wV84BNGcwzgj_5rU | 20 |
-| BE-006 | Create user management endpoints (CRUD for users, roles) | Deferred (Post-MVP) | P1 | Backend | BE-005 | GET/POST/PUT/DELETE /users, /roles working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_5rk | 17 |
+| BE-006 | Create user management endpoints (CRUD for users, roles) | **Done** (PR #294 merged) | P1 | Backend | BE-005 | GET/POST/PUT/DELETE /users, /roles working with RBAC; soft-delete; audit logging; 70 tests ✅ | PVTI_lAHOAB4wV84BNGcwzgj_5rk | 17 |
 | BE-007 | Implement inbox API (GET /conversations with filters: channel, assignee, tag, status, priority) | **Done** (PR #227 merged) | P0 | Backend | BE-002, BE-005 | Filtering and pagination working ✅ | PVTI_lAHOAB4wV84BNGcwzgj_5sA | 14 |
 | BE-008 | Implement conversation detail endpoint (GET /conversations/:id) | **Done** (PR #227 merged) | P0 | Backend | BE-007 | Returns conversation with messages and metadata ✅ | PVTI_lAHOAB4wV84BNGcwzgj_5rM | 15 |
 | BE-009 | Implement message retrieval endpoint (GET /conversations/:id/messages) | **Done** (PR #240 merged) | P0 | Backend | BE-002, BE-008 | Returns paginated messages with direction (inbound/outbound) | PVTI_lAHOAB4wV84BNGcwzgj_5r4 | 10 |
@@ -224,9 +224,9 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | FE-013 | Implement message.received event listener (real-time inbox update) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-017 | New inbound messages appear in inbox without refresh | PVTI_lAHOAB4wV84BNGcwzgj_9W0 | 51 |
 | FE-014 | Implement message.sent event listener (update message status in UI) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-018 | Message status changes to sent in real-time | PVTI_lAHOAB4wV84BNGcwzgj_6NU | 58 |
 | FE-015 | Implement message.failed event listener (show failed status) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-019 | Failed messages updated in UI, retry button appears | PVTI_lAHOAB4wV84BNGcwzgj_6MI | 49 |
-| FE-012A | Implement WebSocket client with one-definition-per-file structure | Deferred | P0 | Frontend | FE-012, GOV-005 | Follow GOV-005 guidance for constants, types, and service file structure. Blocked: WebSocket client not implemented yet | PVTI_lAHOAB4wV84BNGcwzgldplA | 252 |
-| FE-012B | Implement WebSocket client observability (metrics, traces, SLO) | Deferred | P0 | Frontend | FE-012, GOV-005 | Emit all required metrics per GOV-005; define SLOs in governance log. Blocked: WebSocket client not implemented yet | PVTI_lAHOAB4wV84BNGcwzgldplY | 253 |
-| FE-016 | Implement admin panel - IRC configuration (server, port, username, password inputs) | Not Started | P0 | Frontend | FE-002, BE-026 | Form to save IRC credentials, validation working | PVTI_lAHOAB4wV84BNGcwzgj_6No | 54 |
+| FE-012A | Implement WebSocket client with one-definition-per-file structure | **Done** (PR #295 merged) | P0 | Frontend | FE-012, GOV-005 | 20 files (GOV-005 compliant); WebSocketConnectionManager, EventHandler, Logger; exponential backoff; 63 tests ✅ | PVTI_lAHOAB4wV84BNGcwzgldplA | 252 |
+| FE-012B | Implement WebSocket client observability (metrics, traces, SLO) | **Done** (PR #296 merged) | P0 | Frontend | FE-012A, GOV-005 | 8 metrics; SLOMonitor; pluggable MetricsSink; GOV-030 created; 130 tests ✅ | PVTI_lAHOAB4wV84BNGcwzgldplY | 253 |
+| FE-016 | Implement admin panel - IRC configuration (server, port, username, password inputs) | **Done** (PR merged) | P0 | Frontend | FE-002, BE-026 | 6 input components; real-time validation; Zustand store; DaisyUI; 46 unit tests ✅ | PVTI_lAHOAB4wV84BNGcwzgj_6No | 54 |
 | FE-017 | Implement IRC connection test button (connects to server, shows success/error) | **Done** (PR #297 merged) | P0 | Frontend | FE-016, BE-027 | Button triggers test, displays result message | PVTI_lAHOAB4wV84BNGcwzgj_6Nk | 66 |
 | FE-018 | Implement IRC connection status display (connected/retrying/disconnected/failed) | Not Started | P0 | Frontend | FE-016 | Status badge visible in admin panel, updates in real-time | PVTI_lAHOAB4wV84BNGcwzgj_6MA | 47 |
 | FE-019 | Implement admin panel - users list (table with email, role, status, edit/delete actions) | **Done** (PR #298 merged) | P1 | Frontend | FE-002, BE-006 | Users table functional, CRUD operations working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_6L4 | 52 |
