@@ -32,7 +32,7 @@ import { NotesController } from './notes.controller.js';
 import { NotificationsController } from './notifications.controller.js';
 import { QueueController } from './queue.controller.js';
 import { RoutingRulesController } from './routing-rules.controller.js';
-import { TagsController } from './tags.controller.js';
+import { TagController } from './tag.controller.js';
 import { UsersController } from './users.controller.js';
 
 export const controllers = [
@@ -50,6 +50,6 @@ export const controllers = [
   NotificationsController,
   QueueController,
   RoutingRulesController,
-  TagsController,
+  TagController,
   UsersController,
 ];

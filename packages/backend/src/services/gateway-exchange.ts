@@ -16,6 +16,7 @@ import { randomUUID } from 'crypto';
 import { and, eq } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
+import type { PlatformAdapter } from '../infrastructure/types/adapter.interface';
 import { conversations } from '../schemas/conversation.schema';
 import { messages } from '../schemas/message.schema';
 import type {
@@ -26,12 +27,11 @@ import type {
   Platform,
   SendResult,
 } from '../types/gateway.types';
-import { auditService } from './audit.service';
-import { dlqService } from './dlq.service';
-import { conversationService } from './conversation.service';
-import { emitToConversation, isWebSocketGatewayAvailable } from './websocket/websocket-gateway';
-import type { PlatformAdapter } from '../infrastructure/types/adapter.interface';
 import type { MessageReceivedPayload } from '../types/websocket.types';
+import { auditService } from './audit.service';
+import { conversationService } from './conversation.service';
+import { dlqService } from './dlq.service';
+import { emitToConversation, isWebSocketGatewayAvailable } from './websocket/websocket-gateway';
 
 /**
  * Circuit breaker configuration
@@ -449,7 +449,7 @@ export class GatewayExchange {
   private async createInboundMessage(
     event: InboundMessageEvent,
     conversationId: string,
-    correlationId: string
+    _correlationId: string
   ): Promise<{ id: string } | null> {
     // Use conversationService.createMessage which handles auto-reopen
     const { message } = await conversationService.createMessage({

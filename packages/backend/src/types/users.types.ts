@@ -3,8 +3,7 @@
  * DTOs and interfaces for user CRUD operations (BE-006)
  */
 
-import type { UserRole } from './auth.types';
-import type { UserStatus } from './auth.types';
+import type { UserRole , UserStatus } from './auth.types';
 
 /**
  * User response DTO (returned by API)

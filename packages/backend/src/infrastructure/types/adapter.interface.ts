@@ -12,7 +12,7 @@
  * @see ADR-005 Addendum-2 - PlatformAdapter Interface
  */
 
-import { EventEmitter } from 'events';
+import type { EventEmitter } from 'events';
 import type {
   AdapterStatus,
   HealthCheckResult,

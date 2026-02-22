@@ -17,6 +17,7 @@ import {
   QueryParam,
   BadRequestError,
 } from 'routing-controllers';
+import { usersService } from '../services/users.service';
 import type { AuthUser } from '../types/auth.types';
 import type {
   CreateUserBody,
@@ -28,7 +29,6 @@ import type {
   UpdateUserBody,
   UpdateUserResponse,
 } from '../types/users.types';
-import { usersService } from '../services/users.service';
 
 /**
  * Parse and validate positive integer from query param

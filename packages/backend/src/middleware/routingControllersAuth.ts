@@ -59,9 +59,16 @@ export async function authorizationChecker(
       if (!betterAuthClient) {
         return false;
       }
-      const session = await betterAuthClient.api.getSession({
-       headers: request.headers,
-     });
+       // Convert Node.js headers to HeadersInit compatible format
+       const headers = new Headers();
+       for (const [key, value] of Object.entries(request.headers)) {
+         if (value !== undefined) {
+           headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+         }
+       }
+       const session = await betterAuthClient.api.getSession({
+         headers,
+       });
 
      let userId: string | undefined;
      
@@ -165,8 +172,15 @@ export async function currentUserChecker(
       if (!betterAuthClient) {
         return undefined;
       }
+      // Convert Node.js headers to HeadersInit compatible format
+      const headers = new Headers();
+      for (const [key, value] of Object.entries(request.headers)) {
+        if (value !== undefined) {
+          headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+        }
+      }
       const session = await betterAuthClient.api.getSession({
-        headers: request.headers,
+        headers,
       });
 
      let userId: string | undefined;

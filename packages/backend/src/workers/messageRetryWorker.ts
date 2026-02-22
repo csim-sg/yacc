@@ -3,6 +3,9 @@
  *
  * BullMQ worker that processes retry jobs for failed outbound messages.
  * Implements exponential backoff retry strategy.
+ *
+ * DEV-006: Uses gateway-exchange for unified outbound dispatch.
+ * @see ADR-005 Addendum-2 - Gateway-Exchange Pattern
  */
 
 import type { Platform } from '@yacc/common/types/platform.type';
@@ -13,8 +16,9 @@ import { logger } from '../infrastructure/logger.js';
 import { redisClient } from '../infrastructure/redis.client.js';
 import { conversations } from '../schemas/conversation.schema.js';
 import { messages } from '../schemas/message.schema.js';
-import { connectorManager } from '../services/connector-manager.js';
+import { gatewayExchange } from '../services/gateway-exchange.js';
 import { MessageStatusTracker } from '../services/messageStatusTracker.js';
+import type { OutboundMessagePayload } from '../types/gateway.types.js';
 import type { SendMessageJobPayload } from '../types/message-queue.types.js';
 
 // ============================================
@@ -91,9 +95,10 @@ export function getRetryWorker(): Worker<SendMessageJobPayload> {
 /**
  * Process a retry job
  *
- * Fetches message from DB, attempts to resend via connector,
+ * Fetches message from DB, attempts to resend via gateway-exchange,
  * and updates status or moves to DLQ based on result
  *
+ * DEV-006: Uses gateway-exchange for unified outbound dispatch.
  * Export for testing purposes
  */
 export async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<void> {
@@ -159,12 +164,6 @@ export async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<
 
     platform = platformType as unknown as Platform;
 
-    // Get connector for this platform
-    const connector = connectorManager.getConnector(platformType);
-    if (!connector) {
-      throw new Error(`No connector registered for platform: ${platformType}`);
-    }
-
     // Use correlationId from payload or fall back to stored value in message.metadata
     // This ensures correlationId is propagated end-to-end even for retries
     const messageMetadata = typeof message.metadata === 'object' && message.metadata !== null
@@ -172,39 +171,29 @@ export async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<
       : {};
     traceCorrelationId = correlationId || (messageMetadata.correlationId as string | undefined);
 
-    // Call connector to send message
-    const sendRequest = {
-      messageId,
+    // Build outbound payload for gateway-exchange
+    const outboundPayload: OutboundMessagePayload = {
       conversationId,
-      recipientId,
       body,
-      platformType: platformType as 'telegram' | 'irc' | 'whatsapp' | 'weChat' | 'meta' | 'twitter',
+      userId: message.senderId || 'system',
       correlationId: traceCorrelationId,
+      metadata: {
+        recipientId,
+        retryCount,
+      },
     };
 
-    const response = await connector.sendMessage(sendRequest);
+    // Dispatch via gateway-exchange (handles adapter lookup, sending, status updates)
+    const result = await gatewayExchange.handleOutbound(outboundPayload, messageId);
 
-    if (response.success) {
-      // Update message with external ID and mark as sent
-      await dbClient
-        .update(messages)
-        .set({
-          externalMessageId: response.platformMessageId,
-          status: 'sent',
-          metadata: {
-            sentAt: response.sentAt,
-            platform: platformType,
-          },
-        })
-        .where(eq(messages.id, messageId));
-
+    if (result.success) {
       // Track sent status via MessageStatusTracker for WebSocket emission
       await MessageStatusTracker.trackSentMessage({
         messageId,
         conversationId,
         status: 'sent',
         platform,
-        timestamp: new Date(response.sentAt),
+        timestamp: result.timestamp,
       });
 
       logger.info(
@@ -213,14 +202,15 @@ export async function processRetryJob(job: Job<SendMessageJobPayload>): Promise<
           conversationId,
           retryCount,
           platformType,
-          platformMessageId: response.platformMessageId,
+          externalMessageId: result.externalMessageId,
           correlationId: traceCorrelationId,
         },
-        'Message retry succeeded'
+        'Message retry succeeded via gateway-exchange'
       );
     } else {
-      // Connector returned failure
-      throw new Error(response.error || 'Connector returned failure');
+      // Gateway returned failure - status already updated by gateway-exchange
+      const errorMsg = result.error?.message || 'Gateway dispatch failed';
+      throw new Error(errorMsg);
     }
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';

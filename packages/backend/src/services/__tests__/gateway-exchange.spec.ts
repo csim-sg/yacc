@@ -4,16 +4,17 @@
  * Tests the central hub for message orchestration between platforms and YACC.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
-import { GatewayExchange } from '../gateway-exchange';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { MockAdapter } from '../../../tests/utils/MockAdapter';
+import type { PlatformAdapter } from '../../infrastructure/types/adapter.interface';
 import type {
   InboundMessageEvent,
   OutboundMessagePayload,
   Platform,
   SendResult,
 } from '../../types/gateway.types';
-import type { PlatformAdapter } from '../../infrastructure/types/adapter.interface';
+import { GatewayExchange } from '../gateway-exchange';
 
 // Mock dependencies
 const mockSelect = vi.fn(() => ({
@@ -85,43 +86,6 @@ vi.mock('../websocket/websocket-gateway', () => ({
   isWebSocketGatewayAvailable: vi.fn(() => true),
   emitToConversation: vi.fn(),
 }));
-
-/**
- * Mock adapter for testing
- */
-class MockAdapter extends EventEmitter implements PlatformAdapter {
-  readonly platform: Platform = 'irc';
-  status: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected';
-  private sendResult: SendResult = { success: true, timestamp: new Date() };
-
-  setSendResult(result: SendResult): void {
-    this.sendResult = result;
-  }
-
-  async connect(): Promise<void> {
-    this.status = 'connecting';
-    this.status = 'connected';
-    this.emit('adapter:connected');
-  }
-
-  async disconnect(): Promise<void> {
-    this.status = 'disconnected';
-    this.emit('adapter:disconnected', { reason: 'manual' });
-  }
-
-  async healthCheck(): Promise<{ healthy: boolean; details?: string }> {
-    return { healthy: this.status === 'connected' };
-  }
-
-  async send(_message: OutboundMessagePayload): Promise<SendResult> {
-    return this.sendResult;
-  }
-
-  // Helper to simulate inbound message
-  simulateInboundMessage(event: InboundMessageEvent): void {
-    this.emit('message:inbound', event);
-  }
-}
 
 describe('GatewayExchange', () => {
   let gateway: GatewayExchange;

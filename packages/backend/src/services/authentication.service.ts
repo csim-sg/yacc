@@ -13,8 +13,8 @@
  * @see ADR-005 Addendum-2 - Auth Service Consolidation
  */
 
-import type { AuthUser } from '../types/auth.types';
 import { logger } from '../infrastructure/logger';
+import type { AuthUser } from '../types/auth.types';
 import { login, logout, getSession, type LoginResponse } from './login.service';
 import { generateResetToken, resetPassword } from './passwordReset.service';
 import { usersService } from './users.service';
