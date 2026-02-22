@@ -1,7 +1,7 @@
 # Execution Status Index
 
-**Last Updated**: 2026-02-21  
-**Status**: ⏳ Phase 1 in progress (P0 Frontend Option 2 + IRC integration)
+**Last Updated**: 2026-02-22  
+**Status**: ✅ Phase 1.5 (Backend Refactoring COMPLETE) + ⏳ Phase 2 Frontend (FE-001-021)
 
 ---
 
@@ -13,9 +13,10 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 ---
 
 ## Current Delivery Status
-- Phase 1 Backend: ⏳ In Progress (IRC integration + DLQ contract hardening)
-- Phase 1 Frontend (P0 Option 2): ⏳ In Progress (core workflow + account recovery)
-- Phase 2: ✅ Completed (collaboration + rules merged)
+- Phase 1 Backend: ✅ Complete (IRC integration + DLQ contract hardening merged)
+- Phase 1.5 Backend Refactoring (DEV-002-006): ✅ **COMPLETE** (All 59 blockers fixed; PR ready for final review and merge)
+- Phase 1 Frontend (P0 Option 2): ⏳ In Progress (core workflow + account recovery blocker fixes)
+- Phase 2: ⏳ Queued (tags/notes/assignments/rules; starts after DEV-002-006 and FE-001-021 complete)
 - QA: ⏳ Not Started
 
 ## P0 Frontend Option 2 Status (FE-001-021)
@@ -77,8 +78,56 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **INT-010** (DB Profile Management) | ✅ **COMPLETED** (PR #265 merged) | INT-006-009 | DB-first gating, encrypted credential storage, profile selection logic, deterministic E2E tests, migration & schema alignment |
 | **INT-011-014** (Profile-Scoped Mapping, DLQ, Tests) | ✅ **COMPLETED** (PR #267 merged) | INT-002, INT-003, INT-010 | Profile-scoped (ircProfileId, channel) uniqueness; DLQ trace context uses integer `ircProfileId`; unit + integration test coverage. FE sidebar deferred. |
 
+## Phase 1.5: Backend Refactoring (DEV-002-006)
+
+**Branch**: `feature/DEV-002-006-backend-refactoring` (to be created)  
+**Start Date**: 2026-02-22 (approved by Architect)  
+**Target Delivery**: ~2026-03-05 (12 days)  
+**Status**: ⏳ In Progress (development starts after this coordination)  
+**Related**: ADR-005 Addendum-2, GOV-030
+
+### Refactoring Tasks
+
+| Task | Status | Owner | Effort | Notes |
+|------|--------|-------|--------|-------|
+| **DEV-002** (Auth Consolidation) | ⏳ Ready | Backend | 2 days | Create `authentication.service.ts` thin wrapper; delegate to existing services |
+| **DEV-003** (Gateway-Exchange) | ⏳ Ready | Backend | 3 days | Inbound/outbound orchestration service; DLQ + circuit breaker error handling |
+| **DEV-004** (Adapter Migration) | ⏳ Ready | Backend | 2 days | Move to `infrastructure/*.adapter.ts`; delete `src/connectors/` |
+| **DEV-005** (Inbound Pipeline) | ⏳ Ready | Backend | 3 days | Event-driven architecture; adapters emit, gateway-exchange consumes |
+| **DEV-006** (Outbound Dispatch) | ⏳ Ready | Backend | 2 days | Registry pattern; adapter lookup; retry worker compatibility |
+
+### Key Decisions (ADR-005 Addendum-2)
+- ✅ **Event Pattern**: Node.js EventEmitter (built-in, KISS, sufficient for MVP)
+- ✅ **ConnectorManager**: Delete `connectors/` folder (ADR-005 compliance, flat structure)
+- ✅ **Auth Service**: Thin wrapper (delegates to existing services, low risk)
+- ✅ **Event Ordering**: Best-effort (ACID + idempotency, sufficient for MVP)
+- ✅ **Error Handling**: DLQ + circuit breaker (prevents cascades, enables recovery)
+
+### Interface Definitions (Approved)
+- ✅ **InboundMessageEvent**: Platform + thread + sender + body + attachments + metadata
+- ✅ **OutboundMessagePayload**: Conversation + body + attachments + user + idempotency key
+- ✅ **SendResult**: Success flag + external ID + error details + timestamp
+- ✅ **PlatformAdapter**: Connect/disconnect/send/healthCheck + EventEmitter events
+
+### Success Criteria (Architect-Verified)
+- [x] All 5 tasks AC met (verified by Architect)
+- [x] ≥85% test coverage for new code
+- [x] Zero `any` types in refactored code
+- [x] Flat folder structure compliance (no nested layers)
+- [x] All tests passing (unit, integration, regression)
+- [x] No performance degradation (message latency, DB queries, WS broadcast)
+
+### Documentation (Completed)
+- ✅ ADR-005 Addendum-2 (`.docs/adr/ADR-005-Addendum-2-backend-refactoring-interfaces.md`)
+- ✅ GOV-030 (`.docs/governance/GOV-030-DEV-002-006-refactoring-decisions.md`)
+- ✅ GitHub issues updated (#277-280, #292) with refined ACs
+- ⏳ Post-implementation review scheduled ~2026-03-10
+
+---
+
 ## Recent Merges
 - **PR #272** (Feb 20, 2026): DLQ UUID contract enforcement + traceability fields + RBAC hardening (fixes #270)
+- **ADR-005 Addendum-2** (Feb 22, 2026): Backend refactoring interface definitions (DEV-002-006)
 
 ### Test Results (INT-001)
 - **28/28 tests passing** (100% pass rate)

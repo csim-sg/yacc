@@ -1,14 +1,17 @@
 /**
  * Auth Controller (Aligned with BetterAuth)
- * 
+ *
  * BetterAuth provides comprehensive auth endpoints via its handler:
  * - /auth/sign-in/email (login)
  * - /auth/sign-out (logout)
  * - /auth/get-session (session)
  * - /auth/sign-up/email (register)
- * 
+ *
  * This controller also handles custom password reset flow
  * for forgot-password and reset-password endpoints.
+ *
+ * @updated DEV-002: Now uses AuthenticationService as single entry point
+ * @see ADR-005 Addendum-2 - Auth Service Consolidation
  */
 
 import { eq } from 'drizzle-orm';
@@ -19,7 +22,7 @@ import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
 import { loginRateLimiter, passwordResetRateLimiter } from '../middleware/rateLimit.middleware';
 import { users } from '../schemas/user.schema';
-import { generateResetToken, resetPassword } from '../services/passwordReset.service';
+import { authenticationService } from '../services/authentication.service';
 import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
 
 interface AuthenticatedRequest extends Request {
@@ -60,8 +63,8 @@ export class AuthController {
         };
       }
 
-        // Generate token using password reset service
-        const _token = await generateResetToken(user.id, correlationId);
+        // Generate token using authentication service (DEV-002)
+        const _token = await authenticationService.initiatePasswordReset(user.id, correlationId);
 
          // TODO: Send email via emailService when implemented
          // const resetLink = `${appConfig.APP_FRONTEND_URL}/reset-password?token=${_token}`;
@@ -104,8 +107,8 @@ export class AuthController {
       // Validate input using Zod schema
       const { token, newPassword } = ResetPasswordSchema.parse(body);
 
-      // Reset password (throws if token invalid/expired)
-      await resetPassword(token, newPassword, correlationId);
+      // Reset password using authentication service (DEV-002)
+      await authenticationService.completePasswordReset(token, newPassword, correlationId);
 
       logger.info('Password reset successful - correlationId: %s', correlationId);
 

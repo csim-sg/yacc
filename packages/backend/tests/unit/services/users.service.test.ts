@@ -24,6 +24,13 @@ describe('UsersService', () => {
     status?: 'active' | 'inactive' | 'suspended';
     passwordHash?: string;
   }) {
+    // First try to delete existing user to avoid conflicts
+    try {
+      await dbClient.delete(users).where(eq(users.id, userData.id));
+    } catch {
+      // Ignore if user doesn't exist
+    }
+
     const result = await dbClient
       .insert(users)
       .values({

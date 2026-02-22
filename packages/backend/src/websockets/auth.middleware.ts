@@ -43,11 +43,17 @@ export async function webSocketAuthMiddleware(
        return next(new Error('Authentication token required'));
      }
 
-       // Validate session with BetterAuth
-       type HeadersRecord = Record<string, string | string[] | undefined>;
-       const session = await betterAuthClient.api.getSession({
-         headers: socket.handshake.headers as HeadersRecord,
-       });
+        // Validate session with BetterAuth
+        // Convert socket headers to HeadersInit compatible format
+        const headers = new Headers();
+        for (const [key, value] of Object.entries(socket.handshake.headers)) {
+          if (value !== undefined) {
+            headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+          }
+        }
+        const session = await betterAuthClient.api.getSession({
+          headers,
+        });
 
      if (!session) {
        logger.warn('WebSocket connection rejected: Invalid session with socketId: %s', socket.id);

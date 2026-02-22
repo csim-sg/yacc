@@ -44,10 +44,18 @@ export class RulesEngineService {
         'Evaluating rules for message'
       );
 
-      // Evaluate each rule in priority order
-      for (const rule of activeRules) {
-        const conditions = (rule.conditions as unknown as RoutingCondition[]) || [];
-        const actions = (rule.actions as unknown as RoutingAction[]) || [];
+       // Evaluate each rule in priority order
+       for (const rule of activeRules) {
+         // Safely parse conditions - ensure it's always an array
+         const rawConditions = rule.conditions;
+         const conditions = Array.isArray(rawConditions) 
+           ? rawConditions as RoutingCondition[] 
+           : [];
+         // Safely parse actions - ensure it's always an array
+         const rawActions = rule.actions;
+         const actions = Array.isArray(rawActions) 
+           ? rawActions as RoutingAction[] 
+           : [];
 
         // Check if all conditions match (AND logic)
         const allConditionsMatch = await this.evaluateConditions(

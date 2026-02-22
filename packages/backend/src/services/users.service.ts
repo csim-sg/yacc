@@ -4,7 +4,8 @@
  */
 
 import * as bcrypt from 'bcryptjs';
-import { and, count, eq, ilike, isNull, ne, SQL } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
+import { and, count, eq, ilike, isNull, ne } from 'drizzle-orm';
 import { sign } from 'jsonwebtoken';
 import { BadRequestError, ForbiddenError, NotFoundError } from 'routing-controllers';
 import { appConfig } from '../config/appConfig';

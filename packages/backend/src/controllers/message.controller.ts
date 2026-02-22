@@ -168,8 +168,8 @@ export class MessageController {
         return;
       }
 
-      // Validate role (user and manager can send, admin and super_admin cannot)
-      const allowedRoles = ['user', 'manager'];
+      // Validate role (user, manager, admin, and super_admin can send messages)
+      const allowedRoles = ['user', 'manager', 'admin', 'super_admin'];
       if (!allowedRoles.includes(userRole || '')) {
         logger.warn(
           {
@@ -180,7 +180,7 @@ export class MessageController {
           },
           'Unauthorized message send attempt'
         );
-        res.status(403).json({ error: 'Only users and managers can send messages' });
+        res.status(403).json({ error: 'Insufficient permissions to send messages' });
         return;
       }
 

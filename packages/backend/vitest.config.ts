@@ -76,6 +76,10 @@ export default defineConfig({
     // Test isolation
     isolate: true,
 
+    // Disable file parallelism to prevent DB race conditions
+    // Tests share the same database and can interfere with each other
+    fileParallelism: false,
+
     // Mock reset between tests
     mockReset: true,
     restoreMocks: true,
