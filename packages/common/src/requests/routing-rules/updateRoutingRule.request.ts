@@ -1,28 +1,29 @@
 import { IsOptional, IsString, IsInt, IsEnum, Min } from 'class-validator';
 
 /**
- * Create Routing Rule Request
- * Body parameters for creating a new routing rule
+ * Update Routing Rule Request
+ * Body parameters for updating an existing routing rule
  *
- * @see POST /api/rules
- * @see RBAC: admin+ (managers cannot create rules)
+ * @see PATCH /api/rules/:id
+ * @see RBAC: admin+ (managers cannot modify rules)
  */
-export class CreateRoutingRuleRequest {
-  /** Rule display name (required) */
+export class UpdateRoutingRuleRequest {
+  /** Rule display name */
+  @IsOptional()
   @IsString()
-  name!: string;
+  name?: string;
 
   /** Rule description */
   @IsOptional()
   @IsString()
   description?: string;
 
-  /** Rule status (active or disabled, defaults to active) */
+  /** Rule status (active or disabled) */
   @IsOptional()
   @IsEnum(['active', 'disabled'])
   status?: 'active' | 'disabled';
 
-  /** Priority order (lower = higher priority, evaluated first) */
+  /** Priority order (lower = higher priority) */
   @IsOptional()
   @IsInt()
   @Min(1)
