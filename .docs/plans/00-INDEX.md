@@ -1,7 +1,7 @@
 # Execution Status Index
 
-**Last Updated**: 2026-02-22  
-**Status**: ✅ Phase 1.5 (Backend Refactoring COMPLETE) + ⏳ Phase 2 Frontend (FE-001-021)
+**Last Updated**: 2026-02-23  
+**Status**: ✅ Phase 1.5 (Backend Refactoring COMPLETE) + ⏳ Phase 2 Frontend (FE-001-021) + 🔴 Infrastructure Phase (DEV-013-015 CONDITIONAL)
 
 ---
 
@@ -16,6 +16,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - Phase 1 Backend: ✅ Complete (IRC integration + DLQ contract hardening merged)
 - Phase 1.5 Backend Refactoring (DEV-002-006): ✅ **COMPLETE** (All 59 blockers fixed; PR ready for final review and merge)
 - Phase 1 Frontend (P0 Option 2): ⏳ In Progress (core workflow + account recovery blocker fixes)
+- **Infrastructure Phase (DEV-013-015)**: 🔴 **CONDITIONAL** (PO gap analysis complete; 9 blockers require resolution before start; see GOV-031)
 - Phase 2: ⏳ Queued (tags/notes/assignments/rules; starts after DEV-002-006 and FE-001-021 complete)
 - QA: ⏳ Not Started
 
@@ -155,6 +156,64 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 
 **Related**: GOV-029 (interim policy), PR #274 (CI checks)
 
+## Infrastructure Phase Status (DEV-013-015)
+
+**Status**: ⏸️ **COORDINATION PHASE COMPLETE - AWAITING BLOCKER RESOLUTION**  
+**Coordination Complete**: 2026-02-23 (Architect analysis + PO analysis + memo)  
+**Target Decision**: 2026-02-25 5:00 PM (Go/No-Go on 9 blockers)  
+**PO Recommendation**: Proceed if all 9 blockers resolved by 2026-02-25; otherwise defer to post-MVP  
+
+| Task | Status | Dependencies | Est. Timeline (if proceed) |
+|------|--------|--------------|----------------------------|
+| **DEV-013** (ADR-019 approval + docs) | ⏸️ Blocked on 5 decisions | None | 2026-02-26 to 2026-02-28 (2 days) |
+| **DEV-014** (Helm charts) | ⏸️ Blocked on 3 decisions | DEV-013 | 2026-02-28 to 2026-03-03 (3-5 days) |
+| **DEV-015** (CI pipeline → Helm) | ⏸️ Blocked on 2 decisions | DEV-014 | 2026-03-03 to 2026-03-05 (2-3 days) |
+
+**Critical Blockers**: 9 total (all must be resolved by 2026-02-25)
+- Frontend scope (S3/CloudFront), K3s cluster status, Secret management, GitHub Actions access, Smoke deploy criteria, Rollback approach, Environment specs, Documentation scope, ADR-019 approval
+
+### Critical Blockers Requiring Resolution (by 2026-02-25)
+
+| Blocker | Owner | Timeline | Impact |
+|---------|-------|----------|--------|
+| 1. Frontend deployment scope clarification (S3/CloudFront, not K3s) | Product Owner | TODAY | Scope ambiguity |
+| 2. K3s cluster provisioning status confirmed | Infrastructure team | 2026-02-24 | Cannot test DEV-014 |
+| 3. Secret management approach documented (ADR-020) | Architect | 2026-02-24 | Cannot finalize DEV-014 |
+| 4. GitHub Actions ↔ K3s network access confirmed | Infrastructure team | 2026-02-25 | Cannot implement DEV-015 |
+| 5. "Smoke deploy" definition finalized | Product Owner + Architect | 2026-02-25 | Acceptance criteria unclear |
+| 6. Rollback procedure documented | Architect | 2026-02-25 | Risk mitigation |
+| 7. Environment requirements documented | Architect | 2026-02-25 | K3s node sizing unknown |
+| 8. Documentation scope finalized | Product Owner | 2026-02-25 | Dev guidance |
+| 9. ADR-019 Product Owner signature added | Product Owner | 2026-02-25 | Incomplete approval |
+
+### Recommended Timeline (IF All Blockers Resolved)
+
+```
+2026-02-26:  DEV-013 development starts (ADR + docs)
+2026-03-05:  Target DEV-013 completion
+2026-03-07:  DEV-014 development starts (Helm charts)
+2026-03-12:  Target DEV-014 completion
+2026-03-14:  DEV-015 development starts (CI pipeline)
+2026-03-19:  Target DEV-015 completion
+2026-03-21:  Infrastructure Phase COMPLETE
+```
+
+### IF Blockers Cannot Be Resolved by 2026-02-25
+
+**Decision:** Move DEV-013-015 to **Post-MVP Infrastructure Phase** (does not impact user feature delivery).
+
+**Rationale:**
+- Phase 1.2 (Frontend) independent ✅
+- Phase 2 (Features) independent ✅
+- Current Docker deployment stable ✅
+
+### Key Documents
+- **GOV-031**: `.docs/governance/GOV-031-DEV-013-015-PO-gap-analysis.md` (complete analysis)
+- **GOV-031 Summary**: `.docs/governance/GOV-031-EXECUTIVE-SUMMARY.md` (quick reference)
+- **ADR-019**: `.docs/adr/ADR-019-k3s-helm-cicd-deployment.md` (awaiting PO signature)
+
+---
+
 ## References (Authoritative)
 - Product scope & ACs: `.docs/01-product-specification.md`
 - API & data model: `.docs/02-api-and-data-model.md`
@@ -166,3 +225,4 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 ## Governance
 - ADRs: `.docs/adr/`
 - GOV logs: `.docs/governance/`
+- **Recent:** GOV-031 (Infrastructure Phase PO Analysis)
