@@ -3,21 +3,21 @@
 # ============================================
 # Usage: helm upgrade --install yacc-backend ./deploy/helm/yacc-backend -n yacc-staging --values deploy/helm/yacc-backend/values-staging.yaml
 
-# Two replicas for staging
-replicaCount: 2
+# Single replica for staging MVP (scale post-MVP)
+replicaCount: 1
 
-# Container image
+# Container image (from local Docker build or registry)
 image:
-  registry: ghcr.io
-  repository: csim-sg/yacc/yacc-backend
-  pullPolicy: Always
-  tag: ""  # Will use appVersion from Chart.yaml
+  registry: ""  # Empty for local image
+  repository: yacc-backend
+  pullPolicy: IfNotPresent
+  tag: "latest"
 
-# Higher resources for staging
+# MVP resources (same as development)
 resources:
   limits:
     cpu: 1000m
-    memory: 1024Mi
+    memory: 1Gi
   requests:
     cpu: 500m
     memory: 512Mi

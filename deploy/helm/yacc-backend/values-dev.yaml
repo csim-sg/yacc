@@ -3,24 +3,24 @@
 # ============================================
 # Usage: helm upgrade --install yacc-backend ./deploy/helm/yacc-backend -n yacc-dev --values deploy/helm/yacc-backend/values-dev.yaml
 
-# Single replica for development
+# Single replica for development (k3d local testing)
 replicaCount: 1
 
-# Container image
+# Container image (local k3d build)
 image:
-  registry: ""  # Local registry for k3d
+  registry: ""  # No registry for local k3d
   repository: yacc-backend
-  pullPolicy: Always
+  pullPolicy: IfNotPresent  # Use local image if available
   tag: "latest"
 
-# Lower resources for development
+# Development resources (same as MVP)
 resources:
   limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
     cpu: 500m
     memory: 512Mi
-  requests:
-    cpu: 100m
-    memory: 256Mi
 
 # Development configuration
 config:

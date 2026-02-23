@@ -72,39 +72,49 @@ securityContext:
 # ============================================
 service:
   type: ClusterIP
-  port: 3000
+  port: 8080
   targetPort: 3000
   annotations: {}
 
 # ============================================
 # RESOURCES
 # ============================================
+# MVP allocations: backend pod uses ~200m CPU / 256 MB RAM at rest
+# Limits provide 2x buffer for spikes (safety margin)
 resources:
   limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
     cpu: 500m
     memory: 512Mi
-  requests:
-    cpu: 100m
-    memory: 256Mi
 
 # ============================================
 # LIVENESS AND READINESS PROBES
 # ============================================
+# Liveness probe: Is the process running?
+# - Path: /health/live (simple check, returns 200 if process alive)
+# - Restart on failure (after failureThreshold * periodSeconds)
+# - MVP: 30 second threshold (10s initial delay + 3 failures * 10s period)
 livenessProbe:
   enabled: true
   path: /health/live
   port: 3000
-  initialDelaySeconds: 10
-  periodSeconds: 10
+  initialDelaySeconds: 15
+  periodSeconds: 30
   timeoutSeconds: 5
   failureThreshold: 3
 
+# Readiness probe: Can the pod handle traffic?
+# - Path: /health/ready (checks PostgreSQL, Redis, R2 connectivity)
+# - Remove from LB on failure (stop sending traffic)
+# - MVP: 30 second threshold (5s initial delay + 3 failures * 10s period)
 readinessProbe:
   enabled: true
   path: /health/ready
   port: 3000
   initialDelaySeconds: 5
-  periodSeconds: 5
+  periodSeconds: 10
   timeoutSeconds: 3
   failureThreshold: 3
 

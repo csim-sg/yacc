@@ -12,7 +12,6 @@ spec:
   template:
     metadata:
       annotations:
-        # Force rollout on config change
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
@@ -38,109 +37,72 @@ spec:
               containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
           envFrom:
-            # Load non-sensitive config from ConfigMap
             - configMapRef:
                 name: {{ include "yacc-backend.fullname" . }}-config
           env:
-            # ============================================
-            # DATABASE URL (constructed from secret + config)
-            # ============================================
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.postgresql.existingSecret }}
-                  key: database-url
-            
-            # ============================================
-            # REDIS URL (constructed from secret + config)
-            # ============================================
+                  name: yacc-backend-secrets
+                  key: DATABASE_URL
             - name: REDIS_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.redis.existingSecret }}
-                  key: redis-url
-            
-            # ============================================
-            # AUTH SECRETS
-            # ============================================
-            - name: BETTER_AUTH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.betterAuthSecret.existingSecret }}
-                  key: {{ .Values.secrets.betterAuthSecret.key }}
+                  name: yacc-backend-secrets
+                  key: REDIS_URL
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.jwtSecret.existingSecret }}
-                  key: {{ .Values.secrets.jwtSecret.key }}
-            
-            # ============================================
-            # CLOUDFLARE R2
-            # ============================================
+                  name: yacc-backend-secrets
+                  key: JWT_SECRET
+            - name: BETTER_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: yacc-backend-secrets
+                  key: BETTER_AUTH_SECRET
+                  optional: true
             - name: CLOUDFLARE_R2_ENDPOINT
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.cloudflareR2.existingSecret }}
-                  key: {{ .Values.secrets.cloudflareR2.endpointKey }}
+                  name: yacc-backend-secrets
+                  key: R2_ENDPOINT
+                  optional: true
             - name: CLOUDFLARE_R2_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.cloudflareR2.existingSecret }}
-                  key: {{ .Values.secrets.cloudflareR2.accessKeyKey }}
+                  name: yacc-backend-secrets
+                  key: R2_ACCESS_KEY_ID
+                  optional: true
             - name: CLOUDFLARE_R2_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.cloudflareR2.existingSecret }}
-                  key: {{ .Values.secrets.cloudflareR2.secretKeyKey }}
+                  name: yacc-backend-secrets
+                  key: R2_SECRET_ACCESS_KEY
+                  optional: true
             - name: CLOUDFLARE_R2_BUCKET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.cloudflareR2.existingSecret }}
-                  key: {{ .Values.secrets.cloudflareR2.bucketKey }}
-            - name: CLOUDFLARE_CDN_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.cloudflareR2.existingSecret }}
-                  key: {{ .Values.secrets.cloudflareR2.cdnUrlKey }}
-            
-            # ============================================
-            # EMAIL (SENDGRID)
-            # ============================================
+                  name: yacc-backend-secrets
+                  key: R2_BUCKET_NAME
+                  optional: true
             - name: SENDGRID_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.email.existingSecret }}
-                  key: {{ .Values.secrets.email.sendgridApiKeyKey }}
-            - name: SENDGRID_FROM_EMAIL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.email.existingSecret }}
-                  key: {{ .Values.secrets.email.sendgridFromEmailKey }}
-            - name: SENDGRID_FROM_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.email.existingSecret }}
-                  key: {{ .Values.secrets.email.sendgridFromNameKey }}
-            
-            # ============================================
-            # INTEGRATIONS (OPTIONAL)
-            # ============================================
+                  name: yacc-backend-secrets
+                  key: SENDGRID_API_KEY
+                  optional: true
             - name: TELEGRAM_BOT_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.integrations.existingSecret }}
-                  key: {{ .Values.secrets.integrations.telegramBotTokenKey }}
+                  name: yacc-backend-secrets
+                  key: TELEGRAM_BOT_TOKEN
                   optional: true
             - name: IRC_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.integrations.existingSecret }}
-                  key: {{ .Values.secrets.integrations.ircPasswordKey }}
+                  name: yacc-backend-secrets
+                  key: IRC_PASSWORD
                   optional: true
-          
-          # ============================================
-          # LIVENESS PROBE
-          # ============================================
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
             httpGet:
@@ -151,10 +113,6 @@ spec:
             timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
             failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
           {{- end }}
-          
-          # ============================================
-          # READINESS PROBE
-          # ============================================
           {{- if .Values.readinessProbe.enabled }}
           readinessProbe:
             httpGet:
@@ -165,16 +123,8 @@ spec:
             timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
             failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
           {{- end }}
-          
-          # ============================================
-          # RESOURCES
-          # ============================================
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          
-          # ============================================
-          # VOLUME MOUNTS (for logs if needed)
-          # ============================================
           volumeMounts:
             - name: tmp
               mountPath: /tmp
@@ -182,10 +132,6 @@ spec:
             - name: logs
               mountPath: /app/logs
             {{- end }}
-      
-      # ============================================
-      # VOLUMES
-      # ============================================
       volumes:
         - name: tmp
           emptyDir: {}
@@ -193,26 +139,14 @@ spec:
         - name: logs
           emptyDir: {}
         {{- end }}
-      
-      # ============================================
-      # NODE SELECTOR
-      # ============================================
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      
-      # ============================================
-      # TOLERATIONS
-      # ============================================
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      
-      # ============================================
-      # AFFINITY
-      # ============================================
       {{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
