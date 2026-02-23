@@ -1,0 +1,37 @@
+apiVersion: v2
+name: yacc-backend
+description: YACC Backend Service - Unified inbox for multi-channel social communications
+
+# Chart type
+type: application
+
+# Chart version (SemVer 2)
+version: 0.1.0
+
+# Application version
+appVersion: "0.1.0"
+
+# Chart metadata
+maintainers:
+  - name: YACC Team
+    email: team@yacc.dev
+
+# Keywords for searching
+keywords:
+  - yacc
+  - inbox
+  - messaging
+  - telegram
+  - irc
+
+# Home page
+home: https://github.com/csim-sg/yacc
+
+# Sources
+sources:
+  - https://github.com/csim-sg/yacc
+
+# Notes:
+# - PostgreSQL and Redis are pre-installed in the K3s cluster
+# - This chart only deploys the backend application
+# - Secrets are managed via Kubernetes Secrets (created separately)
