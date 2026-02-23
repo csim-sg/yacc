@@ -158,30 +158,31 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 
 ## Infrastructure Phase Status (DEV-013-015)
 
-**Status**: 🟡 **PARTIAL RESOLUTION** (1 of 9 blockers resolved; 8 remain)  
-**PO Blocker #1 Resolution**: ✅ **2026-02-23 14:30** - Frontend scope = S3/CloudFront (out of Helm)  
-**Target Decision for Remaining 8**: 2026-02-25 5:00 PM (Go/No-Go)  
-**PO Recommendation**: Proceed if all 9 blockers resolved by 2026-02-25; otherwise defer to post-MVP  
+**Status**: 🟢 **ALL 9 BLOCKERS RESOLVED - GO DECISION**  
+**Resolution Date**: 2026-02-24 (2 days early)  
+**Quality**: HIGH (all decisions documented, rationale clear, implementation paths defined)  
+**Start Date**: 2026-02-26  
+**Expected Completion**: ~2026-03-05
 
-| Task | Status | Dependencies | Est. Timeline (if proceed) |
-|------|--------|--------------|----------------------------|
-| **DEV-013** (ADR-019 approval + docs) | ⏸️ Blocked on 4 remaining decisions | Blocker #1 ✅ resolved | 2026-02-26 to 2026-02-28 (2 days) |
-| **DEV-014** (Helm charts - **backend only**) | ⏸️ Blocked on 3 decisions | DEV-013 + Blocker #1 ✅ | 2026-02-28 to 2026-03-03 (3-5 days) |
-| **DEV-015** (CI pipeline → Helm) | ⏸️ Blocked on 2 decisions | DEV-014 | 2026-03-03 to 2026-03-05 (2-3 days) |
+| Task | Status | Timeline | Notes |
+|------|--------|----------|-------|
+| **DEV-013** (ADR-019 + docs) | 🟢 READY | 2026-02-26 to 2026-02-28 (2 days) | Architect: All blockers clear, docs ready to finalize |
+| **DEV-014** (Helm charts - **backend only**) | 🟢 READY | 2026-02-28 to 2026-03-03 (3-5 days) | Backend: PostgreSQL + Redis pre-installed (NOT Helm-managed) |
+| **DEV-015** (CI pipeline → Helm) | 🟢 READY | 2026-03-03 to 2026-03-05 (2-3 days) | Backend: GitHub Actions deploy via Helm (network path confirmed) |
 
-**Blocker Resolution Status**: 
+**All 9 Blockers RESOLVED**: 
 
-| # | Blocker | Owner | Status | Resolution Notes |
-|---|---------|-------|--------|------------------|
-| 1 | Frontend scope (S3/CloudFront, not Helm) | PO | 🟢 **RESOLVED** | DEV-014 AC updated; ADR-019 clarified; deployment independent |
-| 2 | K3s cluster provisioning status confirmed | Infrastructure team | ⏳ DUE 2026-02-24 | Cannot test DEV-014 |
-| 3 | Secret management approach documented (ADR-020) | Architect | ⏳ DUE 2026-02-24 | Cannot finalize DEV-014; blocking Infrastructure team |
-| 4 | GitHub Actions ↔ K3s network access confirmed | Infrastructure team | ⏳ DUE 2026-02-25 | Cannot implement DEV-015 |
-| 5 | "Smoke deploy" definition finalized | Product Owner + Architect | 🟢 **RESOLVED 2026-02-24** | GOV-032: Smoke deploy = Pod Running + Health 200 + Logs OK + Helm lint + Idempotency. Manual (DEV-014) + Automated (DEV-015). Updated AC provided. |
-| 6 | Rollback procedure documented | Architect | 🟢 **RESOLVED 2026-02-24** | GOV-032: .docs/runbooks/helm-rollback.md (NEW) - Architect drafts by 2026-02-27 |
-| 7 | Environment requirements documented | Architect | 🟢 **RESOLVED 2026-02-24** | GOV-032: .docs/infrastructure/k3s-cluster-requirements.md (NEW) - Architect drafts by 2026-02-27 |
-| 8 | Documentation scope finalized | Product Owner | 🟢 **RESOLVED 2026-02-24** | GOV-032: 7 docs confirmed (ADR-019 ✅, Tech Arch NEW, Impl Guide update, Quick Ref update, Infra Req NEW, Rollback Runbook NEW, Planning Index update). Timeline: drafts by 2026-02-27, PO reviews same day, commit 2026-02-28. |
-| 9 | ADR-019 Product Owner signature added | Product Owner | 🟢 **RESOLVED 2026-02-24** | ADR-019 signed; PO approval block completed. Conditional on ADR-020 (blocker #3). |
+| # | Blocker | Owner | Status | Decision |
+|---|---------|-------|--------|----------|
+| 1 | Frontend scope | PO | ✅ RESOLVED | S3/CloudFront only (OUT of Helm) |
+| 2 | K3s cluster status | Infrastructure | ✅ RESOLVED | Provisioned & operational (wedding-wp reference) |
+| 3 | Secret management | Architect | ✅ RESOLVED | K8s Secrets (KISS), PostgreSQL/Redis pre-installed (no Helm dep) |
+| 4 | GitHub Actions access | Infrastructure | ✅ RESOLVED | Network path established (wedding-wp proven) |
+| 5 | Smoke deploy criteria | PO + Backend | ✅ RESOLVED | Pod Running + Health 200 OK + Logs verified + Helm lint + Idempotency |
+| 6 | Rollback procedure | Architect | ✅ RESOLVED | Manual rollback + runbook (.docs/runbooks/helm-rollback.md) |
+| 7 | Environment specs | Architect | ✅ RESOLVED | K3s 1.30+, 2CPU/4GB/20GB, local-path storage, Traefik ingress, self-signed TLS |
+| 8 | Documentation scope | PO | ✅ RESOLVED | 7 docs confirmed (6 Architect-owned, 1 PO-owned; all committed by 2026-02-28) |
+| 9 | ADR-019 approval | PO | ✅ RESOLVED | Approved + signed by Product Owner |
 
 ### Recommended Timeline (IF All Blockers Resolved)
 
