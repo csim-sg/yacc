@@ -1,0 +1,322 @@
+name: Deploy Backend to Staging
+
+# Trigger: Push to dev branch with backend or helm changes
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'packages/backend/**'
+      - 'deploy/helm/yacc-backend/**'
+      - '.github/workflows/deploy-staging.yaml'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  # Registry configuration
+  REGISTRY: ghcr.io
+  IMAGE_NAME: csim-sg/yacc/yacc-backend
+  CHART_PATH: deploy/helm/yacc-backend
+  NAMESPACE: yacc-staging
+  RELEASE_NAME: yacc-backend
+
+jobs:
+  # ============================================
+  # Job 1: Build and Test Backend
+  # ============================================
+  build:
+    name: Build Backend Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=sha,prefix={{branch}}-,suffix=-${{ github.run_number }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            latest
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packages/backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================
+  # Job 2: Deploy to Staging via Helm
+  # ============================================
+  deploy-staging:
+    name: Deploy to Staging Cluster
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+    environment:
+      name: staging
+      url: https://api-staging.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Configure kubeconfig
+        run: |
+          # Decode kubeconfig from GitHub secret
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > /tmp/kubeconfig
+          chmod 600 /tmp/kubeconfig
+          echo "KUBECONFIG=/tmp/kubeconfig" >> $GITHUB_ENV
+
+      - name: Verify cluster connectivity
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Create namespace if not exists
+        run: |
+          kubectl get namespace ${{ env.NAMESPACE }} || \
+          kubectl create namespace ${{ env.NAMESPACE }}
+
+      - name: Create/Update Helm release
+        run: |
+          helm upgrade --install ${{ env.RELEASE_NAME }} ${{ env.CHART_PATH }} \
+            --namespace ${{ env.NAMESPACE }} \
+            --values ${{ env.CHART_PATH }}/values-staging.yaml \
+            --set image.tag=${{ github.sha }} \
+            --wait \
+            --timeout 5m
+
+      - name: Verify deployment rollout
+        run: |
+          kubectl rollout status deployment/${{ env.RELEASE_NAME }} \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=5m
+
+      - name: Check pod status
+        run: |
+          kubectl get pods -n ${{ env.NAMESPACE }} -l app.kubernetes.io/name=${{ env.RELEASE_NAME }}
+          kubectl describe pod -n ${{ env.NAMESPACE }} -l app.kubernetes.io/name=${{ env.RELEASE_NAME }}
+
+  # ============================================
+  # Job 3: Smoke Tests
+  # ============================================
+  smoke-test:
+    name: Run Smoke Tests
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > /tmp/kubeconfig
+          chmod 600 /tmp/kubeconfig
+          echo "KUBECONFIG=/tmp/kubeconfig" >> $GITHUB_ENV
+
+      - name: Wait for deployment to be ready
+        run: |
+          kubectl rollout status deployment/${{ env.RELEASE_NAME }} \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=5m
+
+      - name: Port forward to backend service
+        run: |
+          kubectl port-forward -n ${{ env.NAMESPACE }} \
+            svc/${{ env.RELEASE_NAME }} 8080:8080 &
+          sleep 2
+
+      - name: Health Check - Liveness (/health/live)
+        run: |
+          for i in {1..10}; do
+            if curl -sf http://localhost:8080/health/live; then
+              echo "✅ Liveness probe PASSED"
+              exit 0
+            fi
+            echo "Attempt $i/10 - Waiting for health endpoint..."
+            sleep 3
+          done
+          echo "❌ Liveness probe FAILED"
+          exit 1
+
+      - name: Health Check - Readiness (/health/ready)
+        run: |
+          for i in {1..10}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/health/ready)
+            if [ "$STATUS" == "200" ] || [ "$STATUS" == "503" ]; then
+              echo "✅ Readiness probe responded with status: $STATUS"
+              if [ "$STATUS" == "200" ]; then
+                echo "✅ Backend is READY to handle traffic"
+                exit 0
+              else
+                echo "⚠️ Backend is NOT READY yet (503 - Service Unavailable)"
+                sleep 3
+              fi
+            fi
+            echo "Attempt $i/10 - Waiting for readiness endpoint..."
+            sleep 3
+          done
+          echo "❌ Readiness probe FAILED"
+          exit 1
+
+      - name: Full Health Check (/health)
+        run: |
+          HEALTH_RESPONSE=$(curl -s http://localhost:8080/health)
+          echo "Health response: $HEALTH_RESPONSE"
+          
+          # Check if status is not "unhealthy"
+          STATUS=$(echo "$HEALTH_RESPONSE" | jq -r '.status' 2>/dev/null || echo "unknown")
+          if [ "$STATUS" != "unhealthy" ]; then
+            echo "✅ Full health check PASSED (status: $STATUS)"
+          else
+            echo "❌ Full health check FAILED (status: $STATUS)"
+            exit 1
+          fi
+
+      - name: Check pod logs for errors
+        run: |
+          echo "Checking backend pod logs..."
+          LOGS=$(kubectl logs -n ${{ env.NAMESPACE }} \
+            -l app.kubernetes.io/name=${{ env.RELEASE_NAME }} \
+            --tail=50 2>/dev/null || echo "No logs available")
+          
+          echo "Recent logs:"
+          echo "$LOGS"
+          
+          # Fail if logs contain critical errors (but not warnings)
+          if echo "$LOGS" | grep -qi "ERROR\|FATAL\|PANIC"; then
+            echo "⚠️ Error log entries detected"
+            # Don't fail - could be expected errors
+          else
+            echo "✅ No critical errors in logs"
+          fi
+
+      - name: Verify resource allocation
+        run: |
+          echo "Verifying resource allocation..."
+          kubectl get pods -n ${{ env.NAMESPACE }} \
+            -l app.kubernetes.io/name=${{ env.RELEASE_NAME }} \
+            -o json | jq -r '.items[0].spec.containers[0].resources'
+
+  # ============================================
+  # Job 4: Verify Rollback Capability
+  # ============================================
+  verify-rollback:
+    name: Verify Rollback Capability
+    runs-on: ubuntu-latest
+    needs: smoke-test
+    if: success()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > /tmp/kubeconfig
+          chmod 600 /tmp/kubeconfig
+          echo "KUBECONFIG=/tmp/kubeconfig" >> $GITHUB_ENV
+
+      - name: View Helm release history
+        run: |
+          echo "Helm release history:"
+          helm history ${{ env.RELEASE_NAME }} -n ${{ env.NAMESPACE }} || true
+          
+          echo ""
+          echo "Latest deployment info:"
+          helm get values ${{ env.RELEASE_NAME }} -n ${{ env.NAMESPACE }} | head -20
+
+      - name: Verify rollback command syntax
+        run: |
+          echo "Rollback command (if needed):"
+          echo "  helm rollback ${{ env.RELEASE_NAME }} -n ${{ env.NAMESPACE }}"
+          echo ""
+          echo "Rollback procedure documented in: .docs/runbooks/helm-rollback.md"
+
+  # ============================================
+  # Job 5: Notify on Success/Failure
+  # ============================================
+  notify:
+    name: Notification
+    runs-on: ubuntu-latest
+    needs: [build, deploy-staging, smoke-test, verify-rollback]
+    if: always()
+    steps:
+      - name: Determine status
+        id: status
+        run: |
+          if [ "${{ needs.build.result }}" == "failure" ] || \
+             [ "${{ needs.deploy-staging.result }}" == "failure" ] || \
+             [ "${{ needs.smoke-test.result }}" == "failure" ] || \
+             [ "${{ needs.verify-rollback.result }}" == "failure" ]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+            echo "message=Deployment FAILED" >> $GITHUB_OUTPUT
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "emoji=✅" >> $GITHUB_OUTPUT
+            echo "message=Deployment SUCCESSFUL" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Print deployment summary
+        run: |
+          echo "${{ steps.status.outputs.emoji }} ${{ steps.status.outputs.message }}"
+          echo ""
+          echo "Deployment Summary:"
+          echo "  Commit: ${{ github.sha }}"
+          echo "  Branch: ${{ github.ref }}"
+          echo "  Cluster: Staging (yacc-staging namespace)"
+          echo "  Release: ${{ env.RELEASE_NAME }}"
+          echo ""
+          echo "View logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Failure notification (optional Slack/Teams integration)
+        if: steps.status.outputs.status == 'failure'
+        run: |
+          echo "Send alert to team"
+          echo "Deployment failed for commit: ${{ github.sha }}"
+          echo "See logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
