@@ -33,20 +33,31 @@
 
 ## Critical Blockers (Must Resolve Before Start)
 
-### 1. **Frontend Deployment Scope Clarification** 🔴 **BLOCKING**
+### 1. **Frontend Deployment Scope Clarification** 🟢 **RESOLVED**
 
 **Issue**: DEV-014 AC says "and frontend if deployed in-cluster", but AGENTS.md specifies "Frontend to AWS S3 + CloudFront"
 
-**Current State**: Ambiguous  
-**Decision Needed**: Is frontend in Helm scope or not?  
+**Current State**: Ambiguous (2026-02-23 10:00 AM)  
+**Decision Made**: Frontend OUT of Helm scope  
 **Owner**: Product Owner  
-**Timeline**: TODAY (2026-02-23)  
-**Impact**: Determines DEV-014 chart scope (backend-only vs backend+frontend)
+**Timeline**: ✅ TODAY (2026-02-23 14:30)  
+**Impact**: DEV-014 scope is backend-only Helm chart
 
-**Resolution**:
-- ✅ **Recommendation**: Frontend stays S3/CloudFront (out of Helm scope)
-  - Rationale: Separate deployment pipeline, CDN distribution, no shared lifecycle
-  - Action: Confirm with stakeholders, update DEV-014 AC to "backend chart only"
+**DECISION RECORD:**
+- ✅ **Option A Selected**: Frontend stays S3/CloudFront (out of Helm scope)
+- **Rationale**:
+  1. Deployment independence (frontend ≠ backend lifecycle)
+  2. Cost optimization (CDN native, no container overhead)
+  3. Performance (static asset serving on CloudFront)
+  4. MVP scope alignment (AGENTS.md establishes this model)
+  5. Development velocity (+2-3 days saved vs Option B)
+- **Action**: Updated DEV-014 GitHub issue #288 AC (confirmed backend-only scope)
+
+**Documentation Updated**:
+- ✅ DEV-014 GitHub issue AC (backend-only, frontend out of scope)
+- ✅ This memo (Blocker #1 marked RESOLVED)
+- 🟡 ADR-019 section 3.2 needs update: add "Frontend Deployment" clarification
+- 🟡 00-INDEX.md: mark blocker as resolved in Infrastructure Phase status
 
 ---
 
@@ -283,13 +294,14 @@
 
 ## Blocker Resolution Checklist
 
-**Status**: 🔴 **BLOCKED** (9 of 9 unresolved)  
-**Target Resolution**: 2026-02-25 11:59 PM  
+**Status**: 🟡 **PARTIALLY RESOLVED** (1 of 9 resolved - Frontend scope)  
+**Blocker #1**: 🟢 ✅ RESOLVED (2026-02-23 14:30)  
+**Target Resolution for Remaining**: 2026-02-25 11:59 PM  
 **Consequence if Delayed**: Defer DEV-013-015 to post-MVP (does not impact FE-001-021 or Phase 2 features)
 
 | # | Blocker | Owner | Status | Target Date | Notes |
 |---|---------|-------|--------|-------------|-------|
-| 1 | Frontend scope (S3/CloudFront) | PO | ⏸️ | 2026-02-23 | Decision: Frontend out of Helm scope |
+| 1 | Frontend scope (S3/CloudFront) | PO | 🟢 ✅ RESOLVED | 2026-02-23 | Decision: Frontend out of Helm scope; DEV-014 is backend-only |
 | 2 | K3s cluster status | Infrastructure | ⏸️ | 2026-02-24 | Decision: Provision or use k3d for testing |
 | 3 | Secret management (Sealed vs K8s) | Architect | ⏸️ | 2026-02-24 | Decision: Sealed Secrets (recommended) |
 | 4 | GitHub Actions K3s access | Infrastructure | ⏸️ | 2026-02-25 | Decision: Network path + kubeconfig delivery |
@@ -397,10 +409,13 @@ DEV-015 (CI Pipeline)
 ### Immediate (TODAY - 2026-02-23)
 
 **Product Owner**:
-- [ ] Confirm frontend deployment scope (S3/CloudFront only, not Helm)
-- [ ] Update 00-INDEX.md with Infrastructure Phase section
-- [ ] Share blocker list with Architect + Infrastructure team
-- [ ] Schedule 30-min sync with Architect (2026-02-24 morning) to discuss blocker resolutions
+- [x] ✅ **DONE** Confirm frontend deployment scope (S3/CloudFront only, not Helm)
+- [x] ✅ **DONE** Update DEV-014 GitHub issue AC (backend-only Helm chart scope)
+- [x] ✅ **DONE** Update ADR-019 with frontend deployment rationale
+- [x] ✅ **DONE** Record Blocker #1 resolution in this memo
+- [ ] Update 00-INDEX.md Infrastructure Phase status
+- [ ] Share blocker resolution with Architect + Backend team
+- [ ] Confirm remaining 8 blockers on track for 2026-02-25
 
 **Architect**:
 - [ ] Review Product Owner blocker analysis
