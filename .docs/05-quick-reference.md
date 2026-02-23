@@ -132,6 +132,91 @@ pnpm --filter @yacc/common lint       # Common package linter
 
 ---
 
+## Helm Deployment Commands
+
+**Prerequisites**: Helm 3.12+ installed, K3s cluster running, kubeconfig configured
+
+### Installation & Deployment
+
+```bash
+# Deploy backend to staging (first time)
+helm install yacc-backend ./deploy/helm/yacc-backend \
+  -n yacc-staging \
+  -f deploy/helm/yacc-backend/values-staging.yaml
+
+# Update/redeploy (idempotent)
+helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \
+  -n yacc-staging \
+  -f deploy/helm/yacc-backend/values-staging.yaml
+
+# Deploy specific version
+helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \
+  -n yacc-staging \
+  --set image.tag=v1.2.3
+```
+
+### Monitoring & Debugging
+
+```bash
+# View release status
+helm status yacc-backend -n yacc-staging
+
+# View release history
+helm history yacc-backend -n yacc-staging
+
+# View manifest (what will be deployed)
+helm template yacc-backend ./deploy/helm/yacc-backend \
+  -f deploy/helm/yacc-backend/values-staging.yaml
+
+# Get actual values (from deployed release)
+helm get values yacc-backend -n yacc-staging
+
+# Watch pod deployment
+kubectl rollout status deployment/yacc-backend -n yacc-staging -w
+kubectl logs -n yacc-staging -l app=yacc-backend -f
+
+# Check pod health
+kubectl get pods -n yacc-staging
+kubectl exec -it <pod-name> -n yacc-staging -- curl http://localhost:8080/health
+```
+
+### Rollback & Uninstall
+
+```bash
+# Rollback to previous revision
+helm rollback yacc-backend -n yacc-staging
+
+# Rollback to specific revision
+helm rollback yacc-backend 2 -n yacc-staging
+
+# Completely remove release
+helm uninstall yacc-backend -n yacc-staging
+
+# Dry-run (validate without deploying)
+helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \
+  -n yacc-staging --dry-run --debug
+```
+
+### Troubleshooting
+
+```bash
+# Chart validation (catches syntax errors early)
+helm lint ./deploy/helm/yacc-backend
+
+# Template rendering (debug variable substitution)
+helm template yacc-backend ./deploy/helm/yacc-backend -f values-staging.yaml
+
+# Check dependencies installed
+helm get all yacc-backend -n yacc-staging
+
+# View recent events
+kubectl get events -n yacc-staging --sort-by='.lastTimestamp'
+```
+
+**More details**: See `.docs/infrastructure/k3s-cluster-requirements.md` and `.docs/runbooks/helm-rollback.md`
+
+---
+
 ## Checklist for Dev Kickoff
 
 - [ ] Read 01-product-specification.md (features + user stories)

@@ -1387,6 +1387,245 @@ const { data } = useConversations({ page: 0, limit: 20, status: 'open' });
 
 ---
 
-**Version**: 2.1  
-**Last Updated**: February 22, 2026  
-**Status**: Phase 1 Development in Progress (BE-003 Complete)
+## 7. Helm Deployment Architecture
+
+### Overview
+
+YACC backend is deployed to Kubernetes via Helm (ADR-019 approved). The Helm chart manages backend application lifecycle while PostgreSQL and Redis are managed as Kubernetes StatefulSets.
+
+**Scope**: Backend deployment only. Frontend remains AWS S3 + CloudFront (separate pipeline).
+
+### Chart Structure
+
+```
+deploy/helm/yacc-backend/
+├── Chart.yaml              # Helm metadata
+├── values.yaml             # Default values
+├── values-staging.yaml     # Staging overrides
+├── values-prod.yaml        # Production overrides (post-MVP)
+└── templates/
+    ├── deployment.yaml     # Backend app (Deployment)
+    ├── service.yaml        # Backend service (ClusterIP)
+    ├── serviceaccount.yaml # RBAC
+    ├── configmap.yaml      # App configuration
+    ├── ingress.yaml        # External routing (Traefik)
+    ├── _helpers.tpl        # Template macros
+    └── tests/
+        └── test-connection.yaml  # Smoke tests
+```
+
+### Deployment Manifest (deployment.yaml)
+
+**Key Configuration**:
+- **Type**: Deployment (stateless, rolling updates)
+- **Replicas**: 1 (MVP), scale to 2-3 for HA
+- **Strategy**: RollingUpdate with zero downtime
+- **Liveness Probe**: HTTP GET `/health` (detects crashed pods)
+- **Readiness Probe**: HTTP GET `/ready` (checks database/redis connectivity)
+
+**Pod Resource Allocation**:
+```yaml
+resources:
+  requests:
+    cpu: 500m          # Guaranteed minimum
+    memory: 512Mi
+  limits:
+    cpu: 1000m         # Hard limit (pod killed if exceeded)
+    memory: 1Gi
+```
+
+**Environment Variables**:
+- Injected from ConfigMap (`NODE_ENV`, `PORT`, `LOG_LEVEL`, etc.)
+- Injected from K8s Secret (`DATABASE_URL`, `REDIS_URL`, credentials)
+- Service discovery auto-populated (`POSTGRES_SVC_SERVICE_HOST`, etc.)
+
+### Service Discovery
+
+**Internal DNS Names**:
+```
+Backend pod resolves:
+  - postgres-svc.yacc-staging.svc.cluster.local:5432 → PostgreSQL
+  - redis-svc.yacc-staging.svc.cluster.local:6379 → Redis
+
+Backend service exposed as:
+  - yacc-backend.yacc-staging.svc.cluster.local:8080 (internal)
+  - api-staging.example.com (external via Ingress/Traefik)
+```
+
+### Backend Service (ClusterIP)
+
+**Type**: ClusterIP (internal only, no external port)
+
+```yaml
+ports:
+- port: 8080            # Service port
+  targetPort: 8080      # Pod port (container port)
+  name: http
+```
+
+**Service Selector**: Automatically routes traffic to pods matching labels (`app=yacc-backend`)
+
+### Configuration Management
+
+**ConfigMap** (non-sensitive settings):
+```yaml
+NODE_ENV: staging
+LOG_LEVEL: info
+DATABASE_POOL_SIZE: 15
+```
+
+**K8s Secrets** (sensitive credentials):
+```bash
+kubectl create secret generic yacc-backend-secrets \
+  --from-literal=DATABASE_URL="postgresql://user:pass@postgres-svc:5432/yacc" \
+  --from-literal=REDIS_URL="redis://:pass@redis-svc:6379/0" \
+  --from-literal=TELEGRAM_BOT_TOKEN="xxxxx:xxxxx" \
+  --from-literal=SESSION_SECRET="xxxxx" \
+  --from-literal=JWT_SECRET="xxxxx" \
+  -n yacc-staging
+```
+
+**MVP Approach**: K8s Secrets (simple, sufficient). Post-MVP: sealed-secrets or Vault for multi-cluster.
+
+### Ingress & External Access
+
+**Traefik Ingress Controller** (K3s built-in):
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: yacc-backend-ingress
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: api-staging.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: yacc-backend
+                port:
+                  number: 8080
+  tls:
+    - secretName: yacc-backend-tls
+      hosts:
+        - api-staging.example.com
+```
+
+**Traffic Flow**:
+```
+Client (external) → VPS:80/443 → Traefik Pod → Backend Service → Backend Pod
+```
+
+### Health Probes
+
+**Backend Implementation**:
+
+```typescript
+// GET /health - Pod liveness indicator
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// GET /ready - Service readiness check
+app.get('/ready', async (req, res) => {
+  try {
+    await db.query('SELECT 1');       // Database check
+    await redis.ping();               // Redis check
+    res.json({ ready: true });
+  } catch (err) {
+    res.status(503).json({ 
+      ready: false, 
+      reason: err.message 
+    });
+  }
+});
+```
+
+**Probe Configuration**:
+- **Liveness**: Every 30 seconds, fail after 3 tries (pod restart)
+- **Readiness**: Every 10 seconds, fail after 3 tries (remove from load balancer)
+- **Initial Delay**: 15s for liveness, 5s for readiness
+
+### Storage Strategy
+
+**PostgreSQL & Redis**: StatefulSet with PersistentVolumes
+
+```yaml
+kind: StatefulSet
+spec:
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      storageClassName: local-path  # K3s default
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: 5Gi               # PostgreSQL
+```
+
+**Backend Pod**: No persistent storage (stateless)
+
+**Attachment Storage**: External (Cloudflare R2, not in Kubernetes)
+
+### Deployment Workflow
+
+**Local Development**:
+```bash
+# Using default values (values.yaml)
+helm install yacc-backend ./deploy/helm/yacc-backend -n yacc-staging
+```
+
+**Staging Environment**:
+```bash
+# Using staging overrides (values-staging.yaml)
+helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \
+  -n yacc-staging \
+  -f deploy/helm/yacc-backend/values-staging.yaml
+```
+
+**Version Pinning**:
+```bash
+# Deploy specific backend version
+helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \
+  -n yacc-staging \
+  --set image.tag=v1.2.3
+```
+
+### Rollback Procedure
+
+**View Release History**:
+```bash
+helm history yacc-backend -n yacc-staging
+
+# REVISION  UPDATED                     STATUS      CHART
+# 1         Thu Feb 26 10:00:00 2026    superseded  yacc-backend-1.0.0
+# 2         Thu Feb 26 10:05:00 2026    deployed    yacc-backend-1.0.0
+```
+
+**Rollback to Previous Revision**:
+```bash
+helm rollback yacc-backend 1 -n yacc-staging
+
+# Monitor rollback
+kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
+```
+
+**Details**: See `.docs/runbooks/helm-rollback.md` for complete procedures and troubleshooting.
+
+### Related Documentation
+
+- **ADR-019**: K3s + Helm deployment decision & rationale
+- **K3s Cluster Requirements**: `.docs/infrastructure/k3s-cluster-requirements.md`
+- **Technology Architecture**: `.docs/architecture/TECH-ARCH-006-helm-deployment-architecture.md`
+- **Helm Rollback Runbook**: `.docs/runbooks/helm-rollback.md`
+
+---
+
+**Version**: 2.2  
+**Last Updated**: February 26, 2026  
+**Status**: Phase 1 Development + Infrastructure (DEV-013-015 in progress)
