@@ -74,6 +74,7 @@ This decision is fixed for MVP. Post-MVP multi-region deployments may revisit un
 - Status: ✅ APPROVED
 
 **Product Owner Approval:**
-- Name: _________________
-- Date: _________________
-- Comments: _________________
+- Name: Product Owner (YACC Project)
+- Date: 2026-02-24
+- Status: ✅ APPROVED
+- Comments: Frontend deployment explicitly out of K3s/Helm scope (S3/CloudFront independent). Backend-only scope confirmed. Smoke deploy criteria + documentation scope detailed in GOV-032. Conditional on ADR-020 (Secret Management) resolution by Infrastructure Team.

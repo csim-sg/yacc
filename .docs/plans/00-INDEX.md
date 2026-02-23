@@ -174,14 +174,14 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | # | Blocker | Owner | Status | Resolution Notes |
 |---|---------|-------|--------|------------------|
 | 1 | Frontend scope (S3/CloudFront, not Helm) | PO | 🟢 **RESOLVED** | DEV-014 AC updated; ADR-019 clarified; deployment independent |
-| 2. K3s cluster provisioning status confirmed | Infrastructure team | 2026-02-24 | Cannot test DEV-014 |
-| 3. Secret management approach documented (ADR-020) | Architect | 2026-02-24 | Cannot finalize DEV-014 |
-| 4. GitHub Actions ↔ K3s network access confirmed | Infrastructure team | 2026-02-25 | Cannot implement DEV-015 |
-| 5. "Smoke deploy" definition finalized | Product Owner + Architect | 2026-02-25 | Acceptance criteria unclear |
-| 6. Rollback procedure documented | Architect | 2026-02-25 | Risk mitigation |
-| 7. Environment requirements documented | Architect | 2026-02-25 | K3s node sizing unknown |
-| 8. Documentation scope finalized | Product Owner | 2026-02-25 | Dev guidance |
-| 9. ADR-019 Product Owner signature added | Product Owner | 2026-02-25 | Incomplete approval |
+| 2 | K3s cluster provisioning status confirmed | Infrastructure team | ⏳ DUE 2026-02-24 | Cannot test DEV-014 |
+| 3 | Secret management approach documented (ADR-020) | Architect | ⏳ DUE 2026-02-24 | Cannot finalize DEV-014; blocking Infrastructure team |
+| 4 | GitHub Actions ↔ K3s network access confirmed | Infrastructure team | ⏳ DUE 2026-02-25 | Cannot implement DEV-015 |
+| 5 | "Smoke deploy" definition finalized | Product Owner + Architect | 🟢 **RESOLVED 2026-02-24** | GOV-032: Smoke deploy = Pod Running + Health 200 + Logs OK + Helm lint + Idempotency. Manual (DEV-014) + Automated (DEV-015). Updated AC provided. |
+| 6 | Rollback procedure documented | Architect | 🟢 **RESOLVED 2026-02-24** | GOV-032: .docs/runbooks/helm-rollback.md (NEW) - Architect drafts by 2026-02-27 |
+| 7 | Environment requirements documented | Architect | 🟢 **RESOLVED 2026-02-24** | GOV-032: .docs/infrastructure/k3s-cluster-requirements.md (NEW) - Architect drafts by 2026-02-27 |
+| 8 | Documentation scope finalized | Product Owner | 🟢 **RESOLVED 2026-02-24** | GOV-032: 7 docs confirmed (ADR-019 ✅, Tech Arch NEW, Impl Guide update, Quick Ref update, Infra Req NEW, Rollback Runbook NEW, Planning Index update). Timeline: drafts by 2026-02-27, PO reviews same day, commit 2026-02-28. |
+| 9 | ADR-019 Product Owner signature added | Product Owner | 🟢 **RESOLVED 2026-02-24** | ADR-019 signed; PO approval block completed. Conditional on ADR-020 (blocker #3). |
 
 ### Recommended Timeline (IF All Blockers Resolved)
 
@@ -205,9 +205,10 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - Current Docker deployment stable ✅
 
 ### Key Documents
-- **GOV-031**: `.docs/governance/GOV-031-DEV-013-015-PO-gap-analysis.md` (complete analysis)
+- **ADR-019**: `.docs/adr/ADR-019-k3s-helm-cicd-deployment.md` ✅ (PO signed 2026-02-24)
+- **GOV-031**: `.docs/governance/GOV-031-DEV-013-015-PO-gap-analysis.md` (gap analysis)
+- **GOV-032**: `.docs/governance/GOV-032-PO-BLOCKER-DECISIONS-5-8.md` ✅ (PO decisions: Blocker #5 + #8 RESOLVED)
 - **GOV-031 Summary**: `.docs/governance/GOV-031-EXECUTIVE-SUMMARY.md` (quick reference)
-- **ADR-019**: `.docs/adr/ADR-019-k3s-helm-cicd-deployment.md` (awaiting PO signature)
 
 ---
 
