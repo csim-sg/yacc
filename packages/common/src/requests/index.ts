@@ -16,6 +16,7 @@ export { ListAuditLogsRequest } from './audit/listAuditLogs.request';
 // Conversations (classes)
 export { AssignRequest } from './conversations/assign.request';
 export { BulkActionRequest } from './conversations/bulkAction.request';
+export { BulkActionData } from './conversations/bulkActionData.request';
 export { ListConversationsRequest } from './conversations/listConversations.request';
 export { UpdatePriorityRequest } from './conversations/updatePriority.request';
 export { UpdateStatusRequest } from './conversations/updateStatus.request';

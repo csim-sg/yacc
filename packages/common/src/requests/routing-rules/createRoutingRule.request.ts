@@ -1,4 +1,5 @@
-import { IsOptional, IsString, IsInt, IsEnum, Min } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min } from 'class-validator';
+import type { RoutingRuleStatus } from '../../types/RoutingRuleStatus.type';
 
 /**
  * Create Routing Rule Request
@@ -19,8 +20,7 @@ export class CreateRoutingRuleRequest {
 
   /** Rule status (active or disabled, defaults to active) */
   @IsOptional()
-  @IsEnum(['active', 'disabled'])
-  status?: 'active' | 'disabled';
+  status?: RoutingRuleStatus;
 
   /** Priority order (lower = higher priority, evaluated first) */
   @IsOptional()

@@ -1,32 +1,7 @@
-import { IsArray, IsEnum, IsUUID, IsOptional, IsString, IsNumber, ArrayMinSize, ArrayMaxSize, ValidateNested } from 'class-validator';
+import { IsArray, IsEnum, IsUUID, ArrayMinSize, ArrayMaxSize, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { BulkActionType } from '../../types/BulkActionType.type';
-
-/**
- * Bulk Action Data
- * Action-specific parameters for bulk operations
- */
-class BulkActionData {
-  @IsOptional()
-  @IsUUID()
-  assignedUserId?: string;
-
-  @IsOptional()
-  @IsUUID()
-  assigneeId?: string;
-
-  @IsOptional()
-  @IsNumber()
-  tagId?: number;
-
-  @IsOptional()
-  @IsString()
-  status?: 'open' | 'pending' | 'resolved';
-
-  @IsOptional()
-  @IsString()
-  priority?: 'low' | 'normal' | 'high' | 'urgent';
-}
+import { BulkActionData } from './bulkActionData.request';
 
 /**
  * Bulk Action Request
