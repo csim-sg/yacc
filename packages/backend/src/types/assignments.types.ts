@@ -1,10 +1,16 @@
 /**
  * Assignment Types
- * Type definitions for conversation assignment operations
+ * Backend-specific types for conversation assignment operations
+ *
+ * For shared types, use:
+ * - Assignment from '@yacc/common/types/Assignment.type'
+ * - AssignmentResponse from '@yacc/common/responses/conversations/assignment.response'
+ * - AssignRequest from '@yacc/common/requests/conversations/assign.request'
  */
 
 /**
  * Assign Conversation Request
+ * @deprecated Use AssignRequest from '@yacc/common/requests/conversations/assign.request'
  */
 export interface AssignConversationRequest {
   assignedUserId: string; // User ID to assign the conversation to
@@ -12,6 +18,7 @@ export interface AssignConversationRequest {
 
 /**
  * Assignment Response DTO
+ * @deprecated Use AssignmentResponse from '@yacc/common/responses/conversations/assignment.response'
  */
 export interface AssignmentResponse {
   id: string;

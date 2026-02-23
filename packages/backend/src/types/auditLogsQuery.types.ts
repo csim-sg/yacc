@@ -1,9 +1,17 @@
 /**
  * Audit Logs Query Types
- * 
- * Types for querying audit logs with filtering and pagination
+ * Backend-specific types for querying audit logs with filtering and pagination
+ *
+ * For shared types, use:
+ * - AuditLog from '@yacc/common/types/AuditLog.type'
+ * - AuditLogResponse from '@yacc/common/responses/audit/auditLog.response'
+ * - ListAuditLogsRequest from '@yacc/common/requests/audit/listAuditLogs.request'
  */
 
+/**
+ * Audit Log Query Filters
+ * @deprecated Use ListAuditLogsRequest from '@yacc/common/requests/audit/listAuditLogs.request'
+ */
 export interface AuditLogQueryFilters {
   // Filter by actor (user who performed action)
   actorId?: string;
@@ -28,6 +36,10 @@ export interface AuditLogQueryFilters {
   limit?: number;
 }
 
+/**
+ * Audit Log Entry
+ * @deprecated Use AuditLog from '@yacc/common/types/AuditLog.type'
+ */
 export interface AuditLogEntry {
   id: string;
   actorId: string;
@@ -38,6 +50,9 @@ export interface AuditLogEntry {
   createdAt: Date;
 }
 
+/**
+ * Audit Log Query Response
+ */
 export interface AuditLogQueryResponse {
   items: AuditLogEntry[];
   total: number;
@@ -46,11 +61,17 @@ export interface AuditLogQueryResponse {
   pages: number;
 }
 
+/**
+ * Audit Log Export Request
+ */
 export interface AuditLogExportRequest {
   format?: 'csv' | 'json';
   filters?: AuditLogQueryFilters;
 }
 
+/**
+ * Audit Log Export Response
+ */
 export interface AuditLogExportResponse {
   data: string; // CSV or JSON string
   format: 'csv' | 'json';

@@ -1,11 +1,12 @@
 /**
  * Bulk Actions API Types
- * 
- * Handles bulk operations on conversations:
- * - Bulk assign/reassign to user
- * - Bulk tag (add tag to multiple conversations)
- * - Bulk status update (open/pending/resolved)
- * 
+ * Backend-specific types for bulk operations on conversations
+ *
+ * For shared types, use:
+ * - BulkAction from '@yacc/common/types/BulkAction.type'
+ * - BulkActionResponse from '@yacc/common/responses/conversations/bulkAction.response'
+ * - BulkActionRequest from '@yacc/common/requests/conversations/bulkAction.request'
+ *
  * Features:
  * - Best-effort: partial success is OK (failures returned, not all-or-nothing)
  * - Max 100 conversations per request
@@ -14,17 +15,16 @@
  * - Audit logging: bulk_action_applied for each successful action
  */
 
-export type BulkActionType = 'assign' | 'tag' | 'status';
+import type { BulkActionType } from '@yacc/common/types/BulkActionType.type';
 
+/**
+ * Conversation status type (local definition for consistency)
+ */
 export type ConversationStatus = 'open' | 'pending' | 'resolved';
 
 /**
  * Bulk action request body
- * 
- * Examples:
- * - Assign: { conversationIds: ['c1', 'c2'], action: 'assign', data: { assigneeId: 'u123' } }
- * - Tag: { conversationIds: ['c1', 'c2'], action: 'tag', data: { tagId: 't456' } }
- * - Status: { conversationIds: ['c1', 'c2'], action: 'status', data: { status: 'resolved' } }
+ * @deprecated Use BulkActionRequest from '@yacc/common/requests/conversations/bulkAction.request'
  */
 export interface BulkActionRequest {
   conversationIds: string[];
@@ -42,9 +42,8 @@ export interface BulkActionFailure {
 
 /**
  * Bulk action response (inner data)
- * 
+ *
  * Returns success count, failure count, and detailed failure reasons.
- * Example: { successCount: 98, failureCount: 2, failures: [{id: 'c1', reason: 'Not found'}] }
  */
 export interface BulkActionResponseData {
   successCount: number;
@@ -54,9 +53,6 @@ export interface BulkActionResponseData {
 
 /**
  * Bulk action response (envelope)
- * 
- * Wraps the bulk action result in a standard data envelope per API contract.
- * Example: { data: { successCount: 98, failureCount: 2, failures: [...] } }
  */
 export interface BulkActionResponse {
   data: BulkActionResponseData;

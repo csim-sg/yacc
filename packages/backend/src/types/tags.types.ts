@@ -1,8 +1,17 @@
 /**
  * Tags Types
- * Type definitions for tag creation and tag-related operations
+ * Backend-specific types for tag operations
+ *
+ * For shared types, use:
+ * - Tag from '@yacc/common/types/Tag.interface'
+ * - TagResponse from '@yacc/common/responses/tags/tag.response'
+ * - CreateTagRequest from '@yacc/common/requests/tags/createTag.request'
  */
 
+/**
+ * Create Tag Request
+ * @deprecated Use CreateTagRequest from '@yacc/common/requests/tags/createTag.request'
+ */
 export interface CreateTagRequest {
   name: string;
   color?: string;
@@ -17,6 +26,7 @@ export interface AttachTagRequest {
 
 /**
  * Tag Response DTO
+ * @deprecated Use TagResponse from '@yacc/common/responses/tags/tag.response'
  */
 export interface TagResponse {
   id: number;
