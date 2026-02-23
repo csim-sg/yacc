@@ -16,7 +16,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - Phase 1 Backend: ✅ Complete (IRC integration + DLQ contract hardening merged)
 - Phase 1.5 Backend Refactoring (DEV-002-006): ✅ **COMPLETE** (All 59 blockers fixed; PR ready for final review and merge)
 - Phase 1 Frontend (P0 Option 2): ⏳ In Progress (core workflow + account recovery blocker fixes)
-- **Infrastructure Phase (DEV-013-015)**: 🔴 **CONDITIONAL** (PO gap analysis complete; 9 blockers require resolution before start; see GOV-031)
+- **Infrastructure Phase (DEV-013-015)**: 🟡 **CONDITIONAL** (PO: Blocker #1 RESOLVED; 8 blockers remain; see DEV-013-015-COORDINATION-MEMO.md)
 - Phase 2: ⏳ Queued (tags/notes/assignments/rules; starts after DEV-002-006 and FE-001-021 complete)
 - QA: ⏳ Not Started
 
@@ -158,25 +158,22 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 
 ## Infrastructure Phase Status (DEV-013-015)
 
-**Status**: ⏸️ **COORDINATION PHASE COMPLETE - AWAITING BLOCKER RESOLUTION**  
-**Coordination Complete**: 2026-02-23 (Architect analysis + PO analysis + memo)  
-**Target Decision**: 2026-02-25 5:00 PM (Go/No-Go on 9 blockers)  
+**Status**: 🟡 **PARTIAL RESOLUTION** (1 of 9 blockers resolved; 8 remain)  
+**PO Blocker #1 Resolution**: ✅ **2026-02-23 14:30** - Frontend scope = S3/CloudFront (out of Helm)  
+**Target Decision for Remaining 8**: 2026-02-25 5:00 PM (Go/No-Go)  
 **PO Recommendation**: Proceed if all 9 blockers resolved by 2026-02-25; otherwise defer to post-MVP  
 
 | Task | Status | Dependencies | Est. Timeline (if proceed) |
 |------|--------|--------------|----------------------------|
-| **DEV-013** (ADR-019 approval + docs) | ⏸️ Blocked on 5 decisions | None | 2026-02-26 to 2026-02-28 (2 days) |
-| **DEV-014** (Helm charts) | ⏸️ Blocked on 3 decisions | DEV-013 | 2026-02-28 to 2026-03-03 (3-5 days) |
+| **DEV-013** (ADR-019 approval + docs) | ⏸️ Blocked on 4 remaining decisions | Blocker #1 ✅ resolved | 2026-02-26 to 2026-02-28 (2 days) |
+| **DEV-014** (Helm charts - **backend only**) | ⏸️ Blocked on 3 decisions | DEV-013 + Blocker #1 ✅ | 2026-02-28 to 2026-03-03 (3-5 days) |
 | **DEV-015** (CI pipeline → Helm) | ⏸️ Blocked on 2 decisions | DEV-014 | 2026-03-03 to 2026-03-05 (2-3 days) |
 
-**Critical Blockers**: 9 total (all must be resolved by 2026-02-25)
-- Frontend scope (S3/CloudFront), K3s cluster status, Secret management, GitHub Actions access, Smoke deploy criteria, Rollback approach, Environment specs, Documentation scope, ADR-019 approval
+**Blocker Resolution Status**: 
 
-### Critical Blockers Requiring Resolution (by 2026-02-25)
-
-| Blocker | Owner | Timeline | Impact |
-|---------|-------|----------|--------|
-| 1. Frontend deployment scope clarification (S3/CloudFront, not K3s) | Product Owner | TODAY | Scope ambiguity |
+| # | Blocker | Owner | Status | Resolution Notes |
+|---|---------|-------|--------|------------------|
+| 1 | Frontend scope (S3/CloudFront, not Helm) | PO | 🟢 **RESOLVED** | DEV-014 AC updated; ADR-019 clarified; deployment independent |
 | 2. K3s cluster provisioning status confirmed | Infrastructure team | 2026-02-24 | Cannot test DEV-014 |
 | 3. Secret management approach documented (ADR-020) | Architect | 2026-02-24 | Cannot finalize DEV-014 |
 | 4. GitHub Actions ↔ K3s network access confirmed | Infrastructure team | 2026-02-25 | Cannot implement DEV-015 |
