@@ -3,6 +3,7 @@
  * Handles note CRUD endpoints: create, list
  */
 
+import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import type { Request } from 'express';
 import {
   JsonController,
@@ -18,7 +19,6 @@ import {
   NotFoundError,
   QueryParam,
 } from 'routing-controllers';
-import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import { logger } from '../infrastructure/logger';
 import { notesService } from '../services/notes.service';
 import type { AuthUser } from '../types/auth.types';

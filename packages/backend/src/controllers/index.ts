@@ -20,8 +20,8 @@
  */
 
 import { AssignmentsController } from './assignment.controller.js';
-import { AuditController } from './audit.controller.js';
 import { AuditLogsQueryController } from './audit-log.controller.js';
+import { AuditController } from './audit.controller.js';
 import { AuthController } from './auth.controller.js';
 import { BulkActionsController } from './bulk-action.controller.js';
 import { ConversationsController } from './conversations.controller.js';
@@ -38,8 +38,8 @@ import { UsersController } from './users.controller.js';
 
 export const controllers = [
   AssignmentsController,
-  AuditController,
   AuditLogsQueryController,
+  AuditController,
   AuthController,
   BulkActionsController,
   ConversationsController,

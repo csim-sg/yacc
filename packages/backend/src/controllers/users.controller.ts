@@ -3,6 +3,7 @@
  * REST API endpoints for user management (BE-006)
  */
 
+import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import {
   Authorized,
   Body,
@@ -17,7 +18,6 @@ import {
   QueryParam,
   BadRequestError,
 } from 'routing-controllers';
-import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import { usersService } from '../services/users.service';
 import type { AuthUser } from '../types/auth.types';
 import type {

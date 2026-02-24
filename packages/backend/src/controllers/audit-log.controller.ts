@@ -5,9 +5,9 @@
  * RBAC: manager+ only for viewing, admin+ for export
  */
 
+import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import type { Request , Response } from 'express';
 import { JsonController, Get, Post, Param, QueryParam, Req, Res, Authorized, CurrentUser, Body, BadRequestError } from 'routing-controllers';
-import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import { logger } from '../infrastructure/logger';
 import {
   queryAuditLogs,
