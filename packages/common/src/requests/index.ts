@@ -6,6 +6,9 @@
  * import { CreateTagRequest } from '@yacc/common/requests/tags/createTag.request';
  */
 
+// Base list request (class - used for pagination)
+export { BaseListRequest } from './base-list.request';
+
 // Auth (type re-exports)
 export type { ForgotPasswordRequest, ResetPasswordRequest } from './passwordReset.request';
 

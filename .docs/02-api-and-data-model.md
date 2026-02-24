@@ -103,6 +103,33 @@ class BaseListResponse<T> {
 3. **No Ad-Hoc Shapes**: Don't create custom pagination response structures
 4. **Extension Only If Needed**: Only extend `BaseListResponse<T>` if additional metadata required
 
+#### Pagination Calculation
+
+Internal pages are **0-indexed** for consistency with database queries:
+
+| API Request (1-indexed) | Internal Page | Limit | Offset | Records Returned |
+|-------------------------|---------------|-------|--------|------------------|
+| `?page=1&limit=15`      | 0             | 15    | 0      | 1-15             |
+| `?page=2&limit=15`      | 1             | 15    | 15     | 16-30            |
+| `?page=3&limit=25`      | 2             | 25    | 50     | 51-75            |
+
+**Formula**: `offset = page * limit` (where `page` is 0-indexed internally)
+
+**Note**: API responses return 1-indexed pages (`BaseListResponse` adds +1 for display).
+
+#### Import from @yacc/common
+
+Both `BaseListRequest` and `BaseListResponse` are exported from the main `@yacc/common` entry point:
+
+```typescript
+// Import from main entry point
+import { BaseListRequest, BaseListResponse } from '@yacc/common';
+
+// Or import from specific paths for tree-shaking
+import { BaseListRequest } from '@yacc/common/requests/base-list.request';
+import { BaseListResponse } from '@yacc/common/responses/base-list.response';
+```
+
 #### Backend PaginationRequest Helper
 
 Backend controllers use `PaginationRequest` (extends `BaseListRequest`) with Drizzle ORM helpers:

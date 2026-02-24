@@ -32,8 +32,11 @@
 
     "declaration": true,
     "declarationDir": "./dist",
-    "outDir": "./dist"
+    "outDir": "./dist",
+
+    /* Test types */
+    "types": ["vitest/globals"]
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "exclude": ["node_modules", "dist", "tests", "**/__tests__/**"]
 }

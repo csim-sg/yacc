@@ -11,6 +11,10 @@
  * - Schemas: import { TagSchema } from '@yacc/common/schemas/tag.schema';
  */
 
+// Base pagination classes (SH-002)
+export { BaseListRequest } from './requests/base-list.request';
+export { BaseListResponse } from './responses/base-list.response';
+
 // Re-export requests (centralized index)
 export type {
   ForgotPasswordRequest,
