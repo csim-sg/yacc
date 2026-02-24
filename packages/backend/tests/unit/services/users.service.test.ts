@@ -3,8 +3,8 @@
  * Tests for user CRUD operations
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { dbClient } from '../../../src/infrastructure/db.client';
 import { users } from '../../../src/schemas/user.schema';
 import { usersService } from '../../../src/services/users.service';
@@ -13,7 +13,7 @@ import type { AuthUser } from '../../../src/types/auth.types';
 describe('UsersService', () => {
   let superAdminUser: AuthUser;
   let regularUser: AuthUser;
-  let testUserIds: string[] = [];
+  const testUserIds: string[] = [];
 
   // Helper to create test user in DB
   async function createTestUserInDB(userData: {
