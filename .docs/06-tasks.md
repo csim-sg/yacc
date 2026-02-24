@@ -1,10 +1,10 @@
 # 06. Issues & User stories
 
 **Last Updated**: February 24, 2026  
-**Status**: ✅ API Hygiene (SH-002+DEV-016/017/018) MERGED | ⏳ Phase 2 ready (collaboration + rules)  
-**Current focus**: Phase 2 execution (tags/notes/assignments/rules) - 40% faster development expected
-**Latest**: ✅ SH-002 (PR #305) + DEV-016/017/018 (PR #306) merged; 659 tests passing; linting strict mode pass; zero TypeScript errors  
-**Governance**: ADR-003, ADR-005, ADR-014, ADR-015, GOV-005, GOV-026, GOV-030
+**Status**: ✅ Phase 1 Backend COMPLETE | ✅ Phase 1 Frontend READY TO MERGE (PR #307) | ✅ Infrastructure Phase COMPLETE (PR #303 merged)  
+**Current focus**: Backend Refactoring (DEV-002-006, 5 tasks, ~12 days) + Phase 2 queued
+**Latest**: ✅ PR #307 (FE all 6 blockers + 25+ E2E tests) TypeScript violations FIXED, Architect APPROVED; ✅ PR #303 (Infrastructure K3s/Helm) MERGED; ✅ API Hygiene PRs #305, #306 merged  
+**Governance**: ADR-003, ADR-005, ADR-014, ADR-015, ADR-019, GOV-005, GOV-026, GOV-030, GOV-031, GOV-032
 
 ---
 
@@ -201,9 +201,9 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | DEV-010 | Migrate monorepo installs to Bun workspaces | Not Started | P0 | Backend | DEV-009 | `bun install` works at repo root; workspace links resolve; pnpm usage removed or explicitly scoped; lockfile and CI caching updated; `turbo` tasks still run | PVTI_lAHOAB4wV84BNGcwzgl42mw | 284 |
 | DEV-011 | Run backend on Bun in dev and production Docker | Not Started | P0 | Backend | DEV-010 | Backend starts via Bun (local + Docker); health smoke test passes; decorator stack works; no Node runtime requirement for prod container | PVTI_lAHOAB4wV84BNGcwzgl42m8 | 285 |
 | DEV-012 | CI/CD update for Bun runtime | Not Started | P1 | Backend | DEV-011 | GitHub Actions uses Bun install/cache; backend/frontend/common build and tests pass in CI; rollback path verified | PVTI_lAHOAB4wV84BNGcwzgl42nQ | 286 |
-| DEV-013 | ADR-019: Standardize CI/CD to K3s + Helm | Not Started | P0 | Architect | - | ADR-019 approved; docs updated (technology + implementation + quick reference); environment assumptions documented; rollback approach captured | PVTI_lAHOAB4wV84BNGcwzgl42n4 | 287 |
-| DEV-014 | Create Helm charts for YACC + dependencies (MVP) | Not Started | P0 | Backend | DEV-013 | Helm charts exist for backend (and frontend if deployed in-cluster); PostgreSQL + Redis installed via Helm; values separated per env; `helm upgrade --install` is idempotent; smoke deploy works on K3s | PVTI_lAHOAB4wV84BNGcwzgl42oQ | 288 |
-| DEV-015 | Update CI pipeline to deploy to K3s using Helm | Not Started | P0 | Backend | DEV-014 | GitHub Actions deploy job uses Helm; deploys to staging namespace; rollback documented; no kubectl imperative drift; pipeline passes | PVTI_lAHOAB4wV84BNGcwzgl42ok | 289 |
+| DEV-013 | ADR-019: Standardize CI/CD to K3s + Helm | ✅ **Done** (PR #303 merged) | P0 | Architect | - | ADR-019 approved; docs updated (technology + implementation + quick reference); environment assumptions documented; rollback approach captured ✅ | PVTI_lAHOAB4wV84BNGcwzgl42n4 | 287 |
+| DEV-014 | Create Helm charts for YACC + dependencies (MVP) | ✅ **Done** (PR #303 merged) | P0 | Backend | DEV-013 | Helm charts exist for backend; PostgreSQL + Redis pre-installed on cluster; values separated per env; `helm upgrade --install` idempotent; smoke deploy works on K3s ✅ | PVTI_lAHOAB4wV84BNGcwzgl42oQ | 288 |
+| DEV-015 | Update CI pipeline to deploy to K3s using Helm | ✅ **Done** (PR #303 merged) | P0 | Backend | DEV-014 | GitHub Actions deploy job uses Helm; deploys to staging namespace; rollback documented; no kubectl imperative drift; pipeline passes ✅ | PVTI_lAHOAB4wV84BNGcwzgl42ok | 289 |
 | DEV-016 | Align controller names with endpoint paths (code hygiene) | ✅ **Done** (PR #306 merged) | P1 | Backend | - | Renamed 5 controllers to kebab-case (assignments→assignment, bulkActions→bulk-action, notes→note, auditLogsQuery→audit-log); deleted duplicate tags.controller.ts; API paths unchanged (non-breaking) ✅ | PVTI_lAHOAB4wV84BNGcwzgl2YV8 | 300 |
 | DEV-017 | Standardize list request/response contracts (BaseListRequest/Response) | ✅ **Done** (PR #306 merged) | P1 | Backend, Frontend | SH-002 | All 7+ list controllers return `BaseListResponse<T>`; services return `{ data, total }`; `IListResponse` removed completely; common exports updated ✅ | PVTI_lAHOAB4wV84BNGcwzgl2YXY | 301 |
 | DEV-018 | Consolidate pagination logic (service-layer pattern) | ✅ **Done** (PR #306 merged) | P1 | Backend | DEV-017 | Pagination consolidated in services; ~70% boilerplate reduction; query adapter pattern for offset calculation; offset formula: (page-1)*limit ✅ | PVTI_lAHOAB4wV84BNGcwzgl2YZ6 | 302 |
