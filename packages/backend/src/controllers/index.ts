@@ -6,29 +6,30 @@
  * Controllers:
  * - AuthController: Authentication endpoints (sign-up, sign-in, forgot password)
  * - ConversationsController: Inbox & conversation management
- * - TagsController: Tag CRUD endpoints
- * - NotesController: Note CRUD endpoints with @mention parsing
- * - AssignmentsController: Conversation assignment endpoints
+ * - TagController: Tag CRUD endpoints
+ * - NoteController: Note CRUD endpoints with @mention parsing
+ * - AssignmentController: Conversation assignment endpoints
  * - NotificationsController: Notification CRUD endpoints
  * - RoutingRulesController: Routing rules CRUD + evaluation endpoints
- * - BulkActionsController: Bulk action endpoints (assign/tag/status)
+ * - BulkActionController: Bulk action endpoints (assign/tag/status)
  * - AuditController: Audit logging endpoints
+ * - AuditLogController: Audit logs query and export endpoints
  * - HealthController: Health check endpoints
  * - QueueController: Message queue status endpoints
  * - UsersController: User management endpoints (CRUD)
  */
 
-import { AssignmentsController } from './assignments.controller.js';
+import { AssignmentsController } from './assignment.controller.js';
 import { AuditController } from './audit.controller.js';
-import { AuditLogsQueryController } from './auditLogsQuery.controller.js';
+import { AuditLogsQueryController } from './audit-log.controller.js';
 import { AuthController } from './auth.controller.js';
-import { BulkActionsController } from './bulkActions.controller.js';
+import { BulkActionsController } from './bulk-action.controller.js';
 import { ConversationsController } from './conversations.controller.js';
 import { DLQController } from './dlq.controller.js';
 import { HealthController } from './health.controller.js';
 import { IRCIntegrationController } from './ircIntegration.controller.js';
 import { MessageController } from './message.controller.js';
-import { NotesController } from './notes.controller.js';
+import { NotesController } from './note.controller.js';
 import { NotificationsController } from './notifications.controller.js';
 import { QueueController } from './queue.controller.js';
 import { RoutingRulesController } from './routing-rules.controller.js';
