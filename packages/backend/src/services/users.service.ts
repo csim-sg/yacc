@@ -19,7 +19,7 @@ import type {
   CreateUserResponse,
   DeleteUserResponse,
   ListUsersQuery,
-  ListUsersResponse,
+  ListUsersServiceResponse,
   UpdateUserBody,
   UpdateUserResponse,
   UserChanges,
@@ -46,7 +46,7 @@ export class UsersService {
     query: ListUsersQuery,
     actor: AuthUser,
     correlationId?: string
-  ): Promise<ListUsersResponse> {
+  ): Promise<ListUsersServiceResponse> {
     const { page = 1, limit = 20, role, status, search } = query;
 
     // Validate pagination
@@ -124,7 +124,7 @@ export class UsersService {
       });
 
       return {
-        users: usersList.map((u) => ({
+        data: usersList.map((u) => ({
           id: u.id,
           email: u.email,
           name: u.name,
@@ -134,12 +134,7 @@ export class UsersService {
           updatedAt: u.updatedAt,
           deletedAt: u.deletedAt,
         })),
-        pagination: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
+        total,
       };
     } catch (error) {
       if (error instanceof BadRequestError) {

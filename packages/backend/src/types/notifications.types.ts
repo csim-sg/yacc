@@ -24,15 +24,12 @@ export interface NotificationResponse {
 }
 
 /**
- * List Notifications Response
+ * List Notifications Response (service layer)
+ * Service returns { data, total } - controller wraps in BaseListResponse
  */
-export interface ListNotificationsResponse {
+export interface ListNotificationsServiceResponse {
   data: NotificationResponse[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-  };
+  total: number;
 }
 
 /**

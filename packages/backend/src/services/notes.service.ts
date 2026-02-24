@@ -4,7 +4,7 @@ import { logger } from '../infrastructure/logger';
 import { conversations } from '../schemas/conversation.schema';
 import { notes } from '../schemas/note.schema';
 import { notifications } from '../schemas/notification.schema';
-import type { CreateNoteRequest, NoteResponse, NoteCreationResult } from '../types/notes.types';
+import type { CreateNoteRequest, NoteResponse, NoteCreationResult, ListNotesServiceResponse } from '../types/notes.types';
 import { auditService } from './audit.service';
 import { mentionParserService } from './mention-parser.service';
 
@@ -123,7 +123,7 @@ export class NotesService {
     conversationId: string,
     page: number = 1,
     limit: number = 50
-  ) {
+  ): Promise<ListNotesServiceResponse> {
     try {
       // Validate conversation exists
       const conversation = await dbClient
@@ -173,12 +173,7 @@ export class NotesService {
 
       return {
         data: noteResponses,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit),
-        },
+        total,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';

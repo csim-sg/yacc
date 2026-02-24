@@ -106,7 +106,8 @@ export class RoutingRulesService {
   }
 
   /**
-   * List all active routing rules
+   * List all routing rules
+   * Returns { data, total } for consistency with other list endpoints
    */
   async listRules() {
     try {
@@ -120,7 +121,10 @@ export class RoutingRulesService {
         'Rules listed successfully'
       );
 
-      return allRules;
+      return {
+        data: allRules,
+        total: allRules.length,
+      };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error(
@@ -295,6 +299,7 @@ export class RoutingRulesService {
 
   /**
    * Get rule execution logs with pagination
+   * Returns { data, total } for consistency with other list endpoints
    */
   async getRuleExecutions(ruleId: string, page: number = 1, pageSize: number = 50) {
     try {
@@ -323,7 +328,7 @@ export class RoutingRulesService {
         'Fetched rule executions'
       );
 
-      return { executions, total, page, pageSize: limit };
+      return { data: executions, total };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error(

@@ -3,6 +3,7 @@
  * REST API endpoints for user management (BE-006)
  */
 
+import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import {
   Authorized,
   Body,
@@ -24,10 +25,9 @@ import type {
   CreateUserResponse,
   DeleteUserResponse,
   ListUsersQuery,
-  ListUsersResponse,
-  ListRolesResponse,
   UpdateUserBody,
   UpdateUserResponse,
+  ListRolesResponse,
 } from '../types/users.types';
 
 /**
@@ -123,7 +123,7 @@ export class UsersController {
     @QueryParam('status') status?: 'active' | 'inactive' | 'suspended',
     @QueryParam('search') search?: string,
     @CurrentUser() user?: AuthUser
-  ): Promise<ListUsersResponse> {
+  ) {
     const query: ListUsersQuery = {
       page: parsePage(page),
       limit: parseLimit(limit),
@@ -131,7 +131,15 @@ export class UsersController {
       status,
       search,
     };
-    return usersService.listUsers(query, user!);
+    const result = await usersService.listUsers(query, user!);
+    
+    // Create a query adapter for BaseListResponse
+    const queryAdapter = {
+      getLimit: () => query.limit || 20,
+      getPage: () => (query.page || 1) - 1, // Convert to 0-indexed
+    };
+    
+    return new BaseListResponse(result.data, result.total, queryAdapter);
   }
 
   /**

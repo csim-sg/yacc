@@ -31,16 +31,12 @@ export type ListUsersQuery = {
 };
 
 /**
- * List users response with pagination
+ * List users response with pagination (service layer)
+ * Service returns { data, total } - controller wraps in BaseListResponse
  */
-export type ListUsersResponse = {
-  users: UserResponse[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
+export type ListUsersServiceResponse = {
+  data: UserResponse[];
+  total: number;
 };
 
 /**
