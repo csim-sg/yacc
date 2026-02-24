@@ -6,6 +6,9 @@
  * import { TagResponse } from '@yacc/common/responses/tags/tag.response';
  */
 
+// Base list response (class - generic list response wrapper)
+export { BaseListResponse } from './base-list.response';
+
 // Auth (interfaces)
 export type { ForgotPasswordResponse, ResetPasswordResponse } from './passwordReset.response';
 
