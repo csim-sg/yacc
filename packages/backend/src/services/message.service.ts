@@ -11,7 +11,6 @@ import type { GetMessagesQuery, SendMessageRequestBody } from '../types/message.
 import { gatewayExchange } from './gateway-exchange.js';
 import { messageQueueService } from './message-queue.service.js';
 import { MessageStatusTracker } from './messageStatusTracker.js';
-import { messageQueueService } from './message-queue.service.js';
 
 /**
  * Message Service - handles message retrieval and sending
