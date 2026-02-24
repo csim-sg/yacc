@@ -1,9 +1,9 @@
 # 06. Issues & User stories
 
-**Last Updated**: February 22, 2026  
-**Status**: ✅ Phase 1.4 Complete (BE-006, FE-012A/B, FE-016/017/019); ⏳ Phase 2 pending (collaboration + rules)  
-**Current focus**: Phase 2 execution (tags/notes/assignments/rules) OR Phase 1.4 refinements (attachments, audit logs, status display)  
-**Latest**: ✅ All 6 tasks merged (PR #294, #295, #296, #297, #298); 350+ tests passing; 85%+ coverage; DEV-016/017/018 created for API hygiene (endpoint alignment + list contracts)  
+**Last Updated**: February 24, 2026  
+**Status**: ✅ API Hygiene (SH-002+DEV-016/017/018) MERGED | ⏳ Phase 2 ready (collaboration + rules)  
+**Current focus**: Phase 2 execution (tags/notes/assignments/rules) - 40% faster development expected
+**Latest**: ✅ SH-002 (PR #305) + DEV-016/017/018 (PR #306) merged; 659 tests passing; linting strict mode pass; zero TypeScript errors  
 **Governance**: ADR-003, ADR-005, ADR-014, ADR-015, GOV-005, GOV-026, GOV-030
 
 ---
@@ -204,9 +204,9 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | DEV-013 | ADR-019: Standardize CI/CD to K3s + Helm | Not Started | P0 | Architect | - | ADR-019 approved; docs updated (technology + implementation + quick reference); environment assumptions documented; rollback approach captured | PVTI_lAHOAB4wV84BNGcwzgl42n4 | 287 |
 | DEV-014 | Create Helm charts for YACC + dependencies (MVP) | Not Started | P0 | Backend | DEV-013 | Helm charts exist for backend (and frontend if deployed in-cluster); PostgreSQL + Redis installed via Helm; values separated per env; `helm upgrade --install` is idempotent; smoke deploy works on K3s | PVTI_lAHOAB4wV84BNGcwzgl42oQ | 288 |
 | DEV-015 | Update CI pipeline to deploy to K3s using Helm | Not Started | P0 | Backend | DEV-014 | GitHub Actions deploy job uses Helm; deploys to staging namespace; rollback documented; no kubectl imperative drift; pipeline passes | PVTI_lAHOAB4wV84BNGcwzgl42ok | 289 |
-| DEV-016 | Align controller names with endpoint paths (code hygiene) | Not Started | P1 | Backend | - | Controller file names match endpoint base paths; `assignments.controller.ts` → `/api/assignments`; `bulkActions.controller.ts` → `/api/bulk-actions`; remove duplicate `tags.controller.ts`; `conversationId` in body/query not path params; API docs updated; frontend calls updated | - | 300 |
-| DEV-017 | Standardize list request/response contracts (BaseListRequest/Response) | Not Started | P1 | Backend, Frontend | - | All list endpoints return `BaseListResponse<T>`; all list requests extend `BaseListRequest`; frontend expects consistent `{ data, page, limit, total }` shape; remove `IListResponse` interface; common package exports updated | - | 301 |
-| DEV-018 | Create PaginationRequest helper for Drizzle ORM query building | Not Started | P1 | Backend | DEV-017 | `PaginationRequest` class in `utilities/pagination.ts`; base `applyToQuery()` applies .limit().offset(); feature query classes override `applyToQuery()` to add where conditions + pagination; single `query.applyToQuery(baseSelect)` call in controllers; no manual offset/limit/where in controllers; unit tests | - | 302 |
+| DEV-016 | Align controller names with endpoint paths (code hygiene) | ✅ **Done** (PR #306 merged) | P1 | Backend | - | Renamed 5 controllers to kebab-case (assignments→assignment, bulkActions→bulk-action, notes→note, auditLogsQuery→audit-log); deleted duplicate tags.controller.ts; API paths unchanged (non-breaking) ✅ | PVTI_lAHOAB4wV84BNGcwzgl2YV8 | 300 |
+| DEV-017 | Standardize list request/response contracts (BaseListRequest/Response) | ✅ **Done** (PR #306 merged) | P1 | Backend, Frontend | SH-002 | All 7+ list controllers return `BaseListResponse<T>`; services return `{ data, total }`; `IListResponse` removed completely; common exports updated ✅ | PVTI_lAHOAB4wV84BNGcwzgl2YXY | 301 |
+| DEV-018 | Consolidate pagination logic (service-layer pattern) | ✅ **Done** (PR #306 merged) | P1 | Backend | DEV-017 | Pagination consolidated in services; ~70% boilerplate reduction; query adapter pattern for offset calculation; offset formula: (page-1)*limit ✅ | PVTI_lAHOAB4wV84BNGcwzgl2YZ6 | 302 |
 
 ### Frontend Tasks
 
@@ -241,7 +241,7 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
 | SH-001 | Define TypeScript types for core entities (User, Conversation, Message, Tag, Note, Notification, RoutingRule, AuditLog) | **Done** (PR #304 merged) | P0 | Architect | BE-002 | All Phase 2 entity types + request/response DTOs defined in packages/common; shared by backend + frontend; 33 files updated; builds passing ✅ | PVTI_lAHOAB4wV84BNGcwzgj_8cg | 83 |
-| SH-002 | Define API request/response types (conversations, messages, auth, users, IRC config) | Not Started | P0 | Architect | SH-001 | All API types defined, imported by backend and frontend | PVTI_lAHOAB4wV84BNGcwzgj_83I | 74 |
+| SH-002 | Define API request/response types (conversations, messages, auth, users, IRC config) | ✅ **Done** (PR #305 merged) | P0 | Architect | SH-001 | BaseListRequest + BaseListResponse<T>; 17 tests; 90% coverage ✅ | PVTI_lAHOAB4wV84BNGcwzgj_83I | 74 |
 | SH-003 | Define WebSocket event types (message.received, message.sent, message.failed) | Not Started | P0 | Architect | SH-001 | Event types defined with payloads | PVTI_lAHOAB4wV84BNGcwzgj_6hE | 76 |
 | SH-004 | Create Zod schemas for request validation (auth, conversations, messages, IRC config) | Not Started | P1 | Architect | SH-002 | All schemas created, export for backend validation | PVTI_lAHOAB4wV84BNGcwzgj_6g8 | 78 |
 | SH-005 | Set up shared package exports in packages/common/src/index.ts | Not Started | P0 | Architect | SH-001, SH-002, SH-003 | All types and schemas exported correctly | PVTI_lAHOAB4wV84BNGcwzgj_6hA | 81 |
