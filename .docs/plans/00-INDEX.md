@@ -23,8 +23,8 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 
 ## Shared Code Hygiene Phase (SH-003, SH-004, SH-005)
 
-**Status**: 🟢 **GO - PO APPROVED ALL RECOMMENDATIONS**  
-**Phase**: Phase 1 (Gap Analysis) ✅ Complete | Phase 2 (PO Decisions) ✅ Approved | Phase 3 (Development) ⏳ Starting 2026-02-26  
+**Status**: ✅ **READY FOR DEVELOPMENT - All Finalization Complete**  
+**Phase**: Phase 1 (Gap Analysis) ✅ Complete | Phase 2 (PO Decisions) ✅ Approved | Phase 3a (Architect Finalization) ✅ **COMPLETE** | Phase 3b (Development) ⏳ Starting 2026-02-26  
 **Timeline**: 16 days development (saves 4 days via parallel execution)
 
 ### Decisions Approved ✅
@@ -34,7 +34,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **SH-003** | Option C (Full) | 9 WebSocket events | Complete real-time feature set |
 | **SH-004** | Option C (Full) | 35+ API endpoints with Zod validation | Complete validation coverage |
 | **SH-005** | Option A (Domain-specific) | @yacc/common/types/entities, etc. | ADR-005 compliant, code discoverable |
-| **ADR-XXX** | YES (Approved) | Zod as source of truth | DRY principle, single source |
+| **ADR-020** | YES (Approved) | Zod as source of truth | DRY principle, single source |
 
 ### Requirement Coverage
 
@@ -42,26 +42,38 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - SH-003: 100% (9/9 WebSocket events)
 - SH-004: 100% (35+/35+ endpoints)
 - SH-005: 100% (domain-specific exports)
-- ADR-XXX: 100% (Zod decision approved)
+- ADR-020: 100% (Zod decision approved + documented)
 
 ### Approval Record
 
 📄 **File**: `.docs/plans/SH-003-005-PO-APPROVAL.md` (detailed approval + sign-off)
 
+### Finalization Complete (Phase 3a) ✅
+
+✅ **ADR-020 Created**: `.docs/adr/ADR-020-zod-schema-source-of-truth.md`  
+✅ **.docs/06-tasks.md Updated**: Refined SH-003, SH-004, SH-005 definitions with detailed ACs  
+✅ **GitHub Issues Created**:
+- Issue #308: SH-003 - Define WebSocket Event Types (9 events)
+- Issue #309: SH-004 - Create Zod Schemas for Request Validation (35+ endpoints)
+- Issue #310: SH-005 - Set Up Shared Package Exports (domain-specific, ADR-005 compliant)
+
 ### Development Timeline (Approved)
 
-| Phase | Tasks | Timeline | Owner |
-|-------|-------|----------|-------|
-| **Phase 1** | SH-003 (4d) + SH-004 START | Feb 26-Mar 1 | Backend |
-| **Phase 2** | SH-004 Continue (7.5d) | Mar 2-9 | Backend |
-| **Phase 3** | SH-005 (3.5d) | Mar 10-13 | Architect |
+| Phase | Tasks | Timeline | Owner | Status |
+|-------|-------|----------|-------|--------|
+| **Phase 3a** | ADR-020 + Docs + Issues | Feb 25 | Architect | ✅ **DONE** |
+| **Phase 3b.1** | SH-003 (4d) + SH-004 START | Feb 26-Mar 1 | Backend | ⏳ Starting |
+| **Phase 3b.2** | SH-004 Continue (7.5d) | Mar 2-9 | Backend | Queued |
+| **Phase 3b.3** | SH-005 (3.5d) | Mar 10-13 | Architect | Queued |
 | **Total** | All 3 tasks | **16 days** (saves 4 days) | ✅ |
 
-### Next Steps (Architect)
+### Next Steps (2026-02-26)
 
-1. **2026-02-25**: Create ADR-XXX + Update .docs/06-tasks.md + Create GitHub Issues
-2. **2026-02-26**: Assign developers to SH-003 + SH-004, establish daily standup
-3. **Ongoing**: Monitor parallel execution, code reviews per workflow
+1. ✅ **Finalization Complete**: ADR-020 created, documentation updated, GitHub issues created
+2. **Developer Assignment**: Assign Backend Developer to SH-003 (#308) + SH-004 (#309)
+3. **Branch Creation**: Create feature branches (`sh-003-websocket-events`, `sh-004-zod-schemas`)
+4. **Daily Standup**: Establish coordination for parallel work (SH-003 + SH-004)
+5. **Ongoing**: Monitor parallel execution, code reviews per workflow
 
 ---
 

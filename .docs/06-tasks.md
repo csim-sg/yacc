@@ -242,11 +242,151 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
 | SH-001 | Define TypeScript types for core entities (User, Conversation, Message, Tag, Note, Notification, RoutingRule, AuditLog) | **Done** (PR #304 merged) | P0 | Architect | BE-002 | All Phase 2 entity types + request/response DTOs defined in packages/common; shared by backend + frontend; 33 files updated; builds passing ✅ | PVTI_lAHOAB4wV84BNGcwzgj_8cg | 83 |
 | SH-002 | Define API request/response types (conversations, messages, auth, users, IRC config) | ✅ **Done** (PR #305 merged) | P0 | Architect | SH-001 | BaseListRequest + BaseListResponse<T>; 17 tests; 90% coverage ✅ | PVTI_lAHOAB4wV84BNGcwzgj_83I | 74 |
-| SH-003 | Define WebSocket event types (message.received, message.sent, message.failed) | Not Started | P0 | Architect | SH-001 | Event types defined with payloads | PVTI_lAHOAB4wV84BNGcwzgj_6hE | 76 |
-| SH-004 | Create Zod schemas for request validation (auth, conversations, messages, IRC config) | Not Started | P1 | Architect | SH-002 | All schemas created, export for backend validation | PVTI_lAHOAB4wV84BNGcwzgj_6g8 | 78 |
-| SH-005 | Set up shared package exports in packages/common/src/index.ts | Not Started | P0 | Architect | SH-001, SH-002, SH-003 | All types and schemas exported correctly | PVTI_lAHOAB4wV84BNGcwzgj_6hA | 81 |
+| SH-003 | Define WebSocket Event Types (9 events: message, conversation, notification, presence, typing) | Ready | P0 | Backend | SH-001 | TypeScript interfaces in packages/common/types/events/; one-definition-per-file (ADR-005); BaseEvent<T,D> with discriminated union; JSDoc + example payloads; 85%+ tests; zero `any` types | PVTI_lAHOAB4wV84BNGcwzgj_6hE | 308 |
+| SH-004 | Create Zod Schemas for Request Validation (35+ endpoints, source of truth per ADR-020) | Ready | P0 | Backend | SH-002 | Zod schemas in packages/common/schemas/ (domain-specific files); validation middleware via middlewares option; types inferred via z.infer; user-friendly errors; 85%+ tests; ADR-020 compliance | PVTI_lAHOAB4wV84BNGcwzgj_6g8 | 309 |
+| SH-005 | Set Up Shared Package Exports (domain-specific, NO single barrel export per ADR-005) | Ready | P0 | Architect | SH-001, SH-002, SH-003, SH-004 | package.json exports map configured; domain-specific aggregators (types/entities, types/api, types/events, schemas); README documented; backend + frontend imports work; tree-shaking verified; NO src/index.ts barrel | PVTI_lAHOAB4wV84BNGcwzgj_6hA | 310 |
 
 | SH-006 | Organize DTOs by feature folders | Not Started | P1 | Architect | SH-001 | DTOs grouped by feature; no barrel export regressions | PVTI_lAHOAB4wV84BNGcwzgkHUZM | 126 |
+
+---
+
+#### SH-003: Define WebSocket Event Types - Detailed Acceptance Criteria
+
+**Objective**: Create TypeScript interfaces for all 9 WebSocket events with complete payload structures
+
+**Scope**:
+- Base event structure (`BaseEvent<T, D>`)
+- Message events: `message.received`, `message.sent`, `message.failed`
+- Conversation events: `conversation.updated`, `conversation.reopened`
+- Notification events: `notification.received`
+- Presence events: `presence.updated`, `typing.started`, `typing.stopped`
+
+**Deliverables**:
+1. TypeScript interfaces in `packages/common/types/events/`
+2. One definition per file (ADR-005 compliance)
+3. Domain-specific index aggregators (message, conversation, notification, presence)
+4. Discriminated union type `WebSocketEvent`
+5. JSDoc documentation with example payloads
+6. Tests with 85%+ coverage
+
+**Acceptance Criteria**:
+1. ✅ All 9 WebSocket events have TypeScript interfaces
+2. ✅ Each interface extends `BaseEvent<T, D>` with event name literal type
+3. ✅ Payloads reference entity types from SH-001 (User, Conversation, Message, Notification)
+4. ✅ Events documented with JSDoc + example payloads
+5. ✅ File structure follows one-definition-per-file (ADR-005)
+6. ✅ Discriminated union type `WebSocketEvent` exists for type narrowing
+7. ✅ Exports available in `packages/common/types/events/index.ts`
+8. ✅ Tests verify type assertions and discriminated union discrimination works
+9. ✅ 85%+ test coverage
+10. ✅ Zero `any` types in TypeScript
+11. ✅ All linting passes
+
+**Dependencies**: SH-001 (entity types must be complete)
+
+**Estimate**: 4 days
+
+**Reference**: `.docs/02-api-and-data-model.md` Section 6 (WebSocket events)
+
+---
+
+#### SH-004: Create Zod Schemas for Request Validation - Detailed Acceptance Criteria
+
+**Objective**: Create Zod schemas for all 35+ REST API endpoints with runtime validation integrated
+
+**Scope**:
+- Auth endpoints (4): login, register, forgot-password, reset-password
+- Conversation endpoints (7): list, get, update, reopen, assign, tag, bulk-action
+- Message endpoints (4): send, retry, list, get
+- Tags, Notes, Routing Rules endpoints (13 total)
+- IRC config endpoints (5+): save, test, connect, status, list-profiles
+- Search, Notifications, Bulk, Raw Payloads, DLQ, Integrations (11+ endpoints)
+
+**Deliverables**:
+1. Zod schemas in `packages/common/schemas/` (domain-specific files)
+2. Schema aggregator in `schemas/index.ts`
+3. Validation middleware in `packages/backend/middleware/validation.middleware.ts`
+4. Integration with routing-controllers via `middlewares` option
+5. Tests with 85%+ coverage
+
+**Acceptance Criteria**:
+1. ✅ Zod schemas for all 35+ request bodies
+2. ✅ Schemas validate body, query params, path params where applicable
+3. ✅ Schemas export from `packages/common/schemas/` organized by domain (auth, conversations, messages, etc.)
+4. ✅ **ADR-020**: Schemas are source of truth, types inferred via `z.infer<typeof schema>`
+5. ✅ Validation middleware integrates via `middlewares` option (NOT app.use() per ADR-014)
+6. ✅ Error messages are user-friendly (not raw Zod errors, formatted for API consumers)
+7. ✅ Tests verify schema validation catches invalid inputs (400 errors)
+8. ✅ Tests verify valid requests pass validation
+9. ✅ 85%+ test coverage
+10. ✅ Zero `any` types in TypeScript
+11. ✅ All linting passes
+
+**Implementation Notes**:
+- **ADR-020**: Zod schemas are source of truth (see ADR for rationale)
+- Middleware must not use `app.use()` (violates routing-controllers pattern per ADR-014)
+- Use `middlewares` option in `useExpressServer()` instead
+- Error handling: catch Zod errors, return 400 with friendly message (e.g., `{ error: 'validation_error', details: [...] }`)
+
+**Dependencies**: SH-002 (API types may be refactored to use `z.infer`)
+
+**Estimate**: 11.5 days
+
+**Reference**: `.docs/02-api-and-data-model.md` Sections 2-5 (API endpoints), ADR-020 (Zod source of truth)
+
+---
+
+#### SH-005: Set Up Shared Package Exports - Detailed Acceptance Criteria
+
+**Objective**: Configure domain-specific export paths using package.json `exports` map (NOT barrel exports)
+
+**Scope**:
+- Configure package.json `exports` map for domain-specific imports
+- Create domain-specific index aggregators
+- Document allowed import patterns
+- Test imports in backend/frontend
+
+**Deliverables**:
+1. Updated `packages/common/package.json` with `exports` map
+2. Domain-specific index aggregators:
+   - `types/entities/index.ts`
+   - `types/api/index.ts`
+   - `types/events/index.ts`
+   - `schemas/index.ts`
+3. Documentation in `packages/common/README.md`
+4. Tests in backend/frontend verifying imports work
+
+**Acceptance Criteria**:
+1. ✅ package.json `exports` map configured for domain paths (`@yacc/common/types/entities`, etc.)
+2. ✅ Domain-specific index aggregators export all types/schemas
+3. ✅ Import patterns documented in README with DO/DON'T examples
+4. ✅ Backend can import and use types/schemas
+5. ✅ Frontend can import and use types
+6. ✅ No circular dependencies introduced
+7. ✅ Tree-shaking works correctly (unused exports not bundled)
+8. ✅ **NO** single barrel export at `src/index.ts` (ADR-005 compliance)
+9. ✅ TypeScript module resolution works (no import errors)
+10. ✅ Tests verify all imports resolve and compile
+
+**Import Pattern (Expected)**:
+```typescript
+// ✅ GOOD (domain-specific)
+import { User, Conversation } from '@yacc/common/types/entities';
+import { LoginRequest } from '@yacc/common/types/api';
+import { MessageReceivedEvent } from '@yacc/common/types/events';
+import { loginSchema } from '@yacc/common/schemas';
+
+// ❌ BAD (barrel export, violates ADR-005)
+import { User, LoginRequest } from '@yacc/common';
+```
+
+**Dependencies**: SH-001, SH-002, SH-003, SH-004
+
+**Estimate**: 3.5 days
+
+**Reference**: `AGENTS.md` (ADR-005 constraint on barrel exports), ADR-005, ADR-012 (index aggregator allowance)
+
+---
 
 ### Integration Tasks (IRC)
 
