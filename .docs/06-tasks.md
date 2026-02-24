@@ -240,7 +240,7 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 
 | ID | Task | Status | Priority | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
 |----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
-| SH-001 | Define TypeScript types for core entities (User, Conversation, Message, Tag, Note, Notification, RoutingRule, AuditLog) | Not Started | P0 | Architect | BE-002 | All types defined in packages/common/src/types/ | PVTI_lAHOAB4wV84BNGcwzgj_8cg | 83 |
+| SH-001 | Define TypeScript types for core entities (User, Conversation, Message, Tag, Note, Notification, RoutingRule, AuditLog) | **Done** (PR #304 merged) | P0 | Architect | BE-002 | All Phase 2 entity types + request/response DTOs defined in packages/common; shared by backend + frontend; 33 files updated; builds passing ✅ | PVTI_lAHOAB4wV84BNGcwzgj_8cg | 83 |
 | SH-002 | Define API request/response types (conversations, messages, auth, users, IRC config) | Not Started | P0 | Architect | SH-001 | All API types defined, imported by backend and frontend | PVTI_lAHOAB4wV84BNGcwzgj_83I | 74 |
 | SH-003 | Define WebSocket event types (message.received, message.sent, message.failed) | Not Started | P0 | Architect | SH-001 | Event types defined with payloads | PVTI_lAHOAB4wV84BNGcwzgj_6hE | 76 |
 | SH-004 | Create Zod schemas for request validation (auth, conversations, messages, IRC config) | Not Started | P1 | Architect | SH-002 | All schemas created, export for backend validation | PVTI_lAHOAB4wV84BNGcwzgj_6g8 | 78 |

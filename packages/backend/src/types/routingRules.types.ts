@@ -1,11 +1,19 @@
 /**
  * Routing Rules Types
- * DTOs and types for routing rule CRUD and evaluation
+ * Backend-specific DTOs and types for routing rule CRUD and evaluation
+ *
+ * For shared types, use:
+ * - RoutingRule from '@yacc/common/types/routingRule.interface'
+ * - RuleCondition from '@yacc/common/types/RuleCondition.interface'
+ * - RuleAction from '@yacc/common/types/RuleAction.interface'
+ * - RoutingRuleResponse from '@yacc/common/responses/rules/routingRule.response'
+ * - CreateRoutingRuleRequest from '@yacc/common/requests/routing-rules/createRoutingRule.request'
+ * - UpdateRoutingRuleRequest from '@yacc/common/requests/routing-rules/updateRoutingRule.request'
  */
 
 /**
  * Condition types for rule evaluation
- * Supports: channel (eq), keyword (contains, regex), sender (eq), tag (has), time (hour gt/lt)
+ * @deprecated Use RuleCondition from '@yacc/common/types/RuleCondition.interface'
  */
 export interface RoutingCondition {
   field: 'channel' | 'keyword' | 'sender' | 'tag' | 'time';
@@ -15,7 +23,7 @@ export interface RoutingCondition {
 
 /**
  * Action types for rule evaluation
- * Supports: assign (user_id), tag (tag_id), priority (low/normal/high/urgent)
+ * @deprecated Use RuleAction from '@yacc/common/types/RuleAction.interface'
  */
 export interface RoutingAction {
   type: 'assign' | 'tag' | 'priority';
@@ -24,6 +32,7 @@ export interface RoutingAction {
 
 /**
  * Request body for creating a routing rule
+ * @deprecated Use CreateRoutingRuleRequest from '@yacc/common/requests/routing-rules/createRoutingRule.request'
  */
 export interface CreateRoutingRuleRequest {
   name: string;
@@ -36,6 +45,7 @@ export interface CreateRoutingRuleRequest {
 
 /**
  * Request body for updating a routing rule
+ * @deprecated Use UpdateRoutingRuleRequest from '@yacc/common/requests/routing-rules/updateRoutingRule.request'
  */
 export interface UpdateRoutingRuleRequest {
   name?: string;

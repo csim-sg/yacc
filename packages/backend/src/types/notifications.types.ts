@@ -1,10 +1,16 @@
 /**
  * Notification Types
- * Type definitions for notification creation and management
+ * Backend-specific types for notification creation and management
+ *
+ * For shared types, use:
+ * - Notification from '@yacc/common/types/notification.interface'
+ * - NotificationResponse from '@yacc/common/responses/notifications/notification.response'
+ * - MarkNotificationAsReadRequest from '@yacc/common/requests/notifications/markNotificationAsRead.request'
  */
 
 /**
  * Notification Response DTO
+ * @deprecated Use NotificationResponse from '@yacc/common/responses/notifications/notification.response'
  */
 export interface NotificationResponse {
   id: string;

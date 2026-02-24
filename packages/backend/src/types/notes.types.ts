@@ -1,10 +1,15 @@
 /**
  * Notes Types
- * Type definitions for note creation and note-related operations
+ * Backend-specific types for note operations
+ *
+ * For shared types, use:
+ * - NoteResponse from '@yacc/common/responses/notes/note.response'
+ * - CreateNoteRequest from '@yacc/common/requests/notes/createNote.request'
  */
 
 /**
  * Create Note Request
+ * @deprecated Use CreateNoteRequest from '@yacc/common/requests/notes/createNote.request'
  */
 export interface CreateNoteRequest {
   body: string;
@@ -12,6 +17,7 @@ export interface CreateNoteRequest {
 
 /**
  * Note Response DTO
+ * @deprecated Use NoteResponse from '@yacc/common/responses/notes/note.response'
  */
 export interface NoteResponse {
   id: string;
