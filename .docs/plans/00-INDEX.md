@@ -14,9 +14,9 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 
 ## Current Delivery Status
 - Phase 1 Backend: ✅ Complete (IRC integration + DLQ contract hardening merged)
-- Phase 1.5 Backend Refactoring (DEV-002-006): ✅ **COMPLETE** (All 59 blockers fixed; PR ready for final review and merge)
-- Phase 1 Frontend (P0 Option 2): ⏳ In Progress (core workflow + account recovery blocker fixes)
-- **Infrastructure Phase (DEV-013-015)**: 🟡 **CONDITIONAL** (PO: Blocker #1 RESOLVED; 8 blockers remain; see DEV-013-015-COORDINATION-MEMO.md)
+- Phase 1.5 Backend Refactoring (DEV-002-006): ✅ **COMPLETE** (All 5 tasks complete; ready for implementation)
+- Phase 1 Frontend (P0 Option 2): ⏳ **In Progress** (6/6 blocker fixes complete; documentation updates pending)
+- **Infrastructure Phase (DEV-013-015)**: 🟢 **GO** (All 9 blockers RESOLVED; ready to start)
 - Phase 2: ⏳ Queued (tags/notes/assignments/rules; starts after DEV-002-006 and FE-001-021 complete)
 - QA: ⏳ Not Started
 
@@ -24,20 +24,20 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 
 **Branch**: `feature/p0-frontend-option2-core-workflow`  
 **Target Delivery**: Sprint end (1-2 days)
-**Code Review Status**: ⏳ Fixing blockers from ea-architecture-validator (6 blockers)
+**Code Review Status**: ✅ **ALL 6 BLOCKERS FIXED** | 📝 Documentation updates pending
 
 ### Implementation Summary
 | Component | Status | Details |
 |-----------|--------|---------|
 | **Auth** | ✅ DONE | Login, session, logout + protected routes + RBAC-safe navigation |
 | **Account Recovery** | ✅ DONE | Forgot password (no enumeration) + Reset password (token expiry, single-use) |
-| **Core Workflow** | ⏳ In Progress (Blocker Fixes) | Inbox → conversation → reply; message delivery status + manual retry (exactly once, RBAC-gated) |
-| **Real-Time** | ⏳ In Progress (Blocker Fixes) | WS listeners properly managed (no double-registration); REST refresh on reconnect |
-| **Notifications** | ⏳ In Progress (Blocker Fixes) | Bell mounted in Header; assignment-only filtering; click-through + mark-read navigation |
+| **Core Workflow** | ✅ DONE | Inbox → conversation → reply; message delivery status + manual retry (exactly once, RBAC-gated) |
+| **Real-Time** | ✅ DONE | WS listeners properly managed (no double-registration); REST refresh on reconnect |
+| **Notifications** | ✅ DONE | Bell mounted in Header; assignment-only filtering; click-through + mark-read navigation |
 | **Tests** | ✅ DONE | Playwright E2E tests for auth, recovery, workflow, real-time, notifications (25+ scenarios) |
 | **Docs** | ⏳ In Progress | Update spec, API docs, QA strategy, task list |
 
-### Blocker Fixes In Progress
+### Blocker Fixes Completed (6/6) ✅
 1. ✅ **Manual retry endpoint**: Implemented `POST /api/conversations/:id/messages/:msgId/retry` in backend
 2. ✅ **Exactly-once UI behavior**: Track attempted retries per message, disable button after first click
 3. ✅ **WebSocket double-registration**: Properly unregister listeners in cleanup, handle React strict mode
@@ -54,13 +54,13 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - `packages/frontend/src/pages/LoginPage.tsx` (updated: test IDs)
 - `packages/frontend/tests/acceptance/phase1/p0-frontend-option2.spec.ts` (NEW: 25+ tests)
 
-### Next Steps (Before Merge)
-1. ✅ Code review (ea-architecture-validator)
-2. ⏳ Update `.docs/02-api-and-data-model.md` (API response shapes for reset, retry endpoints)
-3. ⏳ Update `.docs/01-product-specification.md` (P0 scope confirmation)
-4. ⏳ Update `.docs/04-qa-and-testing.md` (E2E test cases)
-5. ⏳ Update `.docs/05-quick-reference.md` (role matrix + P0 features)
-6. ⏳ Update `.docs/06-tasks.md` (mark FE tasks complete)
+### Remaining Steps (Documentation Only)
+1. ⏳ Update `.docs/02-api-and-data-model.md` (API response shapes for reset, retry endpoints)
+2. ⏳ Update `.docs/01-product-specification.md` (P0 scope confirmation)
+3. ⏳ Update `.docs/04-qa-and-testing.md` (E2E test cases)
+4. ⏳ Update `.docs/05-quick-reference.md` (role matrix + P0 features)
+5. ⏳ Update `.docs/06-tasks.md` (mark FE tasks complete)
+6. ⏳ Create PR and merge to dev
 
 ## Current Integration Task Status (Phase 1)
 
