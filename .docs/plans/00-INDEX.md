@@ -23,8 +23,9 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 ## P0 Frontend Option 2 Status (FE-001-021)
 
 **Branch**: `feature/p0-frontend-option2-core-workflow`  
-**Target Delivery**: Sprint end (1-2 days)
-**Code Review Status**: ✅ **ALL 6 BLOCKERS FIXED** | 📝 Documentation updates pending
+**PR**: #307 (Ready for merge)  
+**Target Delivery**: Today (after PR approval)
+**Code Review Status**: ✅ **ALL 6 BLOCKERS FIXED** | ✅ **Documentation Updated** | 📝 Awaiting Architect Review
 
 ### Implementation Summary
 | Component | Status | Details |
@@ -54,13 +55,13 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - `packages/frontend/src/pages/LoginPage.tsx` (updated: test IDs)
 - `packages/frontend/tests/acceptance/phase1/p0-frontend-option2.spec.ts` (NEW: 25+ tests)
 
-### Remaining Steps (Documentation Only)
-1. ⏳ Update `.docs/02-api-and-data-model.md` (API response shapes for reset, retry endpoints)
-2. ⏳ Update `.docs/01-product-specification.md` (P0 scope confirmation)
-3. ⏳ Update `.docs/04-qa-and-testing.md` (E2E test cases)
-4. ⏳ Update `.docs/05-quick-reference.md` (role matrix + P0 features)
-5. ⏳ Update `.docs/06-tasks.md` (mark FE tasks complete)
-6. ⏳ Create PR and merge to dev
+### Remaining Steps
+1. ✅ Update `.docs/02-api-and-data-model.md` (API response shapes for reset, retry endpoints)
+2. ✅ Update `.docs/03-implementation-guide.md` (FE architecture + tech decisions)
+3. ✅ Update `.docs/06-tasks.md` (mark FE-006, FE-007, FE-011, FE-020, FE-021 complete)
+4. ✅ Create PR #307 (ready for merge)
+5. ⏳ Architect review + approval
+6. ⏳ Merge to dev (squash commit recommended)
 
 ## Current Integration Task Status (Phase 1)
 
