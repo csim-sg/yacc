@@ -29,6 +29,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/registerPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { RoutingRulesPage } from './pages/RoutingRulesPage';
+import { UsersPage } from './pages/UsersPage';
 import { registerSocketListeners, unregisterSocketListeners } from './services/socketListeners';
 import { webSocketService } from './services/websocket.service';
 
@@ -226,7 +227,7 @@ function AppRoutes(): ReactElement {
         element={
           <ProtectedRoute requiredRole="SUPER_ADMIN">
             <MainLayout>
-              <div className="p-8">Admin: Users (Coming soon)</div>
+              <UsersPage />
             </MainLayout>
           </ProtectedRoute>
         }

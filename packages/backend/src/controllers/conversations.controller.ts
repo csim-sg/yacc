@@ -7,11 +7,11 @@ import type { AssignRequest } from '@yacc/common/requests/conversations/assign.r
 import type { ListConversationsRequest } from '@yacc/common/requests/conversations/listConversations.request';
 import type { UpdatePriorityRequest } from '@yacc/common/requests/conversations/updatePriority.request';
 import type { UpdateStatusRequest } from '@yacc/common/requests/conversations/updateStatus.request';
+import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import type { Request } from 'express';
 import {
   JsonController,
   Get,
-  Post,
   Patch,
   Param,
   Body,
@@ -20,7 +20,6 @@ import {
   CurrentUser,
   HttpCode,
   BadRequestError,
-  NotFoundError,
 } from 'routing-controllers';
 import { logger } from '../infrastructure/logger';
 import { auditService } from '../services/audit.service';
@@ -135,12 +134,13 @@ export class ConversationsController {
         'GET /api/conversations completed'
       );
 
-      return {
-        data: result.data,
-        page: result.page,
-        pageSize: result.pageSize,
-        total: result.total,
+      // Create a query adapter for BaseListResponse
+      const queryAdapter = {
+        getLimit: () => normalizedQuery.limit || 20,
+        getPage: () => (normalizedQuery.page || 1) - 1, // Convert to 0-indexed
       };
+
+      return new BaseListResponse(result.data, result.total, queryAdapter);
     } catch (error) {
       const duration = performance.now() - startTime;
       logger.error(
@@ -286,134 +286,6 @@ export class ConversationsController {
    // This provides a unified tag API with proper response formatting
    // See packages/backend/src/controllers/tag.controller.ts
 
-  /**
-   * GET /api/conversations/:id/messages
-   * Get messages for a conversation with pagination
-   */
-  @Get('/:id/messages')
-  async getMessages(
-    @Param('id') conversationId: string,
-    @Req() req: AuthenticatedRequest
-  ) {
-    const startTime = performance.now();
-    const correlationId = req.correlationId || 'unknown';
-
-    try {
-      const query = req.query || {};
-      const page = query.page ? Number(query.page) : 1;
-      const limit = query.limit ? Number(query.limit) : 50;
-      const offset = (page - 1) * limit;
-
-      const result = await conversationService.listConversationMessages(conversationId, offset, limit);
-
-      const duration = performance.now() - startTime;
-      logger.debug(
-        {
-          correlationId,
-          conversationId,
-          page,
-          limit,
-          messageCount: result.messages.length,
-          total: result.total,
-          durationMs: Math.round(duration),
-        },
-        'GET /api/conversations/:id/messages completed'
-      );
-
-      return {
-        data: result.messages,
-        page,
-        pageSize: limit,
-        total: result.total,
-      };
-    } catch (error) {
-      const duration = performance.now() - startTime;
-      logger.error(
-        {
-          correlationId,
-          conversationId,
-          error: error instanceof Error ? error.message : String(error),
-          durationMs: Math.round(duration),
-        },
-        'GET /api/conversations/:id/messages failed'
-      );
-      throw error;
-    }
-  }
-
-   /**
-    * POST /api/conversations/:id/messages
-    * Send a new message to a conversation
-    */
-    @Post('/:id/messages')
-    @HttpCode(201)
-    async sendMessage(
-      @Param('id') conversationId: string,
-      @Body() body: { body: string },
-      @CurrentUser() user: AuthUser,
-      @Req() req: AuthenticatedRequest
-    ) {
-      const startTime = performance.now();
-      const correlationId = req.correlationId || 'unknown';
-
-      try {
-        // Validate message body
-        if (!body.body || body.body.trim().length === 0) {
-          throw new BadRequestError('Message body cannot be empty');
-        }
-
-        // Verify conversation exists
-        try {
-          await conversationService.getConversation(conversationId);
-        } catch {
-          throw new NotFoundError('Conversation not found');
-        }
-
-        const result = await conversationService.createMessage({
-          conversationId,
-          senderName: user.email,
-          body: body.body,
-          direction: 'outbound',
-          status: 'pending',
-        });
-
-        // Log audit
-        await auditService.logAction({
-          actorId: user.id,
-          action: 'message_sent',
-          entityType: 'conversation',
-          entityId: conversationId,
-          metadata: { messageId: result.message.id },
-        });
-
-        const duration = performance.now() - startTime;
-        logger.debug(
-          {
-            correlationId,
-            conversationId,
-            messageId: result.message.id,
-            userId: user.id,
-            durationMs: Math.round(duration),
-          },
-          'POST /api/conversations/:id/messages completed'
-        );
-
-        return {
-          data: result.message,
-        };
-      } catch (error) {
-        const duration = performance.now() - startTime;
-        logger.error(
-          {
-            correlationId,
-            conversationId,
-            userId: user.id,
-            error: error instanceof Error ? error.message : String(error),
-            durationMs: Math.round(duration),
-          },
-          'POST /api/conversations/:id/messages failed'
-        );
-        throw error;
-      }
-    }
+   // Message endpoints moved to MessageController
+   // See packages/backend/src/controllers/message.controller.ts
 }

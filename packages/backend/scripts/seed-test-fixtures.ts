@@ -78,39 +78,38 @@ const FIXTURE = {
     {
       id: '00000000-0000-0000-0000-000000002001',
       name: 'Auto-assign VIP to admin',
-      priority: 1,
+      priority: 100,
       status: 'active',
-      conditions: JSON.stringify({
-        tag: 'VIP',
-      }),
-      actions: JSON.stringify({
-        assignTo: '00000000-0000-0000-0000-000000000002', // admin user
-      }),
+      conditions: JSON.stringify([
+        { field: 'tag', operator: 'has', value: 'VIP' },
+      ]),
+      actions: JSON.stringify([
+        { type: 'assign', value: '00000000-0000-0000-0000-000000000002' }, // admin user
+      ]),
     },
     {
       id: '00000000-0000-0000-0000-000000002002',
       name: 'Auto-tag urgent keywords',
-      priority: 2,
+      priority: 101,
       status: 'active',
-      conditions: JSON.stringify({
-        keyword: ['urgent', 'critical', 'emergency'],
-      }),
-      actions: JSON.stringify({
-        addTag: 'Urgent',
-        setPriority: 'high',
-      }),
+      conditions: JSON.stringify([
+        { field: 'keyword', operator: 'contains', value: 'yacc-seed-urgent-keyword-xyz' },
+      ]),
+      actions: JSON.stringify([
+        { type: 'priority', value: 'high' },
+      ]),
     },
     {
       id: '00000000-0000-0000-0000-000000002003',
       name: 'Disabled rule for testing',
-      priority: 3,
+      priority: 102,
       status: 'disabled',
-      conditions: JSON.stringify({
-        channel: 'telegram',
-      }),
-      actions: JSON.stringify({
-        addTag: 'Telegram',
-      }),
+      conditions: JSON.stringify([
+        { field: 'channel', operator: 'eq', value: 'telegram' },
+      ]),
+      actions: JSON.stringify([
+        { type: 'priority', value: 'low' },
+      ]),
     },
   ],
   bulkTestConversations: {

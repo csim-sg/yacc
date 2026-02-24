@@ -5,13 +5,11 @@
 
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
-import { logger } from '../infrastructure/logger';
+import { eq, isNull, and } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
 import { passwordResetTokens } from '../schemas/passwordReset.schema';
 import { users } from '../schemas/user.schema';
-import { eq, isNull, and } from 'drizzle-orm';
-import { validatePassword } from './passwordValidation.service';
 import { auditService } from './audit.service';
 import { validatePassword } from './passwordValidation.service';
 
@@ -22,7 +20,7 @@ import { validatePassword } from './passwordValidation.service';
  */
 export async function generateResetToken(
   userId: string,
-  _correlationId: string,
+  correlationId: string,
 ): Promise<string> {
   // Delete any existing unused tokens for this user (enforces one active token)
   await dbClient
@@ -70,7 +68,7 @@ export async function generateResetToken(
  */
 export async function validateAndGetUserId(
   token: string,
-  _correlationId: string,
+  correlationId: string,
 ): Promise<string> {
   // Basic format check
   if (!token || token.length !== 64 || !/^[a-f0-9]{64}$/.test(token)) {

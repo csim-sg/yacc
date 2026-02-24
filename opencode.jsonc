@@ -38,7 +38,7 @@
       "description": "Fullstack developer specialist for YACC project. Implements features across backend (Node.js/Express) and frontend (React/TanStack Start) following project standards. Performs impact analysis before starting, delegates to QA after completion, follows detailed PR workflow. Use proactively for feature implementation, bug fixes, and refactoring tasks.",
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/fullstack-developer.md}",
-      "model": "anthropic/claude-haiku-4-5-20251001",
+      "model": "zai-coding-plan/glm-5",
       "tools": {
         "write": true,
         "edit": true,
@@ -67,7 +67,8 @@
       "description": "Product owner of this project, maintain biz requirement and biz documents. Analyze requirement with users & architect on any new request. Help answer any biz related issues from developers and architect.",
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/product-owner.md}",
-      "model": "openai/gpt-5.2",
+      // "model": "openai/gpt-5.2",
+      "model": "anthropic/claude-haiku-4-5-20251001",
       "tools": {
         "write": true,
         "edit": true,
@@ -112,7 +113,7 @@
       "description": "Enterprise Architecture solution validator and Product Owner. Validates architectural decisions against ADRs, project constraints, EA principles, and governance standards. Ensures 95%+ requirement coverage before development. Use proactively when making architectural changes, introducing new patterns, before major refactoring, during PR reviews, or when capturing user requirements and ensuring documentation completeness.",
       "mode": "all",
       "prompt": "{file:./.opencode/prompts/architect.md}",
-      "model": "openai/gpt-5.2",
+      "model": "anthropic/claude-sonnet-4-5-20250929",
       "tools": {
         "write": true,
         "edit": true,

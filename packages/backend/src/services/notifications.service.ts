@@ -10,7 +10,7 @@ import { notifications } from '../schemas/notification.schema';
 import { users } from '../schemas/user.schema';
 import type {
   NotificationResponse,
-  ListNotificationsResponse,
+  ListNotificationsServiceResponse,
   CreateNotificationParams,
 } from '../types/notifications.types';
 
@@ -126,7 +126,7 @@ export class NotificationsService {
     userId: string,
     page: number = 1,
     limit: number = 20
-  ): Promise<ListNotificationsResponse> {
+  ): Promise<ListNotificationsServiceResponse> {
     try {
       // Validate pagination
       const pageNum = Math.max(1, page);
@@ -157,11 +157,7 @@ export class NotificationsService {
 
       return {
         data: notificationList.map((n) => this.notificationToResponse(n)),
-        pagination: {
-          page: pageNum,
-          limit: pageLimit,
-          total,
-        },
+        total,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';

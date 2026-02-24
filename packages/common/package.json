@@ -11,11 +11,16 @@
     "./requests": "./dist/requests/index.js",
     "./requests/*": "./dist/requests/*.js",
     "./responses": "./dist/responses/index.js",
-    "./responses/*": "./dist/responses/*.js"
+    "./responses/*": "./dist/responses/*.js",
+    "./websocket/constants/*": "./dist/websocket/constants/*.js",
+    "./websocket/types/*": "./dist/websocket/types/*.js"
   },
   "scripts": {
     "build": "tsc",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "class-transformer": "^0.5.1",
@@ -23,6 +28,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.8"
   }
 }

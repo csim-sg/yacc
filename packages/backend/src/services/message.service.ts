@@ -6,8 +6,10 @@ import { conversations } from '../schemas/conversation.schema.js';
 import { messages } from '../schemas/message.schema.js';
 import type { Message } from '../schemas/message.schema.js';
 import { users } from '../schemas/user.schema.js';
+import type { OutboundMessagePayload } from '../types/gateway.types.js';
 import type { GetMessagesQuery, SendMessageRequestBody } from '../types/message.types.js';
-import { connectorManager } from './connector-manager.js';
+import { gatewayExchange } from './gateway-exchange.js';
+import { messageQueueService } from './message-queue.service.js';
 import { MessageStatusTracker } from './messageStatusTracker.js';
 import { messageQueueService } from './message-queue.service.js';
 
@@ -149,10 +151,11 @@ export class MessageService {
   }
 
     /**
-      * Dispatch message to connector and update status
+      * Dispatch message to adapter via gateway-exchange and update status
       * This is async and non-blocking; errors are logged but don't fail the original request
-      * 
-      * For async delivery with BullMQ retry, failures trigger a BullMQ job for exponential backoff.
+      *
+      * DEV-006: Uses gateway-exchange for unified outbound dispatch.
+      * @see ADR-005 Addendum-2 - Gateway-Exchange Pattern
       */
     private async dispatchToConnector(
       conversationId: string,
@@ -181,7 +184,6 @@ export class MessageService {
         }
 
         platform = conversation.channel as unknown as Platform;
-        const platformStr = String(platform);
 
         logger.debug(
           {
@@ -190,63 +192,80 @@ export class MessageService {
             channel: conversation.channel,
             correlationId,
           },
-          'Dispatching message to connector'
+          'Dispatching message via gateway-exchange'
         );
 
-        // Get connector for this platform
-        const connector = connectorManager.getConnector(platformStr);
-        if (!connector) {
-          throw new Error(`No connector registered for platform: ${platformStr}`);
-        }
-
-        // Call connector with SendMessageRequest
-        const sendRequest = {
-          messageId: message.id,
+        // Build outbound payload for gateway-exchange
+        const outboundPayload: OutboundMessagePayload = {
           conversationId,
-          recipientId: conversation.externalThreadId, // For IRC: #channel; for Telegram: chat_id
           body: message.body,
-          platformType: platformStr as 'telegram' | 'irc' | 'whatsapp' | 'weChat' | 'meta' | 'twitter',
+          userId,
           correlationId,
+          metadata: {
+            recipientId: conversation.externalThreadId, // For IRC: #channel; for Telegram: chat_id
+          },
         };
 
-        const response = await connector.sendMessage(sendRequest);
+        // Dispatch via gateway-exchange (handles adapter lookup, sending, status updates)
+        const result = await gatewayExchange.handleOutbound(outboundPayload, message.id);
 
-        if (response.success) {
-          // Update message with external ID and mark as sent
-          await dbClient
-            .update(messages)
-            .set({
-              externalMessageId: response.platformMessageId,
-              status: 'sent',
-              metadata: {
-                sentAt: response.sentAt,
-                platform: platformStr,
-              },
-            })
-            .where(eq(messages.id, message.id));
-
+        if (result.success) {
           // Track sent status via MessageStatusTracker for WebSocket emission
           await MessageStatusTracker.trackSentMessage({
             messageId: message.id,
             conversationId,
             status: 'sent',
             platform,
-            timestamp: new Date(response.sentAt),
+            timestamp: result.timestamp,
           });
 
           logger.info(
             {
               messageId: message.id,
               conversationId,
-              platform: platformStr,
-              platformMessageId: response.platformMessageId,
+              platform,
+              externalMessageId: result.externalMessageId,
               correlationId,
             },
-            'Message dispatched successfully'
+            'Message dispatched successfully via gateway-exchange'
           );
         } else {
-          // Connector returned failure
-          throw new Error(response.error || 'Connector returned failure');
+          // Gateway returned failure - status already updated by gateway-exchange
+          const errorMsg = result.error?.message || 'Gateway dispatch failed';
+
+          // Track failed status via MessageStatusTracker
+          if (platform) {
+            try {
+              await MessageStatusTracker.trackFailedMessage({
+                messageId: message.id,
+                conversationId,
+                status: 'failed',
+                platform,
+                error: errorMsg,
+                timestamp: new Date(),
+              });
+            } catch (trackerError) {
+              logger.error(
+                {
+                  messageId: message.id,
+                  error: trackerError instanceof Error ? trackerError.message : 'Unknown',
+                  correlationId,
+                },
+                'Failed to track message status'
+              );
+            }
+          }
+
+          logger.warn(
+            {
+              messageId: message.id,
+              conversationId,
+              platform,
+              error: errorMsg,
+              correlationId,
+            },
+            'Message dispatch failed via gateway-exchange'
+          );
         }
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -259,7 +278,7 @@ export class MessageService {
             error: errorMsg,
             correlationId,
           },
-          'Error dispatching message to connector'
+          'Error dispatching message via gateway-exchange'
         );
 
         // Track failed status via MessageStatusTracker (if platform was determined)

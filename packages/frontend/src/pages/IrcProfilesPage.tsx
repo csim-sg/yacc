@@ -15,6 +15,7 @@ import {
   IrcProfileResponse,
   CreateIrcProfileRequest,
 } from '../services/ircProfiles.service';
+import { IRCTestButton } from '../components/admin/IRCTestButton';
 
 export function IrcProfilesPage() {
   const { user } = useAuth();
@@ -333,6 +334,19 @@ function CreateProfileForm({ onSuccess, onCancel }: CreateProfileFormProps) {
     channels: '' as string,
   });
 
+  // Check if form has required fields for test button
+  const isTestable = formData.server.trim() !== '' && 
+                     formData.port > 0 && 
+                     formData.username.trim() !== '';
+
+  // Get current config for test button
+  const testConfig = {
+    server: formData.server,
+    port: formData.port,
+    username: formData.username,
+    password: formData.password || undefined,
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -476,7 +490,7 @@ function CreateProfileForm({ onSuccess, onCancel }: CreateProfileFormProps) {
             />
           </div>
 
-          <div className="flex gap-2 pt-4">
+          <div className="flex flex-wrap gap-2 pt-4">
             <button
               type="submit"
               className="btn btn-primary"
@@ -492,6 +506,11 @@ function CreateProfileForm({ onSuccess, onCancel }: CreateProfileFormProps) {
                 'Create Profile'
               )}
             </button>
+            <IRCTestButton
+              ircConfig={testConfig}
+              disabled={!isTestable || loading}
+              className="btn-outline"
+            />
             <button
               type="button"
               className="btn btn-outline"

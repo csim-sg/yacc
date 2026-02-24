@@ -13,6 +13,8 @@
 5. [Implementation Phases](#5-implementation-phases)
 6. [Configuration & Environment](#6-configuration--environment)
 7. [Key Technical Decisions](#7-key-technical-decisions)
+8. [Code Architecture Constraints](#8-code-architecture-constraints-strict---non-negotiable)
+9. [API Contract Patterns](#9-api-contract-patterns-mandatory)
 
 ---
 
@@ -592,6 +594,65 @@ socket.on('presence.updated', (payload) => {
 });
 ```
 
+#### 3.5.1 WebSocket Observability
+
+All WebSocket metrics are emitted via the `MetricsSink` interface. By default, metrics are logged to console as JSON.
+
+**SLO Targets** (from GOV-030):
+- Connection Success Rate: ≥99.5%
+- Event Latency P95: <100ms
+- Reconnection Success Rate: ≥95%
+- Backlog Replay: <5s per 100 events
+
+**Metrics Architecture**:
+```typescript
+// Abstract interface for pluggable metrics
+interface MetricsSink {
+  counter(name: string, value: number, tags?: MetricsSinkTags): void;
+  histogram(name: string, value: number, tags?: MetricsSinkTags): void;
+  gauge(name: string, value: number, tags?: MetricsSinkTags): void;
+  timer<T>(name: string, fn: () => T, tags?: MetricsSinkTags): T;
+}
+
+// Default implementation logs to console as JSON
+class ConsoleMetricsSink implements MetricsSink { ... }
+
+// No-op implementation for testing
+class NoOpMetricsSink implements MetricsSink { ... }
+```
+
+**8 Metrics Emitted**:
+| Metric | Type | Purpose |
+|--------|------|---------|
+| `ws.connection.attempt` | Counter | Track connection attempts |
+| `ws.connection.success` | Counter | Calculate success rate SLO |
+| `ws.connection.failure` | Counter | Diagnose failure modes |
+| `ws.reconnection.attempt` | Counter | Track reconnection efficiency |
+| `ws.event.received` | Counter | Track event volume |
+| `ws.event.processed` | Histogram | Calculate latency P95 |
+| `ws.event.error` | Counter | Surface handler bugs |
+| `ws.backlog.replay` | Counter | Track reconnection efficiency |
+
+**SLO Monitoring**:
+```typescript
+// Get current SLO metrics
+const metrics = wsClient.getSLOMetrics();
+// Returns: { connectionSuccessRate, eventLatencyP95, reconnectionSuccessRate, backlogReplayEfficiency }
+
+// Warnings are automatically logged when SLO breaches occur
+// [SLO] Connection success rate 98.50% below threshold (99%)
+```
+
+**Integration**:
+```typescript
+import { WebSocketClient, createWebSocketClient } from '@/services/websocket';
+import { defaultMetricsSink } from '@/services/observability/ConsoleMetricsSink';
+
+const wsClient = createWebSocketClient(WS_URL, authToken, userId, defaultMetricsSink);
+```
+
+See **GOV-030** for full metrics definitions and measurement methodology.
+
 ---
 
 ### 3.6 Routing Rules Engine
@@ -1136,6 +1197,196 @@ REACT_APP_WS_URL=https://api.example.com
 
 ---
 
-**Version**: 2.0  
-**Last Updated**: January 25, 2026  
+## 9. API Contract Patterns (MANDATORY)
+
+### List Request/Response Standard Contract
+
+All list/searchable endpoints MUST use standardized request/response classes from `@yacc/common`.
+
+#### BaseListRequest (Frontend → Backend)
+
+All list requests extend `BaseListRequest`:
+
+```typescript
+// @yacc/common/src/requests/base-list.request.ts
+class BaseListRequest {
+  page?: number = 0;       // 0-indexed internally
+  limit?: number = 15;     // Default page size
+  searchText?: string;     // Optional search term
+
+  getPage(): number;       // Validated page number
+  getLimit(): number;      // Validated limit (must be in allowed set: 15, 25, 35, 45, 55, 100, 150, 200)
+  getSearch(): string;     // Search text or empty string
+  getOffset(): number;     // Calculated offset (page * limit)
+}
+```
+
+**Extending for Feature-Specific Filters:**
+```typescript
+// @yacc/common/src/requests/conversations/listConversations.request.ts
+class ListConversationsRequest extends BaseListRequest {
+  channel?: 'telegram' | 'irc';
+  status?: 'open' | 'pending' | 'resolved';
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  assignedUserId?: string;
+  tagId?: number;
+  dateFrom?: string;
+  dateTo?: string;
+}
+```
+
+#### BaseListResponse<T> (Backend → Frontend)
+
+All list endpoints return `BaseListResponse<T>`:
+
+```typescript
+// @yacc/common/src/responses/base-list.response.ts
+class BaseListResponse<T> {
+  data: T[];      // Array of items
+  page: number;   // Current page (1-indexed for API consumers)
+  limit: number;  // Items per page
+  total: number;  // Total count of items matching filters
+
+  constructor(data: T[], total: number, listRequest: BaseListRequest) {
+    this.total = total;
+    this.data = data;
+    this.limit = listRequest.getLimit();
+    this.page = listRequest.getPage() + 1; // 1-indexed for API
+  }
+}
+```
+
+#### Backend PaginationRequest Helper
+
+Backend controllers use `PaginationRequest` which extends `BaseListRequest` with Drizzle ORM helpers:
+
+```typescript
+// packages/backend/src/utilities/pagination.ts
+class PaginationRequest extends BaseListRequest {
+  /**
+   * Apply pagination to Drizzle query.
+   * Override in subclasses to add where conditions + pagination.
+   */
+  applyToQuery<T extends PgSelect>(query: T): T {
+    return query.limit(this.getLimit()).offset(this.getOffset()) as T;
+  }
+
+  /**
+   * Get offset (page * limit)
+   */
+  getOffset(): number {
+    return this.getPage() * this.getLimit();
+  }
+}
+```
+
+**Feature-specific query classes override `applyToQuery()` to add BOTH filtering AND pagination:**
+```typescript
+// packages/backend/src/types/conversations.types.ts
+class ListConversationsQuery extends PaginationRequest {
+  channel?: 'telegram' | 'irc';
+  status?: 'open' | 'pending' | 'resolved';
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  assignedUserId?: string;
+
+  /**
+   * Override to apply BOTH filtering AND pagination
+   */
+  override applyToQuery<T extends PgSelect>(query: T): T {
+    const conditions = [];
+    if (this.channel) conditions.push(eq(conversations.channel, this.channel));
+    if (this.status) conditions.push(eq(conversations.status, this.status));
+    if (this.priority) conditions.push(eq(conversations.priority, this.priority));
+    if (this.assignedUserId) conditions.push(eq(conversations.assignedUserId, this.assignedUserId));
+
+    let result = query;
+    if (conditions.length > 0) {
+      result = result.where(and(...conditions)) as T;
+    }
+    
+    // Apply pagination from base class
+    return super.applyToQuery(result);
+  }
+}
+```
+
+### Rules (ENFORCED)
+
+1. **Backend Controllers**:
+   - ✅ MUST return `BaseListResponse<T>` for all list/search endpoints
+   - ✅ MUST accept query objects extending `PaginationRequest`
+   - ✅ MUST use single `query.applyToQuery(baseSelect)` call for filtering + pagination
+   - ❌ MUST NOT create ad-hoc pagination response shapes
+   - ❌ MUST NOT manually calculate offset/limit in controllers
+   - ❌ MUST NOT manually build where conditions in controllers
+
+2. **Feature Query Classes**:
+   - ✅ MUST extend `PaginationRequest`
+   - ✅ MUST override `applyToQuery()` to add where conditions + call `super.applyToQuery()`
+   - ✅ Encapsulates all filtering logic in the query class
+
+3. **Frontend API Calls**:
+   - ✅ MUST expect `BaseListResponse<T>` shape from all list endpoints
+   - ✅ MUST send request objects extending `BaseListRequest`
+   - ✅ CAN rely on consistent `{ data, page, limit, total }` shape
+
+4. **When NOT to Extend**:
+   - If no additional fields needed, use `BaseListResponse<T>` directly
+   - Don't create `ConversationListResponse extends BaseListResponse<Conversation>` if no extra fields
+
+### Example Controller Implementation
+
+```typescript
+@JsonController('/api/conversations')
+export class ConversationsController {
+  @Get()
+  @Authorized()
+  async listConversations(
+    @QueryParams() query: ListConversationsQuery
+  ): Promise<BaseListResponse<Conversation>> {
+    // Single call: applyToQuery handles BOTH filtering AND pagination
+    const results = await query.applyToQuery(
+      db.select().from(conversations)
+    );
+
+    // Get total count (query class can also be used for count)
+    const total = await conversationService.count(query);
+
+    // Return standardized response
+    return new BaseListResponse(results, total, query);
+  }
+}
+```
+
+### Example Frontend Usage
+
+```typescript
+// API call with typed response
+const fetchConversations = async (
+  filters: ListConversationsRequest
+): Promise<BaseListResponse<Conversation>> => {
+  const response = await api.get('/api/conversations', { params: filters });
+  return response.data;
+};
+
+// React Query hook
+const useConversations = (filters: ListConversationsRequest) => {
+  return useQuery({
+    queryKey: ['conversations', filters],
+    queryFn: () => fetchConversations(filters),
+  });
+};
+
+// Component usage - consistent shape guaranteed
+const { data } = useConversations({ page: 0, limit: 20, status: 'open' });
+// data.data: Conversation[]
+// data.page: number (1-indexed)
+// data.limit: number
+// data.total: number
+```
+
+---
+
+**Version**: 2.1  
+**Last Updated**: February 22, 2026  
 **Status**: Phase 1 Development in Progress (BE-003 Complete)
