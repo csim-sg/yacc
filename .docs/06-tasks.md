@@ -213,12 +213,12 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | FE-003 | Set up Zustand for client state management | **Done** | P0 | Frontend | FE-001 | Store configured, example state working | PVTI_lAHOAB4wV84BNGcwzgj_6Ew | 37 |
 | FE-004 | Set up TanStack Query for API data fetching | **Done** | P0 | Frontend | FE-001 | Query client configured, API requests working | PVTI_lAHOAB4wV84BNGcwzgj_6E0 | 38 |
 | FE-005 | Implement login page (email/password form) | **Done** | P0 | Frontend | FE-002, BE-003 | Login functional, redirects on success, error handling working | PVTI_lAHOAB4wV84BNGcwzgj_6EI | 42 |
-| FE-006 | Implement forgot password page (email input form) | Not Started | P1 | Frontend | FE-002, BE-004 | Request reset working, confirmation message shown | PVTI_lAHOAB4wV84BNGcwzgj_6EU | 45 |
-| FE-007 | Implement password reset page (new password form) | Not Started | P1 | Frontend | FE-002, BE-004 | Password reset functional, login redirect on success | PVTI_lAHOAB4wV84BNGcwzgj_6EM | 39 |
+| FE-006 | Implement forgot password page (email input form) | **Done** (P0 Option 2 feature branch) | P1 | Frontend | FE-002, BE-004 | Request reset working, confirmation message shown ✅ | PVTI_lAHOAB4wV84BNGcwzgj_6EU | 45 |
+| FE-007 | Implement password reset page (new password form) | **Done** (P0 Option 2 feature branch) | P1 | Frontend | FE-002, BE-004 | Password reset functional, login redirect on success ✅ | PVTI_lAHOAB4wV84BNGcwzgj_6EM | 39 |
 | FE-008 | Implement inbox list page (conversation cards with filters) | **Done** (PR #243 merged) | P0 | Frontend | FE-004, BE-007 | Filters: channel, assignee, tag, status, priority, search, date range | PVTI_lAHOAB4wV84BNGcwzgj_6Eo | 35 |
 | FE-009 | Implement conversation detail page (messages timeline, reply composer) | **Done** (PR #243 merged) | P0 | Frontend | FE-004, BE-008 | Shows conversation with messages, reply form functional | PVTI_lAHOAB4wV84BNGcwzgj_6D0 | 41 |
 | FE-010 | Implement message reply composer (text input, attachment upload) | **Done** (PR #243 merged) | P0 | Frontend | FE-009, BE-010 | Send message working, attachment upload to R2 | PVTI_lAHOAB4wV84BNGcwzgj_6E8 | 46 |
-| FE-011 | Implement message status display (pending/sent/failed with retry button) | Not Started | P0 | Frontend | FE-009, BE-011 | Status icons visible, retry button for failed messages | PVTI_lAHOAB4wV84BNGcwzgj_6EY | 44 |
+| FE-011 | Implement message status display (pending/sent/failed with retry button) | **Done** (P0 Option 2 feature branch) | P0 | Frontend | FE-009, BE-011 | Status icons visible, retry button for failed messages ✅ | PVTI_lAHOAB4wV84BNGcwzgj_6EY | 44 |
 | FE-012 | Set up Socket.io client for WebSocket | **Done** (PR #244 merged) | P0 | Frontend | - | Socket.io client connected to server | PVTI_lAHOAB4wV84BNGcwzgj_6EE | 36 |
 | FE-013 | Implement message.received event listener (real-time inbox update) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-017 | New inbound messages appear in inbox without refresh | PVTI_lAHOAB4wV84BNGcwzgj_9W0 | 51 |
 | FE-014 | Implement message.sent event listener (update message status in UI) | **Done** (PR #244 merged) | P0 | Frontend | FE-012, BE-018 | Message status changes to sent in real-time | PVTI_lAHOAB4wV84BNGcwzgj_6NU | 58 |
@@ -229,8 +229,8 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | FE-017 | Implement IRC connection test button (connects to server, shows success/error) | Not Started | P0 | Frontend | FE-016, BE-027 | Button triggers test, displays result message | PVTI_lAHOAB4wV84BNGcwzgj_6Nk | 66 |
 | FE-018 | Implement IRC connection status display (connected/retrying/disconnected/failed) | Not Started | P0 | Frontend | FE-016 | Status badge visible in admin panel, updates in real-time | PVTI_lAHOAB4wV84BNGcwzgj_6MA | 47 |
 | FE-019 | Implement admin panel - users list (table with email, role, status, edit/delete actions) | Not Started | P1 | Frontend | FE-002, BE-006 | Users table functional, CRUD operations working with RBAC | PVTI_lAHOAB4wV84BNGcwzgj_6L4 | 52 |
-| FE-020 | Implement authentication guards (redirect to login if unauthenticated) | Not Started | P0 | Frontend | FE-005 | Protected pages redirect unauthenticated users | PVTI_lAHOAB4wV84BNGcwzgj_6NM | 48 |
-| FE-021 | Implement role-based UI (hide admin features from non-admin users) | Not Started | P1 | Frontend | FE-020 | Admin panel only visible to Super Admin/Admin | PVTI_lAHOAB4wV84BNGcwzgj_6Ng | 56 |
+| FE-020 | Implement authentication guards (redirect to login if unauthenticated) | **Done** (P0 Option 2 feature branch) | P0 | Frontend | FE-005 | Protected pages redirect unauthenticated users ✅ | PVTI_lAHOAB4wV84BNGcwzgj_6NM | 48 |
+| FE-021 | Implement role-based UI (hide admin features from non-admin users) | **Done** (P0 Option 2 feature branch) | P1 | Frontend | FE-020 | Admin panel only visible to Super Admin/Admin ✅ | PVTI_lAHOAB4wV84BNGcwzgj_6Ng | 56 |
 
 ### Shared Tasks
 
