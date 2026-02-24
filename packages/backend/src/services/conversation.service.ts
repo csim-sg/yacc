@@ -241,8 +241,6 @@ export class ConversationService {
 
     return {
       data: enrichedConvos,
-      page,
-      pageSize: limit,
       total,
     };
   }

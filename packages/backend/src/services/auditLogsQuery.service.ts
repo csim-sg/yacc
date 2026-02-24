@@ -11,7 +11,7 @@ import { logger } from '../infrastructure/logger';
 import { auditLogs } from '../schemas/auditLog.schema';
 import type {
   AuditLogQueryFilters,
-  AuditLogQueryResponse,
+  AuditLogQueryServiceResponse,
   AuditLogExportRequest,
   AuditLogExportResponse,
   AuditLogEntry,
@@ -31,7 +31,7 @@ export async function queryAuditLogs(
   userId: string,
   filters: AuditLogQueryFilters,
   correlationId: string = 'unknown'
-): Promise<AuditLogQueryResponse> {
+): Promise<AuditLogQueryServiceResponse> {
   const page = Math.max(1, filters.page || DEFAULT_PAGE);
   const limit = Math.min(MAX_LIMIT, Math.max(1, filters.limit || DEFAULT_LIMIT));
   const offset = (page - 1) * limit;
@@ -164,10 +164,8 @@ export async function queryAuditLogs(
     );
 
     return {
-      items,
+      data: items,
       total,
-      page,
-      limit,
       pages: Math.ceil(total / limit),
     };
   } catch (error: unknown) {
@@ -190,7 +188,7 @@ export async function queryConversationAuditLogs(
   conversationId: string,
   filters?: Omit<AuditLogQueryFilters, 'entityId'>,
   correlationId: string = 'unknown'
-): Promise<AuditLogQueryResponse> {
+): Promise<AuditLogQueryServiceResponse> {
   return queryAuditLogs(
     userId,
     {
@@ -231,7 +229,7 @@ export async function exportAuditLogs(
       correlationId
     );
     
-    allItems.push(...firstPageResponse.items);
+    allItems.push(...firstPageResponse.data);
     const totalPages = firstPageResponse.pages;
     
     // Fetch remaining pages if any
@@ -241,7 +239,7 @@ export async function exportAuditLogs(
         { ...filters, page, limit: pageSize },
         correlationId
       );
-      allItems.push(...pageResponse.items);
+      allItems.push(...pageResponse.data);
     }
 
     let data: string;

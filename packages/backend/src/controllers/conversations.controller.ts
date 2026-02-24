@@ -7,6 +7,7 @@ import type { AssignRequest } from '@yacc/common/requests/conversations/assign.r
 import type { ListConversationsRequest } from '@yacc/common/requests/conversations/listConversations.request';
 import type { UpdatePriorityRequest } from '@yacc/common/requests/conversations/updatePriority.request';
 import type { UpdateStatusRequest } from '@yacc/common/requests/conversations/updateStatus.request';
+import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import type { Request } from 'express';
 import {
   JsonController,
@@ -133,12 +134,13 @@ export class ConversationsController {
         'GET /api/conversations completed'
       );
 
-      return {
-        data: result.data,
-        page: result.page,
-        pageSize: result.pageSize,
-        total: result.total,
+      // Create a query adapter for BaseListResponse
+      const queryAdapter = {
+        getLimit: () => normalizedQuery.limit || 20,
+        getPage: () => (normalizedQuery.page || 1) - 1, // Convert to 0-indexed
       };
+
+      return new BaseListResponse(result.data, result.total, queryAdapter);
     } catch (error) {
       const duration = performance.now() - startTime;
       logger.error(

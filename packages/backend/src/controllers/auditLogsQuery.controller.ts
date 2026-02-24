@@ -7,6 +7,7 @@
 
 import type { Request , Response } from 'express';
 import { JsonController, Get, Post, Param, QueryParam, Req, Res, Authorized, CurrentUser, Body, BadRequestError } from 'routing-controllers';
+import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import { logger } from '../infrastructure/logger';
 import {
   queryAuditLogs,
@@ -71,7 +72,14 @@ export class AuditLogsQueryController {
       };
 
       const result = await queryAuditLogs(user.id, filters, correlationId);
-      return res.status(200).json(result);
+      
+      // Create a query adapter for BaseListResponse
+      const queryAdapter = {
+        getLimit: () => filters.limit || 20,
+        getPage: () => (filters.page || 1) - 1, // Convert to 0-indexed
+      };
+      
+      return res.status(200).json(new BaseListResponse(result.data, result.total, queryAdapter));
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       
@@ -125,7 +133,14 @@ export class AuditLogsQueryController {
       };
 
       const result = await queryConversationAuditLogs(user.id, conversationId, filters, correlationId);
-      return res.status(200).json(result);
+      
+      // Create a query adapter for BaseListResponse
+      const queryAdapter = {
+        getLimit: () => filters.limit || 20,
+        getPage: () => (filters.page || 1) - 1, // Convert to 0-indexed
+      };
+      
+      return res.status(200).json(new BaseListResponse(result.data, result.total, queryAdapter));
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       

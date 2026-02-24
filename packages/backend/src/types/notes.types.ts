@@ -44,3 +44,12 @@ export interface NoteCreationResult {
   note: NoteResponse;
   mentionedUserIds: string[]; // User IDs that were notified about mentions
 }
+
+/**
+ * List Notes Service Response
+ * Service returns { data, total } - controller wraps in BaseListResponse
+ */
+export interface ListNotesServiceResponse {
+  data: NoteResponse[];
+  total: number;
+}

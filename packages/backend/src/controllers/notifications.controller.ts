@@ -20,6 +20,7 @@ import {
   NotFoundError,
   QueryParam,
 } from 'routing-controllers';
+import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import { logger } from '../infrastructure/logger';
 import { notificationsService } from '../services/notifications.service';
 import type { AuthUser } from '../types/auth.types';
@@ -72,16 +73,19 @@ export class NotificationsController {
         {
           userId: user.id,
           count: result.data.length,
-          total: result.pagination.total,
+          total: result.total,
           correlationId,
         },
         'Notifications listed successfully'
       );
 
-      return {
-        data: result.data,
-        pagination: result.pagination,
+      // Create a query adapter for BaseListResponse
+      const queryAdapter = {
+        getLimit: () => limit,
+        getPage: () => pageNum - 1, // Convert to 0-indexed
       };
+
+      return new BaseListResponse(result.data, result.total, queryAdapter);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error(

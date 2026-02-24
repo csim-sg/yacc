@@ -51,13 +51,13 @@ export interface AuditLogEntry {
 }
 
 /**
- * Audit Log Query Response
+ * Audit Log Query Response (service layer)
+ * Service returns { data, total, pages } - controller wraps in BaseListResponse
+ * Note: pages is included for export iteration purposes
  */
-export interface AuditLogQueryResponse {
-  items: AuditLogEntry[];
+export interface AuditLogQueryServiceResponse {
+  data: AuditLogEntry[];
   total: number;
-  page: number;
-  limit: number;
   pages: number;
 }
 

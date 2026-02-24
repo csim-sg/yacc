@@ -22,6 +22,7 @@ import {
   QueryParams,
   Authorized,
 } from 'routing-controllers';
+import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import { logger } from '../infrastructure/logger';
 import { routingRulesService } from '../services/routing-rules.service';
 import type { AuthUser } from '../types/auth.types';
@@ -70,14 +71,20 @@ export class RoutingRulesController {
         'Listing routing rules'
       );
 
-      const rules = await routingRulesService.listRules();
+      const result = await routingRulesService.listRules();
 
       logger.info(
-        { userId: user.id, count: rules.length, correlationId },
+        { userId: user.id, count: result.data.length, correlationId },
         'Routing rules listed successfully'
       );
 
-      return { data: rules };
+      // Create a query adapter for BaseListResponse (no pagination for rules list)
+      const queryAdapter = {
+        getLimit: () => result.total,
+        getPage: () => 0,
+      };
+
+      return new BaseListResponse(result.data, result.total, queryAdapter);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error(
@@ -290,16 +297,17 @@ export class RoutingRulesController {
       const result = await routingRulesService.getRuleExecutions(ruleId, page, pageSize);
 
       logger.info(
-        { userId: user.id, ruleId, count: result.executions.length, correlationId },
+        { userId: user.id, ruleId, count: result.data.length, correlationId },
         'Rule execution logs fetched successfully'
       );
 
-      return {
-        data: result.executions,
-        page: result.page,
-        pageSize: result.pageSize,
-        total: result.total,
+      // Create a query adapter for BaseListResponse
+      const queryAdapter = {
+        getLimit: () => pageSize,
+        getPage: () => page - 1, // Convert to 0-indexed
       };
+
+      return new BaseListResponse(result.data, result.total, queryAdapter);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error(

@@ -18,6 +18,7 @@ import {
   NotFoundError,
   QueryParam,
 } from 'routing-controllers';
+import { BaseListResponse } from '@yacc/common/responses/base-list.response';
 import { logger } from '../infrastructure/logger';
 import { notesService } from '../services/notes.service';
 import type { AuthUser } from '../types/auth.types';
@@ -66,18 +67,19 @@ export class NotesController {
           userId: user.id,
           conversationId,
           count: result.data.length,
-          total: result.pagination.total,
+          total: result.total,
           correlationId,
         },
         'Notes listed successfully'
       );
 
-      return {
-        data: result.data,
-        page: result.pagination.page,
-        pageSize: result.pagination.limit,
-        total: result.pagination.total,
+      // Create a query adapter for BaseListResponse
+      const queryAdapter = {
+        getLimit: () => limit,
+        getPage: () => pageNum - 1, // Convert to 0-indexed
       };
+
+      return new BaseListResponse(result.data, result.total, queryAdapter);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error(

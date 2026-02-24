@@ -71,10 +71,8 @@ export type { Attachment } from './types/attachment.interface';
 export type { Assignment } from './types/Assignment.type';
 export type { AuditLog } from './types/AuditLog.type';
 export type { BulkAction } from './types/BulkAction.type';
-export type { IListResponse } from './types/listResponse.type';
-export type { Timestamp } from './types/Timestamp.interface';
-
 // Re-export supporting types
+export type { Timestamp } from './types/Timestamp.interface';
 export type { RuleCondition } from './types/RuleCondition.interface';
 export type { RuleAction } from './types/RuleAction.interface';
 export type { RuleConditionField, RuleConditionOperator } from './types/RuleConditionType.type';
