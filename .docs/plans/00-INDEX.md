@@ -1,7 +1,7 @@
 # Execution Status Index
 
 **Last Updated**: 2026-02-24  
-**Status**: ✅ API Hygiene (SH-002+DEV-016/017/018) MERGED | ⏳ Phase 2 Frontend (FE-001-021) | 🟢 Infrastructure Phase (DEV-013-015 GO)
+**Status**: ✅ API Hygiene MERGED | 🔴 SH-003-005 Gap Analysis Complete (PO Decisions Required) | ⏳ Phase 2 Frontend | 🟢 Infrastructure Phase GO
 
 ---
 
@@ -16,9 +16,47 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - Phase 1 Backend: ✅ Complete (IRC integration + DLQ contract hardening merged)
 - Phase 1.5 Backend Refactoring (DEV-002-006): ✅ **COMPLETE** (All 5 tasks complete; ready for implementation)
 - Phase 1 Frontend (P0 Option 2): ⏳ **In Progress** (6/6 blocker fixes complete; documentation updates pending)
+- **Shared Code Hygiene (SH-003-005)**: 🔴 **BLOCKED - Gap Analysis Complete** (3 blockers identified, PO decisions required)
 - **Infrastructure Phase (DEV-013-015)**: 🟢 **GO** (All 9 blockers RESOLVED; ready to start)
-- Phase 2: ⏳ Queued (tags/notes/assignments/rules; starts after DEV-002-006 and FE-001-021 complete)
+- Phase 2: ⏳ Queued (tags/notes/assignments/rules; starts after Phase 1 dependencies complete)
 - QA: ⏳ Not Started
+
+## Shared Code Hygiene Phase (SH-003, SH-004, SH-005)
+
+**Status**: 🔴 **BLOCKED - Gap Analysis Complete, PO Decisions Required**  
+**Phase**: Phase 1 (Gap Analysis) ✅ Complete | Phase 2 (PO Decisions) 🔴 In Progress  
+**Timeline**: +1 day for decisions; 15-16 days development (saves 4 days via parallel execution)
+
+### Blockers Identified (3 Critical)
+
+| Blocker | Task | Issue | Impact | Decision |
+|---------|------|-------|--------|----------|
+| **BLOCKER-1** | SH-003 | WebSocket event scope unclear (3 vs 8+ events) | Real-time completeness | Minimal vs Hybrid vs Full |
+| **BLOCKER-2** | SH-004 | Endpoint validation scope unclear (4 vs 35+ endpoints) | API quality + coverage | Core vs Hybrid vs Full |
+| **BLOCKER-3** | SH-005 | Barrel export conflicts with ADR-005 | Code discoverability | Domain-specific vs barrel |
+
+### Decisions Required (By EOD Today)
+
+1. **SH-003 Event Scope**: Option A (3 events) | Option B (6 events) | Option C (9 events) ✅ RECOMMENDED
+2. **SH-004 Endpoint Scope**: Option A (15 endpoints) | Option B (23 endpoints) | Option C (35+ endpoints) ✅ RECOMMENDED
+3. **SH-005 Export Pattern**: Option A (domain-specific) ✅ RECOMMENDED | Option B (barrel export)
+4. **ADR-XXX Approval**: Zod schemas as source of truth (DRY principle) ✅ RECOMMENDED
+
+### Where to Provide Decisions
+
+📄 **File**: `.docs/plans/SH-003-005-PO-DECISION-REQUEST.md` (391 lines, detailed)
+- 3-5 pages per decision with pros/cons/timeline/impact
+- Checklist format for easy input
+- Architect recommendations included
+
+### Key Dates
+
+- **2026-02-24 EOD**: Decisions deadline
+- **2026-02-25**: Architect finalizes ADR-XXX + task updates
+- **2026-02-26**: Development starts (SH-003 + SH-004 parallel)
+- **2026-03-10**: Target completion (~15 days)
+
+---
 
 ## P0 Frontend Option 2 Status (FE-001-021)
 
