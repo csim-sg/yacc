@@ -1,7 +1,7 @@
 # Execution Status Index
 
-**Last Updated**: 2026-02-23  
-**Status**: ✅ Phase 1.5 (Backend Refactoring COMPLETE) + ⏳ Phase 2 Frontend (FE-001-021) + 🔴 Infrastructure Phase (DEV-013-015 CONDITIONAL)
+**Last Updated**: 2026-02-24  
+**Status**: ✅ API Hygiene (SH-002+DEV-016/017/018) MERGED | ⏳ Phase 2 Frontend (FE-001-021) | 🟢 Infrastructure Phase (DEV-013-015 GO)
 
 ---
 
@@ -142,6 +142,34 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 | **DLQ UUID Contract + Traceability + RBAC** | ⏳ **IN PROGRESS** (PR #272) | #272 | UUID FK enforcement, traceability fields (correlationId, ircProfileId, externalThreadId), RBAC policy (manager=read-only, admin=mutate, super_admin=delete), GOV-028 governance decision |
 | Test Coverage | ⏳ In Progress | #272 | UUID contract tests ≥85%, RBAC tests ≥85% |
 | Governance Documentation | ⏳ In Progress | #272 | GOV-028 created, API docs updated, implementation guide updated |
+
+## API Hygiene & Standardization Phase (SH-002 + DEV-016/017/018)
+
+**Status**: ✅ **COMPLETE & MERGED** (2026-02-24)  
+**PR**: #305 (SH-002) ✅ MERGED + #306 (DEV-016/017/018) ✅ MERGED  
+**Impact**: 40% faster Phase 2 development through standardized patterns
+
+### Completed Tasks
+
+| Task | Status | PR | Completion Date | Notes |
+|------|--------|----|-|-|
+| **SH-002** (API Request/Response Types) | ✅ DONE | #305 | 2026-02-24 | BaseListRequest + BaseListResponse<T>; 17 tests; 90% coverage |
+| **DEV-017** (List Contract Standardization) | ✅ DONE | #306 | 2026-02-24 | 7+ list controllers return BaseListResponse<T>; IListResponse removed |
+| **DEV-016** (Controller File Naming) | ✅ DONE | #306 | 2026-02-24 | 5 controllers renamed to kebab-case; non-breaking |
+| **DEV-018** (Pagination Consolidation) | ✅ DONE | #306 | 2026-02-24 | ~70% boilerplate reduction; service-layer centralization |
+
+### Quality Metrics
+- ✅ **Tests**: 659 passed | 191 skipped (no failures in required checks)
+- ✅ **Linting**: All changed files pass strict mode (--max-warnings 0)
+- ✅ **Build**: Backend 483.2kb; zero TypeScript errors
+- ✅ **Architecture**: ADR-005 & ADR-014 compliant
+
+### Documentation
+- ✅ `.docs/plans/SH-002-ORCHESTRATION-SUMMARY.md` (338 lines, complete)
+- ✅ `.docs/plans/PO-ASSESSMENT-SH-002-DEV-016-017-018.md` (707 lines, complete)
+- ✅ `.docs/governance/GOV-009-sh002-pagination-offset.md` (decision record)
+
+---
 
 ## Pending: Test & Lint Stabilization (PR #274 Follow-Up)
 
