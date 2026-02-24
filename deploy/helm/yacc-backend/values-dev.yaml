@@ -1,0 +1,98 @@
+# ============================================
+# YACC Backend - Development Environment Values
+# ============================================
+# Usage: helm upgrade --install yacc-backend ./deploy/helm/yacc-backend -n yacc-dev --values deploy/helm/yacc-backend/values-dev.yaml
+
+# Single replica for development (k3d local testing)
+replicaCount: 1
+
+# Container image (local k3d build)
+image:
+  registry: ""  # No registry for local k3d
+  repository: yacc-backend
+  pullPolicy: IfNotPresent  # Use local image if available
+  tag: "latest"
+
+# Development resources (same as MVP)
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Development configuration
+config:
+  NODE_ENV: development
+  PORT: "3000"
+  LOG_LEVEL: debug
+  LOG_FORMAT: pretty
+  LOG_FILE_ENABLED: "false"
+  AUDIT_LOG_ENABLED: "true"
+  ACCESS_TOKEN_TTL_SECONDS: "172800"
+  REFRESH_TOKEN_TTL_SECONDS: "2592000"
+  RESET_PASSWORD_TOKEN_TTL_MINUTES: "60"
+  WS_HEARTBEAT_INTERVAL_SEC: "60"
+  WS_BACKLOG_RETENTION_HOURS: "1"
+  MESSAGE_RETRY_ATTEMPTS: "3"
+  MESSAGE_RETRY_BASE_DELAY_MS: "60000"
+  MESSAGE_RETRY_BACKOFF_MULTIPLIER: "5"
+  ATTACHMENT_MAX_SIZE_MB: "5"
+  RAW_PAYLOAD_RETENTION_DAYS: "7"
+  EXPORT_RETENTION_HOURS: "24"
+  FRONTEND_URL: http://localhost:5173
+  RESET_PASSWORD_URL: http://localhost:5173/reset-password
+
+# PostgreSQL (local k3d cluster)
+postgresql:
+  host: postgresql
+  port: 5432
+  database: yacc_inbox
+  existingSecret: postgresql-credentials
+  usernameKey: username
+  passwordKey: password
+
+# Redis (local k3d cluster)
+redis:
+  host: redis
+  port: 6379
+  existingSecret: redis-credentials
+  passwordKey: password
+
+# Secrets references (create these secrets before deploying)
+secrets:
+  betterAuthSecret:
+    existingSecret: yacc-auth-secrets
+    key: better-auth-secret
+  jwtSecret:
+    existingSecret: yacc-auth-secrets
+    key: jwt-secret
+  cloudflareR2:
+    existingSecret: yacc-cloudflare-secrets
+    endpointKey: r2-endpoint
+    accessKeyKey: r2-access-key
+    secretKeyKey: r2-secret-key
+    bucketKey: r2-bucket
+    cdnUrlKey: cdn-url
+  email:
+    existingSecret: yacc-email-secrets
+    provider: sendgrid
+    sendgridApiKeyKey: sendgrid-api-key
+    sendgridFromEmailKey: sendgrid-from-email
+    sendgridFromNameKey: sendgrid-from-name
+    smtpHostKey: smtp-host
+    smtpPortKey: smtp-port
+    smtpSecureKey: smtp-secure
+    smtpUserKey: smtp-user
+    smtpPasswordKey: smtp-password
+    smtpFromEmailKey: smtp-from-email
+    smtpFromNameKey: smtp-from-name
+  integrations:
+    existingSecret: yacc-integration-secrets
+    telegramBotTokenKey: telegram-bot-token
+    ircPasswordKey: irc-password
+
+# Ingress disabled for local development
+ingress:
+  enabled: false

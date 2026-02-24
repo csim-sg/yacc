@@ -1,0 +1,260 @@
+# ============================================
+# YACC Backend Helm Values
+# ============================================
+# Default values for yacc-backend.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# ============================================
+# REPLICA COUNT
+# ============================================
+replicaCount: 1
+
+# ============================================
+# CONTAINER IMAGE
+# ============================================
+image:
+  registry: ""  # e.g., ghcr.io
+  repository: csim-sg/yacc/yacc-backend
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+# ============================================
+# IMAGE PULL SECRETS
+# ============================================
+imagePullSecrets: []
+# - name: regcred
+
+# ============================================
+# NAME OVERRIDE
+# ============================================
+nameOverride: ""
+fullnameOverride: ""
+
+# ============================================
+# SERVICE ACCOUNT
+# ============================================
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# ============================================
+# POD ANNOTATIONS
+# ============================================
+podAnnotations: {}
+
+# ============================================
+# POD SECURITY CONTEXT
+# ============================================
+podSecurityContext:
+  fsGroup: 1000
+
+# ============================================
+# CONTAINER SECURITY CONTEXT
+# ============================================
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# ============================================
+# SERVICE
+# ============================================
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 3000
+  annotations: {}
+
+# ============================================
+# RESOURCES
+# ============================================
+# MVP allocations: backend pod uses ~200m CPU / 256 MB RAM at rest
+# Limits provide 2x buffer for spikes (safety margin)
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# ============================================
+# LIVENESS AND READINESS PROBES
+# ============================================
+# Liveness probe: Is the process running?
+# - Path: /health/live (simple check, returns 200 if process alive)
+# - Restart on failure (after failureThreshold * periodSeconds)
+# - MVP: 30 second threshold (10s initial delay + 3 failures * 10s period)
+livenessProbe:
+  enabled: true
+  path: /health/live
+  port: 3000
+  initialDelaySeconds: 15
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Readiness probe: Can the pod handle traffic?
+# - Path: /health/ready (checks PostgreSQL, Redis, R2 connectivity)
+# - Remove from LB on failure (stop sending traffic)
+# - MVP: 30 second threshold (5s initial delay + 3 failures * 10s period)
+readinessProbe:
+  enabled: true
+  path: /health/ready
+  port: 3000
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# ============================================
+# NODE SELECTOR
+# ============================================
+nodeSelector: {}
+
+# ============================================
+# TOLERATIONS
+# ============================================
+tolerations: []
+
+# ============================================
+# AFFINITY
+# ============================================
+affinity: {}
+
+# ============================================
+# ENVIRONMENT CONFIGURATION
+# ============================================
+# Non-sensitive configuration (stored in ConfigMap)
+config:
+  # Node environment
+  NODE_ENV: production
+  
+  # Application port
+  PORT: "3000"
+  
+  # Logging
+  LOG_LEVEL: info
+  LOG_FORMAT: json
+  LOG_FILE_ENABLED: "false"
+  AUDIT_LOG_ENABLED: "true"
+  
+  # Token TTLs (in seconds)
+  ACCESS_TOKEN_TTL_SECONDS: "172800"
+  REFRESH_TOKEN_TTL_SECONDS: "2592000"
+  RESET_PASSWORD_TOKEN_TTL_MINUTES: "60"
+  
+  # WebSocket
+  WS_HEARTBEAT_INTERVAL_SEC: "60"
+  WS_BACKLOG_RETENTION_HOURS: "1"
+  
+  # Message retry
+  MESSAGE_RETRY_ATTEMPTS: "3"
+  MESSAGE_RETRY_BASE_DELAY_MS: "60000"
+  MESSAGE_RETRY_BACKOFF_MULTIPLIER: "5"
+  
+  # Attachments
+  ATTACHMENT_MAX_SIZE_MB: "5"
+  RAW_PAYLOAD_RETENTION_DAYS: "7"
+  EXPORT_RETENTION_HOURS: "24"
+  
+  # Frontend URL (update for your environment)
+  FRONTEND_URL: https://app.example.com
+  RESET_PASSWORD_URL: https://app.example.com/reset-password
+
+# ============================================
+# EXTERNAL SERVICES CONFIGURATION
+# ============================================
+# PostgreSQL (pre-installed in cluster)
+postgresql:
+  # Service name of PostgreSQL in the cluster
+  host: postgresql
+  port: 5432
+  database: yacc_inbox
+  # Username and password from secret
+  existingSecret: postgresql-credentials
+  usernameKey: username
+  passwordKey: password
+
+# Redis (pre-installed in cluster)
+redis:
+  # Service name of Redis in the cluster
+  host: redis
+  port: 6379
+  # Password from secret (optional)
+  existingSecret: redis-credentials
+  passwordKey: password
+
+# ============================================
+# SECRETS CONFIGURATION
+# ============================================
+# Reference to existing secrets (create these separately)
+# DO NOT put actual secret values here
+secrets:
+  # Auth secrets
+  betterAuthSecret:
+    existingSecret: yacc-auth-secrets
+    key: better-auth-secret
+  jwtSecret:
+    existingSecret: yacc-auth-secrets
+    key: jwt-secret
+  
+  # Cloudflare R2
+  cloudflareR2:
+    existingSecret: yacc-cloudflare-secrets
+    endpointKey: r2-endpoint
+    accessKeyKey: r2-access-key
+    secretKeyKey: r2-secret-key
+    bucketKey: r2-bucket
+    cdnUrlKey: cdn-url
+  
+  # Email (SendGrid or SMTP)
+  email:
+    existingSecret: yacc-email-secrets
+    provider: sendgrid  # sendgrid or smtp
+    sendgridApiKeyKey: sendgrid-api-key
+    sendgridFromEmailKey: sendgrid-from-email
+    sendgridFromNameKey: sendgrid-from-name
+    smtpHostKey: smtp-host
+    smtpPortKey: smtp-port
+    smtpSecureKey: smtp-secure
+    smtpUserKey: smtp-user
+    smtpPasswordKey: smtp-password
+    smtpFromEmailKey: smtp-from-email
+    smtpFromNameKey: smtp-from-name
+  
+  # Integrations (optional - may not be needed for all environments)
+  integrations:
+    existingSecret: yacc-integration-secrets
+    telegramBotTokenKey: telegram-bot-token
+    ircPasswordKey: irc-password
+
+# ============================================
+# INGRESS (Optional - Post-MVP)
+# ============================================
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: api.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: yacc-backend-tls
+  #    hosts:
+  #      - api.example.com

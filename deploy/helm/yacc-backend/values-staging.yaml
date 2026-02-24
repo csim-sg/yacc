@@ -1,0 +1,110 @@
+# ============================================
+# YACC Backend - Staging Environment Values
+# ============================================
+# Usage: helm upgrade --install yacc-backend ./deploy/helm/yacc-backend -n yacc-staging --values deploy/helm/yacc-backend/values-staging.yaml
+
+# Single replica for staging MVP (scale post-MVP)
+replicaCount: 1
+
+# Container image (from local Docker build or registry)
+image:
+  registry: ""  # Empty for local image
+  repository: yacc-backend
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# MVP resources (same as development)
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Staging configuration
+config:
+  NODE_ENV: production
+  PORT: "3000"
+  LOG_LEVEL: info
+  LOG_FORMAT: json
+  LOG_FILE_ENABLED: "false"
+  AUDIT_LOG_ENABLED: "true"
+  ACCESS_TOKEN_TTL_SECONDS: "172800"
+  REFRESH_TOKEN_TTL_SECONDS: "2592000"
+  RESET_PASSWORD_TOKEN_TTL_MINUTES: "60"
+  WS_HEARTBEAT_INTERVAL_SEC: "60"
+  WS_BACKLOG_RETENTION_HOURS: "1"
+  MESSAGE_RETRY_ATTEMPTS: "3"
+  MESSAGE_RETRY_BASE_DELAY_MS: "60000"
+  MESSAGE_RETRY_BACKOFF_MULTIPLIER: "5"
+  ATTACHMENT_MAX_SIZE_MB: "5"
+  RAW_PAYLOAD_RETENTION_DAYS: "7"
+  EXPORT_RETENTION_HOURS: "24"
+  FRONTEND_URL: https://staging.yacc.example.com
+  RESET_PASSWORD_URL: https://staging.yacc.example.com/reset-password
+
+# PostgreSQL (K3s cluster)
+postgresql:
+  host: postgresql
+  port: 5432
+  database: yacc_inbox
+  existingSecret: postgresql-credentials
+  usernameKey: username
+  passwordKey: password
+
+# Redis (K3s cluster)
+redis:
+  host: redis
+  port: 6379
+  existingSecret: redis-credentials
+  passwordKey: password
+
+# Secrets references (create these secrets before deploying)
+secrets:
+  betterAuthSecret:
+    existingSecret: yacc-auth-secrets
+    key: better-auth-secret
+  jwtSecret:
+    existingSecret: yacc-auth-secrets
+    key: jwt-secret
+  cloudflareR2:
+    existingSecret: yacc-cloudflare-secrets
+    endpointKey: r2-endpoint
+    accessKeyKey: r2-access-key
+    secretKeyKey: r2-secret-key
+    bucketKey: r2-bucket
+    cdnUrlKey: cdn-url
+  email:
+    existingSecret: yacc-email-secrets
+    provider: sendgrid
+    sendgridApiKeyKey: sendgrid-api-key
+    sendgridFromEmailKey: sendgrid-from-email
+    sendgridFromNameKey: sendgrid-from-name
+    smtpHostKey: smtp-host
+    smtpPortKey: smtp-port
+    smtpSecureKey: smtp-secure
+    smtpUserKey: smtp-user
+    smtpPasswordKey: smtp-password
+    smtpFromEmailKey: smtp-from-email
+    smtpFromNameKey: smtp-from-name
+  integrations:
+    existingSecret: yacc-integration-secrets
+    telegramBotTokenKey: telegram-bot-token
+    ircPasswordKey: irc-password
+
+# Ingress enabled for staging (if needed)
+ingress:
+  enabled: false
+  className: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: self-signed
+  hosts:
+    - host: api.staging.yacc.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: yacc-backend-staging-tls
+      hosts:
+        - api.staging.yacc.example.com
