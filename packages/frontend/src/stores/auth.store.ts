@@ -37,9 +37,10 @@ export const useAuthStore = create<AuthState>((set) => ({
         isAuthenticated: true,
         isLoading: false,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Invalid email or password';
       set({
-        error: error.error || 'Invalid email or password',
+        error: message,
         isLoading: false,
         isAuthenticated: false,
         user: null,
@@ -69,9 +70,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       await authService.register({ email, password, name });
       set({ isLoading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Registration failed';
       set({
-        error: error.error || 'Registration failed',
+        error: message,
         isLoading: false,
       });
       throw error;
@@ -104,7 +106,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           error: null,
         });
       }
-    } catch (error: any) {
+    } catch {
       // Token invalid or expired
       clearToken();
       set({
