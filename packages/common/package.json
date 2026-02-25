@@ -4,16 +4,66 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./dist/index.js",
-    "./types/*": "./dist/types/*.js",
-    "./schemas/*": "./dist/schemas/*.js",
-    "./constants/*": "./dist/constants/*.js",
-    "./requests": "./dist/requests/index.js",
-    "./requests/*": "./dist/requests/*.js",
-    "./responses": "./dist/responses/index.js",
-    "./responses/*": "./dist/responses/*.js",
-    "./websocket/constants/*": "./dist/websocket/constants/*.js",
-    "./websocket/types/*": "./dist/websocket/types/*.js"
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./types/entities": {
+      "types": "./src/types/entities/index.ts",
+      "default": "./src/types/entities/index.ts"
+    },
+    "./types/api": {
+      "types": "./src/types/api/index.ts",
+      "default": "./src/types/api/index.ts"
+    },
+    "./types/events": {
+      "types": "./src/types/events/index.ts",
+      "default": "./src/types/events/index.ts"
+    },
+    "./schemas": {
+      "types": "./src/schemas/index.ts",
+      "default": "./src/schemas/index.ts"
+    },
+    "./requests": {
+      "types": "./src/requests/index.ts",
+      "default": "./src/requests/index.ts"
+    },
+    "./responses": {
+      "types": "./src/responses/index.ts",
+      "default": "./src/responses/index.ts"
+    },
+    "./constants": {
+      "types": "./src/constants/index.ts",
+      "default": "./src/constants/index.ts"
+    },
+    "./types/*": {
+      "types": "./src/types/*.ts",
+      "default": "./src/types/*.ts"
+    },
+    "./schemas/*": {
+      "types": "./src/schemas/*.ts",
+      "default": "./src/schemas/*.ts"
+    },
+    "./constants/*": {
+      "types": "./src/constants/*.ts",
+      "default": "./src/constants/*.ts"
+    },
+    "./requests/*": {
+      "types": "./src/requests/*.ts",
+      "default": "./src/requests/*.ts"
+    },
+    "./responses/*": {
+      "types": "./src/responses/*.ts",
+      "default": "./src/responses/*.ts"
+    },
+    "./websocket/constants/*": {
+      "types": "./src/websocket/constants/*.ts",
+      "default": "./src/websocket/constants/*.ts"
+    },
+    "./websocket/types/*": {
+      "types": "./src/websocket/types/*.ts",
+      "default": "./src/websocket/types/*.ts"
+    }
   },
   "scripts": {
     "build": "tsc",
