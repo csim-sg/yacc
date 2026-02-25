@@ -1,6 +1,8 @@
 /**
  * Message Controller
  * Handles message retrieval and sending
+ *
+ * @see ADR-020 - Zod validation decorators
  */
 
 import type { Request, Response } from 'express';
@@ -17,11 +19,15 @@ import {
   HttpCode,
   BadRequestError,
 } from 'routing-controllers';
+import { MessageParamsSchema, GetMessagesQuerySchema } from '@yacc/common/schemas';
+import { ValidateParams } from '../decorators/validate-params.decorator';
+import { ValidateQuery } from '../decorators/validate-query.decorator';
 import { logger } from '../infrastructure/logger';
 import { messageService } from '../services/message.service.js';
 import type { AuthUser } from '../types/auth.types.js';
 import type { GetMessagesQuery, SendMessageRequestBody } from '../types/message.types.js';
 import { SendMessageRequestSchema } from '../types/message.types.js';
+import type { ValidatedRequest } from '../types/validated-request.type';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;
