@@ -10,7 +10,7 @@ import {
   Res,
   Authorized,
 } from 'routing-controllers';
-import { logger } from '../infrastructure/logger.js';
+import { logger } from '../infrastructure/logger';
 import { messageQueueDLQService } from '../services/message-queue-dlq.service.js';
 import { messageQueueService } from '../services/message-queue.service.js';
 import type { AuthUser } from '../types/auth.types.js';

@@ -1,7 +1,7 @@
 import type { Platform } from '@yacc/common/types/platform.type';
 import { eq, asc, and, sql } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client.js';
-import { logger } from '../infrastructure/logger.js';
+import { logger } from '../infrastructure/logger';
 import { conversations } from '../schemas/conversation.schema.js';
 import { messages } from '../schemas/message.schema.js';
 import type { Message } from '../schemas/message.schema.js';

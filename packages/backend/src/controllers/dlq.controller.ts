@@ -29,7 +29,7 @@ import {
   NotFoundError,
   InternalServerError,
 } from 'routing-controllers';
-import { logger } from '../infrastructure/logger.js';
+import { logger } from '../infrastructure/logger';
 import { dlqService } from '../services/dlq.service.js';
 import type { AuthUser } from '../types/auth.types.js';
 
