@@ -1,4 +1,4 @@
-import type { BaseListRequest } from "@/requests/base-list.request";
+import type { BaseListRequest } from "../requests/base-list.request";
 
 export class BaseListResponse<T> {
   data: T[];

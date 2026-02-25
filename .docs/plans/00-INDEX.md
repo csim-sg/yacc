@@ -22,9 +22,33 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 
 ## Shared Code Hygiene Phase (SH-003, SH-004, SH-005)
 
-**Status**: ✅ **READY FOR DEVELOPMENT - All Finalization Complete**  
-**Phase**: Phase 1 (Gap Analysis) ✅ Complete | Phase 2 (PO Decisions) ✅ Approved | Phase 3a (Architect Finalization) ✅ **COMPLETE** | Phase 3b (Development) ⏳ Starting 2026-02-26  
+**Status**: ⏳ **IN PROGRESS** - Phase 3b Development Started  
+**Phase**: Phase 1 (Gap Analysis) ✅ Complete | Phase 2 (PO Decisions) ✅ Approved | Phase 3a (Architect Finalization) ✅ Complete | Phase 3b (Development) ⏳ **30% COMPLETE**  
 **Timeline**: 16 days development (saves 4 days via parallel execution)
+
+### Current Progress
+
+| Task | Status | Progress | Notes |
+|------|--------|----------|-------|
+| **SH-003** (WebSocket Events) | ⏳ Ready | 0% | 9 events to define |
+| **SH-004** (Zod Schemas) | ⏳ In Progress | **30%** | Core infrastructure + 12 schemas + 2 controllers done |
+| **SH-005** (Package Exports) | ⏳ Queued | 0% | Awaits SH-003/SH-004 completion |
+
+### SH-004 Detailed Progress
+
+**Completed (30%)**:
+- ✅ Validation middleware (`src/middleware/validation.middleware.ts`)
+- ✅ 3 validation decorators (`@ValidateBody`, `@ValidateQuery`, `@ValidateParams`)
+- ✅ ValidatedRequest type for type-safe access
+- ✅ 12 Zod schema files in `@yacc/common/schemas/`
+- ✅ Schema index with all exports
+- ✅ AuthController validation (2 endpoints)
+- ✅ ConversationsController params validation (1 endpoint)
+
+**Remaining (70%)**:
+- ⏳ Controller integration (~33 more endpoints)
+- ⏳ Integration tests (~100 tests)
+- ⏳ Documentation updates
 
 ### Decisions Approved ✅
 
@@ -43,9 +67,10 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - SH-005: 100% (domain-specific exports)
 - ADR-020: 100% (Zod decision approved + documented)
 
-### Approval Record
+### Approval Records
 
-📄 **File**: `.docs/plans/SH-003-005-PO-APPROVAL.md` (detailed approval + sign-off)
+📄 **File**: `.docs/plans/SH-003-005-PO-APPROVAL.md` (PO scope decisions + sign-off)  
+📄 **File**: `.docs/plans/PO-REVIEW-SH-003-TO-SH-006.md` (PO requirement completeness review)
 
 ### Finalization Complete (Phase 3a) ✅
 

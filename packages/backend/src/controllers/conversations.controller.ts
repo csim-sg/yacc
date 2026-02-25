@@ -1,6 +1,9 @@
 /**
  * Conversations Controller
  * Handles conversation CRUD and updates with routing-controllers
+ *
+ * Note: Uses manual validation for list endpoint due to schema type mismatch
+ * @see ADR-020 - Zod validation decorators (partial implementation)
  */
 
 import type { AssignRequest } from '@yacc/common/requests/conversations/assign.request';
@@ -21,10 +24,14 @@ import {
   HttpCode,
   BadRequestError,
 } from 'routing-controllers';
+import { ConversationParamsSchema } from '@yacc/common/schemas';
+import { ValidateParams } from '../decorators/validate-params.decorator';
+import { ValidateBody } from '../decorators/validate-body.decorator';
 import { logger } from '../infrastructure/logger';
 import { auditService } from '../services/audit.service';
 import { conversationService } from '../services/conversation.service';
 import type { AuthUser } from '../types/auth.types';
+import type { ValidatedRequest } from '../types/validated-request.type';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;
@@ -111,6 +118,7 @@ export class ConversationsController {
   /**
    * GET /api/conversations
    * List conversations with filters and pagination
+   * Note: Uses manual validation due to schema type mismatch (tagId: number vs UUID)
    */
   @Get('/')
   async listConversations(@Req() req: AuthenticatedRequest) {
@@ -160,9 +168,13 @@ export class ConversationsController {
    * Get conversation by ID
    */
   @Get('/:id')
-  async getConversation(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+  @ValidateParams(ConversationParamsSchema)
+  async getConversation(
+    @Req() req: ValidatedRequest<never, never, typeof ConversationParamsSchema>
+  ) {
     const startTime = performance.now();
     const correlationId = req.correlationId || 'unknown';
+    const { id } = req.validated.params;
 
     try {
       const conversation = await conversationService.getConversation(id);
@@ -200,6 +212,7 @@ export class ConversationsController {
    * Update conversation status
    */
   @Patch('/:id/status')
+  @ValidateParams(ConversationParamsSchema)
   @Authorized(['admin', 'manager', 'super_admin'])
   @HttpCode(200)
   async updateStatus(
@@ -228,6 +241,7 @@ export class ConversationsController {
    * Update conversation priority
    */
   @Patch('/:id/priority')
+  @ValidateParams(ConversationParamsSchema)
   @Authorized(['manager', 'admin', 'super_admin'])
   @HttpCode(200)
   async updatePriority(
@@ -256,6 +270,7 @@ export class ConversationsController {
    * Assign conversation to user
    */
   @Patch('/:id/assign')
+  @ValidateParams(ConversationParamsSchema)
   @Authorized(['admin', 'super_admin'])
   @HttpCode(200)
   async assignConversation(

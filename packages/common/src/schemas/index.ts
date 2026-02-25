@@ -21,59 +21,222 @@
  * ```
  */
 
-// Authentication schemas
-export { LoginRequestSchema } from './loginRequest.schema';
-export { ForgotPasswordRequestSchema } from './forgotPasswordRequest.schema';
-export { ResetPasswordRequestSchema } from './resetPasswordRequest.schema';
+// =============================================================================
+// PATH PARAMETER SCHEMAS
+// =============================================================================
+export {
+  UuidParamsSchema,
+  ConversationParamsSchema,
+  MessageParamsSchema,
+  UserParamsSchema,
+  TagParamsSchema,
+  NoteParamsSchema,
+  NotificationParamsSchema,
+  RoutingRuleParamsSchema,
+  IntegrationParamsSchema,
+  AttachmentParamsSchema,
+  IrcProfileParamsSchema,
+  type UuidParams,
+  type ConversationParams,
+  type MessageParams,
+  type UserParams,
+  type TagParams,
+  type NoteParams,
+  type NotificationParams,
+  type RoutingRuleParams,
+  type IntegrationParams,
+  type AttachmentParams,
+  type IrcProfileParams,
+} from './params.schema';
+
+// =============================================================================
+// AUTHENTICATION SCHEMAS
+// =============================================================================
+export {
+  LoginRequestSchema,
+  ForgotPasswordRequestSchema,
+  ResetPasswordRequestSchema,
+  type LoginRequest,
+  type ForgotPasswordRequest,
+  type ResetPasswordRequest,
+} from './auth.schema';
+
+// Password schema (for password validation)
 export { PASSWORD_SCHEMA } from './passwordReset.schema';
 
-// User schemas
-export { CreateUserRequestSchema } from './createUserRequest.schema';
-export { UpdateUserRequestSchema } from './updateUserRequest.schema';
+// =============================================================================
+// USER SCHEMAS
+// =============================================================================
+export {
+  CreateUserRequestSchema,
+  UpdateUserRequestSchema,
+  ChangeUserRoleRequestSchema,
+  ListUsersQuerySchema,
+  type CreateUserRequest,
+  type UpdateUserRequest,
+  type ChangeUserRoleRequest,
+  type ListUsersQuery,
+} from './user.schema';
 
-// Conversation schemas
-export { UpdateConversationRequestSchema } from './updateConversationRequest.schema';
+// =============================================================================
+// CONVERSATION SCHEMAS
+// =============================================================================
+export {
+  ListConversationsQuerySchema,
+  CreateConversationRequestSchema,
+  UpdateConversationRequestSchema,
+  UpdateStatusRequestSchema,
+  UpdatePriorityRequestSchema,
+  AssignConversationRequestSchema,
+  BulkUpdateConversationsRequestSchema,
+  BulkAssignConversationsRequestSchema,
+  SearchConversationsQuerySchema,
+  type ListConversationsQuery,
+  type CreateConversationRequest,
+  type UpdateConversationRequest,
+  type UpdateStatusRequest,
+  type UpdatePriorityRequest,
+  type AssignConversationRequest,
+  type BulkUpdateConversationsRequest,
+  type BulkAssignConversationsRequest,
+  type SearchConversationsQuery,
+} from './conversation.schema';
+
+// Legacy exports for backward compatibility
 export { GetConversationsQuerySchema } from './getConversationsQuery.schema';
-export { SearchConversationsQuerySchema } from './searchConversationsQuery.schema';
 export { ConversationFilterSchema } from './conversationFilter.schema';
 
-// Message schemas
-export { SendMessageRequestSchema } from './sendMessageRequest.schema';
+// =============================================================================
+// MESSAGE SCHEMAS
+// =============================================================================
+export {
+  SendMessageRequestSchema,
+  ListMessagesQuerySchema,
+  GetMessagesQuerySchema,
+  type SendMessageRequest,
+  type ListMessagesQuery,
+  type GetMessagesQuery,
+} from './message.schema';
 
-// Tag schemas
-export { TagSchema } from './tag.schema';
-export { AddTagRequestSchema } from './addTagRequest.schema';
+// =============================================================================
+// TAG SCHEMAS
+// =============================================================================
+export {
+  TagSchema,
+  CreateTagRequestSchema,
+  UpdateTagRequestSchema,
+  AddTagRequestSchema,
+  ListTagsQuerySchema,
+  type Tag,
+  type CreateTagRequest,
+  type UpdateTagRequest,
+  type AddTagRequest,
+  type ListTagsQuery,
+} from './tag.schema';
 
-// Note schemas
-export { NoteSchema } from './note.schema';
-export { CreateNoteRequestSchema } from './createNoteRequest.schema';
+// =============================================================================
+// NOTE SCHEMAS
+// =============================================================================
+export {
+  NoteSchema,
+  CreateNoteRequestSchema,
+  UpdateNoteRequestSchema,
+  ListNotesQuerySchema,
+  type Note,
+  type CreateNoteRequest,
+  type UpdateNoteRequest,
+  type ListNotesQuery,
+} from './note.schema';
 
-// Notification schemas
-export { NotificationSchema } from './notification.schema';
+// =============================================================================
+// NOTIFICATION SCHEMAS
+// =============================================================================
+export {
+  NotificationSchema,
+  ListNotificationsQuerySchema,
+  MarkNotificationsReadRequestSchema,
+  DismissNotificationRequestSchema,
+  type Notification,
+  type ListNotificationsQuery,
+  type MarkNotificationsReadRequest,
+  type DismissNotificationRequest,
+} from './notification.schema';
+
+// Legacy filter export
 export { NotificationFilterSchema } from './notificationFilter.schema';
 
-// Routing rule schemas
-export { CreateRoutingRuleRequestSchema } from './createRoutingRuleRequest.schema';
-export { UpdateRoutingRuleRequestSchema } from './updateRoutingRuleRequest.schema';
-export { RuleConditionSchema } from './RuleCondition.schema';
-export { RuleActionSchema } from './RuleAction.schema';
+// =============================================================================
+// ROUTING RULE SCHEMAS
+// =============================================================================
+export {
+  RuleConditionSchema,
+  RuleActionSchema,
+  RoutingRuleSchema,
+  CreateRoutingRuleRequestSchema,
+  UpdateRoutingRuleRequestSchema,
+  TestRoutingRuleRequestSchema,
+  ListRoutingRulesQuerySchema,
+  type RuleCondition,
+  type RuleAction,
+  type RoutingRule,
+  type CreateRoutingRuleRequest,
+  type UpdateRoutingRuleRequest,
+  type TestRoutingRuleRequest,
+  type ListRoutingRulesQuery,
+} from './routing-rule.schema';
+
+// Legacy exports
 export { RoutingRuleExecutionSchema } from './routingRuleExecution.schema';
 
-// Collaboration schemas (exports from collaboration.schema are duplicates of other files)
-export { AssignConversationRequestSchema } from './assignConversationRequest.schema';
-
-// Bulk action schemas
+// =============================================================================
+// BULK ACTION SCHEMAS
+// =============================================================================
 export { BulkActionRequestSchema } from './bulkActionRequest.schema';
 
-// Attachment schemas
-export { AttachmentSchema } from './attachment.schema';
+// =============================================================================
+// ATTACHMENT SCHEMAS
+// =============================================================================
+export {
+  AttachmentSchema,
+  UploadAttachmentRequestSchema,
+  ListAttachmentsQuerySchema,
+  type Attachment,
+  type UploadAttachmentRequest,
+  type ListAttachmentsQuery,
+} from './attachment.schema';
+
 export { FileUploadSchema } from './fileUpload.schema';
 
-// Audit log schemas
-export { AuditLogSchema } from './auditLog.schema';
+// =============================================================================
+// AUDIT LOG SCHEMAS
+// =============================================================================
+export {
+  AuditLogSchema,
+  ListAuditLogsQuerySchema,
+  ExportAuditLogsRequestSchema,
+  type AuditLog,
+  type ListAuditLogsQuery,
+  type ExportAuditLogsRequest,
+} from './audit-log.schema';
 
-// Participant schemas
+// =============================================================================
+// INTEGRATION SCHEMAS
+// =============================================================================
+export {
+  IntegrationSchema,
+  CreateIntegrationRequestSchema,
+  UpdateIntegrationRequestSchema,
+  TestConnectionRequestSchema,
+  ListIntegrationsQuerySchema,
+  type Integration,
+  type CreateIntegrationRequest,
+  type UpdateIntegrationRequest,
+  type TestConnectionRequest,
+  type ListIntegrationsQuery,
+} from './integration.schema';
+
+// =============================================================================
+// OTHER SCHEMAS
+// =============================================================================
 export { ParticipantSchema } from './participant.schema';
-
-// Raw payload schemas
 export { RawPayloadSchema } from './rawPayload.schema';
