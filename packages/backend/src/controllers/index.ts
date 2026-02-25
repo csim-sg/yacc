@@ -28,6 +28,7 @@ import { ConversationsController } from './conversations.controller.js';
 import { DLQController } from './dlq.controller.js';
 import { HealthController } from './health.controller.js';
 import { IRCIntegrationController } from './ircIntegration.controller.js';
+import { IrcProfileController } from './ircProfile.controller.js';
 import { MessageController } from './message.controller.js';
 import { NotesController } from './note.controller.js';
 import { NotificationsController } from './notifications.controller.js';
@@ -46,6 +47,7 @@ export const controllers = [
   DLQController,
   HealthController,
   IRCIntegrationController,
+  IrcProfileController,
   MessageController,
   NotesController,
   NotificationsController,

@@ -8,7 +8,7 @@
 import type { Platform } from '@yacc/common/types/platform.type';
 import { eq } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client.js';
-import { logger } from '../infrastructure/logger';
+import { logger } from '../infrastructure/logger.js';
 import { enqueueRetry } from '../infrastructure/queues.client.js';
 import { conversations } from '../schemas/conversation.schema.js';
 import { messages } from '../schemas/message.schema.js';

@@ -12,7 +12,7 @@ import type { Platform } from '@yacc/common/types/platform.type';
 import { Worker, type Job } from 'bullmq';
 import { eq } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client.js';
-import { logger } from '../infrastructure/logger';
+import { logger } from '../infrastructure/logger.js';
 import { redisClient } from '../infrastructure/redis.client.js';
 import { conversations } from '../schemas/conversation.schema.js';
 import { messages } from '../schemas/message.schema.js';

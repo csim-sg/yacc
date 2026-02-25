@@ -7,7 +7,7 @@
 
 import { eq, desc, and, lte, count } from 'drizzle-orm';
 import { dbClient } from '../infrastructure/db.client.js';
-import { logger } from '../infrastructure/logger';
+import { logger } from '../infrastructure/logger.js';
 import { deadLetterQueue } from '../schemas/deadLetterQueue.schema.js';
 import type { DeadLetterQueueEntry } from '../schemas/deadLetterQueue.schema.js';
 import type { SendMessageJobPayload } from '../types/message-queue.types.js';
