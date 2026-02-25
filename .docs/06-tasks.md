@@ -1,10 +1,14 @@
 # 06. Issues & User stories
 
-**Last Updated**: February 24, 2026  
-**Status**: ✅ Phase 1 Backend COMPLETE | ✅ Phase 1 Frontend READY TO MERGE (PR #307) | ✅ Infrastructure Phase COMPLETE (PR #303 merged)  
-**Current focus**: Backend Refactoring (DEV-002-006, 5 tasks, ~12 days) + Phase 2 queued
-**Latest**: ✅ PR #307 (FE all 6 blockers + 25+ E2E tests) TypeScript violations FIXED, Architect APPROVED; ✅ PR #303 (Infrastructure K3s/Helm) MERGED; ✅ API Hygiene PRs #305, #306 merged  
-**Governance**: ADR-003, ADR-005, ADR-014, ADR-015, ADR-019, GOV-005, GOV-026, GOV-030, GOV-031, GOV-032
+**Last Updated**: February 25, 2026  
+**Phase 1 Status**: ✅ **COMPLETE** (100% feature deliverables merged to `dev`)  
+**Phase 2 Status**: 🚧 **EA-APPROVED** (ready for 2026-03-05 kickoff; see Section 2 below)
+**Outstanding P0/P1 Tasks**: See Section 3 for categorization
+  - ✅ 0 Phase 1 features remain
+  - 🔄 6 post-MVP planning tasks (deferred, EA-gated)
+  - 🧪 3 QA automation tasks (non-blocking for feature completion)
+
+**Key Governance**: ADR-003, ADR-005, GOV-006, GOV-033 (Phase 1 complete), GOV-034 (Phase 2 EA approval), GOV-035 (scope clarification)
 
 ---
 
@@ -30,6 +34,67 @@
 - Advanced analytics/reporting
 
 **Enum policy:** Channel enums include future channels (email, slack, whatsapp, wechat, meta, x) for forward compatibility. Phase 1 UI filters must only show Telegram + IRC.
+
+---
+
+## 1.5 Phase 2 Readiness Checklist (2026-03-05 Kickoff)
+
+Before Phase 2 development may begin, **all 3 conditions must be verified**:
+
+| Condition | Status | Reference | Owner |
+|-----------|--------|-----------|-------|
+| **Condition 1**: Phase 1 100% feature complete | ✅ VERIFIED | GOV-033 | Product Owner |
+| **Condition 2**: EA approval for Phase 2 scope & implementation | ✅ APPROVED | GOV-034 | Architect |
+| **Condition 3**: Phase 2 implementation pre-conditions met | ✅ VERIFIED | GOV-034, 02-PHASE2-PLANNING.md | Product Owner + Architect |
+
+**If any condition fails**: Do not proceed with Phase 2 development. Escalate to Architect.
+
+**Reference Documents**:
+- **GOV-033**: Phase 1 Final Completion Review (all 58 features verified complete)
+- **GOV-034**: Phase 2 Final EA Approval (3 conditions + implementation roadmap)
+- **GOV-035**: Scope Clarification (reconciles P0/P1 tasks vs. Phase 1 completion)
+- **02-PHASE2-PLANNING.md**: Phase 2 feature scope (50+ tasks across backend/frontend)
+
+---
+
+## 1.6 Outstanding P0/P1 Tasks - Categorization
+
+### Not Phase 1 Features (EA-Gated to Phase 2)
+
+The following P0/P1 tasks in the task list below are **NOT Phase 1 features** and are properly deferred. They are marked "Not Started" because:
+
+1. **Configuration & Hygiene** (non-blocking): BE-026, DEV-001a-d
+   - Deferred: Code organization work, no feature impact
+   - EA-Gated: Phase 2 pre-condition (see GOV-034)
+
+2. **Test Infrastructure** (refactoring): DEV-007-008
+   - Deferred: Test structure migration, doesn't block feature tests
+   - EA-Gated: Phase 2 pre-condition (see GOV-034)
+
+3. **Bun Runtime** (architectural shift): DEV-009-012
+   - Deferred: Post-MVP runtime migration decision
+   - EA-Gated: Phase 2 pre-condition (see GOV-034)
+
+4. **UI Polish** (nice-to-have): FE-018
+   - Deferred: Status badge refinement, not Phase 1 scope
+   - EA-Gated: Phase 2 pre-condition (see GOV-034)
+
+5. **Shared Types/Schemas** (Phase 2 prep): SH-003-006
+   - Deferred: Routing rules and notifications prep
+   - EA-Gated: Phase 2 pre-condition (see GOV-034)
+
+### QA Testing (Non-Blocking for Feature Completion)
+
+The following QA tasks are **testing deliverables**, not feature blockers:
+
+- **QA-001-012**: Test automation and regression suite
+  - 3 of 12 tasks remain non-blocking (documentation only)
+  - Can proceed with Phase 2 development in parallel
+  - See GOV-033 for classification
+
+**All Phase 1 features are production-ready for Phase 2 kickoff.**
+
+---
 
 ## 1.1 Phase 2 Developer Ask (Collaboration & Rules)
 
