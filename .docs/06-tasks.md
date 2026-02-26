@@ -206,6 +206,21 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | SV-002 | Validate Phase 1 requirements in execution guide | Completed | Phase 1 | Product Owner | SV-001 | Validation checklist covers all Phase 1 requirements; Phase 2 excluded | PVTI_lAHOAB4wV84BNGcwzgj_5sI | 9 |
 | SV-003 | Update Phase 1 timeline (2 weeks) | Completed | Phase 1 | Product Owner | SV-001 | Phase 1 timeline includes Telegram + IRC tasks; Phase 2 deferred | PVTI_lAHOAB4wV84BNGcwzgj_5r8 | 16 |
 
+### Gateway Plugin Architecture Tasks
+
+| ID | Task | Status | Phase | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
+|----|------|--------|----------|----------|--------------|---------------------|-----------------|----------|
+| GPA-001 | Create gateway hooks type definitions | Not Started | Phase 2+ | Backend | - | `types/gateway-hooks.types.ts` created with HookResult, HookResults, HookHandler types; builds pass | TBD | 311 |
+| GPA-002 | Implement GatewayHooks service (single do() method) | Not Started | Phase 2+ | Backend | GPA-001 | `services/gateway-hooks.ts` with on/off/do methods; parallel execution; error handling; 85%+ test coverage | TBD | 312 |
+| GPA-003 | Enhance PlatformAdapter interface with metadata and capabilities | Not Started | Phase 2+ | Backend | GPA-001 | `infrastructure/types/adapter.interface.ts` updated with BaseAdapterConfig, AdapterMetadata, AdapterCapability; generic type support | TBD | 313 |
+| GPA-004 | Create AdapterRegistry service | Not Started | Phase 2+ | Backend | GPA-002, GPA-003 | `services/adapter-registry.ts` with register/connect/disconnect/get methods; lifecycle management; 85%+ test coverage | TBD | 314 |
+| GPA-005 | Migrate TelegramAdapter to new interface | Not Started | Phase 2+ | Backend | GPA-003, GPA-004 | TelegramAdapter implements new PlatformAdapter interface; uses hooks; metadata defined; tests pass | TBD | 315 |
+| GPA-006 | Migrate IRCAdapter to new interface | Not Started | Phase 2+ | Backend | GPA-003, GPA-004 | IRCAdapter implements new PlatformAdapter interface; uses hooks; metadata defined; tests pass | TBD | 316 |
+| GPA-007 | Update GatewayExchange to use hook system | Not Started | Phase 2+ | Backend | GPA-002, GPA-004 | GatewayExchange fires hooks instead of direct adapter calls; registers with AdapterRegistry; backward compatible | TBD | 317 |
+| GPA-008 | Add hook calls to message flow (inbound/outbound) | Not Started | Phase 2+ | Backend | GPA-007 | Hooks fired at appropriate points: message:received, message:beforePersist, message:persisted, message:send, message:sent, message:failed | TBD | 318 |
+| GPA-009 | Update integration tests for hook-based architecture | Not Started | Phase 2+ | Backend | GPA-005, GPA-006, GPA-007 | All existing integration tests pass; hook execution verified; adapter registration tested | TBD | 319 |
+| GPA-010 | Create migration guide documentation | Not Started | Phase 2+ | Backend | GPA-009 | Documentation in `.docs/` explaining how to create new adapters; hook reference complete; examples provided | TBD | 320 |
+
 ### Backend Tasks
 
 | ID | Task | Status | Phase | Assignee | Dependencies | Acceptance Criteria | Project Item ID | Issue ID |
