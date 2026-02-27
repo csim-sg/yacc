@@ -16,6 +16,7 @@
 import type { EventEmitter } from 'events';
 import type {
   AdapterStatus,
+  HealthCheckResult,
   InboundMessageEvent,
   OutboundMessagePayload,
   Platform,
@@ -113,25 +114,39 @@ export type HealthCheckResultEnhanced = {
  * Extends EventEmitter for event-driven architecture.
  *
  * @template TConfig - Adapter-specific configuration type
+ *
+ * @remarks
+ * Backward Compatibility (GPA-003):
+ * - `metadata` is optional: existing adapters work without implementing it
+ * - `configure` is optional: adapters can use their own config pattern (e.g., setConfig)
+ * - `healthCheck` returns HealthCheckResult: enhanced result available via optional getEnhancedHealth()
+ * - `platform` is required: provides the base platform identifier
+ *
+ * New adapters should implement `metadata` and `configure` for full feature support.
  */
 export interface PlatformAdapter<TConfig extends BaseAdapterConfig = BaseAdapterConfig>
   extends EventEmitter {
   // ========================================
-  // Metadata (read-only, provided at creation)
+  // Required Properties
   // ========================================
 
-  /** Adapter metadata (platform, displayName, version, capabilities) */
-  readonly metadata: AdapterMetadata;
+  /** Platform identifier (e.g., 'telegram', 'irc') */
+  readonly platform: PlatformType;
 
   /** Current adapter status */
   readonly status: AdapterStatus;
 
   // ========================================
-  // Legacy property (for backward compatibility)
+  // Optional Metadata (for enhanced adapters)
   // ========================================
 
-  /** Platform identifier (deprecated: use metadata.platform) */
-  readonly platform: Platform;
+  /**
+   * Adapter metadata (platform, displayName, version, capabilities)
+   *
+   * Optional for backward compatibility. New adapters should implement this
+   * for capability detection and display purposes.
+   */
+  readonly metadata?: AdapterMetadata;
 
   // ========================================
   // Configuration
@@ -140,10 +155,14 @@ export interface PlatformAdapter<TConfig extends BaseAdapterConfig = BaseAdapter
   /**
    * Configure adapter with runtime configuration
    *
+   * Optional for backward compatibility. Adapters can use their own config
+   * pattern (e.g., setConfig method). New adapters should implement this
+   * for standardized configuration.
+   *
    * @param config - Configuration object
    * @returns true if configuration is valid, false otherwise
    */
-  configure(config: TConfig): boolean;
+  configure?(config: TConfig): boolean;
 
   // ========================================
   // Lifecycle
@@ -176,9 +195,16 @@ export interface PlatformAdapter<TConfig extends BaseAdapterConfig = BaseAdapter
   /**
    * Check adapter health
    *
-   * @returns Health check result
+   * @returns Health check result with basic status
    */
-  healthCheck(): Promise<HealthCheckResultEnhanced>;
+  healthCheck(): Promise<HealthCheckResult>;
+
+  /**
+   * Check adapter health with enhanced details (optional)
+   *
+   * @returns Enhanced health check result with status levels
+   */
+  healthCheckEnhanced?(): Promise<HealthCheckResultEnhanced>;
 
   // ========================================
   // Messaging

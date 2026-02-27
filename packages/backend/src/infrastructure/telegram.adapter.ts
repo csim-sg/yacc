@@ -21,10 +21,13 @@ import type {
   HealthCheckResult,
   InboundMessageEvent,
   OutboundMessagePayload,
-  Platform,
   SendResult,
 } from '../types/gateway.types';
-import type { PlatformAdapter } from './types/adapter.interface';
+import type {
+  AdapterMetadata,
+  BaseAdapterConfig,
+  PlatformAdapter,
+} from './types/adapter.interface';
 
 /**
  * Telegram Adapter Configuration
@@ -33,6 +36,12 @@ export interface TelegramAdapterConfig {
   botToken: string;
   botName?: string;
 }
+
+type TelegramRuntimeConfig = BaseAdapterConfig & {
+  credentials?: {
+    botToken?: string;
+  };
+};
 
 /**
  * Telegram API response type
@@ -78,9 +87,28 @@ type TelegramUpdate = {
  *
  * Implements PlatformAdapter for Telegram Bot API.
  */
-export class TelegramAdapter extends EventEmitter implements PlatformAdapter {
-  readonly platform: Platform = 'telegram';
+export class TelegramAdapter extends EventEmitter implements PlatformAdapter<TelegramRuntimeConfig> {
+  readonly platform = 'telegram';
   status: AdapterStatus = 'disconnected';
+
+  /**
+   * Adapter metadata for capability detection
+   */
+  readonly metadata: AdapterMetadata = {
+    platform: 'telegram',
+    displayName: 'Telegram',
+    version: '1.0.0',
+    capabilities: [
+      'send_text',
+      'send_attachments',
+      'receive_text',
+      'receive_attachments',
+      'delete_message',
+      'update_message',
+      'typing_indicator',
+      'reactions',
+    ],
+  };
 
   private config: TelegramAdapterConfig | null = null;
   private baseUrl = 'https://api.telegram.org';
@@ -94,6 +122,22 @@ export class TelegramAdapter extends EventEmitter implements PlatformAdapter {
    */
   setConfig(config: TelegramAdapterConfig): void {
     this.config = config;
+  }
+
+  /**
+   * Configure adapter with runtime configuration (PlatformAdapter interface)
+   *
+   * @param config - Configuration object (uses BaseAdapterConfig structure)
+   * @returns true if configuration is valid
+   */
+  configure(config: TelegramRuntimeConfig): boolean {
+    if (!config.credentials?.botToken) {
+      return false;
+    }
+    this.config = {
+      botToken: config.credentials.botToken,
+    };
+    return true;
   }
 
   /**

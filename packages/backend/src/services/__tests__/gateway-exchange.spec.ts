@@ -11,7 +11,6 @@ import type { PlatformAdapter } from '../../infrastructure/types/adapter.interfa
 import type {
   InboundMessageEvent,
   OutboundMessagePayload,
-  Platform,
   SendResult,
 } from '../../types/gateway.types';
 import { GatewayExchange } from '../gateway-exchange';
@@ -318,7 +317,7 @@ describe('GatewayExchange', () => {
 
     it('should handle health check errors gracefully', async () => {
       class FailingAdapter extends EventEmitter implements PlatformAdapter {
-        readonly platform: Platform = 'telegram';
+        readonly platform = 'telegram';
         status = 'error' as const;
         async connect(): Promise<void> {}
         async disconnect(): Promise<void> {}

@@ -22,10 +22,13 @@ import type {
   HealthCheckResult,
   InboundMessageEvent,
   OutboundMessagePayload,
-  Platform,
   SendResult,
 } from '../types/gateway.types';
-import type { PlatformAdapter } from './types/adapter.interface';
+import type {
+  AdapterMetadata,
+  BaseAdapterConfig,
+  PlatformAdapter,
+} from './types/adapter.interface';
 
 /**
  * IRC Adapter Configuration
@@ -38,6 +41,16 @@ export interface IRCAdapterConfig {
   channels: string[];
   profileId?: number;
 }
+
+type IRCRuntimeConfig = BaseAdapterConfig & {
+  credentials?: {
+    server?: string;
+    port?: number;
+    nick?: string;
+    password?: string;
+    channels?: string[];
+  };
+};
 
 /**
  * Connection timeout in milliseconds
@@ -54,9 +67,24 @@ const MAX_MESSAGE_LENGTH = 400;
  *
  * Implements PlatformAdapter for IRC networks.
  */
-export class IRCAdapter extends EventEmitter implements PlatformAdapter {
-  readonly platform: Platform = 'irc';
+export class IRCAdapter extends EventEmitter implements PlatformAdapter<IRCRuntimeConfig> {
+  readonly platform = 'irc';
   status: AdapterStatus = 'disconnected';
+
+  /**
+   * Adapter metadata for capability detection
+   */
+  readonly metadata: AdapterMetadata = {
+    platform: 'irc',
+    displayName: 'IRC',
+    version: '1.0.0',
+    capabilities: [
+      'send_text',
+      'receive_text',
+      'presence',
+      'typing_indicator',
+    ],
+  };
 
   private client: IRCClient | null = null;
   private config: IRCAdapterConfig | null = null;
@@ -75,6 +103,27 @@ export class IRCAdapter extends EventEmitter implements PlatformAdapter {
   setConfig(config: IRCAdapterConfig): void {
     this.config = config;
     this.profileId = config.profileId;
+  }
+
+  /**
+   * Configure adapter with runtime configuration (PlatformAdapter interface)
+   *
+   * @param config - Configuration object (uses BaseAdapterConfig structure)
+   * @returns true if configuration is valid
+   */
+  configure(config: IRCRuntimeConfig): boolean {
+    const creds = config.credentials;
+    if (!creds?.server || !creds?.nick) {
+      return false;
+    }
+    this.config = {
+      server: creds.server,
+      port: creds.port ?? 6667,
+      nick: creds.nick,
+      password: creds.password,
+      channels: creds.channels ?? [],
+    };
+    return true;
   }
 
   /**

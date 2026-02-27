@@ -6,7 +6,17 @@
  * @see GPA-003 - Enhanced PlatformAdapter Interface
  */
 
+/* eslint-disable max-classes-per-file */
+
+import { EventEmitter } from 'events';
 import { describe, expect, it } from 'vitest';
+import type {
+  AdapterStatus,
+  HealthCheckResult,
+  InboundMessageEvent,
+  OutboundMessagePayload,
+  SendResult,
+} from '../../../types/gateway.types';
 import type {
   AdapterCapability,
   AdapterEventHandlers,
@@ -16,7 +26,6 @@ import type {
   PlatformAdapter,
   PlatformType,
 } from '../adapter.interface';
-import type { InboundMessageEvent } from '../../../types/gateway.types';
 
 describe('PlatformAdapter Interface Types', () => {
   describe('PlatformType', () => {
@@ -171,19 +180,17 @@ describe('PlatformAdapter Interface Types', () => {
   });
 
   describe('PlatformAdapter Interface', () => {
-    it('should define required metadata property', () => {
+    it('should define optional metadata property', () => {
       // This test verifies the interface compiles correctly
-      type TestAdapter = PlatformAdapter<BaseAdapterConfig>;
-
-      // TypeScript will error if interface doesn't have these properties
-      const requiredMetadata: AdapterMetadata = {
+      // metadata is optional for backward compatibility
+      const optionalMetadata: AdapterMetadata | undefined = {
         platform: 'telegram',
         displayName: 'Telegram',
         version: '1.0.0',
         capabilities: ['send_text'],
       };
 
-      expect(requiredMetadata.platform).toBe('telegram');
+      expect(optionalMetadata.platform).toBe('telegram');
     });
 
     it('should define configure method', () => {
@@ -220,11 +227,10 @@ describe('PlatformAdapter Interface Types', () => {
     });
 
     it('should be generic for config type', () => {
-      // Test generic type parameter
-      type TelegramConfig = BaseAdapterConfig & { botToken: string };
-      type TelegramAdapter = PlatformAdapter<TelegramConfig>;
+      type _TelegramConfig = BaseAdapterConfig & { botToken: string };
+      type _TelegramAdapter = PlatformAdapter<_TelegramConfig>;
 
-      const config: TelegramConfig = {
+      const config: _TelegramConfig = {
         id: '1',
         name: 'Telegram',
         key: 'telegram',
@@ -235,16 +241,131 @@ describe('PlatformAdapter Interface Types', () => {
 
       expect(config.botToken).toBe('secret');
     });
-  });
 
-  describe('Backward Compatibility', () => {
-    it('should include legacy platform property', () => {
+    it('should accept legacy platform property in interface', () => {
       // The interface should still have the legacy platform property
       // for backward compatibility with existing adapters
       type LegacyProperty = { readonly platform: 'telegram' | 'irc' };
 
       const adapter: LegacyProperty = { platform: 'telegram' };
       expect(adapter.platform).toBe('telegram');
+    });
+
+    it('should accept HealthCheckResult return type', () => {
+      // healthCheck returns HealthCheckResult (not enhanced)
+      const result: HealthCheckResult = {
+        healthy: true,
+      };
+
+      expect(result.healthy).toBe(true);
+    });
+
+    it('should accept healthCheckResultEnhanced type', () => {
+      const result: HealthCheckResultEnhanced = {
+        status: 'healthy',
+        lastCheck: new Date(),
+      };
+
+      expect(result.status).toBe('healthy');
+    });
+
+    it('should accept adapter eventHandlers', () => {
+      const handlers: AdapterEventHandlers = {
+        'message:inbound': (_event: InboundMessageEvent) => {},
+        'adapter:connected': () => {},
+        'adapter:disconnected': (_event: { reason: string }) => {},
+        'adapter:error': (_error: Error) => {},
+      };
+
+      expect(handlers).toBeDefined();
+    });
+
+    it('should verify interface can be implemented by an adapter', () => {
+      // Create a minimal adapter that implements the new PlatformAdapter interface
+      class MinimalAdapter extends EventEmitter implements PlatformAdapter {
+        readonly platform = 'telegram';
+        status: AdapterStatus = 'disconnected';
+
+        /**
+         * Adapter metadata (optional, capability detection)
+         */
+        readonly metadata: AdapterMetadata = {
+          platform: 'telegram',
+          displayName: 'Telegram',
+          version: '1.0.0',
+          capabilities: ['send_text', 'receive_text'],
+        };
+
+        async connect(): Promise<void> {
+          this.status = 'connecting';
+          this.status = 'connected';
+          this.emit('adapter:connected');
+        }
+
+        async disconnect(): Promise<void> {
+          this.status = 'disconnected';
+          this.emit('adapter:disconnected', { reason: 'manual' });
+        }
+
+        async healthCheck(): Promise<HealthCheckResult> {
+          return { healthy: this.status === 'connected' };
+        }
+
+        async send(_message: OutboundMessagePayload): Promise<SendResult> {
+          return { success: true, timestamp: new Date() };
+        }
+
+        // Helper to simulate inbound message
+        simulateInboundMessage(event: InboundMessageEvent): void {
+          this.emit('message:inbound', event);
+        }
+      }
+
+      const minimalAdapter = new MinimalAdapter();
+      expect(minimalAdapter.platform).toBe('telegram');
+      expect(minimalAdapter.metadata).toBeDefined();
+    });
+
+    it('should be able to create a minimal adapter without metadata', () => {
+      // Create a minimal adapter that does NOT implement metadata (backward compatible)
+      class MinimalAdapterNoMetadata extends EventEmitter implements PlatformAdapter {
+        readonly platform = 'irc';
+        status: AdapterStatus = 'disconnected';
+
+        async connect(): Promise<void> {
+          this.status = 'connecting';
+          this.status = 'connected';
+          this.emit('adapter:connected');
+        }
+
+        async disconnect(): Promise<void> {
+          this.status = 'disconnected';
+          this.emit('adapter:disconnected', { reason: 'manual' });
+        }
+
+        async healthCheck(): Promise<HealthCheckResult> {
+          return { healthy: this.status === 'connected' };
+        }
+
+        async send(_message: OutboundMessagePayload): Promise<SendResult> {
+          return { success: true, timestamp: new Date() };
+        }
+      }
+
+      const minimalAdapterNoMetadata = new MinimalAdapterNoMetadata();
+      const adapter: PlatformAdapter = minimalAdapterNoMetadata;
+      expect(adapter.platform).toBe('irc');
+      expect(adapter.metadata).toBeUndefined();
+    });
+
+    it('should accept healthCheckResultEnhanced as optional method', () => {
+      // Adapter that, healthCheckEnhanced returns enhanced result
+      const result: HealthCheckResultEnhanced = {
+        status: 'healthy',
+        lastCheck: new Date(),
+      };
+
+      expect(result.status).toBe('healthy');
     });
   });
 });
