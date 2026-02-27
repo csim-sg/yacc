@@ -31,6 +31,7 @@ import type {
  */
 export type PlatformType = Platform | 'whatsapp' | 'wechat' | 'meta' | 'x' | 'slack' | 'email';
 
+
 /**
  * Adapter Capabilities
  *
