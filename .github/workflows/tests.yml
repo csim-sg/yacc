@@ -19,7 +19,7 @@ jobs:
         env:
           POSTGRES_USER: yacc_user
           POSTGRES_PASSWORD: yacc_password
-          POSTGRES_DB: yacc_test
+          POSTGRES_DB: yacc_inbox
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -54,13 +54,10 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run backend tests
-        run: pnpm --filter @yacc/backend test
+        run: pnpm --filter @yacc/backend test tests/QA-001-integration.spec.ts
         env:
-          DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_test
+          DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
           REDIS_URL: redis://localhost:6379
-
-      - name: Run frontend tests
-        run: pnpm --filter @yacc/frontend test

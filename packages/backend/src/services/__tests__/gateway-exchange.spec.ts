@@ -6,12 +6,11 @@
 
 import { EventEmitter } from 'events';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { MockAdapter } from '../../../tests/utils/MockAdapter';
+import { MockAdapter } from '../../../tests/utils/mock-adapter';
 import type { PlatformAdapter } from '../../infrastructure/types/adapter.interface';
 import type {
   InboundMessageEvent,
   OutboundMessagePayload,
-  Platform,
   SendResult,
 } from '../../types/gateway.types';
 import { GatewayExchange } from '../gateway-exchange';
@@ -318,7 +317,7 @@ describe('GatewayExchange', () => {
 
     it('should handle health check errors gracefully', async () => {
       class FailingAdapter extends EventEmitter implements PlatformAdapter {
-        readonly platform: Platform = 'telegram';
+        readonly platform = 'telegram';
         status = 'error' as const;
         async connect(): Promise<void> {}
         async disconnect(): Promise<void> {}
