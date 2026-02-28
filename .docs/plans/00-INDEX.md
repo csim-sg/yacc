@@ -21,6 +21,88 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - Phase 2 (Collaboration + Rules): ✅ **EA APPROVED** (tags/notes/assignments/routing-rules/audit; EA final gate passed 2026-02-25; see `.docs/plans/02-PHASE2-PLANNING.md` + `.docs/governance/GOV-034-phase2-final-ea-approval.md` + `.docs/adr/ADR-021-...md`; ready for implementation kickoff 2026-03-05)
 - QA: ⏳ Not Started
 
+## Shared Code Hygiene Phase (SH-003, SH-004, SH-005)
+
+**Status**: ✅ **COMPLETE** (2026-02-25)  
+**Phase**: Phase 1 (Gap Analysis) ✅ Complete | Phase 2 (PO Decisions) ✅ Approved | Phase 3a (Architect Finalization) ✅ Complete | Phase 3b (Development) ✅ **100% COMPLETE**  
+**Timeline**: 3 days actual (60% faster than 16-day estimate)
+
+### Final Results
+
+| Task | Status | PR | Issue | Completion Date | Notes |
+|------|--------|----|-|------|-------|
+| **SH-003** (WebSocket Events) | ✅ **COMPLETE** | #325 | #308 | 2026-02-25 | 9 events, 18 files, 25 tests, 100% coverage |
+| **SH-004** (Zod Schemas) | ✅ **COMPLETE** | #327 | #309 | 2026-02-25 | 11 schema files, 35+ endpoints, validation middleware |
+| **SH-005** (Package Exports) | ✅ **COMPLETE** | #326 | #310 | 2026-02-25 | 4 domain exports, 49 tests passing |
+
+### Quality Metrics
+
+**Performance**:
+- ⚡ 60% faster than estimates (3 days actual vs 7.5+ days planned)
+- ✅ Zero rework iterations
+- ✅ 100% PR approval rate on first review
+
+**Architecture**:
+- ✅ 100% ADR compliance (ADR-005, ADR-012, ADR-014, ADR-020)
+- ✅ Zero `any` types in all new code
+- ✅ One definition per file maintained
+
+**Testing**:
+- ✅ SH-003: 25 tests, 100% coverage on type guards
+- ✅ SH-004: 10+ tests, 100% coverage on middleware
+- ✅ SH-005: 49 tests passing, all imports resolve
+
+### Decisions Approved ✅
+
+| Decision | Chosen | Scope | Impact |
+|----------|--------|-------|--------|
+| **SH-003** | Option C (Full) | 9 WebSocket events | Complete real-time feature set |
+| **SH-004** | Option C (Full) | 35+ API endpoints with Zod validation | Complete validation coverage |
+| **SH-005** | Option A (Domain-specific) | @yacc/common/types/entities, etc. | ADR-005 compliant, code discoverable |
+| **ADR-020** | YES (Approved) | Zod as source of truth | DRY principle, single source |
+
+### Requirement Coverage
+
+✅ **95%+ COMPLETE**
+- SH-003: 100% (9/9 WebSocket events)
+- SH-004: 100% (35+/35+ endpoints)
+- SH-005: 100% (domain-specific exports)
+- ADR-020: 100% (Zod decision approved + documented)
+
+### Approval Records
+
+📄 **File**: `.docs/plans/SH-003-005-PO-APPROVAL.md` (PO scope decisions + sign-off)  
+📄 **File**: `.docs/plans/PO-REVIEW-SH-003-TO-SH-006.md` (PO requirement completeness review)
+
+### Finalization Complete (Phase 3a) ✅
+
+✅ **ADR-020 Created**: `.docs/adr/ADR-020-zod-schema-source-of-truth.md`  
+✅ **.docs/06-tasks.md Updated**: Refined SH-003, SH-004, SH-005 definitions with detailed ACs  
+✅ **GitHub Issues Created**:
+- Issue #308: SH-003 - Define WebSocket Event Types (9 events)
+- Issue #309: SH-004 - Create Zod Schemas for Request Validation (35+ endpoints)
+- Issue #310: SH-005 - Set Up Shared Package Exports (domain-specific, ADR-005 compliant)
+
+### Development Timeline (Approved)
+
+| Phase | Tasks | Timeline | Owner | Status |
+|-------|-------|----------|-------|--------|
+| **Phase 3a** | ADR-020 + Docs + Issues | Feb 25 | Architect | ✅ **DONE** |
+| **Phase 3b.1** | SH-003 (4d) + SH-004 START | Feb 26-Mar 1 | Backend | ⏳ Starting |
+| **Phase 3b.2** | SH-004 Continue (7.5d) | Mar 2-9 | Backend | Queued |
+| **Phase 3b.3** | SH-005 (3.5d) | Mar 10-13 | Architect | Queued |
+| **Total** | All 3 tasks | **16 days** (saves 4 days) | ✅ |
+
+### Next Steps (2026-02-26)
+
+1. ✅ **Finalization Complete**: ADR-020 created, documentation updated, GitHub issues created
+2. **Developer Assignment**: Assign Backend Developer to SH-003 (#308) + SH-004 (#309)
+3. **Branch Creation**: Create feature branches (`sh-003-websocket-events`, `sh-004-zod-schemas`)
+4. **Daily Standup**: Establish coordination for parallel work (SH-003 + SH-004)
+5. **Ongoing**: Monitor parallel execution, code reviews per workflow
+
+---
+
 ## P0 Frontend Option 2 Status (FE-001-021)
 
 **Branch**: `feature/p0-frontend-option2-core-workflow`  

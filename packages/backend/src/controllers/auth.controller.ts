@@ -12,18 +12,21 @@
  *
  * @updated DEV-002: Now uses AuthenticationService as single entry point
  * @see ADR-005 Addendum-2 - Auth Service Consolidation
+ * @see ADR-020 - Zod validation decorators
  */
 
 import { eq } from 'drizzle-orm';
 import type { Request, Response } from 'express';
-import { All, JsonController, Post, Req, Res, Body, BadRequestError, UseBefore } from 'routing-controllers';
+import { All, JsonController, Post, Req, Res, BadRequestError, UseBefore } from 'routing-controllers';
+import { ForgotPasswordRequestSchema, ResetPasswordRequestSchema } from '@yacc/common/schemas';
 import { betterAuthClient } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
 import { loginRateLimiter, passwordResetRateLimiter } from '../middleware/rateLimit.middleware';
+import { ValidateBody } from '../decorators/validate-body.decorator';
 import { users } from '../schemas/user.schema';
 import { authenticationService } from '../services/authentication.service';
-import { ForgotPasswordSchema, ResetPasswordSchema } from '../types/passwordReset.schema';
+import type { ValidatedRequest } from '../types/validated-request.type';
 
 interface AuthenticatedRequest extends Request {
   correlationId?: string;
@@ -43,13 +46,16 @@ export class AuthController {
    * Response: { "message": "If an email exists, a password reset link has been sent" }
    */
   @Post('/forgot-password')
+  @ValidateBody(ForgotPasswordRequestSchema)
   @UseBefore(passwordResetRateLimiter)
-  async forgotPassword(@Body() body: unknown, @Req() req: AuthenticatedRequest): Promise<{ message: string }> {
+  async forgotPassword(
+    @Req() req: ValidatedRequest<typeof ForgotPasswordRequestSchema>
+  ): Promise<{ message: string }> {
     const correlationId = req.correlationId || 'unknown';
 
     try {
-      // Validate input using Zod schema
-      const { email } = ForgotPasswordSchema.parse(body);
+      // Get validated email from request
+      const { email } = req.validated.body;
 
       // Try to find user
       const userResult = await dbClient.select().from(users).where(eq(users.email, email)).limit(1);
@@ -91,24 +97,24 @@ export class AuthController {
    * Reset password using token
    * Rate limited to prevent abuse
    *
-   * Request: { "token": "64-char-hex-token", "newPassword": "NewPassword123!" }
+   * Request: { "token": "64-char-hex-token", "password": "NewPassword123!" }
    * Response: { "success": true, "message": "Password reset successfully" }
    * Error: 400 { "error": "Invalid or expired token" }
    */
   @Post('/reset-password')
+  @ValidateBody(ResetPasswordRequestSchema)
   @UseBefore(passwordResetRateLimiter)
   async resetPasswordHandler(
-    @Body() body: unknown,
-    @Req() req: AuthenticatedRequest,
+    @Req() req: ValidatedRequest<typeof ResetPasswordRequestSchema>
   ): Promise<{ success: boolean; message: string }> {
     const correlationId = req.correlationId || 'unknown';
 
     try {
-      // Validate input using Zod schema
-      const { token, newPassword } = ResetPasswordSchema.parse(body);
+      // Get validated data from request
+      const { token, password } = req.validated.body;
 
       // Reset password using authentication service (DEV-002)
-      await authenticationService.completePasswordReset(token, newPassword, correlationId);
+      await authenticationService.completePasswordReset(token, password, correlationId);
 
       logger.info('Password reset successful - correlationId: %s', correlationId);
 

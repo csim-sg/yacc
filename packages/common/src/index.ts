@@ -127,3 +127,45 @@ export {
   parseRuleConditionOperator,
   parseRuleActionType,
 } from './constants/routingRules.constant';
+
+// WebSocket Event Types (SH-003)
+export type {
+  WebSocketEvent,
+  WebSocketEventName,
+  BaseEvent,
+  // Message events
+  MessageReceivedEvent,
+  MessageReceivedPayload,
+  MessageSentEvent,
+  MessageSentPayload,
+  MessageFailedEvent,
+  MessageFailedPayload,
+  // Conversation events
+  ConversationUpdatedEvent,
+  ConversationUpdatedPayload,
+  ConversationUpdatedFields,
+  ConversationReopenedEvent,
+  ConversationReopenedPayload,
+  ConversationReopenedReason,
+  ConversationSummary,
+  // Notification events
+  NotificationReceivedEvent,
+  NotificationReceivedPayload,
+  NotificationConversationPreview,
+  // Presence events
+  PresenceUpdatedEvent,
+  PresenceUpdatedPayload,
+  PresenceStatus,
+  TypingStartedEvent,
+  TypingStartedPayload,
+  TypingStoppedEvent,
+  TypingStoppedPayload,
+} from './types/events';
+
+// WebSocket Event Type Guards (SH-003)
+export {
+  isMessageEvent,
+  isConversationEvent,
+  isNotificationEvent,
+  isPresenceEvent,
+} from './types/events';

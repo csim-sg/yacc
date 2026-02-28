@@ -1,10 +1,11 @@
 /**
  * Express Type Augmentations
- * Adds auth properties to Express Request type globally
+ * Adds auth properties and validated data to Express Request type globally
  */
 
 import type { Logger } from 'pino';
 import type { AuthUser } from './auth.types';
+import type { ValidatedData } from '../middleware/validation.middleware';
 
 declare module 'express' {
   interface Request {
@@ -31,5 +32,13 @@ declare module 'express' {
      * Pino logger with correlation ID (attached by request-logging middleware)
      */
     logger?: Logger;
+
+    /**
+     * Validated request data (attached by validation middleware)
+     * Contains validated body, query, and params after @ValidateX decorators
+     *
+     * @see ValidatedRequest for type-safe access
+     */
+    validated?: ValidatedData;
   }
 }
