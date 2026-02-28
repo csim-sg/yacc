@@ -6,7 +6,7 @@
 
 import { EventEmitter } from 'events';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { MockAdapter } from '../../../tests/utils/MockAdapter';
+import { MockAdapter } from '../../../tests/utils/mock-adapter';
 import type { PlatformAdapter } from '../../infrastructure/types/adapter.interface';
 import type {
   InboundMessageEvent,
