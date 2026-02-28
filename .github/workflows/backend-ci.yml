@@ -85,7 +85,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Lint changed backend files
         if: needs.changed-files.outputs.backend-files != ''
@@ -145,7 +145,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run backend unit tests (curated stable subset)
         run: pnpm --filter @yacc/backend test src/services/__tests__/irc-ingestion.service.test.ts
@@ -203,7 +203,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run backend smoke tests (integration test with Supertest against in-process backend)
         run: pnpm --filter @yacc/backend test tests/QA-001-integration.spec.ts
@@ -264,7 +264,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run full backend test suite
         run: pnpm --filter @yacc/backend test
