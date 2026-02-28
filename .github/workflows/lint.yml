@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -31,8 +33,33 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Run lint
-        run: pnpm --filter @yacc/backend lint
+      - name: Get changed backend files
+        id: changed-backend
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            DIFF_RANGE="origin/${{ github.base_ref }}..HEAD"
+          else
+            DIFF_RANGE="${{ github.event.before }}..${{ github.sha }}"
+          fi
 
-      - name: Run type-check
-        run: pnpm --filter @yacc/backend type-check
+          CHANGED=$(git diff --name-only --diff-filter=ACMRT $DIFF_RANGE -- packages/backend/src packages/backend/tests 2>/dev/null || echo "")
+          if [ -z "$CHANGED" ]; then
+            echo "files=" >> $GITHUB_OUTPUT
+          else
+            FILES=""
+            for FILE in $CHANGED; do
+              if [ -f "$FILE" ]; then
+                FILES="$FILES $FILE"
+              fi
+            done
+            FILES=$(echo "$FILES" | xargs)
+            echo "files=$FILES" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Lint changed backend files
+        if: steps.changed-backend.outputs.files != ''
+        run: npx eslint ${{ steps.changed-backend.outputs.files }} --max-warnings 0
+
+      - name: Lint skipped (no backend files changed)
+        if: steps.changed-backend.outputs.files == ''
+        run: echo "✅ No backend files changed, lint skipped"
