@@ -8,6 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { logger } from '../../infrastructure/logger';
 import type {
   GatewayHook,
   HookContext,
@@ -26,8 +27,6 @@ vi.mock('../../infrastructure/logger', () => ({
   },
 }));
 
-// Import mocked logger after mock definition
-import { logger } from '../../infrastructure/logger';
 
 // Mock appConfig with mutable log level via vi.stubEnv
 describe('GatewayHooks', () => {

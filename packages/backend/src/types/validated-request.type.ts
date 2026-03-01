@@ -9,8 +9,7 @@
  */
 
 import type { Request } from 'express';
-import type { z } from 'zod';
-import type { ValidatedData } from '../middleware/validation.middleware';
+import type { ValidatedData as ValidationMiddlewareData } from '../middleware/validation.middleware';
 
 /**
  * Generic schema type for type inference (works with both Zod 3 and Zod 4)
@@ -83,4 +82,4 @@ export type ValidatedQuery<T extends ValidatedRequest> = T['validated']['query']
 export type ValidatedParams<T extends ValidatedRequest> = T['validated']['params'];
 
 // Re-export ValidatedData for convenience
-export type { ValidatedData } from '../middleware/validation.middleware';
+export type ValidatedData = ValidationMiddlewareData;

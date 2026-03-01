@@ -9,8 +9,8 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
-import { ZodError } from 'zod';
 import { HttpError } from 'routing-controllers';
+import { ZodError } from 'zod';
 import { logger } from '../infrastructure/logger';
 
 /**
