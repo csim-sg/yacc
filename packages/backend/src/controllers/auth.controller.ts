@@ -15,22 +15,18 @@
  * @see ADR-020 - Zod validation decorators
  */
 
+import { ForgotPasswordRequestSchema, ResetPasswordRequestSchema } from '@yacc/common/schemas';
 import { eq } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 import { All, JsonController, Post, Req, Res, BadRequestError, UseBefore } from 'routing-controllers';
-import { ForgotPasswordRequestSchema, ResetPasswordRequestSchema } from '@yacc/common/schemas';
+import { ValidateBody } from '../decorators/validate-body.decorator';
 import { betterAuthClient } from '../infrastructure/better-auth.client';
 import { dbClient } from '../infrastructure/db.client';
 import { logger } from '../infrastructure/logger';
 import { loginRateLimiter, passwordResetRateLimiter } from '../middleware/rateLimit.middleware';
-import { ValidateBody } from '../decorators/validate-body.decorator';
 import { users } from '../schemas/user.schema';
 import { authenticationService } from '../services/authentication.service';
 import type { ValidatedRequest } from '../types/validated-request.type';
-
-interface AuthenticatedRequest extends Request {
-  correlationId?: string;
-}
 
 // TODO: Implement EmailService in infrastructure layer
 // import { emailService } from '../infrastructure/email.client';

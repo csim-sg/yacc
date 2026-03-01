@@ -6,11 +6,13 @@
  * @see ADR-020 - Zod validation decorators (partial implementation)
  */
 
+import { BaseListRequest } from '@yacc/common/requests/base-list.request';
 import type { AssignRequest } from '@yacc/common/requests/conversations/assign.request';
 import type { ListConversationsRequest } from '@yacc/common/requests/conversations/listConversations.request';
 import type { UpdatePriorityRequest } from '@yacc/common/requests/conversations/updatePriority.request';
 import type { UpdateStatusRequest } from '@yacc/common/requests/conversations/updateStatus.request';
 import { BaseListResponse } from '@yacc/common/responses/base-list.response';
+import { ConversationParamsSchema } from '@yacc/common/schemas';
 import type { Request } from 'express';
 import {
   JsonController,
@@ -24,9 +26,7 @@ import {
   HttpCode,
   BadRequestError,
 } from 'routing-controllers';
-import { ConversationParamsSchema } from '@yacc/common/schemas';
 import { ValidateParams } from '../decorators/validate-params.decorator';
-import { ValidateBody } from '../decorators/validate-body.decorator';
 import { logger } from '../infrastructure/logger';
 import { auditService } from '../services/audit.service';
 import { conversationService } from '../services/conversation.service';
@@ -143,10 +143,10 @@ export class ConversationsController {
       );
 
       // Create a query adapter for BaseListResponse
-      const queryAdapter = {
-        getLimit: () => normalizedQuery.limit || 20,
-        getPage: () => (normalizedQuery.page || 1) - 1, // Convert to 0-indexed
-      };
+      const queryAdapter = new BaseListRequest();
+      queryAdapter.page = normalizedQuery.page ? normalizedQuery.page - 1 : 0;
+      queryAdapter.limit = normalizedQuery.limit || 20;
+      queryAdapter.searchText = normalizedQuery.search || '';
 
       return new BaseListResponse(result.data, result.total, queryAdapter);
     } catch (error) {

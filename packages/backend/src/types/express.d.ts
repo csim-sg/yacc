@@ -4,8 +4,8 @@
  */
 
 import type { Logger } from 'pino';
-import type { AuthUser } from './auth.types';
 import type { ValidatedData } from '../middleware/validation.middleware';
+import type { AuthUser } from './auth.types';
 
 declare module 'express' {
   interface Request {

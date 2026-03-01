@@ -182,9 +182,10 @@ describe('UsersService', () => {
 
   describe('createUser', () => {
     it('should create a new user successfully', async () => {
+      const uniqueEmail = `newuser-${Date.now()}@test.com`;
       const result = await usersService.createUser(
         {
-          email: 'newuser-be006@test.com',
+          email: uniqueEmail,
           password: 'SecurePassword123',
           name: 'New User',
           role: 'admin',
@@ -193,7 +194,7 @@ describe('UsersService', () => {
       );
 
       testUserIds.push(result.id);
-      expect(result.email).toBe('newuser-be006@test.com');
+      expect(result.email).toBe(uniqueEmail);
       expect(result.name).toBe('New User');
       expect(result.role).toBe('admin');
       expect(result.status).toBe('active');

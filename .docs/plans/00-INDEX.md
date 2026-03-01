@@ -16,7 +16,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - Phase 1 Backend: ✅ **COMPLETE** (IRC integration + DLQ contract hardening merged)
 - Phase 1 Frontend (P0 Option 2): ✅ **MERGED** (All 6 blockers fixed, 25+ E2E tests, merged to dev)
 - Phase 1.5 Backend Refactoring (DEV-002-006): ✅ **COMPLETE & MERGED** (Auth consolidation, Gateway-exchange, Adapter migration, Inbound/outbound pipeline refactoring - all 5 tasks complete)
-- Gateway Plugin Architecture (GPA-003/005/006): ⏳ **IN PROGRESS** (PR #323 open; PlatformAdapter enhancement + Telegram/IRC adapter alignment)
+- Gateway Plugin Architecture (GPA-003/004/005/006): ⏳ **IN REVIEW** (PR #324 open for AdapterRegistry, hook lifecycle wiring, and docs/tests)
 - **Infrastructure Phase (DEV-013-015)**: ✅ **COMPLETE & MERGED** (K3s + Helm + GitHub Actions, production-ready)
 - Phase 2 (Collaboration + Rules): ✅ **EA APPROVED** (tags/notes/assignments/routing-rules/audit; EA final gate passed 2026-02-25; see `.docs/plans/02-PHASE2-PLANNING.md` + `.docs/governance/GOV-034-phase2-final-ea-approval.md` + `.docs/adr/ADR-021-...md`; ready for implementation kickoff 2026-03-05)
 - QA: ⏳ Not Started

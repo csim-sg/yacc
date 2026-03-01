@@ -291,4 +291,18 @@ export class GatewayHooks {
       }
     }
   }
+
+  /**
+   * Clear all handlers (alias for clearHandlers())
+   *
+   * Convenience method for clearing all handlers.
+   */
+  clearAll(): void {
+    this.clearHandlers();
+  }
 }
+
+/**
+ * Singleton instance for use across the application
+ */
+export const gatewayHooks = new GatewayHooks();
