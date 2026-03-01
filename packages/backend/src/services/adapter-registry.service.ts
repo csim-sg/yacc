@@ -148,7 +148,11 @@ export class AdapterRegistry {
         platform: config.type,
         error: err,
         key: config.key,
-      }, { adapter }).catch((hookError) => {
+      }, {
+        correlationId: `error-${config.type}-${Date.now()}`,
+        timestamp: Date.now(),
+        metadata: { adapter },
+      }).catch((hookError) => {
         logger.warn({ platform: config.type, error: hookError.message }, 'Hook adapter:error failed');
       });
 
@@ -176,10 +180,10 @@ export class AdapterRegistry {
     try {
       await adapter.disconnect();
       this.connectedConfigs.delete(type);
+      // Remove ALL keys pointing to this adapter (multi-profile support)
       for (const [key, value] of this.adaptersByKey.entries()) {
         if (value === adapter) {
           this.adaptersByKey.delete(key);
-          break;
         }
       }
       logger.info({ platform: type }, `Disconnected adapter: ${type}`);
@@ -188,7 +192,11 @@ export class AdapterRegistry {
       gatewayHooks.do('adapter:disconnected', {
         platform: type,
         reason,
-      }, { adapter }).catch((error) => {
+      }, {
+        correlationId: `disconnect-${type}-${Date.now()}`,
+        timestamp: Date.now(),
+        metadata: { adapter },
+      }).catch((error) => {
         logger.warn({ platform: type, error: error.message }, 'Hook adapter:disconnected failed');
       });
 
@@ -205,7 +213,11 @@ export class AdapterRegistry {
       gatewayHooks.do('adapter:error', {
         platform: type,
         error: err,
-      }, { adapter }).catch((hookError) => {
+      }, {
+        correlationId: `error-disconnect-${type}-${Date.now()}`,
+        timestamp: Date.now(),
+        metadata: { adapter },
+      }).catch((hookError) => {
         logger.warn({ platform: type, error: hookError.message }, 'Hook adapter:error failed');
       });
 
@@ -366,11 +378,10 @@ export class AdapterRegistry {
     this.adapters.delete(type);
     this.connectedConfigs.delete(type);
 
-    // Remove from key map
+    // Remove ALL keys pointing to this adapter (multi-profile support)
     for (const [key, value] of this.adaptersByKey.entries()) {
       if (value === adapter) {
         this.adaptersByKey.delete(key);
-        break;
       }
     }
 

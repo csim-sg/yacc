@@ -81,8 +81,8 @@ gatewayHooks.on('message:persisted', async (payload, ctx) => {
   };
 });
 
-// Register with priority (lower = earlier, default = 10)
-gatewayHooks.on('message:send', handler, { priority: 5 });
+// Register with priority (higher = earlier, default = 10)
+gatewayHooks.on('message:send', handler, { priority: 20 });
 ```
 
 ### Firing Hooks
@@ -104,13 +104,13 @@ gatewayHooks.do('message:persisted', { messageId, conversationId, direction: 'in
 ### Removing Handlers
 
 ```typescript
-// Keep reference to handler
+// Define handler function
 const myHandler = async (payload, ctx) => { /* ... */ };
 
-// Register
+// Register (on() returns void - keep reference to handler if needed for removal)
 gatewayHooks.on('message:sent', myHandler);
 
-// Later, remove
+// Later, remove using off()
 gatewayHooks.off('message:sent', myHandler);
 ```
 
@@ -336,19 +336,19 @@ All handlers for a hook run in parallel via `Promise.all`. Order is not guarante
 - Throwing is the correct way to indicate failure
 
 ### Priority
-- Lower number = higher priority (runs first)
+- Higher number = earlier execution (runs first)
 - Default priority is 10
 - Use priority to ensure handler order when needed
 
 ```typescript
-// Runs first (priority 1)
-gatewayHooks.on('message:send', validateHandler, { priority: 1 });
+// Runs first (priority 20 - highest)
+gatewayHooks.on('message:send', validateHandler, { priority: 20 });
 
-// Runs second (priority 5)
-gatewayHooks.on('message:send', formatHandler, { priority: 5 });
+// Runs second (priority 15)
+gatewayHooks.on('message:send', formatHandler, { priority: 15 });
 
-// Runs last (priority 20)
-gatewayHooks.on('message:send', sendHandler, { priority: 20 });
+// Runs last (priority 1 - lowest)
+gatewayHooks.on('message:send', sendHandler, { priority: 1 });
 ```
 
 ---
@@ -361,7 +361,7 @@ gatewayHooks.on('message:send', sendHandler, { priority: 20 });
 |-----------|-------------|
 | **Idempotent Registration** | Registering the same handler multiple times creates multiple entries (use `off()` first if needed) |
 | **Immediate Availability** | Handlers are available immediately after `on()` returns |
-| **Cleanup via Unsubscribe** | The function returned by `on()` can be called to remove the handler |
+| **Manual Unsubscribe** | Use `off(handler)` to remove handlers; `on()` returns void |
 | **Source Tracking** | Each handler can specify a `source` for debugging and error attribution |
 
 ### Execution Guarantees
@@ -378,7 +378,7 @@ gatewayHooks.on('message:send', sendHandler, { priority: 20 });
 
 | Guarantee | Description |
 |-----------|-------------|
-| **Priority Order** | Handlers are invoked in priority order (lower = earlier) |
+| **Priority Order** | Handlers are invoked in priority order (higher = earlier) |
 | **Default Priority** | Handlers without explicit priority use default of 10 |
 | **Same Priority** | Order among handlers with same priority is not guaranteed |
 | **Invocation vs Completion** | Invocation order follows priority; completion order is not guaranteed |
@@ -388,8 +388,7 @@ gatewayHooks.on('message:send', sendHandler, { priority: 20 });
 | Guarantee | Description |
 |-----------|-------------|
 | **No Handler Leaks** | Use `off()`, `clearHook()`, or `clearAll()` to remove handlers |
-| **Symbol IDs** | Each handler registration gets a unique Symbol ID for tracking |
-| **Weak References** | Handler references are not held strongly by the unsubscribe function |
+| **Manual Reference** | Keep handler reference if you need to remove it later with `off()` |
 
 ---
 
@@ -442,7 +441,7 @@ The AdapterRegistry supports multiple configuration profiles per platform throug
 |----------|---------------------|---------|
 | **No key specified** | Use platform default adapter | `registry.get('telegram')` |
 | **Key specified** | Look up adapter by key | `registry.getByKey('telegram-sales-bot')` |
-| **Key not found** | Fall back to platform default | `registry.getByKey('unknown-key')` → `registry.get('telegram')` |
+| **Key not found** | Returns `undefined` (no fallback) | `registry.getByKey('unknown-key')` → `undefined` |
 
 ### Key Format Requirements
 

@@ -76,7 +76,7 @@ function createMockAdapter(
       status = 'disconnected';
     }),
     healthCheck: vi.fn(async (): Promise<HealthCheckResultEnhanced> => ({
-      healthy: status === 'connected',
+      status: status === 'connected' ? 'healthy' : 'unhealthy',
       lastCheck: new Date(),
     })),
     send: vi.fn(async (): Promise<SendResult> => ({
@@ -305,7 +305,9 @@ describe('AdapterRegistry Service', () => {
         platform: 'telegram',
         error: expect.any(Error),
         key: 'telegram-main',
-      }, { adapter });
+      }, expect.objectContaining({
+        metadata: { adapter },
+      }));
     });
 
     it('should return accurate boolean from connect', async () => {
@@ -365,7 +367,9 @@ describe('AdapterRegistry Service', () => {
       expect(gatewayHooks.do).toHaveBeenCalledWith('adapter:disconnected', {
         platform: 'telegram',
         reason: 'test_reason',
-      }, { adapter });
+      }, expect.objectContaining({
+        metadata: { adapter },
+      }));
     });
 
     it('should fire adapter:error hook when disconnect throws', async () => {
@@ -380,7 +384,9 @@ describe('AdapterRegistry Service', () => {
       expect(gatewayHooks.do).toHaveBeenCalledWith('adapter:error', {
         platform: 'telegram',
         error: expect.any(Error),
-      }, { adapter });
+      }, expect.objectContaining({
+        metadata: { adapter },
+      }));
     });
 
     it('should return accurate boolean from disconnect', async () => {
@@ -599,12 +605,16 @@ describe('AdapterRegistry Service', () => {
       expect(gatewayHooks.do).toHaveBeenCalledWith('adapter:disconnected', {
         platform: 'telegram',
         reason: 'manual_disconnect',
-      }, { adapter: telegramAdapter });
+      }, expect.objectContaining({
+        metadata: { adapter: telegramAdapter },
+      }));
 
       expect(gatewayHooks.do).toHaveBeenCalledWith('adapter:disconnected', {
         platform: 'irc',
         reason: 'manual_disconnect',
-      }, { adapter: ircAdapter });
+      }, expect.objectContaining({
+        metadata: { adapter: ircAdapter },
+      }));
     });
   });
 
@@ -801,11 +811,13 @@ describe('AdapterRegistry Service', () => {
       // Verify the hook was called with correct context
       const calls = vi.mocked(gatewayHooks.do).mock.calls;
       const disconnectedCall = calls.find(
-        (call) => call[0] === 'adapter:disconnected'
+        (call: unknown[]) => call[0] === 'adapter:disconnected'
       );
       expect(disconnectedCall).toBeDefined();
-      // adapter:disconnected passes { adapter } directly (not wrapped in metadata)
-      expect(disconnectedCall![2]).toEqual({ adapter });
+      // adapter:disconnected now passes full HookContext with adapter in metadata
+      expect(disconnectedCall![2]).toEqual(expect.objectContaining({
+        metadata: { adapter },
+      }));
     });
 
     it('should pass correct context with adapter reference for adapter:error', async () => {
@@ -825,10 +837,13 @@ describe('AdapterRegistry Service', () => {
       // Verify the hook was called with correct context
       const calls = vi.mocked(gatewayHooks.do).mock.calls;
       const errorCall = calls.find(
-        (call) => call[0] === 'adapter:error'
+        (call: unknown[]) => call[0] === 'adapter:error'
       );
       expect(errorCall).toBeDefined();
-      expect(errorCall![2]).toEqual({ adapter });
+      // adapter:error now passes full HookContext with adapter in metadata
+      expect(errorCall![2]).toEqual(expect.objectContaining({
+        metadata: { adapter },
+      }));
     });
 
     it('should include key in adapter:connected payload', async () => {
@@ -847,10 +862,9 @@ describe('AdapterRegistry Service', () => {
 
       const calls = doSpy.mock.calls;
       const connectedCall = calls.find(
-        (call) => call[0] === 'adapter:connected'
+        (call: unknown[]) => call[0] === 'adapter:connected'
       );
       expect(connectedCall).toBeDefined();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect((connectedCall![1] as { config: { key?: string } }).config.key).toBe('telegram-main');
     });
 
@@ -870,11 +884,121 @@ describe('AdapterRegistry Service', () => {
 
       const calls = doSpy.mock.calls;
       const errorCall = calls.find(
-        (call) => call[0] === 'adapter:error'
+        (call: unknown[]) => call[0] === 'adapter:error'
       );
       expect(errorCall).toBeDefined();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect((errorCall![1] as { key?: string }).key).toBe('telegram-main');
+    });
+
+    it('should pass full HookContext with correlationId and timestamp for adapter:error', async () => {
+      const adapter = createMockAdapter('telegram', { connectShouldFail: true });
+      registry.register(adapter);
+
+      const config: BaseAdapterConfig = {
+        id: 'uuid-123',
+        name: 'Main Telegram',
+        key: 'telegram-main',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      await registry.connect(config);
+
+      const calls = doSpy.mock.calls;
+      const errorCall = calls.find(
+        (call: unknown[]) => call[0] === 'adapter:error'
+      );
+      expect(errorCall).toBeDefined();
+      
+      // Verify full HookContext is passed
+      const context = errorCall![2];
+      expect(context).toHaveProperty('correlationId');
+      expect(context).toHaveProperty('timestamp');
+      expect(typeof (context as { correlationId: string }).correlationId).toBe('string');
+      expect(typeof (context as { timestamp: number }).timestamp).toBe('number');
+      expect((context as { metadata?: { adapter?: PlatformAdapter } }).metadata?.adapter).toBe(adapter);
+    });
+
+    it('should pass full HookContext with correlationId and timestamp for adapter:disconnected', async () => {
+      const adapter = createMockAdapter('telegram', { initialStatus: 'connected' });
+      registry.register(adapter);
+
+      await registry.disconnect('telegram', 'test_reason');
+
+      const calls = doSpy.mock.calls;
+      const disconnectedCall = calls.find(
+        (call: unknown[]) => call[0] === 'adapter:disconnected'
+      );
+      expect(disconnectedCall).toBeDefined();
+      
+      // Verify full HookContext is passed
+      const context = disconnectedCall![2];
+      expect(context).toHaveProperty('correlationId');
+      expect(context).toHaveProperty('timestamp');
+      expect(typeof (context as { correlationId: string }).correlationId).toBe('string');
+      expect(typeof (context as { timestamp: number }).timestamp).toBe('number');
+      expect((context as { metadata?: { adapter?: PlatformAdapter } }).metadata?.adapter).toBe(adapter);
+    });
+  });
+
+  describe('Multi-Profile Key Cleanup', () => {
+    it('should remove ALL keys pointing to an adapter on disconnect', async () => {
+      const adapter = createMockAdapter('telegram');
+      registry.register(adapter);
+
+      // Connect with first config
+      const config1: BaseAdapterConfig = {
+        id: 'uuid-1',
+        name: 'Telegram Profile 1',
+        key: 'telegram-profile-1',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      // Connect with first config
+      await registry.connect(config1);
+      // Manually add second key (simulating multi-profile scenario)
+      (registry as unknown as { adaptersByKey: Map<string, PlatformAdapter> }).adaptersByKey.set('telegram-profile-2', adapter);
+
+      // Verify both keys exist
+      expect(registry.getByKey('telegram-profile-1')).toBe(adapter);
+      expect(registry.getByKey('telegram-profile-2')).toBe(adapter);
+
+      // Disconnect should remove ALL keys
+      await registry.disconnect('telegram');
+
+      expect(registry.getByKey('telegram-profile-1')).toBeUndefined();
+      expect(registry.getByKey('telegram-profile-2')).toBeUndefined();
+    });
+
+    it('should remove ALL keys pointing to an adapter on unregister', async () => {
+      const adapter = createMockAdapter('telegram');
+      registry.register(adapter);
+
+      const config: BaseAdapterConfig = {
+        id: 'uuid-1',
+        name: 'Telegram Profile 1',
+        key: 'telegram-profile-1',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      await registry.connect(config);
+      // Manually add additional keys (simulating multi-profile scenario)
+      (registry as unknown as { adaptersByKey: Map<string, PlatformAdapter> }).adaptersByKey.set('telegram-profile-2', adapter);
+      (registry as unknown as { adaptersByKey: Map<string, PlatformAdapter> }).adaptersByKey.set('telegram-profile-3', adapter);
+
+      // Verify all keys exist
+      expect(registry.getByKey('telegram-profile-1')).toBe(adapter);
+      expect(registry.getByKey('telegram-profile-2')).toBe(adapter);
+      expect(registry.getByKey('telegram-profile-3')).toBe(adapter);
+
+      // Unregister should remove ALL keys
+      registry.unregister('telegram');
+
+      expect(registry.getByKey('telegram-profile-1')).toBeUndefined();
+      expect(registry.getByKey('telegram-profile-2')).toBeUndefined();
+      expect(registry.getByKey('telegram-profile-3')).toBeUndefined();
     });
   });
 });
