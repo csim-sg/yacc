@@ -6,6 +6,18 @@
  * @see GPA-004 - AdapterRegistry Service
  */
 
+// Set environment variables before any imports
+process.env.DATABASE_URL = 'postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox';
+process.env.BETTER_AUTH_SECRET = 'test-secret-key-for-better-auth-12345';
+process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-12345';
+process.env.CLOUDFLARE_R2_ENDPOINT = 'https://test.r2.cloudflarestorage.com';
+process.env.CLOUDFLARE_R2_ACCESS_KEY = 'test-access-key';
+process.env.CLOUDFLARE_R2_SECRET_KEY = 'test-secret-key';
+process.env.CLOUDFLARE_R2_BUCKET = 'yacc-test';
+process.env.APP_FRONTEND_URL = 'http://localhost:3000';
+process.env.RESET_PASSWORD_URL = 'http://localhost:3000/reset-password';
+process.env.NODE_ENV = 'test';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   BaseAdapterConfig,
@@ -15,6 +27,7 @@ import type {
 } from '../../infrastructure/types/adapter.interface';
 import type { SendResult } from '../../types/gateway.types';
 import { AdapterRegistry } from '../adapter-registry.service';
+import { gatewayHooks } from '../gateway-hooks';
 
 /**
  * Mock adapter for testing
@@ -63,7 +76,7 @@ function createMockAdapter(
       status = 'disconnected';
     }),
     healthCheck: vi.fn(async (): Promise<HealthCheckResultEnhanced> => ({
-      status: status === 'connected' ? 'healthy' : 'unhealthy',
+      healthy: status === 'connected',
       lastCheck: new Date(),
     })),
     send: vi.fn(async (): Promise<SendResult> => ({
@@ -92,13 +105,26 @@ function createMockAdapter(
 
 describe('AdapterRegistry Service', () => {
   let registry: AdapterRegistry;
+  let doSpy: ReturnType<typeof vi.spyOn>;
+  let onSpy: ReturnType<typeof vi.spyOn>;
+  let offSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     registry = new AdapterRegistry();
+    // Clear all hooks before each test
+    gatewayHooks.clearAll();
+    // Create spies on the real methods
+    doSpy = vi.spyOn(gatewayHooks, 'do');
+    onSpy = vi.spyOn(gatewayHooks, 'on');
+    offSpy = vi.spyOn(gatewayHooks, 'off');
   });
 
   afterEach(() => {
     registry.clear();
+    gatewayHooks.clearAll();
+    doSpy.mockRestore();
+    onSpy.mockRestore();
+    offSpy.mockRestore();
   });
 
   describe('register()', () => {
@@ -131,6 +157,19 @@ describe('AdapterRegistry Service', () => {
 
       expect(registry.getAdapterCount()).toBe(1);
       expect(registry.get('telegram')).toBe(adapter2);
+    });
+
+    it('should fire adapter:registered hook with correct payload', () => {
+      const adapter = createMockAdapter('telegram');
+      registry.register(adapter);
+
+      expect(gatewayHooks.do).toHaveBeenCalledWith('adapter:registered', {
+        platform: 'telegram',
+        adapter,
+        key: undefined,
+      }, expect.objectContaining({
+        metadata: { adapter },
+      }));
     });
   });
 
@@ -219,6 +258,85 @@ describe('AdapterRegistry Service', () => {
 
       expect(registry.getByKey('telegram-main')).toBe(adapter);
     });
+
+    it('should fire adapter:connected hook with correct payload on success', async () => {
+      const adapter = createMockAdapter('telegram');
+      registry.register(adapter);
+
+      const config: BaseAdapterConfig = {
+        id: 'uuid-123',
+        name: 'Main Telegram',
+        key: 'telegram-main',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      await registry.connect(config);
+
+      expect(gatewayHooks.do).toHaveBeenCalledWith('adapter:connected', {
+        platform: 'telegram',
+        config: {
+          id: 'uuid-123',
+          name: 'Main Telegram',
+          key: 'telegram-main',
+          type: 'telegram',
+          enabled: true,
+        },
+      }, expect.objectContaining({
+        metadata: { adapter },
+      }));
+    });
+
+    it('should fire adapter:error hook with correct payload on failure', async () => {
+      const adapter = createMockAdapter('telegram', { connectShouldFail: true });
+      registry.register(adapter);
+
+      const config: BaseAdapterConfig = {
+        id: 'uuid-123',
+        name: 'Main Telegram',
+        key: 'telegram-main',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      await registry.connect(config);
+
+      expect(gatewayHooks.do).toHaveBeenCalledWith('adapter:error', {
+        platform: 'telegram',
+        error: expect.any(Error),
+        key: 'telegram-main',
+      }, { adapter });
+    });
+
+    it('should return accurate boolean from connect', async () => {
+      // Success case
+      const successAdapter = createMockAdapter('telegram');
+      registry.register(successAdapter);
+      const successConfig: BaseAdapterConfig = {
+        id: 'uuid-1',
+        name: 'Success',
+        key: 'success',
+        type: 'telegram',
+        enabled: true,
+      };
+      const successResult = await registry.connect(successConfig);
+      expect(successResult).toBe(true);
+
+      registry.clear();
+
+      // Failure case
+      const failAdapter = createMockAdapter('irc', { connectShouldFail: true });
+      registry.register(failAdapter);
+      const failConfig: BaseAdapterConfig = {
+        id: 'uuid-2',
+        name: 'Fail',
+        key: 'fail',
+        type: 'irc',
+        enabled: true,
+      };
+      const failResult = await registry.connect(failConfig);
+      expect(failResult).toBe(false);
+    });
   });
 
   describe('disconnect()', () => {
@@ -236,6 +354,47 @@ describe('AdapterRegistry Service', () => {
       const result = await registry.disconnect('telegram');
 
       expect(result).toBe(false);
+    });
+
+    it('should fire adapter:disconnected hook with correct payload', async () => {
+      const adapter = createMockAdapter('telegram', { initialStatus: 'connected' });
+      registry.register(adapter);
+
+      await registry.disconnect('telegram', 'test_reason');
+
+      expect(gatewayHooks.do).toHaveBeenCalledWith('adapter:disconnected', {
+        platform: 'telegram',
+        reason: 'test_reason',
+      }, { adapter });
+    });
+
+    it('should fire adapter:error hook when disconnect throws', async () => {
+      const adapter = createMockAdapter('telegram');
+      adapter.disconnect = vi.fn(async () => {
+        throw new Error('Disconnect failed');
+      });
+      registry.register(adapter);
+
+      await registry.disconnect('telegram');
+
+      expect(gatewayHooks.do).toHaveBeenCalledWith('adapter:error', {
+        platform: 'telegram',
+        error: expect.any(Error),
+      }, { adapter });
+    });
+
+    it('should return accurate boolean from disconnect', async () => {
+      // Success case
+      const successAdapter = createMockAdapter('telegram', { initialStatus: 'connected' });
+      registry.register(successAdapter);
+      const successResult = await registry.disconnect('telegram');
+      expect(successResult).toBe(true);
+
+      registry.clear();
+
+      // Failure case - not registered
+      const failResult = await registry.disconnect('irc');
+      expect(failResult).toBe(false);
     });
   });
 
@@ -426,6 +585,27 @@ describe('AdapterRegistry Service', () => {
       expect(registry.getConfig('telegram')).toBeUndefined();
       expect(registry.getByKey('telegram-main')).toBeUndefined();
     });
+
+    it('should fire adapter:disconnected hooks for each adapter', async () => {
+      const telegramAdapter = createMockAdapter('telegram');
+      const ircAdapter = createMockAdapter('irc');
+
+      registry.register(telegramAdapter);
+      registry.register(ircAdapter);
+
+      await registry.shutdown();
+
+      // Each disconnect call fires the hook
+      expect(gatewayHooks.do).toHaveBeenCalledWith('adapter:disconnected', {
+        platform: 'telegram',
+        reason: 'manual_disconnect',
+      }, { adapter: telegramAdapter });
+
+      expect(gatewayHooks.do).toHaveBeenCalledWith('adapter:disconnected', {
+        platform: 'irc',
+        reason: 'manual_disconnect',
+      }, { adapter: ircAdapter });
+    });
   });
 
   describe('unregister()', () => {
@@ -462,6 +642,24 @@ describe('AdapterRegistry Service', () => {
 
       expect(registry.getByKey('telegram-main')).toBeUndefined();
     });
+
+    it('should remove from connected configs', async () => {
+      const adapter = createMockAdapter('telegram');
+      registry.register(adapter);
+
+      const config: BaseAdapterConfig = {
+        id: 'uuid-123',
+        name: 'Main Telegram',
+        key: 'telegram-main',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      await registry.connect(config);
+      registry.unregister('telegram');
+
+      expect(registry.getConfig('telegram')).toBeUndefined();
+    });
   });
 
   describe('clear()', () => {
@@ -472,6 +670,211 @@ describe('AdapterRegistry Service', () => {
       registry.clear();
 
       expect(registry.getAdapterCount()).toBe(0);
+    });
+
+    it('should clear all maps', async () => {
+      const adapter = createMockAdapter('telegram');
+      registry.register(adapter);
+
+      const config: BaseAdapterConfig = {
+        id: 'uuid-123',
+        name: 'Main Telegram',
+        key: 'telegram-main',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      await registry.connect(config);
+      registry.clear();
+
+      expect(registry.getAdapterCount()).toBe(0);
+      expect(registry.getByKey('telegram-main')).toBeUndefined();
+      expect(registry.getConfig('telegram')).toBeUndefined();
+    });
+  });
+
+  describe('Multi-Profile Key Support', () => {
+    it('should support multiple keys for the same platform type', async () => {
+      // Note: In the current design, each platform type has ONE adapter instance
+      // but can be looked up by multiple keys if connected multiple times
+      const adapter = createMockAdapter('irc');
+      registry.register(adapter);
+
+      // First connection with key1
+      const config1: BaseAdapterConfig = {
+        id: 'uuid-1',
+        name: 'IRC Libera',
+        key: 'irc-libera',
+        type: 'irc',
+        enabled: true,
+      };
+
+      await registry.connect(config1);
+      expect(registry.getByKey('irc-libera')).toBe(adapter);
+
+      // Disconnect and reconnect with different key
+      await registry.disconnect('irc');
+
+      const config2: BaseAdapterConfig = {
+        id: 'uuid-2',
+        name: 'IRC OFTC',
+        key: 'irc-oftc',
+        type: 'irc',
+        enabled: true,
+      };
+
+      await registry.connect(config2);
+      expect(registry.getByKey('irc-oftc')).toBe(adapter);
+    });
+
+    it('should clean up key map on disconnect', async () => {
+      const adapter = createMockAdapter('telegram');
+      registry.register(adapter);
+
+      const config: BaseAdapterConfig = {
+        id: 'uuid-123',
+        name: 'Main Telegram',
+        key: 'telegram-main',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      await registry.connect(config);
+      expect(registry.getByKey('telegram-main')).toBe(adapter);
+
+      await registry.disconnect('telegram');
+      expect(registry.getByKey('telegram-main')).toBeUndefined();
+    });
+
+    it('should clean up key map on unregister', async () => {
+      const adapter = createMockAdapter('telegram');
+      registry.register(adapter);
+
+      const config: BaseAdapterConfig = {
+        id: 'uuid-123',
+        name: 'Main Telegram',
+        key: 'telegram-main',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      await registry.connect(config);
+      expect(registry.getByKey('telegram-main')).toBe(adapter);
+
+      registry.unregister('telegram');
+      expect(registry.getByKey('telegram-main')).toBeUndefined();
+    });
+  });
+
+  describe('Hook Payload/Context Alignment', () => {
+    it('should pass correct context with adapter reference for adapter:connected', async () => {
+      const adapter = createMockAdapter('telegram');
+      registry.register(adapter);
+
+      const config: BaseAdapterConfig = {
+        id: 'uuid-123',
+        name: 'Main Telegram',
+        key: 'telegram-main',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      await registry.connect(config);
+
+      // Verify the hook was called with correct context
+      const calls = vi.mocked(gatewayHooks.do).mock.calls;
+      const connectedCall = calls.find(
+        (call) => call[0] === 'adapter:connected'
+      );
+      expect(connectedCall).toBeDefined();
+      expect(connectedCall![2]).toEqual(expect.objectContaining({
+        metadata: { adapter },
+      }));
+    });
+
+    it('should pass correct context with adapter reference for adapter:disconnected', async () => {
+      const adapter = createMockAdapter('telegram');
+      registry.register(adapter);
+
+      await registry.disconnect('telegram');
+
+      // Verify the hook was called with correct context
+      const calls = vi.mocked(gatewayHooks.do).mock.calls;
+      const disconnectedCall = calls.find(
+        (call) => call[0] === 'adapter:disconnected'
+      );
+      expect(disconnectedCall).toBeDefined();
+      // adapter:disconnected passes { adapter } directly (not wrapped in metadata)
+      expect(disconnectedCall![2]).toEqual({ adapter });
+    });
+
+    it('should pass correct context with adapter reference for adapter:error', async () => {
+      const adapter = createMockAdapter('telegram', { connectShouldFail: true });
+      registry.register(adapter);
+
+      const config: BaseAdapterConfig = {
+        id: 'uuid-123',
+        name: 'Main Telegram',
+        key: 'telegram-main',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      await registry.connect(config);
+
+      // Verify the hook was called with correct context
+      const calls = vi.mocked(gatewayHooks.do).mock.calls;
+      const errorCall = calls.find(
+        (call) => call[0] === 'adapter:error'
+      );
+      expect(errorCall).toBeDefined();
+      expect(errorCall![2]).toEqual({ adapter });
+    });
+
+    it('should include key in adapter:connected payload', async () => {
+      const adapter = createMockAdapter('telegram');
+      registry.register(adapter);
+
+      const config: BaseAdapterConfig = {
+        id: 'uuid-123',
+        name: 'Main Telegram',
+        key: 'telegram-main',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      await registry.connect(config);
+
+      const calls = doSpy.mock.calls;
+      const connectedCall = calls.find(
+        (call) => call[0] === 'adapter:connected'
+      );
+      expect(connectedCall).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      expect((connectedCall![1] as { config: { key?: string } }).config.key).toBe('telegram-main');
+    });
+
+    it('should include key in adapter:error payload', async () => {
+      const adapter = createMockAdapter('telegram', { connectShouldFail: true });
+      registry.register(adapter);
+
+      const config: BaseAdapterConfig = {
+        id: 'uuid-123',
+        name: 'Main Telegram',
+        key: 'telegram-main',
+        type: 'telegram',
+        enabled: true,
+      };
+
+      await registry.connect(config);
+
+      const calls = doSpy.mock.calls;
+      const errorCall = calls.find(
+        (call) => call[0] === 'adapter:error'
+      );
+      expect(errorCall).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      expect((errorCall![1] as { key?: string }).key).toBe('telegram-main');
     });
   });
 });
