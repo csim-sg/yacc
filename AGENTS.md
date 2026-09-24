@@ -1,577 +1,106 @@
-# Project Context for AI Agents
+# YACC — Agent Context
 
-## 🎯 Project Summary
+**YACC (Yet Another Chat Client)**: single-tenant, multi-channel social inbox (Telegram, IRC) with role-based access (Super Admin / Admin / Manager / User), real-time updates, routing rules, notifications, search, and audit logging. Detailed scope and acceptance criteria live in `.docs/01-product-specification.md`; do not duplicate them here.
 
-**YACC - Yet Another Chat Client** — A unified inbox application that centralizes social communications from multiple platforms (Telegram, IRC) into one interface with role-based access, real-time updates, message routing rules, notifications, search, and full audit logging.
+**Status** (authoritative: `.docs/plans/00-INDEX.md`): Phase 1 complete; Phase 2 (collaboration + rules) EA-approved; Gateway Plugin Architecture GPA-003..006 merged, GPA-007 next (see GOV-038).
 
-**Status**: Monorepo + Turborepo setup complete, ready for Phase 1 implementation (auth, core inbox, messaging)  
-**Scope**: Single-tenant MVP with 2 integrations (Telegram, IRC); additional platforms deferred to post-MVP
-**Deployment**: Frontend to AWS S3 + CloudFront, Backend to Docker on VPS
+## Repository & Project Board
 
----
+- **Repo**: `csim-sg/yacc` (git remote: `git@github.com:csim-sg/yacc.git`). PRs target `dev`.
+- **Board**: GitHub Project #1, ID `PVT_kwHOAB4wV84BNGcw` (https://github.com/users/csim-sg/projects/1/views/1).
+- Runtime field IDs, board state option IDs, worktree root, and central docs vault paths are exported from `.github-project.env` (`ANT_TEAM_*`) — the sole project config source. Source it instead of hardcoding IDs from older docs.
 
-## Important Information
-- Repo: https://github.com/csim-sg/yacc
+## Monorepo & Tooling
 
-### YACC Project Board
-- **Project Number**: 1
-- **Project ID**: `PVT_kwHOAB4wV84BNGcw`
-- **URL**: https://github.com/users/csim-sg/projects/1/views/1
-- **Owner**: csim-sg
+- pnpm 9 + Turborepo; workspace globs `packages/*` (`pnpm-workspace.yaml`); root scripts call `turbo run` (`turbo.json`).
+- Packages:
+  - `packages/common` (`@yacc/common`) — shared types, Zod schemas, constants, requests/responses, websocket contracts. Consumed as TypeScript source via subpath `exports` (`@yacc/common/schemas`, `/types/entities`, `/constants`, ...): every `exports` subpath resolves to `src/*.ts`; `build` runs `tsc` and emits a generated `dist/` for verification only — no export or consumer references it.
+  - `packages/backend` (`@yacc/backend`) — Express + routing-controllers API, Socket.io gateway, Drizzle + PostgreSQL, Redis/BullMQ, Telegram + IRC connectors, Vitest.
+  - `packages/frontend` (`@yacc/frontend`) — React 18 SPA built with Vite; TanStack Query + Zustand, socket.io-client, Tailwind v4 + daisyUI; Vitest unit + Playwright E2E.
+- Runtime: Node 20 pinned in the `backend-ci`, `lint`, and `tests` workflows; `frontend-deploy.yml` still uses Node 18. pnpm 9. ADR-018 (Bun runtime migration) is **Proposed only** — tooling remains Node + pnpm until accepted.
+- Local services: `docker-compose up -d` → PostgreSQL 15 (`yacc_user`/`yacc_password`/`yacc_inbox`, :5432), Redis 7 (:6379), Mailhog (:8025).
+- Env setup: copy `.env.example` in repo root, `packages/backend/`, and `packages/frontend/` to `.env` in the same location.
 
-#### Common Field IDs
-- **Status**: `PVTSSF_lAHOAB4wV84BNGcwzg8MYR0`
-- **Assignee**: `PVTSSF_lAHOAB4wV84BNGcwzg8MYR1`
-- **Priority**: `PVTSSF_lAHOAB4wV84BNGcwzg8MYR2`
-- **Iteration**: `PVIT_lAHOAB4wV84BNGcwzg8MYO0`
+## Verified Commands
 
-## 📋 Project Quick Facts
-
-| Aspect | Details |
-|--------|---------|
-| **Goal** | Unified inbox for teams to manage multi-channel social messages in one place |
-| **Users** | 4 roles: Super Admin (full control), Admin (operations), Manager (oversight), User (handle messages) |
-| **MVP Features** | 15 core features: inbox, auth, messaging, collaboration (tags/notes/assignments), routing rules, notifications (in-app), search (full-text), attachments (5 MB max), real-time (WebSocket), audit logging (1-year retention), presence, integrations |
-| **Initial Platforms** | Telegram groups/channels, IRC networks |
-| **Deferred Platforms** | WhatsApp, WeChat, Meta (FB/Instagram), X/Twitter (post-MVP) |
-| **Monorepo Structure** | `packages/backend/` (Node.js API), `packages/frontend/` (React SPA), `packages/common/` (shared types/schemas) |
-| **Architecture** | Backend (Node.js + Express), Frontend (React 18 + TanStack Start), Database (PostgreSQL + Drizzle), Cache (Redis + BullMQ), Storage (AWS S3), Real-time (Socket.io) |
-| **Timeline** | 6 weeks (4 implementation phases) |
-| **Team** | Backend dev, Frontend dev, QA, Product owner, Architect |
-
----
-
-## 📂 Core Features at a Glance
-
-### 1. **Unified Inbox**
-- Single queue for all channels (Telegram, IRC)
-- Filters: channel, assignee, tag, status (open/pending/resolved), priority
-- Search: full-text on message bodies + sender names, date range
-- Bulk actions: assign, tag, change status (max 100 per request)
-- Sorting: newest activity by default
-
-### 2. **Authentication & RBAC**
-- Email/password login, forgot password (email reset)
-- 4 roles with permission matrix:
-  - **Super Admin**: full access, user/role management, integrations, routing rules
-  - **Admin**: inbox operations, assignments, tags, notes
-  - **Manager**: assignments, priority, audit log access, raw payload access
-  - **User**: reply, use tags/notes, view assigned conversations
-- BetterAuth + JWT or session-based
-
-### 3. **Messaging**
-- Send/receive messages (inbound from platforms, outbound from UI)
-- Message status tracking: pending → sent (success) or failed
-- Attachments: download + re-host inbound (max 5 MB), upload outbound
-- Message retry on failure: exponential backoff (1m, 5m, 30m; 3 attempts max)
-- Dead-letter queue (DLQ) for failed messages (ops review)
-- Delivery status visible in UI (pending/sent/failed with retry button)
-
-### 4. **Collaboration**
-- **Tags**: user-created, reusable across conversations, create inline
-- **Notes**: internal only (not sent to customer), @mention support (triggers notifications)
-- **Assignments**: assign to users, reassignment allowed, notifications sent to assignee
-- **Audit trail**: all actions logged (who, what, when, metadata)
-
-### 5. **Routing Rules**
-- Auto-assign, auto-tag, auto-prioritize based on conditions
-- Conditions: channel (eq), keyword (contains, regex), sender (eq), tag (has), time (hour)
-- Rules evaluated in priority order; first match wins
-- Manual overrides allowed (override rule, logged in audit)
-- Rule execution logs queryable by rule ID or conversation ID
-
-### 6. **Notifications (In-App)**
-- **Triggers**: assigned to conversation, @mentioned in note
-- **Features**: notification center panel, mark as read, dismiss, unread badge count
-- **Delivery**: via WebSocket (real-time push)
-- **Storage**: database persistence (show on reconnect)
-- **Deferred**: email notifications (Phase 2)
-
-### 7. **Search**
-- Full-text search on message bodies and sender names
-- Date range filtering (dateFrom, dateTo)
-- Combine with inbox filters (channel, tag, assignee, status, priority)
-- Results sorted by relevance + recency
-- Pagination: 20 results per page
-- Performance: <1 second for typical queries
-
-### 8. **Attachments**
-- **Inbound**: download from platform, re-host on Cloudflare R2 (5 MB max)
-- **Outbound**: upload from UI to R2, include in reply
-- **Display**: inline images, file previews, download links
-- **Storage**: Cloudflare R2 (CDN-backed for fast delivery)
-
-### 9. **Real-Time Updates (WebSocket)**
-- Events: conversation_updated, message.sent/failed, notification.received, conversation.reopened, presence.updated, typing.started/stopped
-- Configuration: 60-second heartbeat, 1-hour message backlog on reconnect, exponential backoff reconnection (1s → 60s max, 5 attempts)
-- Handles disconnection gracefully (buffered events, replay on reconnect)
-
-### 10. **Conversation Status Lifecycle**
-- **Open**: active, awaiting reply or action
-- **Pending**: agent replied, awaiting customer response
-- **Resolved**: conversation closed (DM/group only; broadcast ignores status)
-- **Auto-Reopen**: resolved conversation reopens if new inbound message arrives
-- Status changes logged in audit trail, WebSocket pushed to UI
-
-### 11. **Integrations (MVP)**
-- **Telegram**: groups/channels, one conversation per group, replies on-behalf-of system account, error handling with retry
-- **IRC**: networks/channels, one conversation per channel, auto-reconnect on disconnect
-- **Credentials**: stored in environment variables (MVP single-tenant)
-
-### 12. **Audit Logging**
-- Logs all actions: assignments, tags, notes, status changes, rule executions, user role changes, message retries, attachment access, integration changes, bulk operations
-- Queryable by: actor, action, entity_type, entity_id, date range
-- Exportable: CSV export
-- Retention: 1 year (configurable)
-
-### 13. **Presence & Typing**
-- Online/offline status visible per user (real-time)
-- Typing indicators in conversation view (5-second timeout)
-
-### 14. **Raw Payload Storage**
-- Store inbound platform payloads as plain text on Cloudflare R2
-- Retention: 7 days (configurable)
-- Access: manager+ only, audit-logged
-- Purpose: debug connector issues
-
-### 15. **Localization**
-- Default: English
-- i18n scaffolding for future translations
-- Deferred: RTL support (Phase 2)
-
----
-
-## 🏗️ System Architecture (High-Level)
-
-```
-FRONTEND (TanStack Start SPA)
-├─ Inbox UI (filters, search, bulk actions)
-├─ Conversation view (messages, timeline, attachments)
-├─ Admin panel (users, integrations, rules, audit logs)
-└─ Notification center
-
-        ↕ REST API + WebSocket
-
-BACKEND (Node.js + Express)
-├─ REST endpoints (40+)
-├─ WebSocket gateway (8 event types)
-├─ Rules engine (evaluate & apply)
-├─ Search service (PostgreSQL FTS)
-├─ Notification engine (create & deliver)
-├─ Audit logger
-└─ Connector manager (Telegram, IRC)
-
-        ↓ (stores/caches)
-
-DATA LAYER
-├─ PostgreSQL (conversations, messages, users, tags, notes, audit logs, notifications, routing rules)
-├─ Cloudflare R2 (raw payloads, attachments, re-hosted files)
-├─ Redis + BullMQ (message retry queue)
-└─ Socket.io (real-time events)
-
-        ↓ (connects to)
-
-EXTERNAL PLATFORMS
-├─ Telegram API (webhooks/polling)
-└─ IRC networks (socket connections)
-```
-
----
-
-## 💾 Data Model (Core Entities)
-
-**Users**: id, email, password_hash, role, status, created_at  
-**Conversations**: id, channel, external_thread_id, status (open/pending/resolved), priority, assigned_user_id  
-**Messages**: id, conversation_id, sender_id, body, status (pending/sent/failed), direction (inbound/outbound)  
-**Attachments**: id, message_id, url (CDN), storage_key (R2), type, name, size  
-**Tags**: id, name, color, created_by_id  
-**ConversationTags**: conversation_id, tag_id (M:M)  
-**Notes**: id, conversation_id, author_id, body  
-**Notifications**: id, user_id, type (assignment/mention), conversation_id, actor_id, is_read  
-**RoutingRules**: id, name, status (active/disabled), priority, conditions (JSON), actions (JSON), last_run_at  
-**RoutingRuleExecutions**: id, rule_id, conversation_id, matched_conditions, applied_actions (audit of rule runs)  
-**RawPayloads**: id, message_id, storage_key (R2), created_at, expires_at  
-**AuditLogs**: id, actor_id, action, entity_type, entity_id, metadata (JSON), created_at  
-
----
-
-## 🛠️ Tech Stack (Complete)
-
-| Layer | Tech | Purpose |
-|-------|------|---------|
-| **Frontend** | TanStack Start (React) | SPA with real-time updates |
-| **Frontend State** | Zustand + TanStack Query | Client state & data fetching |
-| **Frontend Auth** | BetterAuth | Session/JWT management |
-| **Frontend Styling** | Tailwind CSS | Utility-first CSS |
-| **Backend Runtime** | Node.js 18+ | Server runtime |
-| **Backend Framework** | Express + routing-controllers | REST API (MVC pattern) |
-| **Backend Auth** | BetterAuth | Email/password, JWT, session |
-| **Database** | PostgreSQL 14+ | Primary data store (ACID, FTS, JSON) |
-| **Database ORM** | Drizzle | Type-safe SQL queries |
-| **Real-Time** | Socket.io | WebSocket for inbox updates |
-| **Search** | PostgreSQL FTS | Full-text search (MVP); Elasticsearch (future) |
-| **Message Queue** | Redis + BullMQ | Outbound message retry (exponential backoff) |
-| **File Storage** | Cloudflare R2 | Payloads, attachments, re-hosted files |
-| **Email** | Nodemailer/SendGrid | Password reset emails |
-| **Hosting** | Docker on VPS | Single instance (MVP) |
-| **Testing** | Playwright | E2E test automation |
-| **Testing** | Playwright | E2E test automation |
-| **Testing** | Vitest | Unit & integration tests (18.8% faster than Jest) |
-| **Package Manager** | pnpm | Monorepo workspaces, efficient disk usage |
-
----
-
-## 🚀 Development Setup
-
-### Prerequisites
+From package manifests and CI (`.github/workflows/`):
 
 ```bash
-# Required versions
-node --version         # v18 or higher
-pnpm --version        # v9+ (install: npm install -g pnpm@9)
-docker --version      # Required for local services
+pnpm dev / build / test / lint / type-check        # root, via turbo
+pnpm --filter @yacc/backend dev                    # tsx watch (port 3000)
+pnpm --filter @yacc/backend build                  # clean -> tsc -> esbuild bundle
+pnpm --filter @yacc/backend test                   # vitest
+pnpm --filter @yacc/backend lint                   # eslint src
+pnpm --filter @yacc/backend type-check             # tsc --noEmit
+pnpm --filter @yacc/backend db:seed               # scripts/seed-admin.ts
+pnpm --filter @yacc/backend db:fixtures           # scripts/seed-test-fixtures.ts
+pnpm --filter @yacc/frontend dev                   # vite (port 5173)
+pnpm --filter @yacc/frontend test                  # Playwright E2E
+pnpm --filter @yacc/frontend test:unit             # vitest run
+pnpm --filter @yacc/frontend lint | type-check
+pnpm --filter @yacc/common build | type-check | test
 ```
 
-### First-Time Setup
+Known failures / caveats (CI-verified):
 
-```bash
-# 1. Install all workspace dependencies
-pnpm install
+- **Full backend vitest suite may fail on the dev baseline.** CI runs it as informational-only (`continue-on-error`); required gates are the curated unit subset (`pnpm --filter @yacc/backend test src/services/__tests__/irc-ingestion.service.test.ts`), the smoke integration test (`tests/QA-001-integration.spec.ts`), and changed-file ESLint with `--max-warnings 0`. Exit criteria to make the full suite required: GOV-029.
+- `@yacc/common` has no `lint` script; `turbo run lint` simply skips it.
+- No root or backend `db:migrate`/`db:studio` scripts exist, despite claims in `README.md` and package-level AGENTS files — trust `package.json` manifests.
 
-# 2. Start local services (PostgreSQL, Redis, Mailhog)
-docker-compose up -d
+## Backend Entrypoints & Architecture Guardrails
 
-# 3. Environment configuration
-cp packages/backend/.env.example packages/backend/.env
-cp packages/frontend/.env.example packages/frontend/.env
+Entrypoints (verified):
 
-# 4. Start development servers
-pnpm dev
-```
+- `packages/backend/index.ts` — dev/prod bootstrap: imports `reflect-metadata`, calls `start()` from `./src/index`; skipped when `NODE_ENV=test`. Tests import app/server wiring from `./src/index` directly.
+- `packages/backend/src/index.ts` — wiring only: `useExpressServer(app, { controllers, middlewares })` and `new SocketControllers({ io, controllers: socketControllers })`; starts HTTP + Socket.io + workers.
+- Build output: `dist/index.js` (esbuild bundle), run via `pnpm --filter @yacc/backend start`.
 
-### Package Manager: pnpm
+Guardrails (strict, non-negotiable):
 
-This project uses **pnpm** for monorepo management with workspaces:
+1. **Flat `src/` folders** — `controllers/`, `socket-controllers/`, `services/`, `middleware/`, `config/`, `infrastructure/`, `connectors/`, `websockets/`, `workers/`, `schemas/`, `types/`, `utilities/`, `decorators/`, `enums/`. No nested `api/`, `domain/` layering.
+2. **No `any`** — proper interfaces extending `Request` etc.; never cast.
+3. **One definition per file** (class/interface/service), single responsibility.
+4. **Index files export consts only** — `export const controllers = [...]`, `export const socketControllers = [...]`, `export const schemas = {...}`; no re-export barrels, no inline arrays in `src/index.ts`.
+5. **Config vs Infrastructure** (ADR-005) — `config/` holds plain data objects reading env vars (no classes, no init); `infrastructure/` holds singleton clients (DB, Redis, S3, logger).
+6. **Middleware via routing-controllers config** — the `middlewares` option in `useExpressServer()`, never `app.use()` (documented exception: ADR-014).
+7. **No global route prefix** — no `routePrefix: '/api'`; add `/api` at controller level where needed (see GH-206 analysis in `.docs/`).
+8. **Database** — Drizzle query builder only, no raw SQL; schema source in `packages/common` (Zod schemas are the validation source of truth, ADR-020).
+9. **Validation** — Zod schemas for all request payloads (SH-004 conventions in `@yacc/common/schemas`).
+10. **Tests** — Vitest; ≥85% coverage for new code (infrastructure/config may be lower); co-locate or use `__tests__/`; mock Telegram/IRC in tests.
 
-- **Monorepo workspaces**: Native support for multi-package projects
-- **Disk efficient**: Content-addressable storage using symlinks
-- **Fast**: 2-3x faster than npm
-- **Strict mode**: Prevents phantom dependencies
-- **Integrated with Turborepo**: Task orchestration across workspaces
+## Central Documentation Paths
 
-#### Common Commands
+- `.docs/01-product-specification.md` — scope, user stories, ACs
+- `.docs/02-api-and-data-model.md` — endpoints, schema, WebSocket events
+- `.docs/03-implementation-guide.md` — architecture, tech decisions
+- `.docs/04-qa-and-testing.md` — test strategy, regression suite
+- `.docs/05-quick-reference.md` — one-page cheat sheet
+- `.docs/06-tasks.md` — task ID ↔ GitHub issue map
+- `.docs/plans/00-INDEX.md` — the single always-current status page (historical plans removed per ADR-015; recover via git history)
+- `.docs/adr/` — ADR-001…ADR-022 (numbering is not a queue; check `__README.md`)
+- `.docs/governance/` — GOV-xxx execution/review records
+- `.docs/runbooks/`, `.docs/security/`, `.docs/qa/`, `.docs/architecture/`, `.docs/infrastructure/`
+- Central durable docs vault (Obsidian): curated knowledge base for specs, architecture, ADRs, governance, runbooks, and reusable lessons — not task mirrors or communication transcripts; local path via `ANT_TEAM_DOCS_*` in `.github-project.env`
 
-```bash
-# Full workspace commands
-pnpm install              # Install all dependencies
-pnpm dev                  # Start all dev servers
-pnpm build                # Build all packages
-pnpm test                 # Run tests in all packages
-pnpm lint                 # Run linter across packages
+Keep `00-INDEX.md`, relevant ADRs, and governance records in sync in the same PR as code changes. Where this file, `README.md`, or package-level AGENTS files disagree with manifests/workflows, the manifests/workflows win.
 
-# Workspace-specific commands (using --filter)
-pnpm --filter @yacc/backend test        # Backend tests only
-pnpm --filter @yacc/frontend dev        # Frontend dev server
-pnpm --filter @yacc/common build        # Build common package
+## GitHub Delivery Workflow
 
-# Adding dependencies
-pnpm add <package>                      # Add to root
-pnpm add <package> -w -D                # Add to root as dev dep
-pnpm --filter @yacc/backend add <pkg>   # Add to backend package
-```
+- Milestones = specs; Issues = execution tasks; Project #1 = the workflow board (states: Open, Backlog, Need attentions, Ready, In progress, In review, Ready to merge, Blocked, Done).
+- Tech-lead solely owns milestones and task issues. Roles: strategist (shaping), tech-lead (interpretation, task creation), builder (implementation), reviewer (review gate).
+- Loop: branch from `dev` in a dedicated issue worktree → implement with tests → update docs → PR to `dev` → reviewer loop (fix in the same worktree/branch; escalate after 8 loops) → merge only after explicit approval → tech-lead cleans up worktree/branch.
+- No force pushes; no direct commits to `dev`/`main`; commit prefixes: `feat(scope):`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
+- Communication is GitHub-first (GOV-001, STD-001, ARCH-001): issue comments for task-local handoffs, blockers, decisions, and status; PR descriptions for implementation handoff and verification evidence; PR review threads/comments for code review findings, responses, and approval; Project state for workflow state. The central docs vault (Obsidian) is only for durable knowledge documents when warranted — never task mirrors or communication transcripts.
+- Deployment: backend Docker image (`packages/backend/Dockerfile`); K3s + Helm CI/CD is the accepted target (ADR-019, `deploy/helm`); workflows in `.github/workflows/` (`backend-ci.yml`, `lint.yml`, `tests.yml`, `backend-deploy.yml`, `frontend-deploy.yml`, `deploy-staging.yaml`).
 
-### Turborepo Integration
+## Java Spring Backend Migration — ADRs ACCEPTED, NOT YET IMPLEMENTED
 
-**Turborepo** (`turbo.json`) orchestrates task execution:
+A backend migration to Java Spring is approved as planning: ADRs `ADR-023`..`ADR-029` are **Accepted** (see `.docs/adr/`; SPEC-002 in the central vault). No Spring code, dependencies, CI, or infrastructure exists in this repo yet.
 
-```bash
-pnpm dev      # Runs dev task across all packages
-pnpm build    # Builds in dependency order
-pnpm test     # Tests all packages respecting dependencies
-```
-
-Turborepo features:
-- **Caching**: Skips unchanged packages
-- **Parallelization**: Runs independent tasks concurrently
-- **Smart execution**: Respects package dependency graph
+- `ADR-023`..`ADR-029` define the contract source, architecture, auth, WebSocket transport, data access, async processing, and JVM deployment envelope for the Java service.
+- No Spring code, dependencies, CI, or infrastructure may be introduced until the SPEC-002 milestone issues pass the normal builder→reviewer→merge loop.
+- ADR-018 (Bun runtime migration) remains **Proposed only**.
 
 ---
 
-## 📚 Documentation
-
-Complete specifications in `.docs/`:
-
-| File | Purpose | Key Content |
-|------|---------|-------------|
-| **01-product-specification.md** | Product scope & features | 20 user stories, 130+ ACs, UI requirements, flows |
-| **02-api-and-data-model.md** | API contract & database | 40+ endpoints, 11 tables, data models, WebSocket events |
-| **03-implementation-guide.md** | Architecture & decisions | 6 components (code), 4 phases, tech decisions |
-| **04-qa-and-testing.md** | Testing strategy | 80+ test cases, 12-test regression suite |
-| **05-quick-reference.md** | One-page cheat sheet | Configs, role matrix, gotchas, checklist |
-| **README.md** | Navigation guide | How-to-use by role, quick start |
-
-**For detailed info on any feature, see relevant doc (linked above).**
-
----
-
-## 🚦 Implementation Phases (6 Weeks)
-
-### Phase 1: MVP Core (Week 1-2)
-- Auth (BetterAuth, login/logout/forgot password)
-- Data model (PostgreSQL schema)
-- Unified inbox API + UI
-- Messaging (send/receive) + delivery status
-- Real-time (WebSocket) + retry queue (BullMQ)
-- Telegram + IRC integrations (MVP)
-
-### Phase 2: Collaboration + Rules (Week 3-4)
-- Tags, notes, assignments
-- Routing rules engine (first match wins)
-- Notifications (in-app: assignment, @mention)
-- Bulk actions
-- Audit logging + query/export
-
-### Phase 3: Search + Files (Week 5)
-- Search (PostgreSQL FTS)
-- Attachments (R2 upload/download)
-- Raw payload access controls
-
-### Phase 4: Admin + Polish (Week 6)
-- Admin panel (users, audit logs, rules)
-- Integration setup UI (credential management)
-- QA hardening + bug fixes + regression suite
-
----
-
-## 🎯 Key Design Decisions
-
-| Decision | Choice | Why |
-|----------|--------|-----|
-| **Database** | PostgreSQL | ACID transactions, FTS, JSON, mature |
-| **Search** | PostgreSQL FTS (MVP) | Sufficient for MVP, migrate to Elasticsearch later |
-| **Storage** | Cloudflare R2 | Cheaper than S3, CDN-backed, S3-compatible API |
-| **Queue** | Redis + BullMQ | Simple, fast, built-in retry scheduling |
-| **Real-Time** | Socket.io | Handles reconnection, fallback to polling |
-| **Architecture** | Single-tenant (MVP) | Simpler, credentials in env vars |
-| **Conversations** | One per group/channel | Clear mapping, no confusion |
-| **Rules** | First match wins | Simple, predictable, avoids conflicts |
-| **Retry** | Exponential backoff (1m, 5m, 30m) | Standard, reduces server load |
-| **Bulk Actions** | Best-effort (partial OK) | Pragmatic, better UX than all-or-nothing |
-| **Notifications** | In-app only (email post-MVP) | Simpler MVP, WebSocket instant delivery |
-| **Attachments** | Re-host on R2 | Preserves files, faster via CDN |
-
----
-
-## 👥 Agent Roles & Responsibilities
-
-### Product Owner
-**What to do**: Validate features, acceptance criteria, scope changes  
-**When to ask**: Feature scope unclear, UX questionable, AC incomplete  
-**Reference**: `.docs/01-product-specification.md` (20 stories, 130+ ACs)
-
-### Frontend Developer
-**What to do**: Implement UI (React/TanStack), WebSocket client, API integration  
-**What to collaborate on**: API response shapes, error handling, auth flow  
-**When to ask**: API contract ambiguous, response format unclear, auth integration  
-**Reference**: `.docs/02-api-and-data-model.md` (section 5–6: endpoints, WebSocket events)
-
-### Backend Developer
-**What to do**: Implement REST API, database, integrations, message retry, rules engine  
-**What to collaborate on**: API contract, response shapes, error codes  
-**When to ask**: API design unclear, data model ambiguous, integration strategy  
-**Reference**: `.docs/02-api-and-data-model.md` (endpoints, schema) + `.docs/03-implementation-guide.md` (architecture, components)
-
-### QA/Tester
-**What to do**: Create test cases, automate (Playwright), verify acceptance criteria  
-**What to collaborate on**: AC clarity, edge cases, test strategy  
-**When to ask**: AC unclear, acceptance criteria incomplete  
-**Reference**: `.docs/04-qa-and-testing.md` (80+ test cases, regression suite) + `.docs/01-product-specification.md` section 8 (user stories with ACs)
-
-### Architect (Final Decision-Maker)
-**What to do**: Unblock ambiguities, make design trade-off decisions, ensure alignment  
-**When to escalate**: Architecture questions, tech choice conflicts, scope creep  
-**Reference**: All docs, especially `.docs/03-implementation-guide.md` (design decisions, trade-offs)
-
----
-
-## 🎯 Your Preferences & Constraints (CRITICAL)
-
-### Development Workflow Preferences
-1. **Sequential Development**: "Do it 1 by 1, make it simple"
-   - One task at a time (not parallel)
-   - Each task gets its own feature branch
-   - Each task has its own PR after completion
-   - Simpler, cleaner workflow
-
-2. **Documentation Synchronization**: "Update document if the status not same as project"
-   - Keep `.docs/plans/00-INDEX.md` in sync with actual implementation status
-   - Update ADRs and governance logs when decisions are made
-   - Mark tasks as DONE/In Progress/Ready based on actual state
-
-3. **Infrastructure Setup**: Use Docker Compose for local development
-   - PostgreSQL database
-   - Redis cache
-   - Mailhog for email testing
-   - Don't worry about multi-environment setup yet
-
-4. **Git Workflow**: Create branches, push to repo, create PRs against `dev` branch
-   - No force pushes unless explicitly requested
-   - No direct commits to dev/main without PR review
-   - Each PR should have a clear commit message following your conventions
-
-### Code Architecture Constraints (STRICT - Non-negotiable)
-
-1. **No `any` Types Allowed** (Enforcement: LSP errors, linter warnings)
-   - Use proper TypeScript interfaces extending `Request` from `express` module
-   - Never use `any` casting for Express/Node.js types
-   - Example: Use `AuthRequest extends Request` instead of `req as any`
-
-2. **Flat Folder Structure** (Not layered architecture)
-   - ❌ NO: `api/`, `domain/`, `infrastructure/` nested folders
-   - ✅ YES: Flat structure:
-     - `controllers/` - All API controllers
-     - `middleware/` - All middleware
-     - `services/` - All business logic
-     - `config/` - Configuration objects (data only, no class instances)
-     - `infrastructure/` - Client initialization (singleton classes)
-     - `connectors/`, `websockets/`, `workers/`, `types/`, `utils/`
-
-3. **Routing-Controllers Best Practices** (Follow framework standards)
-   - Use `middlewares` option in `useExpressServer()` to register middleware
-   - ❌ NO: Use `app.use()` for middleware registration
-   - ✅ YES: Pass middlewares via routing-controllers config
-   - Ensures proper integration with authorization flow
-
-4. **One Definition Per File** (Separation of concerns)
-   - One class per file
-   - One interface per file (unless closely related)
-   - One service per file
-   - Clear, single responsibility principle
-
-5. **Index Aggregators (Limited Allowance)**
-   - ✅ Allowed: `index.ts` that exports **lists** for libraries (e.g., controller arrays for routing-controllers, schema registries for ORM)
-   - ✅ Allowed: data-only aggregations (no business logic)
-   - ❌ Not allowed: barrel exports for general imports (avoid `import { X } from '../services'`)
-   - Rationale: enable library wiring while keeping code discoverable
-
-6. **Config vs Infrastructure Pattern** (ADR-005 approved)
-   - **Config folder**: Simple `const` objects with env var references
-     - Example: `{ port: process.env.PORT, dbUrl: process.env.DATABASE_URL }`
-     - NO class definitions, NO initialization logic
-   - **Infrastructure folder**: Singleton client classes
-     - Example: `class DatabaseClient { constructor() { ... } }`
-     - Handles initialization, connection pooling, singleton pattern
-   - Reason: "I don't want clean architecture. I want to keep it simple and clean."
-
-7. **No Global `/api` Prefix** (routing-controllers routePrefix)
-   - ❌ NO: `useExpressServer({ routePrefix: '/api' })`
-   - ✅ YES: Add `/api` at the controller level when needed (e.g., `@Controller('/api/users')`)
-   - ✅ YES: Direct resource paths when `/api` is not needed (e.g., `@Controller('/users')` → `/users/login`)
-   - The restriction is only on global prefix configuration, not controller paths
-
-### Testing & Quality Standards
-
-1. **Code Coverage Target**: ≥ 85% for all new code
-   - Exception: Infrastructure/config code can be lower if simple
-   - Use Jest for unit/integration tests
-   - Use Playwright for E2E tests
-
-2. **Test Organization**:
-   - Unit tests co-located near source files or in `__tests__/` folder
-   - E2E tests in `packages/frontend/e2e/` (Playwright)
-   - Mock external services (Telegram, IRC) in tests
-
-3. **Error Handling**:
-   - Always return proper HTTP status codes (200, 201, 400, 401, 403, 404, 500)
-   - Include error message in response body
-   - Log errors with correlation ID for tracing
-
-### Documentation Standards (MANDATORY)
-
-1. **Keep These Documents Updated**:
-   - `.docs/plans/00-INDEX.md` - Track task progress, approvals, status
-   - `.docs/adr/` - Architecture decision records (ADR-XXX)
-   - `.docs/governance/GOV-008-week1-workarounds.md` - Governance & workarounds
-   - `.docs/03-implementation-guide.md` - Tech decisions & architecture
-
-2. **PR Requirements**:
-   - Clear commit messages (describe WHY, not just WHAT)
-   - Reference related issues/PRs in description
-   - Link ADR if architectural change made
-   - Include test coverage info
-   - Update relevant `.docs/` files in same PR
-
-3. **ADR Requirements** (When ADR is needed):
-   - Change affects multiple services/teams
-   - Introduces new technology or pattern
-   - Impacts security, cost, scalability, or data
-   - Changes core architecture principle
-   - Use template: `.docs/adr/ADR-001-monorepo-turborepo-setup.md`
-
-### Communication & Review Process
-
-1. **PR Review Flow**:
-   - I (Architect) will review all PRs for alignment with constraints
-   - Block PRs that violate architecture rules
-   - Request changes with clear explanations
-   - Approve when all constraints met
-
-2. **Issue Escalation**:
-   - Ask questions early if requirements unclear
-   - Reference relevant docs in questions
-   - Provide context: what you tried, what went wrong, what options you see
-
-3. **Documentation Issues**:
-   - If docs are unclear, say so immediately
-   - Update docs before moving to next task
-   - Keep governance log in sync with decisions
-
-### Your Proven Workflow (From BE-003)
-✅ Works well, continue this pattern:
-1. Create feature branch from `dev`
-2. Implement feature with tests (85%+ coverage)
-3. Update `.docs/` files if needed
-4. Create PR with clear description + ADR reference if applicable
-5. Wait for architect review (me)
-6. Fix any issues raised
-7. Merge to dev when approved
-8. Update planning documents (00-INDEX.md)
-9. Move to next task
-
----
-
-## ⚠️ Important Notes
-
-1. **Single-Tenant MVP**: Credentials stored in env vars (Telegram token, IRC password). Multi-tenant with vault (post-MVP).
-
-2. **Message Retry**: Exponential backoff (1m, 5m, 30m; 3 attempts max) via Redis + BullMQ. Failed messages go to DLQ for ops review.
-
-3. **Conversation Status**: Auto-reopen resolved conversations on new inbound message. Status applies to DM/group only (broadcast ignores).
-
-4. **Rules Engine**: First matching rule wins (simple, predictable). Manual overrides allowed (always logged in audit).
-
-5. **WebSocket Backlog**: Clients receive 1 hour of missed events on reconnect (stored in DB, auto-cleanup).
-
-6. **Audit Logging**: 1-year retention (configurable). Every action logged (assignments, tags, notes, status changes, rule executions, retries, etc.).
-
-7. **Search**: PostgreSQL FTS in MVP (sufficient). Migrate to Elasticsearch if needed (post-MVP).
-
-8. **Attachment Re-Hosting**: Download inbound files, store on R2 (5 MB max). Preserves files if platform deletes, faster via CDN.
-
----
-
-## 🚀 Getting Started
-
-1. **Understand the project**: Read this file + `.docs/05-quick-reference.md` (5 min each)
-2. **Dive into your area**: 
-   - **Frontend dev**: `.docs/02-api-and-data-model.md` (sections 1–5) + section 6 (WebSocket)
-   - **Backend dev**: `.docs/02-api-and-data-model.md` + `.docs/03-implementation-guide.md`
-   - **QA**: `.docs/04-qa-and-testing.md` + `.docs/01-product-specification.md` section 8
-   - **Product owner**: `.docs/01-product-specification.md`
-3. **Ask questions**: If anything is unclear, ask the architect (or relevant agent)
-
----
-
-**Last Updated**: 2026-02-11  
-**Status**: Phase 1.4 in progress; MVP extended to include Phase 2 (collaboration + rules)  
-**Questions?** See `.docs/05-quick-reference.md` → "Quick Links" section
+**Last Updated**: 2026-09-24 · Communication model aligned to GOV-001/STD-001/ARCH-001 (GitHub-first) · Reconciled against git remote, package manifests, `turbo.json`, `docker-compose.yml`, `.github/workflows/`, and `.docs/plans/00-INDEX.md`
