@@ -1,6 +1,6 @@
 # 06. Issues & User stories
 
-**Last Updated**: February 25, 2026  
+**Last Updated**: March 01, 2026  
 **Phase 1 Status**: ✅ **COMPLETE** (100% feature deliverables merged to `dev`)  
 **Phase 2 Status**: 🚧 **EA-APPROVED** (ready for 2026-03-05 kickoff; see Section 2 below)
 **Outstanding P0/P1 Tasks**: See Section 3 for categorization
@@ -13,6 +13,8 @@
 ---
 
 ## 1. Phase Scope (Authoritative)
+
+**Task ID note:** Any references to "GPT-005/006/007" in chat/notes map to **GPA-005/006/007** (Gateway Plugin Architecture) in this document.
 
 **Phase 1 (Weeks 1-2) In scope:**
 - Telegram + IRC integrations (inbound/outbound messaging)
@@ -213,10 +215,10 @@ Phase 1 delivers Telegram + IRC integrations, core inbox operations, authenticat
 | GPA-001 | Create gateway hooks type definitions | ✅ **Done** (PR #321 merged) | Phase 2+ | Backend | - | `types/gateway-hooks.types.ts` created with HookResult, HookResults, HookHandler types; builds pass | TBD | 311 |
 | GPA-002 | Implement GatewayHooks service (single do() method) | ✅ **Done** (PR #322 merged) | Phase 2+ | Backend | GPA-001 | `services/gateway-hooks.ts` with on/off/do methods; parallel execution; error handling; 85%+ test coverage | TBD | 312 |
 | GPA-003 | Enhance PlatformAdapter interface with metadata and capabilities | ✅ **Done** (PR #323 merged) | Phase 2+ | Backend | GPA-001 | `infrastructure/types/adapter.interface.ts` updated with BaseAdapterConfig, AdapterMetadata, AdapterCapability; generic type support | TBD | 313 |
-| GPA-004 | Create AdapterRegistry service | ✅ **EA Approved** (PR #324; CI green; awaiting merge) | Phase 2+ | Backend | GPA-002, GPA-003 | `services/adapter-registry.service.ts` with register/connect/disconnect/get methods; lifecycle hooks for register/connected/disconnected/error; multi-profile key cleanup; 85%+ tests + docs | TBD | 314 |
+| GPA-004 | Create AdapterRegistry service | ✅ **Done** (PR #324 merged) | Phase 2+ | Backend | GPA-002, GPA-003 | `services/adapter-registry.service.ts` with register/connect/disconnect/get methods; lifecycle hooks for register/connected/disconnected/error; multi-profile key cleanup; 85%+ tests + docs | TBD | 314 |
 | GPA-005 | Migrate TelegramAdapter to new interface | ✅ **Done** (PR #323 merged) | Phase 2+ | Backend | GPA-003, GPA-004 | TelegramAdapter implements new PlatformAdapter interface; uses hooks; metadata defined; tests pass | TBD | 315 |
 | GPA-006 | Migrate IRCAdapter to new interface | ✅ **Done** (PR #323 merged) | Phase 2+ | Backend | GPA-003, GPA-004 | IRCAdapter implements new PlatformAdapter interface; uses hooks; metadata defined; tests pass | TBD | 316 |
-| GPA-007 | Update GatewayExchange to use hook system | Not Started | Phase 2+ | Backend | GPA-002, GPA-004 | GatewayExchange fires hooks instead of direct adapter calls; registers with AdapterRegistry; backward compatible | TBD | 317 |
+| GPA-007 | Update GatewayExchange to use hook system | 🟡 Ready (Gap Analysis Complete) | Phase 2+ | Backend | GPA-002, GPA-004 | GatewayExchange uses hooks for orchestration and resolves adapters via AdapterRegistry; backward compatible; no contract drift from ADR-022 / `.docs/07-hooks.md`; **fail-closed** on missing adapter or hook error (no silent legacy fallback) per GOV-038 | TBD | 317 |
 | GPA-008 | Add hook calls to message flow (inbound/outbound) | Not Started | Phase 2+ | Backend | GPA-007 | Hooks fired at appropriate points: message:received, message:beforePersist, message:persisted, message:send, message:sent, message:failed | TBD | 318 |
 | GPA-009 | Update integration tests for hook-based architecture | Not Started | Phase 2+ | Backend | GPA-005, GPA-006, GPA-007 | All existing integration tests pass; hook execution verified; adapter registration tested | TBD | 319 |
 | GPA-010 | Create migration guide documentation | Not Started | Phase 2+ | Backend | GPA-009 | Documentation in `.docs/` explaining how to create new adapters; hook reference complete; examples provided | TBD | 320 |
