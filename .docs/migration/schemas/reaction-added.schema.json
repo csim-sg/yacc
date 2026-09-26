@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yacc/ws/reaction-added.schema.json",
+  "title": "reaction.added payload",
+  "description": "SPEC-002 MIG-002 capture @98db628. Baseline: ReactionAddedPayloadSchema in packages/backend/src/types/websocket.types.ts:100.",
+  "type": "object",
+  "required": ["messageId", "conversationId", "emoji", "userId", "name"],
+  "properties": {
+    "messageId": {"type": "string", "format": "uuid"},
+    "conversationId": {"type": "string", "format": "uuid"},
+    "emoji": {"type": "string", "description": "Emoji codepoint"},
+    "userId": {"type": "string", "format": "uuid"},
+    "name": {"type": "string", "minLength": 1}
+  }
+}

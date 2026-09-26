@@ -1,0 +1,735 @@
+# AsyncAPI capture of the current Node/TypeScript real-time (Socket.io) surface.
+#
+# SPEC-002 / MIG-002 (issue #336) — behavior-capture artifact, NOT yet the frozen contract.
+# Canonicalization + freeze happens in MIG-003 (issue #338).
+#
+# Baseline: packages/backend/src/websockets/ + packages/backend/src/socket-controllers/
+#   + packages/common/src/websocket/ at revision
+#   98db628d78c79578dd11eb0476fab812d81fed32 (branch dev)
+# Captured: 2026-09-26
+#
+# Wire protocol notes (verified in source):
+# - Envelope {event, data, timestamp} is applied ONLY by wsGateway emit paths
+#   (packages/backend/src/websockets/gateway.ts). Socket-controller handlers emit the
+#   RAW payload object without the envelope (e.g. message.controller.ts:34). Both
+#   shapes are captured per channel below; MIG-003 canonicalizes to one.
+# - Server transport at baseline is Socket.io (websocket transport forced in
+#   websocket.server.ts). Java target = raw Spring WebSocket, no STOMP/SockJS/Socket.io
+#   (ADR-026); polling fallback is dropped.
+# - Channels are keyed by the literal Socket.io event name.
+asyncapi: 2.6.0
+info:
+  title: YACC Real-time API (behavior capture)
+  version: 0.1.0-mig-002-capture
+  description: |
+    Full real-time surface of the Node/TypeScript backend (Socket.io + socket-controllers),
+    captured for SPEC-002 Java/Spring parity.
+
+    Counts (code-verified at baseline):
+    - 6 socket controllers (excluding index.ts)
+    - 20 WebSocket event constants in @yacc/common/websocket/constants (Conversation 2,
+      Message 3, Notification 3, Presence 5, System 7) — each enumerated as an individual
+      channel below
+    - 7 reaction event literals (reaction.added, reaction.added.ack, reaction.removed,
+      reaction.removed.ack, reaction.list, reaction.list.ack, reaction.count)
+    - backend runtime constant set (websockets/wsConstants.ts, 13 constants) — the
+      backend-only constants (QueueEvents 2 + notification.dismissed) each captured as an
+      individual channel
+    - envelope {event,data,timestamp} via 4 gateway emit paths
+    - rooms: user:{userId}, conversation:{conversationId}, connector:{platform}
+    - 1h backlog (Redis ws:backlog:{userId}; re-homed to PostgreSQL in target per ADR-028)
+    - 60s heartbeat (PING_INTERVAL_MS; Socket.io engine at baseline, re-implemented in raw WS)
+    - reconnect/backoff (server RECONNECT_CONFIG 1s→60s x2 max 5 attempts; client
+      socket.io 1s/2s/4s/8s/30s, 10 attempts)
+    - auth on handshake (handshake.auth.token → BetterAuth session → status enforcement)
+  x-baseline-revision: 98db628d78c79578dd11eb0476fab812d81fed32
+  x-capture-task: MIG-002
+  x-canonicalization-task: MIG-003
+
+servers:
+  production:
+    url: ws://localhost:3000
+    protocol: socketio
+    description: Local backend Socket.io endpoint (websocket transport forced at baseline)
+
+channels:
+  # =====================================================================
+  # Contract event constants — @yacc/common/websocket/constants (20, individual)
+  # =====================================================================
+  conversation.updated:
+    description: >-
+      Contract constant CONVERSATION_UPDATED. Wired at baseline: emitted via
+      services/websocket/conversation.handler.ts (+ tag.service.ts) and handled inbound by
+      socket-controllers/conversation.controller.ts (@OnMessage, room fan-out, bare payload).
+    publish:
+      operationId: onConversationUpdatedInbound
+      x-controller: packages/backend/src/socket-controllers/conversation.controller.ts:77 @98db628
+      message: {$ref: '#/components/messages/ConversationUpdatedPayload'}
+    subscribe:
+      operationId: onConversationUpdatedOutbound
+      x-source: packages/backend/src/services/websocket/conversation.handler.ts:emits @98db628
+      x-envelope: bare
+      message: {$ref: '#/components/messages/ConversationUpdatedPayload'}
+  conversation.reopened:
+    description: >-
+      Contract constant CONVERSATION_REOPENED. Wired: services/conversation.service.ts.
+    subscribe:
+      operationId: onConversationReopened
+      x-envelope: bare
+      message:
+        payload: {type: object, additionalProperties: true}
+        x-baseline-source: packages/backend/src/services/conversation.service.ts @98db628
+  message.received:
+    description: >-
+      Contract constant MESSAGE_RECEIVED. Wired: messageStatusTracker, gateway-hooks,
+      gateway-exchange, irc-ingestion; inbound broadcast by
+      socket-controllers/connector.controller.ts (@OnMessage connector.message.received →
+      emit message.received, bare payload).
+    subscribe:
+      operationId: onMessageReceived
+      x-envelope: bare
+      message: {$ref: '#/components/messages/MessageReceivedPayload'}
+  message.sent:
+    description: >-
+      Contract constant MESSAGE_SENT. Wired: messageStatusTracker, websocket-gateway,
+      message.handler; also inbound @OnMessage in socket-controllers/message.controller.ts
+      (room fan-out, bare payload).
+    publish:
+      operationId: onMessageSentInbound
+      x-controller: packages/backend/src/socket-controllers/message.controller.ts:22 @98db628
+      message: {$ref: '#/components/messages/MessageSentPayload'}
+    subscribe:
+      operationId: onMessageSentOutbound
+      x-envelope: bare
+      message: {$ref: '#/components/messages/MessageSentPayload'}
+  message.failed:
+    description: >-
+      Contract constant MESSAGE_FAILED. Wired: messageStatusTracker, message.handler,
+      queue-database-integration; also inbound @OnMessage in
+      socket-controllers/message.controller.ts (room fan-out, bare payload).
+    publish:
+      operationId: onMessageFailedInbound
+      x-controller: packages/backend/src/socket-controllers/message.controller.ts:53 @98db628
+      message: {$ref: '#/components/messages/MessageFailedPayload'}
+    subscribe:
+      operationId: onMessageFailedOutbound
+      x-envelope: bare
+      message: {$ref: '#/components/messages/MessageFailedPayload'}
+  notification.received:
+    description: >-
+      Contract constant NOTIFICATION_RECEIVED. Wired via wsGateway
+      (websockets/gateway.ts) — ENVELOPED {event,data,timestamp}.
+    subscribe:
+      operationId: onNotificationReceived
+      x-envelope: enveloped
+      message: {$ref: '#/components/messages/EnvelopedNotification'}
+  notification.deleted:
+    description: >-
+      Contract constant NOTIFICATION_DELETED. Defined in contract only — zero baseline
+      wiring (no backend emitter, no frontend consumer found at capture revision).
+      MIG-003 must canonicalize (wire or drop with founder-visible scope note).
+    subscribe:
+      operationId: onNotificationDeleted
+      x-envelope: defined-not-wired
+      message: {$ref: '#/components/messages/NotificationPayload'}
+  notification.read:
+    description: >-
+      Contract constant NOTIFICATION_READ. Defined in @yacc/common constants; backend
+      references only the constant definition at capture revision (no emitter found).
+      MIG-003 must canonicalize.
+    subscribe:
+      operationId: onNotificationRead
+      x-envelope: defined-not-wired
+      message: {$ref: '#/components/messages/NotificationPayload'}
+  notification.dismissed:
+    description: >-
+      Backend runtime constant NOTIFICATION_DISMISSED (websockets/wsConstants.ts:34) —
+      defined in the backend runtime constant set only, NOT in the 20-constant
+      @yacc/common contract. Defined-not-wired: zero baseline emitters
+      (notifications.service.ts dismiss path only logs; no socket emit found at capture
+      revision). MIG-003 must canonicalize (wire or drop with founder-visible scope note).
+    subscribe:
+      operationId: onNotificationDismissed
+      x-envelope: defined-not-wired
+      message: {$ref: '#/components/messages/NotificationPayload'}
+  presence.updated:
+    description: >-
+      Contract constant PRESENCE_UPDATED. Wired: presence.handler, event-backlog,
+      websocket.server.ts disconnect broadcast (io.emit, bare), inbound @OnMessage in
+      socket-controllers/presence.controller.ts (broadcast, bare).
+    publish:
+      operationId: onPresenceUpdatedInbound
+      x-controller: packages/backend/src/socket-controllers/presence.controller.ts:23 @98db628
+      message: {$ref: '#/components/messages/PresenceUpdatedPayload'}
+    subscribe:
+      operationId: onPresenceUpdatedOutbound
+      x-envelope: bare
+      message: {$ref: '#/components/messages/PresenceUpdatedPayload'}
+  typing.started:
+    description: >-
+      Contract constant TYPING_STARTED. Wired: typing.handler; inbound @OnMessage in
+      socket-controllers/typing.controller.ts (room fan-out, bare payload).
+    publish:
+      operationId: onTypingStartedInbound
+      x-controller: packages/backend/src/socket-controllers/typing.controller.ts:22 @98db628
+      message: {$ref: '#/components/messages/TypingStartedPayload'}
+    subscribe:
+      operationId: onTypingStartedOutbound
+      x-envelope: bare
+      message: {$ref: '#/components/messages/TypingStartedPayload'}
+  typing.stopped:
+    description: >-
+      Contract constant TYPING_STOPPED. Wired: typing.handler; inbound @OnMessage in
+      socket-controllers/typing.controller.ts; also emitted by typing.timeout handler.
+    publish:
+      operationId: onTypingStoppedInbound
+      x-controller: packages/backend/src/socket-controllers/typing.controller.ts:53 @98db628
+      message: {$ref: '#/components/messages/TypingStoppedPayload'}
+    subscribe:
+      operationId: onTypingStoppedOutbound
+      x-envelope: bare
+      message: {$ref: '#/components/messages/TypingStoppedPayload'}
+  user.online:
+    description: >-
+      Contract constant USER_ONLINE. Inbound only at baseline: @OnMessage in
+      socket-controllers/presence.controller.ts (broadcasts presence.updated; replies
+      online.users). No outbound 'user.online' event is emitted.
+    publish:
+      operationId: onUserOnline
+      x-controller: packages/backend/src/socket-controllers/presence.controller.ts:50 @98db628
+      message:
+        payload:
+          type: object
+          required: [userId, name]
+          properties:
+            userId: {type: string}
+            name: {type: string}
+  user.offline:
+    description: >-
+      Contract constant USER_OFFLINE. Inbound only at baseline: @OnMessage in
+      socket-controllers/presence.controller.ts (broadcasts presence.updated). No
+      outbound 'user.offline' event is emitted.
+    publish:
+      operationId: onUserOffline
+      x-controller: packages/backend/src/socket-controllers/presence.controller.ts:89 @98db628
+      message:
+        payload:
+          type: object
+          required: [userId]
+          properties:
+            userId: {type: string}
+  system.connection.established:
+    description: >-
+      Contract constant CONNECTION_ESTABLISHED ('system.connection.established'). Defined
+      in contract only — NOT wired at baseline. The runtime emits the raw literal
+      'connection.established' (see channel connection.established). MIG-003 canonicalizes.
+    subscribe:
+      operationId: onSystemConnectionEstablished
+      x-envelope: defined-not-wired
+      message: {$ref: '#/components/messages/SystemPayload'}
+  system.reconnection.started:
+    description: >-
+      Contract constant RECONNECTION_STARTED. Defined in contract only — zero baseline
+      wiring. Reconnect behavior exists client-side (socket.io) without this event.
+    subscribe:
+      operationId: onSystemReconnectionStarted
+      x-envelope: defined-not-wired
+      message: {$ref: '#/components/messages/SystemPayload'}
+  system.reconnection.failed:
+    description: >-
+      Contract constant RECONNECTION_FAILED. Defined in contract only — zero baseline
+      wiring.
+    subscribe:
+      operationId: onSystemReconnectionFailed
+      x-envelope: defined-not-wired
+      message: {$ref: '#/components/messages/SystemPayload'}
+  system.heartbeat:
+    description: >-
+      Contract constant HEARTBEAT_RECEIVED ('system.heartbeat'). Defined in contract only —
+      baseline heartbeat is Socket.io engine-level ping/pong (60s), not an application
+      event. Java raw WS must re-implement heartbeat behavior (ADR-026).
+    subscribe:
+      operationId: onSystemHeartbeat
+      x-envelope: defined-not-wired
+      message: {$ref: '#/components/messages/SystemPayload'}
+  system.error:
+    description: >-
+      Contract constant ERROR_OCCURRED ('system.error'). Defined in contract; frontend
+      references the constant; backend emits raw literal 'error' {message} on handler
+      failure (see channel error). MIG-003 canonicalizes.
+    subscribe:
+      operationId: onSystemError
+      x-envelope: partial
+      message: {$ref: '#/components/messages/SystemPayload'}
+  system.backlog.replay.started:
+    description: >-
+      Contract constant BACKLOG_REPLAY_STARTED. Defined in contract only — zero baseline
+      wiring. Backlog replay exists in event-backlog.service.ts without emitting this
+      event. Java target must emit replay start/complete (AC-06 behavior tests).
+    subscribe:
+      operationId: onBacklogReplayStarted
+      x-envelope: defined-not-wired
+      message: {$ref: '#/components/messages/SystemPayload'}
+  system.backlog.replay.completed:
+    description: >-
+      Contract constant BACKLOG_REPLAY_COMPLETED. Defined in contract only — zero baseline
+      wiring (same status as system.backlog.replay.started).
+    subscribe:
+      operationId: onBacklogReplayCompleted
+      x-envelope: defined-not-wired
+      message: {$ref: '#/components/messages/SystemPayload'}
+
+  # =====================================================================
+  # Socket-controller-only operations (client → server), 6 controllers
+  # =====================================================================
+  connection:
+    description: >-
+      Connection lifecycle channel. Handshake auth: webSocketAuthMiddleware validates
+      socket.handshake.auth.token via BetterAuth getSession, loads user, rejects
+      inactive/suspended, attaches userId/email/role/name. On connect the server joins
+      user:{userId} room (websocket.server.ts + conversation.controller @OnConnect) and
+      emits 'connection.established'. On disconnect: presence broadcast + room cleanup.
+    publish:
+      operationId: onClientConnect
+      x-controller: packages/backend/src/websockets/auth.middleware.ts:33, websockets/websocket.server.ts:65, socket-controllers/conversation.controller.ts:21 @98db628
+      message:
+        payload:
+          type: object
+          description: Handshake auth object
+          required: [token]
+          properties:
+            token: {type: string, description: BetterAuth session token}
+    subscribe:
+      operationId: onDisconnect
+      x-controller: packages/backend/src/websockets/websocket.server.ts:89, socket-controllers/conversation.controller.ts:49 @98db628
+      message:
+        payload: {type: object, additionalProperties: true}
+  subscribe.conversation:
+    description: Join conversation:{conversationId} room; ack via conversation.subscribed.
+    publish:
+      operationId: onSubscribeConversation
+      x-controller: packages/backend/src/socket-controllers/conversation.controller.ts:107 @98db628
+      message:
+        payload: {type: string, description: conversationId}
+  unsubscribe.conversation:
+    description: Leave conversation:{conversationId} room; ack via conversation.unsubscribed.
+    publish:
+      operationId: onUnsubscribeConversation
+      x-controller: packages/backend/src/socket-controllers/conversation.controller.ts:137 @98db628
+      message:
+        payload: {type: string, description: conversationId}
+  message.retry:
+    description: Client-requested retry of a failed message; ack + room broadcast.
+    publish:
+      operationId: onMessageRetry
+      x-controller: packages/backend/src/socket-controllers/message.controller.ts:85 @98db628
+      message:
+        payload:
+          type: object
+          required: [messageId, conversationId]
+          properties:
+            messageId: {type: string}
+            conversationId: {type: string}
+  message.received.ack:
+    description: Client acknowledgement of message.received (optional tracking, no reply).
+    publish:
+      operationId: onMessageReceivedAck
+      x-controller: packages/backend/src/socket-controllers/message.controller.ts:128 @98db628
+      message:
+        payload:
+          type: object
+          required: [messageId, conversationId]
+          properties:
+            messageId: {type: string}
+            conversationId: {type: string}
+  user.status:
+    description: Granular presence (active|idle|away); broadcasts user.status.changed.
+    publish:
+      operationId: onUserStatus
+      x-controller: packages/backend/src/socket-controllers/presence.controller.ts:120 @98db628
+      message:
+        payload:
+          type: object
+          required: [userId, status]
+          properties:
+            userId: {type: string}
+            status: {type: string, enum: [active, idle, away]}
+  request.online.users:
+    description: Request current online users; replies online.users (or error).
+    publish:
+      operationId: onRequestOnlineUsers
+      x-controller: packages/backend/src/socket-controllers/presence.controller.ts:153 @98db628
+      message: {payload: {type: 'null'}}
+  reaction.added:
+    description: >-
+      Reaction literal 1 of 7 (runtime literal, NOT a contract constant). Wired:
+      socket-controllers/reaction.controller.ts @OnMessage → room fan-out to
+      conversation:{conversationId} (bare payload) + sender ack reaction.added.ack.
+    publish:
+      operationId: onReactionAddedInbound
+      x-controller: packages/backend/src/socket-controllers/reaction.controller.ts:22 @98db628
+      message: {$ref: '#/components/messages/ReactionAddedPayload'}
+    subscribe:
+      operationId: onReactionAddedOutbound
+      x-source: packages/backend/src/socket-controllers/reaction.controller.ts:36 @98db628 (socket.to(room).emit)
+      x-envelope: bare
+      message: {$ref: '#/components/messages/ReactionAddedPayload'}
+  reaction.removed:
+    description: >-
+      Reaction literal 3 of 7 (runtime literal, NOT a contract constant). Wired:
+      socket-controllers/reaction.controller.ts @OnMessage → room fan-out to
+      conversation:{conversationId} (bare payload) + sender ack reaction.removed.ack.
+    publish:
+      operationId: onReactionRemovedInbound
+      x-controller: packages/backend/src/socket-controllers/reaction.controller.ts:62 @98db628
+      message: {$ref: '#/components/messages/ReactionRemovedPayload'}
+    subscribe:
+      operationId: onReactionRemovedOutbound
+      x-source: packages/backend/src/socket-controllers/reaction.controller.ts:76 @98db628 (socket.to(room).emit)
+      x-envelope: bare
+      message: {$ref: '#/components/messages/ReactionRemovedPayload'}
+  reaction.list:
+    description: Request reactions for a message; replies reaction.list.ack (or error).
+    publish:
+      operationId: onReactionList
+      x-controller: packages/backend/src/socket-controllers/reaction.controller.ts:102 @98db628
+      message:
+        payload:
+          type: object
+          required: [messageId]
+          properties:
+            messageId: {type: string}
+  reaction.count:
+    description: Reaction count update; room fan-out with count payload.
+    publish:
+      operationId: onReactionCount
+      x-controller: packages/backend/src/socket-controllers/reaction.controller.ts:135 @98db628
+      message: {$ref: '#/components/messages/ReactionCountPayload'}
+  typing.timeout:
+    description: Server-side typing timeout trigger; emits typing.stopped to room.
+    publish:
+      operationId: onTypingTimeout
+      x-controller: packages/backend/src/socket-controllers/typing.controller.ts:85 @98db628
+      message:
+        payload:
+          type: object
+          required: [userId, conversationId]
+          properties:
+            userId: {type: string}
+            conversationId: {type: string}
+  typing.heartbeat:
+    description: Typing keep-alive; resets server timeout (optional, no reply).
+    publish:
+      operationId: onTypingHeartbeat
+      x-controller: packages/backend/src/socket-controllers/typing.controller.ts:121 @98db628
+      message:
+        payload:
+          type: object
+          required: [userId, conversationId]
+          properties:
+            userId: {type: string}
+            conversationId: {type: string}
+  connector.message.received:
+    description: Inbound platform message bridge (Telegram/IRC); emits message.received to room.
+    publish:
+      operationId: onConnectorMessageReceived
+      x-controller: packages/backend/src/socket-controllers/connector.controller.ts:43 @98db628
+      message: {$ref: '#/components/messages/MessageReceivedPayload'}
+  connector.status.changed:
+    description: Connector connection status change; broadcasts connector.status + room status.updated.
+    publish:
+      operationId: onConnectorStatusChanged
+      x-controller: packages/backend/src/socket-controllers/connector.controller.ts:94 @98db628
+      message:
+        payload:
+          type: object
+          required: [platform, status, timestamp]
+          properties:
+            platform: {type: string, enum: [telegram, irc]}
+            status: {type: string, enum: [connected, disconnected, error, reconnecting]}
+            message: {type: string}
+            timestamp: {type: string, format: date-time}
+  connector.subscribe:
+    description: Join connector:{platform} room; ack via connector.subscribed.
+    publish:
+      operationId: onConnectorSubscribe
+      x-controller: packages/backend/src/socket-controllers/connector.controller.ts:144 @98db628
+      message:
+        payload:
+          type: object
+          required: [platform]
+          properties:
+            platform: {type: string, enum: [telegram, irc]}
+  connector.unsubscribe:
+    description: Leave connector:{platform} room; ack via connector.unsubscribed.
+    publish:
+      operationId: onConnectorUnsubscribe
+      x-controller: packages/backend/src/socket-controllers/connector.controller.ts:186 @98db628
+      message:
+        payload:
+          type: object
+          required: [platform]
+          properties:
+            platform: {type: string, enum: [telegram, irc]}
+  connector.message.error:
+    description: Delivery-failure bridge; emits message.error to conversation room.
+    publish:
+      operationId: onConnectorMessageError
+      x-controller: packages/backend/src/socket-controllers/connector.controller.ts:229 @98db628
+      message:
+        payload:
+          type: object
+          required: [conversationId, messageId, platform, error, willRetry, timestamp]
+          properties:
+            conversationId: {type: string}
+            messageId: {type: string}
+            platform: {type: string, enum: [telegram, irc]}
+            error: {type: string}
+            willRetry: {type: boolean}
+            timestamp: {type: string, format: date-time}
+  connector.message.ack:
+    description: Delivery-ack bridge; emits message.ack to conversation room.
+    publish:
+      operationId: onConnectorMessageAck
+      x-controller: packages/backend/src/socket-controllers/connector.controller.ts:283 @98db628
+      message:
+        payload:
+          type: object
+          required: [conversationId, messageId, platform, platformMessageId, timestamp]
+          properties:
+            conversationId: {type: string}
+            messageId: {type: string}
+            platform: {type: string, enum: [telegram, irc]}
+            platformMessageId: {type: string}
+            timestamp: {type: string, format: date-time}
+
+  # =====================================================================
+  # Raw runtime literals (server → client) not in the 20-constant contract
+  # =====================================================================
+  connection.established:
+    description: >-
+      Raw literal emitted on connect by websocket.server.ts:83 AND
+      conversation.controller.ts:39 (duplicated emit path — MIG-003 note). Bare payload;
+      the contract counterpart system.connection.established is unwired.
+    subscribe:
+      operationId: onConnectionEstablishedRaw
+      x-envelope: bare
+      message:
+        payload:
+          type: object
+          required: [socketId, timestamp]
+          properties:
+            socketId: {type: string}
+            timestamp: {type: string, format: date-time}
+        x-baseline-source: packages/backend/src/websockets/websocket.server.ts:83, socket-controllers/conversation.controller.ts:39 @98db628
+  conversation.subscribed:
+    description: Raw ack for subscribe.conversation (bare payload {conversationId}).
+    subscribe:
+      operationId: onConversationSubscribed
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [conversationId], properties: {conversationId: {type: string}}}
+        x-baseline-source: packages/backend/src/socket-controllers/conversation.controller.ts:120 @98db628
+  conversation.unsubscribed:
+    description: Raw ack for unsubscribe.conversation (bare payload {conversationId}).
+    subscribe:
+      operationId: onConversationUnsubscribed
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [conversationId], properties: {conversationId: {type: string}}}
+        x-baseline-source: packages/backend/src/socket-controllers/conversation.controller.ts:150 @98db628
+  message.retry.acknowledged:
+    description: Raw ack for message.retry (bare payload {messageId, timestamp}).
+    subscribe:
+      operationId: onMessageRetryAcknowledged
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [messageId, timestamp], properties: {messageId: {type: string}, timestamp: {type: string, format: date-time}}}
+        x-baseline-source: packages/backend/src/socket-controllers/message.controller.ts:98 @98db628
+  message.retry.started:
+    description: Raw room broadcast after message.retry (bare payload).
+    subscribe:
+      operationId: onMessageRetryStarted
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [messageId, conversationId, timestamp], properties: {messageId: {type: string}, conversationId: {type: string}, timestamp: {type: string, format: date-time}}}
+        x-baseline-source: packages/backend/src/socket-controllers/message.controller.ts:105 @98db628
+  online.users:
+    description: Raw reply for user.online / request.online.users (bare payload {users[],timestamp}).
+    subscribe:
+      operationId: onOnlineUsers
+      x-envelope: bare
+      message:
+        payload:
+          type: object
+          required: [users, timestamp]
+          properties:
+            users: {type: array, items: {type: string}}
+            timestamp: {type: string, format: date-time}
+        x-baseline-source: packages/backend/src/socket-controllers/presence.controller.ts:68,161 @98db628
+  user.status.changed:
+    description: Raw broadcast for user.status (bare payload).
+    subscribe:
+      operationId: onUserStatusChanged
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [userId, status, timestamp], properties: {userId: {type: string}, status: {type: string, enum: [active, idle, away]}, timestamp: {type: string, format: date-time}}}
+        x-baseline-source: packages/backend/src/socket-controllers/presence.controller.ts:132 @98db628
+  connector.status:
+    description: Raw broadcast for connector.status.changed (bare payload).
+    subscribe:
+      operationId: onConnectorStatus
+      x-envelope: bare
+      message:
+        payload: {type: object, additionalProperties: true}
+        x-baseline-source: packages/backend/src/socket-controllers/connector.controller.ts:110 @98db628
+  status.updated:
+    description: Raw room broadcast to connector:{platform} (bare payload).
+    subscribe:
+      operationId: onConnectorStatusUpdated
+      x-envelope: bare
+      message:
+        payload: {type: object, additionalProperties: true}
+        x-baseline-source: packages/backend/src/socket-controllers/connector.controller.ts:119 @98db628
+  connector.subscribed:
+    description: Raw ack for connector.subscribe (bare payload {platform,timestamp}).
+    subscribe:
+      operationId: onConnectorSubscribed
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [platform, timestamp], properties: {platform: {type: string}, timestamp: {type: string, format: date-time}}}
+        x-baseline-source: packages/backend/src/socket-controllers/connector.controller.ts:163 @98db628
+  connector.unsubscribed:
+    description: Raw ack for connector.unsubscribe (bare payload {platform,timestamp}).
+    subscribe:
+      operationId: onConnectorUnsubscribedAck
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [platform, timestamp], properties: {platform: {type: string}, timestamp: {type: string, format: date-time}}}
+        x-baseline-source: packages/backend/src/socket-controllers/connector.controller.ts:205 @98db628
+  message.error:
+    description: Raw conversation-room delivery-failure event (bare payload).
+    subscribe:
+      operationId: onMessageError
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [messageId, error, willRetry, timestamp], properties: {messageId: {type: string}, error: {type: string}, willRetry: {type: boolean}, timestamp: {type: string, format: date-time}}}
+        x-baseline-source: packages/backend/src/socket-controllers/connector.controller.ts:256 @98db628
+  message.ack:
+    description: Raw conversation-room delivery-ack event (bare payload).
+    subscribe:
+      operationId: onMessageAck
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [messageId, platformMessageId, timestamp], properties: {messageId: {type: string}, platformMessageId: {type: string}, timestamp: {type: string, format: date-time}}}
+        x-baseline-source: packages/backend/src/socket-controllers/connector.controller.ts:308 @98db628
+  reaction.added.ack:
+    description: Reaction literal 2 of 7 — sender acknowledgement for reaction.added (bare payload).
+    subscribe:
+      operationId: onReactionAddedAck
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [messageId, emoji, timestamp], properties: {messageId: {type: string}, emoji: {type: string}, timestamp: {type: string, format: date-time}}}
+        x-baseline-source: packages/backend/src/socket-controllers/reaction.controller.ts:39 @98db628
+  reaction.removed.ack:
+    description: Reaction literal 4 of 7 — sender acknowledgement for reaction.removed (bare payload).
+    subscribe:
+      operationId: onReactionRemovedAck
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [messageId, emoji, timestamp], properties: {messageId: {type: string}, emoji: {type: string}, timestamp: {type: string, format: date-time}}}
+        x-baseline-source: packages/backend/src/socket-controllers/reaction.controller.ts:79 @98db628
+  reaction.list.ack:
+    description: Reaction literal 6 of 7 — reply for reaction.list (bare payload {messageId,reactions[],timestamp}; reactions always [] at baseline).
+    subscribe:
+      operationId: onReactionListAck
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [messageId, reactions, timestamp], properties: {messageId: {type: string}, reactions: {type: array, items: {type: object}}, timestamp: {type: string, format: date-time}}}
+        x-baseline-source: packages/backend/src/socket-controllers/reaction.controller.ts:111 @98db628
+  error:
+    description: >-
+      Generic error emit: socket.emit('error', {message}) on handler failure
+      (presence.controller.ts:170 request.online.users failure; reaction.controller.ts:122
+      reaction.list failure). Bare payload. Contract counterpart system.error is unwired.
+    subscribe:
+      operationId: onGenericError
+      x-envelope: bare
+      message:
+        payload: {type: object, required: [message], properties: {message: {type: string}}}
+        x-baseline-source: packages/backend/src/socket-controllers/presence.controller.ts:170, socket-controllers/reaction.controller.ts:122 @98db628
+
+  # =====================================================================
+  # Gateway-emitted queue events (backend wsConstants QueueEvents — not in the
+  # 20-constant @yacc/common contract; emitted via wsGateway → ENVELOPED)
+  # =====================================================================
+  message.retry.scheduled:
+    description: >-
+      Backend wsConstant QueueEvents.MESSAGE_RETRY_SCHEDULED, emitted globally via
+      wsGateway.emitGlobally (queue-database-integration.ts:190). Enveloped. MIG-003 must
+      reconcile the backend wsConstants set (13 events) with the @yacc/common set (20).
+    subscribe:
+      operationId: onMessageRetryScheduled
+      x-envelope: enveloped
+      message: {$ref: '#/components/messages/EnvelopedGeneric'}
+  queue.message.dlq:
+    description: >-
+      Backend wsConstant QueueEvents.MESSAGE_DLQ, emitted globally via wsGateway
+      (queue-database-integration.ts:261). Enveloped.
+    subscribe:
+      operationId: onQueueMessageDlq
+      x-envelope: enveloped
+      message: {$ref: '#/components/messages/EnvelopedGeneric'}
+
+components:
+  messages:
+    EnvelopedNotification:
+      payload: {$ref: 'schemas/envelope.schema.json'}
+      x-envelope-note: >-
+        wsGateway wraps any payload as {event,data,timestamp}; the `data` property
+        conforms to schemas/notification.schema.json.
+    EnvelopedGeneric:
+      payload: {$ref: 'schemas/envelope.schema.json'}
+    ConversationUpdatedPayload:
+      payload: {$ref: 'schemas/conversation-updated.schema.json'}
+      x-baseline-source: packages/backend/src/types/websocket.types.ts:18 @98db628
+    MessageReceivedPayload:
+      payload: {$ref: 'schemas/message-received.schema.json'}
+      x-baseline-source: packages/backend/src/types/websocket.types.ts:29 @98db628
+    MessageSentPayload:
+      payload: {$ref: 'schemas/message-sent.schema.json'}
+      x-baseline-source: packages/backend/src/types/websocket.types.ts:25 @98db628
+    MessageFailedPayload:
+      payload: {$ref: 'schemas/message-failed.schema.json'}
+      x-baseline-source: packages/backend/src/types/websocket.types.ts:43 @98db628
+    PresenceUpdatedPayload:
+      payload: {$ref: 'schemas/presence-updated.schema.json'}
+      x-baseline-source: packages/backend/src/types/websocket.types.ts:87 @98db628
+    TypingStartedPayload:
+      payload: {$ref: 'schemas/typing-started.schema.json'}
+      x-baseline-source: packages/backend/src/types/websocket.types.ts:56 @98db628
+    TypingStoppedPayload:
+      payload: {$ref: 'schemas/typing-stopped.schema.json'}
+      x-baseline-source: packages/backend/src/types/websocket.types.ts:68 @98db628
+    ReactionAddedPayload:
+      payload: {$ref: 'schemas/reaction-added.schema.json'}
+      x-baseline-source: packages/backend/src/types/websocket.types.ts:100 @98db628
+    ReactionRemovedPayload:
+      payload: {$ref: 'schemas/reaction-removed.schema.json'}
+      x-baseline-source: packages/backend/src/types/websocket.types.ts:112 @98db628
+    ReactionCountPayload:
+      payload:
+        type: object
+        required: [messageId, emoji, count, timestamp]
+        properties:
+          messageId: {type: string}
+          emoji: {type: string}
+          count: {type: integer}
+          timestamp: {type: string, format: date-time}
+      x-baseline-source: packages/backend/src/socket-controllers/reaction.controller.ts:155 @98db628
+    NotificationPayload:
+      payload: {$ref: 'schemas/notification.schema.json'}
+      x-baseline-source: packages/common/src/websocket/types/NotificationPayload.type.ts @98db628
+    SystemPayload:
+      payload: {$ref: 'schemas/system-payload.schema.json'}
+      x-baseline-source: packages/common/src/websocket/types/SystemPayload.type.ts @98db628

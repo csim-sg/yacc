@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yacc/ws/presence-updated.schema.json",
+  "title": "presence.updated payload (runtime)",
+  "description": "SPEC-002 MIG-002 capture @98db628. Baseline: PresenceUpdatedPayloadSchema in packages/backend/src/types/websocket.types.ts:87. The common contract type PresencePayload (packages/common) is a second, divergent shape (adds userName, lastSeenAt, typingIn, status 'away') captured in the ledger; MIG-003 canonicalizes.",
+  "type": "object",
+  "required": ["userId", "status", "lastSeen"],
+  "properties": {
+    "userId": {"type": "string", "format": "uuid"},
+    "status": {"type": "string", "enum": ["online", "offline"]},
+    "lastSeen": {"type": "string", "format": "date-time"},
+    "isOnline": {"type": "boolean", "description": "Alternative field used by websocket.server.ts disconnect broadcast (websocket.server.ts:158) — baseline divergence, MIG-003 note"}
+  }
+}

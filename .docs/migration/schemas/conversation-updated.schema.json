@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yacc/ws/conversation-updated.schema.json",
+  "title": "conversation.updated payload",
+  "description": "SPEC-002 MIG-002 capture @98db628. Baseline: ConversationUpdatedPayloadSchema in packages/backend/src/types/websocket.types.ts:18.",
+  "type": "object",
+  "required": ["conversationId", "updatedFields", "changedBy", "changedAt"],
+  "properties": {
+    "conversationId": {"type": "string", "format": "uuid"},
+    "updatedFields": {"type": "object", "description": "Fields that changed", "additionalProperties": true},
+    "changedBy": {"type": "string", "format": "uuid"},
+    "changedAt": {"type": "string", "format": "date-time"}
+  }
+}

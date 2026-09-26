@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yacc/ws/message-sent.schema.json",
+  "title": "message.sent payload",
+  "description": "SPEC-002 MIG-002 capture @98db628. Baseline: MessageSentPayloadSchema in packages/backend/src/types/websocket.types.ts:25.",
+  "type": "object",
+  "required": ["messageId", "conversationId", "status", "sentAt"],
+  "properties": {
+    "messageId": {"type": "string", "format": "uuid"},
+    "conversationId": {"type": "string", "format": "uuid"},
+    "status": {"type": "string", "const": "sent"},
+    "sentAt": {"type": "string", "format": "date-time"}
+  }
+}
