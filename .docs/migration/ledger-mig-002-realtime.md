@@ -1,15 +1,32 @@
 ---
 ledger_id: LEDGER-MIG-002-REALTIME
 version: 1.0.0
-spec: SPEC-002 (vault: 02-Architecture-Landscape/projects/yacc/spec/SPEC-002-java-spring-backend-migration.md)
+spec: "https://github.com/Antpolis/documentation/blob/feat/issue-65-archive-communication-memory/02-Architecture-Landscape/projects/yacc/spec/SPEC-002-java-spring-backend-migration.md"
 milestone: "https://github.com/csim-sg/yacc/milestone/3"
 task: "https://github.com/csim-sg/yacc/issues/336"
 baseline_revision: 98db628d78c79578dd11eb0476fab812d81fed32
 baseline_branch: dev
 captured_at: 2026-09-26
 reconciliation_target: MIG-003 (#338)
+durable_context:
+  spec: "https://github.com/Antpolis/documentation/blob/feat/issue-65-archive-communication-memory/02-Architecture-Landscape/projects/yacc/spec/SPEC-002-java-spring-backend-migration.md"
+  adrs:
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-023-contract-source-openapi-asyncapi.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-024-java-spring-backend-replacement-architecture.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-025-auth-spring-security-dual-role-oidc-bootstrap-recovery.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-026-raw-spring-websocket-resilience.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-027-data-access-flyway-jpa-encryption.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-028-async-processing-quartz-db-dlq.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-029-jvm-deployment-envelope-observability.md"
+  arch:
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/architecture/001-technology-architecture.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/architecture/002-application-architecture.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/architecture/003-data-architecture.md"
+  gov:
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/governance/GOV-038-GPA-007-gap-analysis-and-fail-closed.md"
+  runbooks: "N/A for this capture task — real-time contract capture only, no deployment or operational change (runbooks apply from FR-02/MIG-014 deploy work onward)"
 status: capture (frozen-scope candidate; canonicalized by MIG-003)
-row_count: 85
+row_count: 86
 ---
 
 # MIG-002 — Atomic Real-time Inventory-to-Evidence Ledger
@@ -32,7 +49,7 @@ AC-01, AC-02, AC-06) alongside `asyncapi.yaml` + `schemas/*.json` (same director
   constants) and the backend `websockets/wsConstants.ts` runtime set (13 constants incl.
   2 QueueEvents, `notification.dismissed`, no SystemEvents group) disagree. The 20
   contract constants are rows WS-EVT-001..020 with per-constant wiring status; backend-only
-  constants appear as WS-QEV rows / reconciliation notes. MIG-003 reconciles.
+  constants are rows WS-QEV-001..003. MIG-003 reconciles.
 - `Result` = ledger closure state; all rows are `blocked` ("pending implementation
   evidence") until MIG-050/051/052 produce passing evidence. A `fail`/`blocked` row at
   MIG-072 blocks cutover.
@@ -41,8 +58,9 @@ AC-01, AC-02, AC-06) alongside `asyncapi.yaml` + `schemas/*.json` (same director
 Counts (code-verified at capture): **6 socket controllers** (excluding `index.ts`),
 **20 contract event constants**, **28 socket-controller operations** (26 `@OnMessage` +
 `@OnConnect` + `@OnDisconnect`), **17 raw runtime emit-only literals** (incl. reaction
-acks = reaction literals 2/4/6 of 7), **2 gateway-emitted queue events**, **18 real-time
-behavior rows**. Total **85 rows**.
+acks = reaction literals 2/4/6 of 7), **3 backend-only runtime constants** (2
+gateway-emitted queue events + 1 defined-not-wired notification constant), **18
+real-time behavior rows**. Total **86 rows**.
 
 ---
 
@@ -159,12 +177,13 @@ behavior rows**. Total **85 rows**.
 > 6 `reaction.list.ack` (WS-RAW-016), 7 `reaction.count` (WS-OP-REACT-004) — one row and
 > one AsyncAPI channel per literal.
 
-## 4. Gateway-emitted queue events (backend-only constants; 2 rows)
+## 4. Backend-only runtime constants — backend `websockets/wsConstants.ts` (3 rows)
 
-| ID | Literal | Baseline source @98db628 | Required target behavior (Java/Spring) | AsyncAPI | Evidence location | Result | Rev |
+| ID | Event | Baseline source @98db628 | Required target behavior (Java/Spring) | AsyncAPI | Evidence location | Result | Rev |
 |---|---|---|---|---|---|---|---|
 | WS-QEV-001 | `message.retry.scheduled` (backend wsConstant QueueEvents.MESSAGE_RETRY_SCHEDULED — NOT in the 20-constant common contract) | `websockets/wsConstants.ts:50`, emitted `services/queue-database-integration.ts:190` via wsGateway → ENVELOPED | Re-expressed over Quartz (ADR-028); MIG-003 reconciles backend wsConstants vs common contract | ch `message.retry.scheduled` | MIG-063 tests | blocked | 2026-09-26 |
 | WS-QEV-002 | `queue.message.dlq` (backend wsConstant QueueEvents.MESSAGE_DLQ — NOT in the 20-constant common contract) | `websockets/wsConstants.ts:51`, emitted `services/queue-database-integration.ts:261` via wsGateway → ENVELOPED | Re-expressed over DB DLQ (ADR-028); MIG-003 reconciliation | ch `queue.message.dlq` | MIG-063 tests | blocked | 2026-09-26 |
+| WS-QEV-003 | `notification.dismissed` (backend wsConstant NotificationEvents.NOTIFICATION_DISMISSED — NOT in the 20-constant common contract) — defined-not-wired: zero baseline emitters (dismiss path logs only, no socket emit) | `websockets/wsConstants.ts:34` | Defined-not-wired captured as frozen surface row; MIG-003 canonicalizes (wire the emit on dismissal, or drop with founder-visible scope note); Java target emits contract name per AC-06 | ch `notification.dismissed` | MIG-052 notification tests | blocked | 2026-09-26 |
 
 ## 5. Real-time behaviors (18 rows)
 
@@ -198,8 +217,8 @@ behavior rows**. Total **85 rows**.
    server-side emit path shape.
 2. **Constant-set coherence:** `@yacc/common` (20 constants) vs backend `wsConstants.ts`
    (13: MessageEvents 3, ConversationEvents 2, NotificationEvents 3 with
-   `notification.dismissed` replacing `notification.deleted`, PresenceEvents 3 without
-   user.online/user.offline, QueueEvents 2, no SystemEvents group). Both sets are frozen
+   `notification.dismissed` replacing `notification.deleted` (row WS-QEV-003), PresenceEvents 3 without
+   user.online/user.offline, QueueEvents 2 (rows WS-QEV-001/002), no SystemEvents group). Both sets are frozen
    above; unification is a MIG-003 decision within frozen scope.
 3. **Literal-vs-constant drift:** runtime emits raw `connection.established` /
    `error` instead of `system.connection.established` / `system.error`; 5 SystemEvents +

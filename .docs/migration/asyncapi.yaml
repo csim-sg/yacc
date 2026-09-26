@@ -32,6 +32,9 @@ info:
       channel below
     - 7 reaction event literals (reaction.added, reaction.added.ack, reaction.removed,
       reaction.removed.ack, reaction.list, reaction.list.ack, reaction.count)
+    - backend runtime constant set (websockets/wsConstants.ts, 13 constants) — the
+      backend-only constants (QueueEvents 2 + notification.dismissed) each captured as an
+      individual channel
     - envelope {event,data,timestamp} via 4 gateway emit paths
     - rooms: user:{userId}, conversation:{conversationId}, connector:{platform}
     - 1h backlog (Redis ws:backlog:{userId}; re-homed to PostgreSQL in target per ADR-028)
@@ -136,6 +139,17 @@ channels:
       MIG-003 must canonicalize.
     subscribe:
       operationId: onNotificationRead
+      x-envelope: defined-not-wired
+      message: {$ref: '#/components/messages/NotificationPayload'}
+  notification.dismissed:
+    description: >-
+      Backend runtime constant NOTIFICATION_DISMISSED (websockets/wsConstants.ts:34) —
+      defined in the backend runtime constant set only, NOT in the 20-constant
+      @yacc/common contract. Defined-not-wired: zero baseline emitters
+      (notifications.service.ts dismiss path only logs; no socket emit found at capture
+      revision). MIG-003 must canonicalize (wire or drop with founder-visible scope note).
+    subscribe:
+      operationId: onNotificationDismissed
       x-envelope: defined-not-wired
       message: {$ref: '#/components/messages/NotificationPayload'}
   presence.updated:
@@ -346,6 +360,34 @@ channels:
       operationId: onRequestOnlineUsers
       x-controller: packages/backend/src/socket-controllers/presence.controller.ts:153 @98db628
       message: {payload: {type: 'null'}}
+  reaction.added:
+    description: >-
+      Reaction literal 1 of 7 (runtime literal, NOT a contract constant). Wired:
+      socket-controllers/reaction.controller.ts @OnMessage → room fan-out to
+      conversation:{conversationId} (bare payload) + sender ack reaction.added.ack.
+    publish:
+      operationId: onReactionAddedInbound
+      x-controller: packages/backend/src/socket-controllers/reaction.controller.ts:22 @98db628
+      message: {$ref: '#/components/messages/ReactionAddedPayload'}
+    subscribe:
+      operationId: onReactionAddedOutbound
+      x-source: packages/backend/src/socket-controllers/reaction.controller.ts:36 @98db628 (socket.to(room).emit)
+      x-envelope: bare
+      message: {$ref: '#/components/messages/ReactionAddedPayload'}
+  reaction.removed:
+    description: >-
+      Reaction literal 3 of 7 (runtime literal, NOT a contract constant). Wired:
+      socket-controllers/reaction.controller.ts @OnMessage → room fan-out to
+      conversation:{conversationId} (bare payload) + sender ack reaction.removed.ack.
+    publish:
+      operationId: onReactionRemovedInbound
+      x-controller: packages/backend/src/socket-controllers/reaction.controller.ts:62 @98db628
+      message: {$ref: '#/components/messages/ReactionRemovedPayload'}
+    subscribe:
+      operationId: onReactionRemovedOutbound
+      x-source: packages/backend/src/socket-controllers/reaction.controller.ts:76 @98db628 (socket.to(room).emit)
+      x-envelope: bare
+      message: {$ref: '#/components/messages/ReactionRemovedPayload'}
   reaction.list:
     description: Request reactions for a message; replies reaction.list.ack (or error).
     publish:
