@@ -25,7 +25,8 @@ durable_context:
   gov:
     - "https://github.com/csim-sg/yacc/blob/dev/.docs/governance/GOV-038-GPA-007-gap-analysis-and-fail-closed.md"
   runbooks: "N/A for this capture task — contract capture only, no deployment/operational change (runbooks apply from FR-02/MIG-014 deploy work onward)"
-status: capture (frozen-scope candidate; canonicalized by MIG-003)
+status: superseded as binding scope by LEDGER-MIG-003-RECONCILED (.docs/migration/ledger-mig-003-reconciled.md, MIG-003 #338); retained as capture provenance
+superseded_by: LEDGER-MIG-003-RECONCILED v1.0.0
 row_count: 70
 ---
 

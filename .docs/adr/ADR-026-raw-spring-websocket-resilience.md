@@ -8,7 +8,7 @@
 
 ## Context
 
-The founder fixed raw Spring WebSocket (no STOMP/SockJS/Socket.io/broker). The current surface: 6 socket controllers, 19 event constants, `{event,data,timestamp}` envelope, rooms, 1h backlog replay, 60s heartbeat, reconnect/backoff, auth middleware, correlationId. Socket.io's HTTP long-polling fallback is dropped.
+The founder fixed raw Spring WebSocket (no STOMP/SockJS/Socket.io/broker). The current surface: 6 socket controllers, 23 named event constants (20 common contract constants + 3 backend-only runtime constants), `{event,data,timestamp}` envelope, rooms, 1h backlog replay, 60s heartbeat, reconnect/backoff, auth middleware, correlationId. Socket.io's HTTP long-polling fallback is dropped.
 
 ## Decision
 
