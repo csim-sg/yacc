@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yacc/ws/message-failed.schema.json",
+  "title": "message.failed payload",
+  "description": "SPEC-002 MIG-002 capture @98db628. Baseline: MessageFailedPayloadSchema in packages/backend/src/types/websocket.types.ts:43.",
+  "type": "object",
+  "required": ["messageId", "conversationId", "status", "error", "retryAt", "attempt"],
+  "properties": {
+    "messageId": {"type": "string", "format": "uuid"},
+    "conversationId": {"type": "string", "format": "uuid"},
+    "status": {"type": "string", "const": "failed"},
+    "error": {"type": "string"},
+    "retryAt": {"type": "string", "format": "date-time"},
+    "attempt": {"type": "integer", "minimum": 1, "maximum": 3}
+  }
+}
