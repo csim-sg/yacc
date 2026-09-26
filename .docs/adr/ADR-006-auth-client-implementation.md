@@ -1,9 +1,17 @@
 # 📚 ADR-006: Auth Client Implementation Strategy
 
-**Status:** ✅ APPROVED  
+**Status:** ✅ APPROVED → **Superseded by ADR-025** (Spring Security + dual-role OIDC; SPEC-002 MIG-005, 2026-09-26)  
 **Date:** 2026-01-26  
 **Impact:** Low (implementation alignment, no changes to code)  
 **Decision:** Use custom fetch-based implementation (NOT BetterAuth client library)
+
+> **Supersession note (2026-09-26, MIG-005 #339).** SPEC-002 replaces BetterAuth with
+> Spring Security + Spring Authorization Server (ADR-025); the POC custom
+> `api-client.ts` auth implementation this ADR approved is replaced by ONE canonical
+> API client consuming generated OpenAPI types (ADR-023, MIG-003
+> `contract-canonicalization.md` §2), with the `/api/auth/*` endpoint map frozen there.
+> The BetterAuth-vs-custom-client tradeoff is moot in the Java target. Content retained
+> unchanged as history.
 
 ---
 

@@ -1,10 +1,10 @@
-# ADR-030: Java Package Layout + Guardrail Codification (Draft)
+# ADR-030: Java Package Layout + Guardrail Codification
 
-**Status:** Proposed
-**Date:** 2026-09-26
-**Owner:** Tech-lead (technical author), Founder (decision authority)
-**Type:** Architecture
-**Acceptance:** Scheduled for acceptance in MIG-005 (#339), per MIG-004 (#337) AC-MIG-004-3. This draft records the decision; nothing here is binding until MIG-005 flips it to Accepted.
+**Status:** Accepted  
+**Date:** 2026-09-26 (drafted); accepted 2026-09-26 in MIG-005 (#339)  
+**Owner:** Tech-lead (technical author), Founder (decision authority)  
+**Type:** Architecture  
+**Acceptance:** Accepted in MIG-005 (#339) per MIG-004 (#337) AC-MIG-004-3; binding for all MIG-010..091 implementation.  
 **Related:** ADR-024 (Java/Spring replacement architecture — parent decision), ADR-023 (contract source), ADR-025..029 (auth, WS, data, async, envelope)
 
 ## Context
