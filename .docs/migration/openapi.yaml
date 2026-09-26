@@ -207,14 +207,18 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/ErrorResponse'}
   /api/auth/{authPath}:
-    all:
+    get:
       tags: [auth]
       operationId: authBetterAuthWildcard
       summary: BetterAuth wildcard delegate — ALL /api/auth/* (public)
       description: |
-        @All('/*') route — single catch-all route in the controller (registered last so the
-        explicit routes above take precedence). Delegates every method to the BetterAuth
-        handler. Known BetterAuth sub-paths at baseline: /sign-up/email (registration),
+        '@All(''/*'') route — responds to any HTTP method. Single catch-all route in the
+        controller (registered last so the explicit routes above take precedence). Delegates
+        every method to the BetterAuth handler. Registered under `get` per this capture's
+        convention for `@All` routes (same as the three HealthController `@All` routes):
+        OpenAPI has no any-method operation field, so the ONE baseline route maps to ONE
+        operation while the description records the ALL-method decorator verbatim.
+        Known BetterAuth sub-paths at baseline: /sign-up/email (registration),
         /sign-out, /get-session, /refresh-token. This is ONE route row (the literal wildcard
         route in code), enumerated individually per MIG-001 guardrails; its concrete
         sub-path behavior is the BetterAuth handler contract and is reconciled in MIG-003.

@@ -1,13 +1,30 @@
 ---
 ledger_id: LEDGER-MIG-001-REST
 version: 1.0.0
-spec: SPEC-002 (vault: 02-Architecture-Landscape/projects/yacc/spec/SPEC-002-java-spring-backend-migration.md)
+spec: "https://github.com/Antpolis/documentation/blob/feat/issue-65-archive-communication-memory/02-Architecture-Landscape/projects/yacc/spec/SPEC-002-java-spring-backend-migration.md"
 milestone: "https://github.com/csim-sg/yacc/milestone/3"
 task: "https://github.com/csim-sg/yacc/issues/335"
 baseline_revision: 98db628d78c79578dd11eb0476fab812d81fed32
 baseline_branch: dev
 captured_at: 2026-09-26
 reconciliation_target: MIG-003 (#338)
+durable_context:
+  spec: "https://github.com/Antpolis/documentation/blob/feat/issue-65-archive-communication-memory/02-Architecture-Landscape/projects/yacc/spec/SPEC-002-java-spring-backend-migration.md"
+  adrs:
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-023-contract-source-openapi-asyncapi.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-024-java-spring-backend-replacement-architecture.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-025-auth-spring-security-dual-role-oidc-bootstrap-recovery.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-026-raw-spring-websocket-resilience.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-027-data-access-flyway-jpa-encryption.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-028-async-processing-quartz-db-dlq.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/adr/ADR-029-jvm-deployment-envelope-observability.md"
+  arch:
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/architecture/001-technology-architecture.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/architecture/002-application-architecture.md"
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/architecture/003-data-architecture.md"
+  gov:
+    - "https://github.com/csim-sg/yacc/blob/dev/.docs/governance/GOV-038-GPA-007-gap-analysis-and-fail-closed.md"
+  runbooks: "N/A for this capture task — contract capture only, no deployment/operational change (runbooks apply from FR-02/MIG-014 deploy work onward)"
 status: capture (frozen-scope candidate; canonicalized by MIG-003)
 row_count: 70
 ---
