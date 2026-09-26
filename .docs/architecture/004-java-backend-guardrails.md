@@ -16,7 +16,7 @@ Founder-fixed decisions are **codified here, not reopened**: dual-role OIDC (emb
 
 ---
 
-## 1. Package layout — package-by-feature (TR-01, ADR-24)
+## 1. Package layout — package-by-feature (TR-01, ADR-024)
 
 - Top level is **package-by-feature**: `auth`, `user`, `conversation`, `message`, `note`, `tag`, `routingrule`, `notification`, `audit`, `dlq`, `queue`, `integration`, `realtime`, `connector`, `config`, `common`.
 - Each feature package has **`controller` / `service` / `repository` / `model`** sub-layers. No deeper nesting.
