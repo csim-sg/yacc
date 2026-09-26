@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: yacc-backend
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      # Health probes keep the frozen wire paths /health, /health/live,
+      # /health/ready (ledger LEDGER-MIG-003 reconciliation #3; ADR-029).
+      # Only `health` is exposed; observability endpoints (/actuator/prometheus
+      # etc.) are re-enabled by MIG-011, which owns their final mapping.
+      base-path: /
+      exposure:
+        include: health
+  endpoint:
+    health:
+      # probes.enabled provides the livenessState/readinessState contributors
+      # (required off-Kubernetes); explicit groups named live/ready make the
+      # probe paths exactly the frozen /health/live and /health/ready wire
+      # paths (the default probe group names would be liveness/readiness,
+      # which the contract does not define). MIG-012 owns the final probe
+      # wiring; its extra default /health/liveness and /health/readiness
+      # paths are inert scaffold surface.
+      probes:
+        enabled: true
+      group:
+        live:
+          include: livenessState
+        ready:
+          include: readinessState
+
+yacc:
+  name: yacc-backend
+  environment: local
