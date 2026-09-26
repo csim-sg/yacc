@@ -1,7 +1,18 @@
-**Status:** Accepted  
+**Status:** Accepted — **Amended by SPEC-002 (MIG-005, 2026-09-26); see amendment note**  
 **Date:** 2026-02-20  
 **Deciders:** Enterprise Architect + Product Owner  
 **Related:** ADR-016 (06-tasks as task map), ADR-018 (Bun runtime migration)
+
+> **Amendment note (2026-09-26, MIG-005 #339).** K3s + Helm remains the accepted
+> deployment target, with these SPEC-002 amendments for the Java/Spring backend:
+> (1) the Redis dependency is REMOVED from the Helm dependency set (Quartz + DB DLQ +
+> PostgreSQL WS backlog replace Redis/BullMQ — ADR-028); (2) the backend pod envelope is
+> re-specified to ≥ 1Gi request / 2Gi limit (the 512Mi/1Gi figures below are too small for
+> Spring Boot — ADR-029); (3) health probes remap to `/actuator/health/*` (or custom
+> `/health/*`) per ADR-029 with wire paths `/health`, `/health/live`, `/health/ready`
+> preserved (MIG-003 §5); (4) the container image is the JVM/Temurin 21 runtime envelope
+> of ADR-029 (non-root, read-only root FS). Frontend stays out of Helm scope (unchanged).
+> Original decision content below is retained unchanged.
 
 ---
 

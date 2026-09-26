@@ -1,7 +1,15 @@
-**Status:** Proposed  
+**Status:** Proposed — **Excluded from SPEC-002 scope by founder decision (MIG-005, 2026-09-26); see exclusion note**  
 **Date:** 2026-02-20  
 **Deciders:** Enterprise Architect + Product Owner  
 **Related:** ADR-013 (backend build bundling esbuild), ADR-007 (vitest)
+
+> **Exclusion note (2026-09-26, MIG-005 #339).** ADR-018 remains Proposed and is NOT
+> accepted: the founder explicitly excluded the Bun migration from SPEC-002 (SPEC-002
+> Non-Goals: "No Bun migration (excluded by founder; ADR-018 remains Proposed, out of
+> scope)"). The Node/TypeScript backend it targets is itself replaced by the Java/Spring
+> service (ADR-024) and decommissioned (MIG-080), which moots this ADR for the backend.
+> Nothing here supersedes or is superseded; this record is retained unchanged as history
+> and must not be implemented without a new founder decision.
 
 ---
 
