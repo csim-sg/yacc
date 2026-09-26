@@ -1,11 +1,19 @@
 # ADR-004: Logging and Observability Strategy
 
-**Status:** ✅ Accepted (Architect Approved: 2026-01-24)  
+**Status:** ✅ Accepted (Architect Approved: 2026-01-24) — **Amended by SPEC-002 (MIG-005, 2026-09-26); see amendment note**  
 **Date:** 2026-01-24  
 **Owner:** Fullstack Developer  
 **Approvers:** Architect ✅, Product Owner ⏳  
 **Supersedes:** None  
-**Related:** GOV-008 (Week 1 Workarounds)  
+**Related:** GOV-008 (Week 1 Workarounds)
+
+> **Amendment note (2026-09-26, MIG-005 #339).** The Pino decision remains in force for
+> the Node/TypeScript POC until decommission. For the Java/Spring backend (SPEC-002), the
+> equivalent strategy is SLF4J/logback structured JSON with MDC correlationId and
+> Micrometer metrics (ADR-029 / TR-07), preserving the baseline pino JSON field shape
+> (observability field-shape parity). This ADR's requirements (structured JSON,
+> correlation IDs, audit logging, <5ms overhead) carry over unchanged; only the
+> library/implementation mapping changes. Original decision content retained unchanged.
 
 ---
 

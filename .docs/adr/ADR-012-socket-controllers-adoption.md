@@ -1,10 +1,16 @@
 # ADR-012: Socket-Controllers Adoption for WebSocket Event Handling
 
 **Date**: February 6, 2026  
-**Status**: ✅ APPROVED  
+**Status**: ✅ APPROVED → **Superseded by ADR-026** (raw Spring WebSocket + resilience; SPEC-002 MIG-005, 2026-09-26)  
 **Author**: Enterprise Architect  
 **Related PR**: #208 (BE-206 Socket-Controllers Migration)  
-**Related Task**: BE-206, BE-017-019 (WebSocket Events)  
+**Related Task**: BE-206, BE-017-019 (WebSocket Events)
+
+> **Supersession note (2026-09-26, MIG-005 #339).** SPEC-002 replaces the Socket.io +
+> socket-controllers real-time stack with raw Spring WebSocket and a session registry
+> (ADR-026); socket-controllers (a Socket.io/TypeStack library) has no Java equivalent
+> and is removed at decommission. The real-time contract itself is frozen in
+> `.docs/migration/asyncapi.yaml` (MIG-003). Content retained unchanged as history.
 
 ---
 

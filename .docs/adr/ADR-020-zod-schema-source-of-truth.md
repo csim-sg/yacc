@@ -1,7 +1,13 @@
-**Status:** Accepted  
+**Status:** Superseded by ADR-023 (OpenAPI 3.1 + AsyncAPI/JSON Schema contract source; SPEC-002 MIG-005, 2026-09-26)  
 **Date:** 2026-02-25  
 **Deciders:** Enterprise Architect + Product Owner  
 **Related:** ADR-005 (one-definition-per-file), ADR-012 (index aggregator allowance), SH-002 (API types), SH-004 (Zod schemas)
+
+> **Supersession note (2026-09-26, MIG-005 #339).** The founder-directed Java/Spring
+> backend replacement (SPEC-002) cannot consume TypeScript Zod schemas as a cross-language
+> contract. ADR-023 makes OpenAPI 3.1 + AsyncAPI/JSON Schema the language-neutral contract
+> source of truth; `@yacc/common` Zod schemas are removed at decommission (SPEC-002
+> Phase 8 / MIG-080). This record's content is retained unchanged as history.
 
 ---
 

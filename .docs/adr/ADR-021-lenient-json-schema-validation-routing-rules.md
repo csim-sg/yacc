@@ -1,10 +1,19 @@
 # ADR-021: Lenient JSON Schema Validation for Routing Rules
 
 **Title**: Lenient JSON Schema Validation for Routing Rules Conditions and Actions  
-**Status**: Approved  
+**Status**: Approved — **Re-expressed in Java by SPEC-002 (MIG-005, 2026-09-26); see amendment note**  
 **Date**: 2026-02-25  
 **Author**: Product Owner + Enterprise Architect  
 **Decision Authority**: EA-003 (Architecture Decision Making)
+
+> **Amendment note (2026-09-26, MIG-005 #339).** The approved behavior is preserved
+> verbatim in the Java/Spring target (SPEC-002): lenient JSON storage of rule
+> conditions/actions with strict validation on referenced entities (users/tags), the
+> `POST /api/routing-rules/:ruleId/test` dry-run endpoint, and execution logging — frozen
+> as ledger rows REST-RULES-001..005 (`.docs/migration/ledger-mig-003-reconciled.md`;
+> REST-RULES-002 explicitly re-expresses this ADR in Java, with leniency covered by
+> MIG-041 contract tests). Only the implementation language changes; the policy is
+> unchanged and not reopened. Original decision content retained unchanged.
 
 ---
 
