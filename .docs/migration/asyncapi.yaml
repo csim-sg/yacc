@@ -1,31 +1,64 @@
-# AsyncAPI capture of the current Node/TypeScript real-time (Socket.io) surface.
+# YACC Real-time API — FROZEN CANONICAL CONTRACT (AsyncAPI 2.6.0 + JSON Schema).
 #
-# SPEC-002 / MIG-002 (issue #336) — behavior-capture artifact, NOT yet the frozen contract.
-# Canonicalization + freeze happens in MIG-003 (issue #338).
+# SPEC-002 / MIG-003 (issue #338) — canonicalized from the MIG-002 (issue #336) behavior
+# capture and FROZEN as the binding real-time contract source (ADR-023). Do not edit
+# without a recorded contract-change decision against
+# .docs/migration/contract-canonicalization.md and
+# .docs/migration/ledger-mig-003-reconciled.md (the binding 156-row ledger).
 #
 # Baseline: packages/backend/src/websockets/ + packages/backend/src/socket-controllers/
 #   + packages/common/src/websocket/ at revision
 #   98db628d78c79578dd11eb0476fab812d81fed32 (branch dev)
-# Captured: 2026-09-26
+# Captured: 2026-09-26 (MIG-002) · Canonicalized: 2026-09-26 (MIG-003)
 #
-# Wire protocol notes (verified in source):
-# - Envelope {event, data, timestamp} is applied ONLY by wsGateway emit paths
-#   (packages/backend/src/websockets/gateway.ts). Socket-controller handlers emit the
-#   RAW payload object without the envelope (e.g. message.controller.ts:34). Both
-#   shapes are captured per channel below; MIG-003 canonicalizes to one.
-# - Server transport at baseline is Socket.io (websocket transport forced in
-#   websocket.server.ts). Java target = raw Spring WebSocket, no STOMP/SockJS/Socket.io
-#   (ADR-026); polling fallback is dropped.
-# - Channels are keyed by the literal Socket.io event name.
+# MIG-003 canonicalization deltas vs the capture (frozen rules; details in info.description):
+# - ONE outbound frame: every server→client emission carries the {event,data,timestamp}
+#   envelope (ADR-026); per-channel message payloads describe the envelope `data` member;
+#   all baseline x-envelope annotations normalized to `enveloped`, with explicit
+#   x-disposition annotations where the capture flagged divergences.
+# - Raw literals `connection.established` / `error` mapped to contract constants
+#   `system.connection.established` / `system.error` (single emit, SystemPayload shape).
+# - Defined-not-wired notification channels retained with disposition
+#   retained-no-emitter (parity-of-absence; founder-visible scope note).
+# - presence.updated payload canonicalized to {userId, status, lastSeen}.
+# - Transport frozen to raw WebSocket (protocol: ws).
 asyncapi: 2.6.0
 info:
-  title: YACC Real-time API (behavior capture)
-  version: 0.1.0-mig-002-capture
+  title: YACC Real-time API (canonical)
+  version: 1.0.0-mig-003-canonical
   description: |
-    Full real-time surface of the Node/TypeScript backend (Socket.io + socket-controllers),
-    captured for SPEC-002 Java/Spring parity.
+    Frozen canonical real-time contract for the SPEC-002 Java/Spring backend and the
+    adapted frontend. Derived from the MIG-002 behavior capture (Socket.io +
+    socket-controllers) and canonicalized in MIG-003 per ADR-023/ADR-026. The Java target
+    implements exactly these channels over raw WebSocket; the frontend consumes generated
+    types from this contract (MIG-052).
 
-    Counts (code-verified at baseline):
+    Canonical wire rules (frozen in MIG-003 — see
+    .docs/migration/contract-canonicalization.md):
+    - EVERY server→client emission (each `subscribe` operation below) carries the
+      `{event, data, timestamp}` envelope (schemas/envelope.schema.json), verbatim per
+      ADR-026. The per-channel `message` payloads describe the envelope's `data` member.
+      All baseline `x-envelope` capture annotations are normalized to `enveloped`;
+      channels the capture flagged `defined-not-wired`/`partial` carry an explicit
+      `x-disposition` recording the frozen MIG-003 decision instead.
+    - Client→server messages (each `publish` operation below) are bare payloads — the
+      envelope is outbound-only.
+    - ONE canonical event-name set of 23 named constants (the 20 @yacc/common contract
+      constants + the 3 backend-only runtime constants: notification.dismissed,
+      message.retry.scheduled, queue.message.dlq). Wire name = contract name; the Java
+      target implements exactly this set (no @yacc/common/backend duplication).
+    - Literal↔constant mappings frozen: raw `connection.established` →
+      `system.connection.established` (single connect-time emit, duplicate path deduped);
+      raw `error` → `system.error` (SystemPayload shape).
+    - notification.deleted / notification.read / notification.dismissed: disposition
+      retained-no-emitter (parity-of-absence; founder-visible note — wiring any of them is
+      a scope change requiring a new founder decision).
+    - presence.updated payload canonical: {userId: uuid, status: online|offline,
+      lastSeen: date-time}; the isOnline disconnect variant is retired.
+    - Transport: raw WebSocket (JSON text frames); Socket.io/STOMP/SockJS/broker and the
+      polling fallback are removed (ADR-026).
+
+    Baseline capture facts (provenance, code-verified @98db628):
     - 6 socket controllers (excluding index.ts)
     - 20 WebSocket event constants in @yacc/common/websocket/constants (Conversation 2,
       Message 3, Notification 3, Presence 5, System 7) — each enumerated as an individual
@@ -40,17 +73,24 @@ info:
     - 1h backlog (Redis ws:backlog:{userId}; re-homed to PostgreSQL in target per ADR-028)
     - 60s heartbeat (PING_INTERVAL_MS; Socket.io engine at baseline, re-implemented in raw WS)
     - reconnect/backoff (server RECONNECT_CONFIG 1s→60s x2 max 5 attempts; client
-      socket.io 1s/2s/4s/8s/30s, 10 attempts)
-    - auth on handshake (handshake.auth.token → BetterAuth session → status enforcement)
+      socket.io 1s/2s/4s/8s/30s, 10 attempts — ladder preserved by the single canonical
+      raw-WS client)
+    - auth on handshake (handshake.auth.token → BetterAuth session at baseline →
+      Spring Security token validation + status enforcement in target, ADR-025/ADR-026)
   x-baseline-revision: 98db628d78c79578dd11eb0476fab812d81fed32
   x-capture-task: MIG-002
   x-canonicalization-task: MIG-003
+  x-canonicalization-record: .docs/migration/contract-canonicalization.md
+  x-binding-ledger: .docs/migration/ledger-mig-003-reconciled.md
 
 servers:
   production:
     url: ws://localhost:3000
-    protocol: socketio
-    description: Local backend Socket.io endpoint (websocket transport forced at baseline)
+    protocol: ws
+    description: >-
+      Raw WebSocket endpoint (canonical target transport, ADR-026). Baseline used
+      Socket.io with the websocket transport forced; Socket.io framing is removed in the
+      target — JSON text frames carrying the {event,data,timestamp} envelope.
 
 channels:
   # =====================================================================
@@ -68,14 +108,14 @@ channels:
     subscribe:
       operationId: onConversationUpdatedOutbound
       x-source: packages/backend/src/services/websocket/conversation.handler.ts:emits @98db628
-      x-envelope: bare
+      x-envelope: enveloped
       message: {$ref: '#/components/messages/ConversationUpdatedPayload'}
   conversation.reopened:
     description: >-
       Contract constant CONVERSATION_REOPENED. Wired: services/conversation.service.ts.
     subscribe:
       operationId: onConversationReopened
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, additionalProperties: true}
         x-baseline-source: packages/backend/src/services/conversation.service.ts @98db628
@@ -87,7 +127,7 @@ channels:
       emit message.received, bare payload).
     subscribe:
       operationId: onMessageReceived
-      x-envelope: bare
+      x-envelope: enveloped
       message: {$ref: '#/components/messages/MessageReceivedPayload'}
   message.sent:
     description: >-
@@ -100,7 +140,7 @@ channels:
       message: {$ref: '#/components/messages/MessageSentPayload'}
     subscribe:
       operationId: onMessageSentOutbound
-      x-envelope: bare
+      x-envelope: enveloped
       message: {$ref: '#/components/messages/MessageSentPayload'}
   message.failed:
     description: >-
@@ -113,7 +153,7 @@ channels:
       message: {$ref: '#/components/messages/MessageFailedPayload'}
     subscribe:
       operationId: onMessageFailedOutbound
-      x-envelope: bare
+      x-envelope: enveloped
       message: {$ref: '#/components/messages/MessageFailedPayload'}
   notification.received:
     description: >-
@@ -130,7 +170,8 @@ channels:
       MIG-003 must canonicalize (wire or drop with founder-visible scope note).
     subscribe:
       operationId: onNotificationDeleted
-      x-envelope: defined-not-wired
+      x-envelope: enveloped
+      x-disposition: "retained-no-emitter (MIG-003 parity-of-absence; founder-visible note: contract-canonicalization.md §4.4) — target emits nothing; MIG-052 asserts no-emit"
       message: {$ref: '#/components/messages/NotificationPayload'}
   notification.read:
     description: >-
@@ -139,7 +180,8 @@ channels:
       MIG-003 must canonicalize.
     subscribe:
       operationId: onNotificationRead
-      x-envelope: defined-not-wired
+      x-envelope: enveloped
+      x-disposition: "retained-no-emitter (MIG-003 parity-of-absence; founder-visible note: contract-canonicalization.md §4.4) — target emits nothing; MIG-052 asserts no-emit"
       message: {$ref: '#/components/messages/NotificationPayload'}
   notification.dismissed:
     description: >-
@@ -150,20 +192,27 @@ channels:
       revision). MIG-003 must canonicalize (wire or drop with founder-visible scope note).
     subscribe:
       operationId: onNotificationDismissed
-      x-envelope: defined-not-wired
+      x-envelope: enveloped
+      x-disposition: "retained-no-emitter (MIG-003 parity-of-absence; founder-visible note: contract-canonicalization.md §4.4) — target emits nothing; MIG-052 asserts no-emit"
       message: {$ref: '#/components/messages/NotificationPayload'}
   presence.updated:
     description: >-
-      Contract constant PRESENCE_UPDATED. Wired: presence.handler, event-backlog,
+      Contract constant PRESENCE_UPDATED. Baseline wiring: presence.handler, event-backlog,
       websocket.server.ts disconnect broadcast (io.emit, bare), inbound @OnMessage in
       socket-controllers/presence.controller.ts (broadcast, bare).
+      MIG-003 canonicalization: payload frozen to {userId: uuid, status: online|offline,
+      lastSeen: date-time} uniformly — including the disconnect path, whose divergent
+      {userId, isOnline, timestamp} variant is retired; the @yacc/common PresencePayload
+      consumer type (userName/lastSeenAt/typingIn/away) is NOT wire truth. Enveloped
+      outbound per the canonical frame rule.
     publish:
       operationId: onPresenceUpdatedInbound
       x-controller: packages/backend/src/socket-controllers/presence.controller.ts:23 @98db628
       message: {$ref: '#/components/messages/PresenceUpdatedPayload'}
     subscribe:
       operationId: onPresenceUpdatedOutbound
-      x-envelope: bare
+      x-envelope: enveloped
+      x-disposition: payload CANONICALIZED {userId, status, lastSeen} incl. disconnect path (contract-canonicalization.md §4.5)
       message: {$ref: '#/components/messages/PresenceUpdatedPayload'}
   typing.started:
     description: >-
@@ -175,7 +224,7 @@ channels:
       message: {$ref: '#/components/messages/TypingStartedPayload'}
     subscribe:
       operationId: onTypingStartedOutbound
-      x-envelope: bare
+      x-envelope: enveloped
       message: {$ref: '#/components/messages/TypingStartedPayload'}
   typing.stopped:
     description: >-
@@ -187,7 +236,7 @@ channels:
       message: {$ref: '#/components/messages/TypingStoppedPayload'}
     subscribe:
       operationId: onTypingStoppedOutbound
-      x-envelope: bare
+      x-envelope: enveloped
       message: {$ref: '#/components/messages/TypingStoppedPayload'}
   user.online:
     description: >-
@@ -225,7 +274,8 @@ channels:
       'connection.established' (see channel connection.established). MIG-003 canonicalizes.
     subscribe:
       operationId: onSystemConnectionEstablished
-      x-envelope: defined-not-wired
+      x-envelope: enveloped
+      x-disposition: wired-in-target — replaces baseline raw literal `connection.established`; ONE connect-time emit, enveloped (contract-canonicalization.md §4.3)
       message: {$ref: '#/components/messages/SystemPayload'}
   system.reconnection.started:
     description: >-
@@ -233,7 +283,8 @@ channels:
       wiring. Reconnect behavior exists client-side (socket.io) without this event.
     subscribe:
       operationId: onSystemReconnectionStarted
-      x-envelope: defined-not-wired
+      x-envelope: enveloped
+      x-disposition: wired-in-target — emitted by the ADR-026 application-level reconnect implementation
       message: {$ref: '#/components/messages/SystemPayload'}
   system.reconnection.failed:
     description: >-
@@ -241,7 +292,8 @@ channels:
       wiring.
     subscribe:
       operationId: onSystemReconnectionFailed
-      x-envelope: defined-not-wired
+      x-envelope: enveloped
+      x-disposition: wired-in-target — emitted after max reconnect attempts (ADR-026)
       message: {$ref: '#/components/messages/SystemPayload'}
   system.heartbeat:
     description: >-
@@ -250,7 +302,8 @@ channels:
       event. Java raw WS must re-implement heartbeat behavior (ADR-026).
     subscribe:
       operationId: onSystemHeartbeat
-      x-envelope: defined-not-wired
+      x-envelope: enveloped
+      x-disposition: wired-in-target — application-level 60s heartbeat (ADR-026; Socket.io engine ping/pong removed)
       message: {$ref: '#/components/messages/SystemPayload'}
   system.error:
     description: >-
@@ -259,7 +312,8 @@ channels:
       failure (see channel error). MIG-003 canonicalizes.
     subscribe:
       operationId: onSystemError
-      x-envelope: partial
+      x-envelope: enveloped
+      x-disposition: wired-in-target — replaces baseline raw literal `error`; enveloped SystemPayload {type:'error',timestamp,error:{code,message}} (contract-canonicalization.md §4.3)
       message: {$ref: '#/components/messages/SystemPayload'}
   system.backlog.replay.started:
     description: >-
@@ -268,7 +322,8 @@ channels:
       event. Java target must emit replay start/complete (AC-06 behavior tests).
     subscribe:
       operationId: onBacklogReplayStarted
-      x-envelope: defined-not-wired
+      x-envelope: enveloped
+      x-disposition: wired-in-target — emitted at backlog replay start (ADR-026/ADR-028 PostgreSQL backlog)
       message: {$ref: '#/components/messages/SystemPayload'}
   system.backlog.replay.completed:
     description: >-
@@ -276,7 +331,8 @@ channels:
       wiring (same status as system.backlog.replay.started).
     subscribe:
       operationId: onBacklogReplayCompleted
-      x-envelope: defined-not-wired
+      x-envelope: enveloped
+      x-disposition: wired-in-target — emitted at backlog replay completion (ADR-026/ADR-028 PostgreSQL backlog)
       message: {$ref: '#/components/messages/SystemPayload'}
 
   # =====================================================================
@@ -372,7 +428,7 @@ channels:
     subscribe:
       operationId: onReactionAddedOutbound
       x-source: packages/backend/src/socket-controllers/reaction.controller.ts:36 @98db628 (socket.to(room).emit)
-      x-envelope: bare
+      x-envelope: enveloped
       message: {$ref: '#/components/messages/ReactionAddedPayload'}
   reaction.removed:
     description: >-
@@ -386,7 +442,7 @@ channels:
     subscribe:
       operationId: onReactionRemovedOutbound
       x-source: packages/backend/src/socket-controllers/reaction.controller.ts:76 @98db628 (socket.to(room).emit)
-      x-envelope: bare
+      x-envelope: enveloped
       message: {$ref: '#/components/messages/ReactionRemovedPayload'}
   reaction.list:
     description: Request reactions for a message; replies reaction.list.ack (or error).
@@ -508,12 +564,15 @@ channels:
   # =====================================================================
   connection.established:
     description: >-
-      Raw literal emitted on connect by websocket.server.ts:83 AND
-      conversation.controller.ts:39 (duplicated emit path — MIG-003 note). Bare payload;
-      the contract counterpart system.connection.established is unwired.
+      Baseline raw literal emitted on connect by websocket.server.ts:83 AND
+      conversation.controller.ts:39 (duplicated emit path).
+      MIG-003 canonicalization: RETIRED — replaced by the contract constant
+      `system.connection.established` (single connect-time emit, enveloped); this raw
+      channel is retained as baseline provenance only and is not implemented by the target.
     subscribe:
       operationId: onConnectionEstablishedRaw
-      x-envelope: bare
+      x-envelope: enveloped
+      x-disposition: retired → canonical system.connection.established (WS-EVT-014; contract-canonicalization.md §4.3) — target does not emit this literal
       message:
         payload:
           type: object
@@ -526,7 +585,7 @@ channels:
     description: Raw ack for subscribe.conversation (bare payload {conversationId}).
     subscribe:
       operationId: onConversationSubscribed
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, required: [conversationId], properties: {conversationId: {type: string}}}
         x-baseline-source: packages/backend/src/socket-controllers/conversation.controller.ts:120 @98db628
@@ -534,7 +593,7 @@ channels:
     description: Raw ack for unsubscribe.conversation (bare payload {conversationId}).
     subscribe:
       operationId: onConversationUnsubscribed
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, required: [conversationId], properties: {conversationId: {type: string}}}
         x-baseline-source: packages/backend/src/socket-controllers/conversation.controller.ts:150 @98db628
@@ -542,7 +601,7 @@ channels:
     description: Raw ack for message.retry (bare payload {messageId, timestamp}).
     subscribe:
       operationId: onMessageRetryAcknowledged
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, required: [messageId, timestamp], properties: {messageId: {type: string}, timestamp: {type: string, format: date-time}}}
         x-baseline-source: packages/backend/src/socket-controllers/message.controller.ts:98 @98db628
@@ -550,7 +609,7 @@ channels:
     description: Raw room broadcast after message.retry (bare payload).
     subscribe:
       operationId: onMessageRetryStarted
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, required: [messageId, conversationId, timestamp], properties: {messageId: {type: string}, conversationId: {type: string}, timestamp: {type: string, format: date-time}}}
         x-baseline-source: packages/backend/src/socket-controllers/message.controller.ts:105 @98db628
@@ -558,7 +617,7 @@ channels:
     description: Raw reply for user.online / request.online.users (bare payload {users[],timestamp}).
     subscribe:
       operationId: onOnlineUsers
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload:
           type: object
@@ -571,7 +630,7 @@ channels:
     description: Raw broadcast for user.status (bare payload).
     subscribe:
       operationId: onUserStatusChanged
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, required: [userId, status, timestamp], properties: {userId: {type: string}, status: {type: string, enum: [active, idle, away]}, timestamp: {type: string, format: date-time}}}
         x-baseline-source: packages/backend/src/socket-controllers/presence.controller.ts:132 @98db628
@@ -579,7 +638,7 @@ channels:
     description: Raw broadcast for connector.status.changed (bare payload).
     subscribe:
       operationId: onConnectorStatus
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, additionalProperties: true}
         x-baseline-source: packages/backend/src/socket-controllers/connector.controller.ts:110 @98db628
@@ -587,7 +646,7 @@ channels:
     description: Raw room broadcast to connector:{platform} (bare payload).
     subscribe:
       operationId: onConnectorStatusUpdated
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, additionalProperties: true}
         x-baseline-source: packages/backend/src/socket-controllers/connector.controller.ts:119 @98db628
@@ -595,7 +654,7 @@ channels:
     description: Raw ack for connector.subscribe (bare payload {platform,timestamp}).
     subscribe:
       operationId: onConnectorSubscribed
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, required: [platform, timestamp], properties: {platform: {type: string}, timestamp: {type: string, format: date-time}}}
         x-baseline-source: packages/backend/src/socket-controllers/connector.controller.ts:163 @98db628
@@ -603,7 +662,7 @@ channels:
     description: Raw ack for connector.unsubscribe (bare payload {platform,timestamp}).
     subscribe:
       operationId: onConnectorUnsubscribedAck
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, required: [platform, timestamp], properties: {platform: {type: string}, timestamp: {type: string, format: date-time}}}
         x-baseline-source: packages/backend/src/socket-controllers/connector.controller.ts:205 @98db628
@@ -611,7 +670,7 @@ channels:
     description: Raw conversation-room delivery-failure event (bare payload).
     subscribe:
       operationId: onMessageError
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, required: [messageId, error, willRetry, timestamp], properties: {messageId: {type: string}, error: {type: string}, willRetry: {type: boolean}, timestamp: {type: string, format: date-time}}}
         x-baseline-source: packages/backend/src/socket-controllers/connector.controller.ts:256 @98db628
@@ -619,7 +678,7 @@ channels:
     description: Raw conversation-room delivery-ack event (bare payload).
     subscribe:
       operationId: onMessageAck
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, required: [messageId, platformMessageId, timestamp], properties: {messageId: {type: string}, platformMessageId: {type: string}, timestamp: {type: string, format: date-time}}}
         x-baseline-source: packages/backend/src/socket-controllers/connector.controller.ts:308 @98db628
@@ -627,7 +686,7 @@ channels:
     description: Reaction literal 2 of 7 — sender acknowledgement for reaction.added (bare payload).
     subscribe:
       operationId: onReactionAddedAck
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, required: [messageId, emoji, timestamp], properties: {messageId: {type: string}, emoji: {type: string}, timestamp: {type: string, format: date-time}}}
         x-baseline-source: packages/backend/src/socket-controllers/reaction.controller.ts:39 @98db628
@@ -635,7 +694,7 @@ channels:
     description: Reaction literal 4 of 7 — sender acknowledgement for reaction.removed (bare payload).
     subscribe:
       operationId: onReactionRemovedAck
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, required: [messageId, emoji, timestamp], properties: {messageId: {type: string}, emoji: {type: string}, timestamp: {type: string, format: date-time}}}
         x-baseline-source: packages/backend/src/socket-controllers/reaction.controller.ts:79 @98db628
@@ -643,18 +702,22 @@ channels:
     description: Reaction literal 6 of 7 — reply for reaction.list (bare payload {messageId,reactions[],timestamp}; reactions always [] at baseline).
     subscribe:
       operationId: onReactionListAck
-      x-envelope: bare
+      x-envelope: enveloped
       message:
         payload: {type: object, required: [messageId, reactions, timestamp], properties: {messageId: {type: string}, reactions: {type: array, items: {type: object}}, timestamp: {type: string, format: date-time}}}
         x-baseline-source: packages/backend/src/socket-controllers/reaction.controller.ts:111 @98db628
   error:
     description: >-
-      Generic error emit: socket.emit('error', {message}) on handler failure
+      Baseline generic error emit: socket.emit('error', {message}) on handler failure
       (presence.controller.ts:170 request.online.users failure; reaction.controller.ts:122
-      reaction.list failure). Bare payload. Contract counterpart system.error is unwired.
+      reaction.list failure).
+      MIG-003 canonicalization: RETIRED — replaced by the contract constant
+      `system.error` (enveloped, SystemPayload shape); this raw channel is retained as
+      baseline provenance only and is not implemented by the target.
     subscribe:
       operationId: onGenericError
-      x-envelope: bare
+      x-envelope: enveloped
+      x-disposition: retired → canonical system.error (WS-EVT-018; contract-canonicalization.md §4.3) — target does not emit this literal
       message:
         payload: {type: object, required: [message], properties: {message: {type: string}}}
         x-baseline-source: packages/backend/src/socket-controllers/presence.controller.ts:170, socket-controllers/reaction.controller.ts:122 @98db628

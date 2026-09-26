@@ -1,39 +1,53 @@
-# OpenAPI 3.1 capture of the current Node/TypeScript REST surface.
+# YACC REST API — FROZEN CANONICAL CONTRACT (OpenAPI 3.1).
 #
-# SPEC-002 / MIG-001 (issue #335) — behavior-capture artifact, NOT yet the frozen contract.
-# Canonicalization + freeze happens in MIG-003 (issue #338).
+# SPEC-002 / MIG-003 (issue #338) — canonicalized from the MIG-001 (issue #335) behavior
+# capture and FROZEN as the binding REST contract source (ADR-023). Do not edit without a
+# recorded contract-change decision against `.docs/migration/contract-canonicalization.md`
+# and `.docs/migration/ledger-mig-003-reconciled.md` (the binding 156-row ledger).
 #
 # Baseline: packages/backend/src/controllers/ at revision
 #   98db628d78c79578dd11eb0476fab812d81fed32 (branch dev)
-# Captured: 2026-09-26
+# Captured: 2026-09-26 (MIG-001) · Canonicalized: 2026-09-26 (MIG-003)
 #
-# Sources: exact route decorators in the 17 controller files (index.ts excluded).
-# Every operation below cites its controller file in `x-baseline-source`.
-# Do NOT derive this contract from Zod schemas (ADR-023 supersedes ADR-020):
-# this file was captured from controller/route behavior and is the REST contract source.
+# MIG-003 canonicalization deltas vs the capture:
+# - `ALL /api/auth/*` BetterAuth wildcard (capture op `authBetterAuthWildcard`, ledger row
+#   REST-AUTH-004) replaced by EXPLICIT wire endpoints: POST /api/auth/sign-up/email,
+#   POST /api/auth/sign-out, GET /api/auth/get-session, POST /api/auth/refresh-token
+#   (ADR-025; sub-path set frozen to exactly the sub-paths the POC frontend consumed).
+# - Auth response DTOs canonicalized (signIn/sign-up/get-session/refresh-token) — see the
+#   auth components; token claims/lifecycle remain ADR-025/MIG-033 implementation detail.
+# - Auth type drift resolved: `User.id` = uuid string; role wire enum = lowercase
+#   super_admin|admin|manager|user; the non-existent `/simple-auth/*` frontend surface has
+#   no contract existence.
 openapi: 3.1.0
 info:
-  title: YACC REST API (behavior capture)
-  version: 0.1.0-mig-001-capture
+  title: YACC REST API (canonical)
+  version: 1.0.0-mig-003-canonical
   description: |
-    Full REST surface of the Node/TypeScript backend (routing-controllers), captured for
-    SPEC-002 Java/Spring parity. 17 controllers, 66 route operations (incl. 4 @All routes;
-    2 controllers are non-JsonController `@Controller`: health, ircIntegration).
+    Frozen canonical REST contract for the SPEC-002 Java/Spring backend and the adapted
+    frontend. Derived from the MIG-001 behavior capture of the Node/TypeScript backend
+    (routing-controllers) and canonicalized in MIG-003. The Java target re-expresses this
+    contract via springdoc from `@RestController`s (ADR-023); the frontend consumes
+    generated TS types from this file (MIG-034/MIG-041).
 
-    Contract conventions observed in baseline:
-    - No global route prefix; `/api` is declared at controller level (`@JsonController('/api/...')`).
-      Exception: HealthController declares `/health` (no `/api`).
+    Contract conventions (frozen):
+    - No global route prefix; `/api` is declared at controller level (`@JsonController('/api/...')`
+      at baseline, `@RequestMapping('/api/...')` in Java).
+      Exception: health endpoints declare `/health` (no `/api`).
     - List endpoints return the BaseListResponse envelope `{data, page, limit, total}`
       (page is 1-indexed in responses; internally controllers pass 0-indexed page).
     - Simple resource envelopes: `{data: <entity>}` for single results.
     - Error shape: `{error: string}` (routing-controllers default error handler);
       IRC integration endpoints use `{code: string, message: string}`.
-    - Auth: `Authorization: Bearer <JWT>`; JWT verified against BETTER_AUTH_SECRET in the
-      POC (this crypto-coupling is unwound in Java per ADR-025 — the wire header contract
-      stays `Authorization: Bearer`).
+    - Auth: `Authorization: Bearer <accessToken>`; the POC's BETTER_AUTH_SECRET
+      crypto-coupling is unwound in Java per ADR-025 (invisible to the wire contract).
+    - Roles on the wire are lowercase: super_admin | admin | manager | user.
+      User ids are UUID strings.
   x-baseline-revision: 98db628d78c79578dd11eb0476fab812d81fed32
   x-capture-task: MIG-001
   x-canonicalization-task: MIG-003
+  x-canonicalization-record: .docs/migration/contract-canonicalization.md
+  x-binding-ledger: .docs/migration/ledger-mig-003-reconciled.md
 
 servers:
   - url: http://localhost:3000
@@ -176,10 +190,15 @@ paths:
     post:
       tags: [auth]
       operationId: authSignInEmail
-      summary: Email/password sign-in (public; rate limited; BetterAuth delegate)
-      description: Delegates to the BetterAuth handler; response is the BetterAuth session/token contract.
+      summary: Email/password sign-in (public; rate limited)
+      description: |
+        Canonical sign-in. Baseline delegated to BetterAuth; the Java target implements
+        this endpoint via Spring Security (ADR-025). Response DTO canonicalized in MIG-003
+        (ledger row REST-AUTH-003): `{user, accessToken, refreshToken}`; token
+        claims/lifecycle are ADR-025/MIG-033 implementation detail.
       security: []
       x-baseline-source: packages/backend/src/controllers/auth.controller.ts:136 @98db628
+      x-canonicalization: MIG-003 (REST-AUTH-003; rate limit frozen 5 req/15 min)
       requestBody:
         required: true
         content:
@@ -192,50 +211,138 @@ paths:
                 password: {type: string}
       responses:
         '200':
-          description: BetterAuth sign-in response (session + token; set-auth-token header also exposed via CORS)
+          description: Signed in — user object plus stateless JWT access/refresh tokens
           content:
             application/json:
-              schema: {type: object, additionalProperties: true}
+              schema: {$ref: '#/components/schemas/AuthSessionResponse'}
         '401':
-          description: Invalid credentials (BetterAuth)
-          content:
-            application/json:
-              schema: {type: object, additionalProperties: true}
-        '429':
-          description: Rate limit exceeded (loginRateLimiter)
+          description: Invalid credentials
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ErrorResponse'}
-  /api/auth/{authPath}:
-    get:
-      tags: [auth]
-      operationId: authBetterAuthWildcard
-      summary: BetterAuth wildcard delegate — ALL /api/auth/* (public)
-      description: |
-        '@All(''/*'') route — responds to any HTTP method. Single catch-all route in the
-        controller (registered last so the explicit routes above take precedence). Delegates
-        every method to the BetterAuth handler. Registered under `get` per this capture's
-        convention for `@All` routes (same as the three HealthController `@All` routes):
-        OpenAPI has no any-method operation field, so the ONE baseline route maps to ONE
-        operation while the description records the ALL-method decorator verbatim.
-        Known BetterAuth sub-paths at baseline: /sign-up/email (registration),
-        /sign-out, /get-session, /refresh-token. This is ONE route row (the literal wildcard
-        route in code), enumerated individually per MIG-001 guardrails; its concrete
-        sub-path behavior is the BetterAuth handler contract and is reconciled in MIG-003.
-      security: []
-      x-baseline-source: packages/backend/src/controllers/auth.controller.ts:154 @98db628
-      parameters:
-        - name: authPath
-          in: path
-          required: true
-          description: BetterAuth sub-path under /api/auth (e.g. sign-up/email, sign-out, get-session, refresh-token)
-          schema: {type: string}
-      responses:
-        '200':
-          description: BetterAuth handler passthrough response
+        '429':
+          description: Rate limit exceeded (5 requests / 15 minutes)
           content:
             application/json:
-              schema: {type: object, additionalProperties: true}
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+  /api/auth/sign-up/email:
+    post:
+      tags: [auth]
+      operationId: authSignUpEmail
+      summary: Self-registration (public; creates USER role only)
+      description: |
+        Canonical self-registration (SPEC-002 FR-04/AC-11). Replaces the baseline
+        BetterAuth wildcard sub-path `sign-up/email` (ledger row REST-AUTH-004) with an
+        explicit endpoint per ADR-025. The request accepts NO role field; the created user
+        is always `role: user`. Privileged user/role management stays super_admin-only
+        (`POST /api/users`).
+      security: []
+      x-baseline-source: BetterAuth wildcard handler (controllers/auth.controller.ts:154 @98db628, sub-path sign-up/email)
+      x-canonicalization: MIG-003 (REST-AUTH-004 wire sub-path mapping)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email: {type: string, format: email}
+                password: {type: string}
+                name: {type: string}
+      responses:
+        '201':
+          description: Registered — user created with role `user` plus tokens
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthSessionResponse'}
+        '400':
+          description: Validation error (e.g. email already registered — generic error)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+  /api/auth/sign-out:
+    post:
+      tags: [auth]
+      operationId: authSignOut
+      summary: Sign out (authenticated)
+      description: |
+        Canonical sign-out. Replaces the baseline BetterAuth wildcard sub-path `sign-out`
+        (ledger row REST-AUTH-004). Invalidates the presented grant per ADR-025 token
+        lifecycle; with stateless JWT access tokens this is an acknowledgment + refresh
+        revocation.
+      security:
+        - bearerAuth: []
+      x-baseline-source: BetterAuth wildcard handler (controllers/auth.controller.ts:154 @98db628, sub-path sign-out)
+      x-canonicalization: MIG-003 (REST-AUTH-004 wire sub-path mapping)
+      responses:
+        '200':
+          description: Signed out
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthSignOutResponse'}
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+  /api/auth/get-session:
+    get:
+      tags: [auth]
+      operationId: authGetSession
+      summary: Current session user (authenticated)
+      description: |
+        Canonical session lookup. Replaces the baseline BetterAuth wildcard sub-path
+        `get-session` (ledger row REST-AUTH-004). Returns the user resolved from the
+        Bearer access token; there is no server-side session object in the canonical
+        stateless model (ADR-025).
+      security:
+        - bearerAuth: []
+      x-baseline-source: BetterAuth wildcard handler (controllers/auth.controller.ts:154 @98db628, sub-path get-session)
+      x-canonicalization: MIG-003 (REST-AUTH-004 wire sub-path mapping)
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthSessionGetResponse'}
+        '401':
+          description: Missing, invalid, expired token, or inactive/suspended account
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+  /api/auth/refresh-token:
+    post:
+      tags: [auth]
+      operationId: authRefreshToken
+      summary: Refresh access token (public; refresh-grant rotation)
+      description: |
+        Canonical token refresh. Replaces the baseline BetterAuth wildcard sub-path
+        `refresh-token` (ledger row REST-AUTH-004). Implements the ADR-025 refresh grant
+        (stateless JWT access + refresh default) with rotation.
+      security: []
+      x-baseline-source: BetterAuth wildcard handler (controllers/auth.controller.ts:154 @98db628, sub-path refresh-token)
+      x-canonicalization: MIG-003 (REST-AUTH-004 wire sub-path mapping)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: {type: string}
+      responses:
+        '200':
+          description: Tokens rotated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthRefreshResponse'}
+        '401':
+          description: Invalid, expired, or revoked refresh token
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
 
   # =====================================================================
   # UsersController — @JsonController('/api/users')
@@ -1601,6 +1708,34 @@ components:
       properties:
         success: {type: boolean}
         message: {type: string}
+
+    # ---------- Auth (canonicalized in MIG-003; ledger rows REST-AUTH-001..004) ----------
+    AuthSessionResponse:
+      type: object
+      description: "Sign-in / self-registration response. `user.role` is always lowercase; sign-up always creates `role: user`. Token claims/lifecycle are ADR-025/MIG-033 implementation detail."
+      required: [user, accessToken, refreshToken]
+      properties:
+        user: {$ref: '#/components/schemas/UserResponse'}
+        accessToken: {type: string, description: Stateless JWT access token (ADR-025 default)}
+        refreshToken: {type: string, description: Refresh token (rotated on refresh-grant use)}
+    AuthSignOutResponse:
+      type: object
+      required: [success]
+      properties:
+        success: {type: boolean, enum: [true]}
+    AuthSessionGetResponse:
+      type: object
+      description: Session lookup — the user resolved from the Bearer access token (no server-side session object; ADR-025 stateless default).
+      required: [user]
+      properties:
+        user: {$ref: '#/components/schemas/UserResponse'}
+    AuthRefreshResponse:
+      type: object
+      description: Rotated token pair.
+      required: [accessToken, refreshToken]
+      properties:
+        accessToken: {type: string}
+        refreshToken: {type: string}
 
     # ---------- Health ----------
     HealthFullResponse:
