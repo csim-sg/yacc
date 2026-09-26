@@ -15,7 +15,7 @@ ADR-020 made Zod schemas in `@yacc/common` the validation/contract source of tru
 Adopt a language-neutral contract source:
 
 - **REST:** OpenAPI 3.1, generated from Spring controllers via springdoc-openapi, consumed by the frontend via codegen (openapi-typescript).
-- **Real-time:** AsyncAPI + JSON Schema for the WebSocket event surface (19 event constants, `{event,data,timestamp}` envelope).
+- **Real-time:** AsyncAPI + JSON Schema for the WebSocket event surface (23 named event constants (20 common + 3 backend-only), `{event,data,timestamp}` envelope).
 
 Both Java DTOs and frontend TS types are generated from these sources. Contract tests assert conformance on both sides.
 
