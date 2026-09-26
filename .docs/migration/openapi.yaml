@@ -1,0 +1,1932 @@
+# OpenAPI 3.1 capture of the current Node/TypeScript REST surface.
+#
+# SPEC-002 / MIG-001 (issue #335) — behavior-capture artifact, NOT yet the frozen contract.
+# Canonicalization + freeze happens in MIG-003 (issue #338).
+#
+# Baseline: packages/backend/src/controllers/ at revision
+#   98db628d78c79578dd11eb0476fab812d81fed32 (branch dev)
+# Captured: 2026-09-26
+#
+# Sources: exact route decorators in the 17 controller files (index.ts excluded).
+# Every operation below cites its controller file in `x-baseline-source`.
+# Do NOT derive this contract from Zod schemas (ADR-023 supersedes ADR-020):
+# this file was captured from controller/route behavior and is the REST contract source.
+openapi: 3.1.0
+info:
+  title: YACC REST API (behavior capture)
+  version: 0.1.0-mig-001-capture
+  description: |
+    Full REST surface of the Node/TypeScript backend (routing-controllers), captured for
+    SPEC-002 Java/Spring parity. 17 controllers, 66 route operations (incl. 4 @All routes;
+    2 controllers are non-JsonController `@Controller`: health, ircIntegration).
+
+    Contract conventions observed in baseline:
+    - No global route prefix; `/api` is declared at controller level (`@JsonController('/api/...')`).
+      Exception: HealthController declares `/health` (no `/api`).
+    - List endpoints return the BaseListResponse envelope `{data, page, limit, total}`
+      (page is 1-indexed in responses; internally controllers pass 0-indexed page).
+    - Simple resource envelopes: `{data: <entity>}` for single results.
+    - Error shape: `{error: string}` (routing-controllers default error handler);
+      IRC integration endpoints use `{code: string, message: string}`.
+    - Auth: `Authorization: Bearer <JWT>`; JWT verified against BETTER_AUTH_SECRET in the
+      POC (this crypto-coupling is unwound in Java per ADR-025 — the wire header contract
+      stays `Authorization: Bearer`).
+  x-baseline-revision: 98db628d78c79578dd11eb0476fab812d81fed32
+  x-capture-task: MIG-001
+  x-canonicalization-task: MIG-003
+
+servers:
+  - url: http://localhost:3000
+    description: Local backend (packages/backend dev server)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: health
+  - name: auth
+  - name: users
+  - name: conversations
+  - name: messages
+  - name: notes
+  - name: tags
+  - name: routing-rules
+  - name: bulk-actions
+  - name: assignments
+  - name: notifications
+  - name: audit
+  - name: audit-logs
+  - name: dlq
+  - name: queue
+  - name: irc-integration
+  - name: irc-profiles
+
+paths:
+  # =====================================================================
+  # HealthController — @Controller('/health') (non-JsonController)
+  # =====================================================================
+  /health:
+    get:
+      tags: [health]
+      operationId: getHealth
+      summary: Full health check with dependencies and SLOs (public, no auth)
+      description: '@All(''/'') route — responds to any HTTP method. Checks PostgreSQL, Redis, R2 in parallel.'
+      security: []
+      x-baseline-source: packages/backend/src/controllers/health.controller.ts:235 @98db628
+      responses:
+        '200':
+          description: Dependency statuses + SLO calculations
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HealthFullResponse'}
+        '500':
+          description: Health check itself failed (all dependencies reported down)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HealthFullResponse'}
+  /health/live:
+    get:
+      tags: [health]
+      operationId: getHealthLive
+      summary: Liveness probe (public, no auth)
+      description: '@All(''/live'') route — responds to any HTTP method. Process-alive check only.'
+      security: []
+      x-baseline-source: packages/backend/src/controllers/health.controller.ts:296 @98db628
+      responses:
+        '200':
+          description: Process alive
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HealthLiveResponse'}
+  /health/ready:
+    get:
+      tags: [health]
+      operationId: getHealthReady
+      summary: Readiness probe (public, no auth)
+      description: '@All(''/ready'') route — responds to any HTTP method. 200 when all dependencies up, 503 otherwise.'
+      security: []
+      x-baseline-source: packages/backend/src/controllers/health.controller.ts:313 @98db628
+      responses:
+        '200':
+          description: All dependencies ready
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HealthReadyResponse'}
+        '503':
+          description: One or more dependencies not ready
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HealthReadyResponse'}
+
+  # =====================================================================
+  # AuthController — @JsonController('/api/auth')
+  # =====================================================================
+  /api/auth/forgot-password:
+    post:
+      tags: [auth]
+      operationId: authForgotPassword
+      summary: Request password reset (public; always 200 to prevent enumeration; rate limited)
+      security: []
+      x-baseline-source: packages/backend/src/controllers/auth.controller.ts:44 @98db628
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ForgotPasswordBody'}
+      responses:
+        '200':
+          description: Constant anti-enumeration message
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MessageResponse'}
+        '429':
+          description: Rate limit exceeded (passwordResetRateLimiter)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+  /api/auth/reset-password:
+    post:
+      tags: [auth]
+      operationId: authResetPassword
+      summary: Reset password with token (public; rate limited)
+      security: []
+      x-baseline-source: packages/backend/src/controllers/auth.controller.ts:100 @98db628
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ResetPasswordBody'}
+      responses:
+        '200':
+          description: Password reset
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SuccessMessageResponse'}
+        '400':
+          description: Invalid or expired token (generic, anti-enumeration)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '429':
+          description: Rate limit exceeded (passwordResetRateLimiter)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+  /api/auth/sign-in/email:
+    post:
+      tags: [auth]
+      operationId: authSignInEmail
+      summary: Email/password sign-in (public; rate limited; BetterAuth delegate)
+      description: Delegates to the BetterAuth handler; response is the BetterAuth session/token contract.
+      security: []
+      x-baseline-source: packages/backend/src/controllers/auth.controller.ts:136 @98db628
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: {type: string, format: email}
+                password: {type: string}
+      responses:
+        '200':
+          description: BetterAuth sign-in response (session + token; set-auth-token header also exposed via CORS)
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '401':
+          description: Invalid credentials (BetterAuth)
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '429':
+          description: Rate limit exceeded (loginRateLimiter)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+  /api/auth/{authPath}:
+    get:
+      tags: [auth]
+      operationId: authBetterAuthWildcard
+      summary: BetterAuth wildcard delegate — ALL /api/auth/* (public)
+      description: |
+        '@All(''/*'') route — responds to any HTTP method. Single catch-all route in the
+        controller (registered last so the explicit routes above take precedence). Delegates
+        every method to the BetterAuth handler. Registered under `get` per this capture's
+        convention for `@All` routes (same as the three HealthController `@All` routes):
+        OpenAPI has no any-method operation field, so the ONE baseline route maps to ONE
+        operation while the description records the ALL-method decorator verbatim.
+        Known BetterAuth sub-paths at baseline: /sign-up/email (registration),
+        /sign-out, /get-session, /refresh-token. This is ONE route row (the literal wildcard
+        route in code), enumerated individually per MIG-001 guardrails; its concrete
+        sub-path behavior is the BetterAuth handler contract and is reconciled in MIG-003.
+      security: []
+      x-baseline-source: packages/backend/src/controllers/auth.controller.ts:154 @98db628
+      parameters:
+        - name: authPath
+          in: path
+          required: true
+          description: BetterAuth sub-path under /api/auth (e.g. sign-up/email, sign-out, get-session, refresh-token)
+          schema: {type: string}
+      responses:
+        '200':
+          description: BetterAuth handler passthrough response
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+
+  # =====================================================================
+  # UsersController — @JsonController('/api/users')
+  # =====================================================================
+  /api/users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      summary: List users (super_admin only) — BaseListResponse
+      x-baseline-source: packages/backend/src/controllers/users.controller.ts:117 @98db628
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 1}, description: 1-indexed page}
+        - {name: limit, in: query, schema: {type: integer, enum: [20, 50, 100]}, description: Allowed values 20/50/100 only}
+        - {name: role, in: query, schema: {$ref: '#/components/schemas/UserRole'}}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/UserStatus'}}
+        - {name: search, in: query, schema: {type: string}}
+      responses:
+        '200':
+          description: Paginated users
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/BaseListResponse'}
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: {$ref: '#/components/schemas/UserResponse'}
+        '400':
+          description: Invalid page/limit value
+          content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}
+        '403':
+          description: Not super_admin
+          content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}
+    post:
+      tags: [users]
+      operationId: createUser
+      summary: Create user (super_admin only)
+      x-baseline-source: packages/backend/src/controllers/users.controller.ts:150 @98db628
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateUserBody'}
+      responses:
+        '201':
+          description: Created user
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CreateUserResponse'}
+        '400':
+          description: Validation error
+          content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}
+        '403':
+          description: Not super_admin
+          content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}
+  /api/users/{id}:
+    put:
+      tags: [users]
+      operationId: updateUser
+      summary: Update user (super_admin only; self role/status change prevented)
+      x-baseline-source: packages/backend/src/controllers/users.controller.ts:166 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UpdateUserBody'}
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UpdateUserResponse'}
+        '400':
+          description: Validation error
+          content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}
+        '403':
+          description: Not super_admin or self-modification attempt
+          content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}
+        '404':
+          description: User not found
+          content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}
+    delete:
+      tags: [users]
+      operationId: deleteUser
+      summary: Soft-delete user (super_admin only; self-deletion prevented)
+      x-baseline-source: packages/backend/src/controllers/users.controller.ts:182 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Soft-deleted user
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DeleteUserResponse'}
+        '403':
+          description: Not super_admin or self-deletion attempt
+          content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}
+        '404':
+          description: User not found
+          content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}
+  /api/users/roles:
+    get:
+      tags: [users]
+      operationId: listUserRoles
+      summary: List role definitions (any authenticated user)
+      x-baseline-source: packages/backend/src/controllers/users.controller.ts:196 @98db628
+      responses:
+        '200':
+          description: Static role/permission definitions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [roles]
+                properties:
+                  roles:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, label, description, permissions]
+                      properties:
+                        id: {$ref: '#/components/schemas/UserRole'}
+                        label: {type: string}
+                        description: {type: string}
+                        permissions:
+                          type: array
+                          items: {type: string}
+
+  # =====================================================================
+  # ConversationsController — @JsonController('/api/conversations')
+  # =====================================================================
+  /api/conversations:
+    get:
+      tags: [conversations]
+      operationId: listConversations
+      summary: List conversations with filters — BaseListResponse (any authenticated user)
+      description: Path registered with trailing slash in controller (@Get('/')); routed as /api/conversations.
+      x-baseline-source: packages/backend/src/controllers/conversations.controller.ts:123 @98db628
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 1}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1}}
+        - {name: channel, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {type: string, enum: [open, pending, resolved]}}
+        - {name: priority, in: query, schema: {type: string, enum: [low, normal, high, urgent]}}
+        - {name: assignedUserId, in: query, schema: {type: string}}
+        - {name: tagId, in: query, schema: {type: string}}
+        - {name: search, in: query, schema: {type: string}}
+        - {name: dateFrom, in: query, schema: {type: string}}
+        - {name: dateTo, in: query, schema: {type: string}}
+        - {name: unread, in: query, schema: {type: string, enum: ['true', 'false']}, description: Literal 'true' enables unread filter}
+        - {name: sortBy, in: query, schema: {type: string, enum: [lastActivity, created, priority]}}
+        - {name: sortOrder, in: query, schema: {type: string, enum: [asc, desc]}}
+      responses:
+        '200':
+          description: Paginated conversations
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/BaseListResponse'}
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: {$ref: '#/components/schemas/Conversation'}
+        '400':
+          description: Invalid query values
+          content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}
+  /api/conversations/{id}:
+    get:
+      tags: [conversations]
+      operationId: getConversation
+      summary: Get conversation by ID (any authenticated user)
+      x-baseline-source: packages/backend/src/controllers/conversations.controller.ts:170 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: {$ref: '#/components/schemas/Conversation'}
+        '404':
+          description: Conversation not found
+          content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}
+  /api/conversations/{id}/status:
+    patch:
+      tags: [conversations]
+      operationId: updateConversationStatus
+      summary: Update conversation status (admin/manager/super_admin; audit-logged)
+      x-baseline-source: packages/backend/src/controllers/conversations.controller.ts:214 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: {type: string, enum: [open, pending, resolved]}
+      responses:
+        '200':
+          description: Updated conversation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/Conversation'}
+        '400': {description: Validation error, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Insufficient role, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/conversations/{id}/priority:
+    patch:
+      tags: [conversations]
+      operationId: updateConversationPriority
+      summary: Update conversation priority (manager/admin/super_admin; audit-logged)
+      x-baseline-source: packages/backend/src/controllers/conversations.controller.ts:243 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [priority]
+              properties:
+                priority: {type: string, enum: [low, normal, high, urgent]}
+      responses:
+        '200':
+          description: Updated conversation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/Conversation'}
+        '400': {description: Validation error, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Insufficient role, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/conversations/{id}/assign:
+    patch:
+      tags: [conversations]
+      operationId: assignConversationByPatch
+      summary: Assign conversation to user (admin/super_admin; audit-logged)
+      x-baseline-source: packages/backend/src/controllers/conversations.controller.ts:272 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssignBody'}
+      responses:
+        '200':
+          description: Updated conversation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/Conversation'}
+        '400': {description: Validation error, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Insufficient role, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+
+  # =====================================================================
+  # AssignmentsController — @JsonController('/api/conversations/:conversationId/assign')
+  # =====================================================================
+  /api/conversations/{conversationId}/assign:
+    post:
+      tags: [assignments]
+      operationId: assignConversationByPost
+      summary: Assign conversation via POST (manager+; in-code RBAC check)
+      x-baseline-source: packages/backend/src/controllers/assignment.controller.ts:40 @98db628
+      parameters:
+        - {name: conversationId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignedUserId]
+              properties:
+                assignedUserId: {type: string}
+      responses:
+        '200':
+          description: Assignment result envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/AssignmentResponse'}
+        '400': {description: Validation / assignment failure, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only manager+ can assign, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Conversation or user not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+
+  # =====================================================================
+  # BulkActionsController — @JsonController('/api/conversations')
+  # =====================================================================
+  /api/conversations/bulk:
+    post:
+      tags: [bulk-actions]
+      operationId: bulkActionConversations
+      summary: Bulk assign/tag/status on up to 100 conversations (manager+; best-effort, partial success returned)
+      x-baseline-source: packages/backend/src/controllers/bulk-action.controller.ts:80 @98db628
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BulkActionRequest'}
+      responses:
+        '200':
+          description: Best-effort result with per-item failures
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: {$ref: '#/components/schemas/BulkActionResponseData'}
+        '400': {description: Invalid input, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only manager+ can perform bulk actions, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '500': {description: Internal error, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+
+  # =====================================================================
+  # MessageController — @JsonController('/api/conversations/:conversationId/messages')
+  # =====================================================================
+  /api/conversations/{conversationId}/messages:
+    get:
+      tags: [messages]
+      operationId: getConversationMessages
+      summary: List messages in a conversation (any authenticated user) — custom shape (not BaseListResponse)
+      x-baseline-source: packages/backend/src/controllers/message.controller.ts:74 @98db628
+      parameters:
+        - {name: conversationId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: page, in: query, schema: {type: integer}, description: Default 1}
+        - {name: limit, in: query, schema: {type: integer}, description: Default 50}
+      responses:
+        '200':
+          description: Messages page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MessageListResponse'}
+        '400': {description: Invalid query parameters, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Conversation not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+    post:
+      tags: [messages]
+      operationId: sendConversationMessage
+      summary: Send a message (roles user/manager/admin/super_admin)
+      x-baseline-source: packages/backend/src/controllers/message.controller.ts:146 @98db628
+      parameters:
+        - {name: conversationId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SendMessageBody'}
+      responses:
+        '201':
+          description: Created message
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/Message'}
+        '401': {description: Unauthenticated, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Role not allowed, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Conversation not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/conversations/{conversationId}/messages/{messageId}/retry:
+    post:
+      tags: [messages]
+      operationId: retryConversationMessage
+      summary: Manual retry of a failed message (all roles if assigned; exactly once per message)
+      x-baseline-source: packages/backend/src/controllers/message.controller.ts:278 @98db628
+      parameters:
+        - {name: conversationId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: messageId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Retry accepted / result
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '400': {description: Retry not allowed (e.g. already retried), content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Conversation or message not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/conversations/{conversationId}/messages/{messageId}/status:
+    get:
+      tags: [messages]
+      operationId: getConversationMessageStatus
+      summary: Get status of a specific message (any authenticated user)
+      x-baseline-source: packages/backend/src/controllers/message.controller.ts:418 @98db628
+      parameters:
+        - {name: conversationId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: messageId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Message status
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '404': {description: Conversation or message not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+
+  # =====================================================================
+  # NotesController — @JsonController('/api/conversations/:conversationId/notes')
+  # =====================================================================
+  /api/conversations/{conversationId}/notes:
+    get:
+      tags: [notes]
+      operationId: listConversationNotes
+      summary: List notes for a conversation — BaseListResponse (any authenticated user)
+      x-baseline-source: packages/backend/src/controllers/note.controller.ts:42 @98db628
+      parameters:
+        - {name: conversationId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: page, in: query, schema: {type: string, default: '1'}}
+        - {name: pageSize, in: query, schema: {type: string, default: '50'}, description: Clamped 1..100}
+      responses:
+        '200':
+          description: Paginated notes
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/BaseListResponse'}
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: {$ref: '#/components/schemas/Note'}
+        '400': {description: Invalid parameters, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Conversation not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+    post:
+      tags: [notes]
+      operationId: createConversationNote
+      summary: Create note with mention parsing (any authenticated user)
+      x-baseline-source: packages/backend/src/controllers/note.controller.ts:101 @98db628
+      parameters:
+        - {name: conversationId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateNoteBody'}
+      responses:
+        '201':
+          description: Created note
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/Note'}
+        '400': {description: Validation error, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Conversation not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+
+  # =====================================================================
+  # TagController — @JsonController('/api')
+  # =====================================================================
+  /api/tags:
+    get:
+      tags: [tags]
+      operationId: listTags
+      summary: List all tags (any authenticated user)
+      x-baseline-source: packages/backend/src/controllers/tag.controller.ts:40 @98db628
+      responses:
+        '200':
+          description: Tags envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: {$ref: '#/components/schemas/Tag'}
+    post:
+      tags: [tags]
+      operationId: createTag
+      summary: Create a tag (any authenticated user; GOV-021)
+      x-baseline-source: packages/backend/src/controllers/tag.controller.ts:85 @98db628
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateTagBody'}
+      responses:
+        '201':
+          description: Created tag
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/Tag'}
+        '400': {description: Name/color validation error, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/conversations/{id}/tags:
+    post:
+      tags: [tags]
+      operationId: addTagToConversation
+      summary: Add tag to conversation (any authenticated user with conversation access; GOV-021)
+      x-baseline-source: packages/backend/src/controllers/tag.controller.ts:160 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tagId]
+              properties:
+                tagId: {type: integer, minimum: 1}
+      responses:
+        '201':
+          description: Tag linked
+          content:
+            application/json:
+              schema: {type: object, properties: {data: {type: object, additionalProperties: true}}}
+        '400': {description: Invalid tagId, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: No conversation access, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Conversation or tag not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/conversations/{id}/tags/{tagId}:
+    delete:
+      tags: [tags]
+      operationId: removeTagFromConversation
+      summary: Remove tag from conversation (any authenticated user with conversation access; GOV-021)
+      x-baseline-source: packages/backend/src/controllers/tag.controller.ts:239 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: tagId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Tag unlinked
+          content:
+            application/json:
+              schema: {type: object, properties: {data: {type: object, additionalProperties: true}}}
+        '400': {description: Invalid tagId, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: No conversation access, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Conversation or tag not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+
+  # =====================================================================
+  # RoutingRulesController — @JsonController('/api/routing-rules')
+  # =====================================================================
+  /api/routing-rules:
+    get:
+      tags: [routing-rules]
+      operationId: listRoutingRules
+      summary: List routing rules (manager+) — BaseListResponse without pagination (total as limit)
+      x-baseline-source: packages/backend/src/controllers/routing-rules.controller.ts:47 @98db628
+      responses:
+        '200':
+          description: All rules
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/BaseListResponse'}
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: {$ref: '#/components/schemas/RoutingRule'}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+    post:
+      tags: [routing-rules]
+      operationId: createRoutingRule
+      summary: Create routing rule (admin+)
+      x-baseline-source: packages/backend/src/controllers/routing-rules.controller.ts:102 @98db628
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RoutingRuleWrite'}
+      responses:
+        '201':
+          description: Created rule
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/RoutingRule'}
+        '400': {description: Validation error, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only admin+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/routing-rules/{id}:
+    patch:
+      tags: [routing-rules]
+      operationId: updateRoutingRule
+      summary: Update routing rule (admin+)
+      x-baseline-source: packages/backend/src/controllers/routing-rules.controller.ts:152 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RoutingRuleWrite'}
+      responses:
+        '200':
+          description: Updated rule
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/RoutingRule'}
+        '400': {description: Validation error, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only admin+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Rule not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+    delete:
+      tags: [routing-rules]
+      operationId: deleteRoutingRule
+      summary: Delete routing rule (admin+)
+      x-baseline-source: packages/backend/src/controllers/routing-rules.controller.ts:208 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Deleted rule
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/RoutingRule'}
+        '403': {description: Only admin+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Rule not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/routing-rules/{id}/executions:
+    get:
+      tags: [routing-rules]
+      operationId: getRoutingRuleExecutions
+      summary: Query rule execution logs (manager+)
+      x-baseline-source: packages/backend/src/controllers/routing-rules.controller.ts:263 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Execution log entries
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Rule not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+
+  # =====================================================================
+  # NotificationsController — @JsonController('/api/notifications')
+  # =====================================================================
+  /api/notifications:
+    get:
+      tags: [notifications]
+      operationId: listNotifications
+      summary: List current user's notifications — BaseListResponse (own notifications only)
+      x-baseline-source: packages/backend/src/controllers/notifications.controller.ts:45 @98db628
+      parameters:
+        - {name: page, in: query, schema: {type: string, default: '1'}}
+        - {name: pageSize, in: query, schema: {type: string, default: '20'}, description: Clamped 1..100}
+      responses:
+        '200':
+          description: Paginated notifications
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/BaseListResponse'}
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: {$ref: '#/components/schemas/Notification'}
+        '400': {description: Invalid parameters, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/notifications/{id}:
+    patch:
+      tags: [notifications]
+      operationId: markNotificationRead
+      summary: Mark own notification read/unread
+      x-baseline-source: packages/backend/src/controllers/notifications.controller.ts:109 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isRead]
+              properties:
+                isRead: {type: boolean}
+      responses:
+        '200':
+          description: Updated notification
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/Notification'}
+        '400': {description: isRead must be boolean / other validation, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Notification not found or not owned, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+    delete:
+      tags: [notifications]
+      operationId: dismissNotification
+      summary: Dismiss own notification
+      x-baseline-source: packages/backend/src/controllers/notifications.controller.ts:175 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '204':
+          description: Dismissed (no body)
+        '404':
+          description: Notification not found or not owned
+          content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}
+  /api/notifications/mark-all-read:
+    post:
+      tags: [notifications]
+      operationId: markAllNotificationsRead
+      summary: Mark all own notifications read
+      x-baseline-source: packages/backend/src/controllers/notifications.controller.ts:229 @98db628
+      responses:
+        '200':
+          description: Bulk mark result
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+
+  # =====================================================================
+  # AuditController — @JsonController('/api/conversations') (conversation-scoped audit)
+  # =====================================================================
+  /api/conversations/{conversationId}/audit-logs:
+    get:
+      tags: [audit]
+      operationId: getConversationAuditLogs
+      summary: Audit logs for one conversation (manager+)
+      x-baseline-source: packages/backend/src/controllers/audit.controller.ts:28 @98db628
+      parameters:
+        - {name: conversationId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: page, in: query, schema: {type: integer}}
+        - {name: limit, in: query, schema: {type: integer}}
+      responses:
+        '200':
+          description: Conversation audit page (custom shape, not BaseListResponse)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, limit, pages]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/AuditLog'}
+                  total: {type: integer}
+                  page: {type: integer}
+                  limit: {type: integer}
+                  pages: {type: integer}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+
+  # =====================================================================
+  # AuditLogsQueryController — @JsonController('/api/audit-logs')
+  # =====================================================================
+  /api/audit-logs:
+    get:
+      tags: [audit-logs]
+      operationId: queryAuditLogs
+      summary: Query audit logs with filters — BaseListResponse (manager+)
+      x-baseline-source: packages/backend/src/controllers/audit-log.controller.ts:45 @98db628
+      parameters:
+        - {name: actorId, in: query, schema: {type: string}}
+        - {name: action, in: query, schema: {type: string}}
+        - {name: entityType, in: query, schema: {type: string}}
+        - {name: entityId, in: query, schema: {type: string}}
+        - {name: dateFrom, in: query, schema: {type: string}, description: ISO date string}
+        - {name: dateTo, in: query, schema: {type: string}, description: ISO date string}
+        - {name: page, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: string}, description: Default 20, max 100}
+      responses:
+        '200':
+          description: Paginated audit logs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/BaseListResponse'}
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: {$ref: '#/components/schemas/AuditLog'}
+        '400': {description: Invalid date filters, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/audit-logs/conversations/{conversationId}:
+    get:
+      tags: [audit-logs]
+      operationId: queryConversationAuditLogs
+      summary: Audit logs where entityId = conversationId — BaseListResponse (manager+)
+      x-baseline-source: packages/backend/src/controllers/audit-log.controller.ts:109 @98db628
+      parameters:
+        - {name: conversationId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: action, in: query, schema: {type: string}}
+        - {name: entityType, in: query, schema: {type: string}}
+        - {name: dateFrom, in: query, schema: {type: string}}
+        - {name: dateTo, in: query, schema: {type: string}}
+        - {name: page, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: string}}
+      responses:
+        '200':
+          description: Paginated audit logs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/BaseListResponse'}
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: {$ref: '#/components/schemas/AuditLog'}
+        '400': {description: Invalid date filters, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/audit-logs/export:
+    post:
+      tags: [audit-logs]
+      operationId: exportAuditLogs
+      summary: Export audit logs as CSV/JSON download (admin+)
+      x-baseline-source: packages/backend/src/controllers/audit-log.controller.ts:177 @98db628
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [format]
+              properties:
+                format: {type: string, enum: [csv, json]}
+                filters:
+                  type: object
+                  description: Same filter fields as GET /api/audit-logs
+                  properties:
+                    actorId: {type: string}
+                    action: {type: string}
+                    entityType: {type: string}
+                    entityId: {type: string}
+                    dateFrom: {type: string}
+                    dateTo: {type: string}
+      responses:
+        '200':
+          description: File download (Content-Disposition attachment; text/csv or application/json)
+          content:
+            text/csv:
+              schema: {type: string}
+            application/json:
+              schema: {type: string}
+        '400': {description: Invalid date filters, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only admin+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+
+  # =====================================================================
+  # DLQController — @JsonController('/api/dlq')
+  # =====================================================================
+  /api/dlq:
+    get:
+      tags: [dlq]
+      operationId: listDlqEntries
+      summary: List DLQ entries (manager+) — custom shape
+      x-baseline-source: packages/backend/src/controllers/dlq.controller.ts:54 @98db628
+      parameters:
+        - {name: page, in: query, schema: {type: string}, description: Default 1}
+        - {name: limit, in: query, schema: {type: string}, description: Default 25, range 1..100}
+        - {name: failureReason, in: query, schema: {type: string}}
+      responses:
+        '200':
+          description: DLQ page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries, total, page, limit]
+                properties:
+                  entries:
+                    type: array
+                    items: {$ref: '#/components/schemas/DlqEntry'}
+                  total: {type: integer}
+                  page: {type: integer}
+                  limit: {type: integer}
+        '400': {description: Invalid pagination (page ≥1, limit 1-100), content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/dlq/stats:
+    get:
+      tags: [dlq]
+      operationId: getDlqStats
+      summary: DLQ statistics counts by failure reason etc. (manager+)
+      x-baseline-source: packages/backend/src/controllers/dlq.controller.ts:114 @98db628
+      responses:
+        '200':
+          description: Stats object
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/dlq/{id}/re-queue:
+    post:
+      tags: [dlq]
+      operationId: reQueueDlqEntry
+      summary: Move DLQ entry back to retry queue (admin+)
+      x-baseline-source: packages/backend/src/controllers/dlq.controller.ts:144 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Re-queued entry
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '403': {description: Only admin+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Entry not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/dlq/{id}:
+    delete:
+      tags: [dlq]
+      operationId: removeDlqEntry
+      summary: Remove DLQ entry after ops review (super_admin only)
+      x-baseline-source: packages/backend/src/controllers/dlq.controller.ts:193 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Removed entry
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '403': {description: Only super_admin, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Entry not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+
+  # =====================================================================
+  # QueueController — @JsonController('/api/queue')
+  # =====================================================================
+  /api/queue/stats:
+    get:
+      tags: [queue]
+      operationId: getQueueStats
+      summary: Queue statistics (manager+)
+      x-baseline-source: packages/backend/src/controllers/queue.controller.ts:92 @98db628
+      responses:
+        '200':
+          description: QueueStatistics fields + timestamp
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '500': {description: Internal error, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/queue/dlq:
+    get:
+      tags: [queue]
+      operationId: getQueueDlqEntries
+      summary: Dead-letter queue entries with pagination (manager+)
+      x-baseline-source: packages/backend/src/controllers/queue.controller.ts:143 @98db628
+      parameters:
+        - {name: page, in: query, schema: {type: number, default: 1}}
+        - {name: pageSize, in: query, schema: {type: number, default: 20}}
+      responses:
+        '200':
+          description: DLQ entries + total
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/queue/retry/{messageId}:
+    post:
+      tags: [queue]
+      operationId: retryQueuedMessage
+      summary: Retry a queued/failed message by ID (manager+)
+      x-baseline-source: packages/backend/src/controllers/queue.controller.ts:213 @98db628
+      parameters:
+        - {name: messageId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Retry accepted
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Message not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/queue/dlq/retry:
+    post:
+      tags: [queue]
+      operationId: bulkRetryDlq
+      summary: Bulk retry DLQ entries by message IDs (manager+)
+      x-baseline-source: packages/backend/src/controllers/queue.controller.ts:273 @98db628
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messageIds]
+              properties:
+                messageIds:
+                  type: array
+                  items: {type: string}
+      responses:
+        '200':
+          description: Bulk retry result
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '400': {description: messageIds must be an array, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/queue/dlq/stats:
+    get:
+      tags: [queue]
+      operationId: getQueueDlqStats
+      summary: DLQ statistics (manager+)
+      x-baseline-source: packages/backend/src/controllers/queue.controller.ts:358 @98db628
+      responses:
+        '200':
+          description: DLQ stats
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/queue/job/{jobId}:
+    get:
+      tags: [queue]
+      operationId: getQueueJob
+      summary: Job details by BullMQ job ID (manager+)
+      x-baseline-source: packages/backend/src/controllers/queue.controller.ts:416 @98db628
+      parameters:
+        - {name: jobId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Job details
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Job not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/queue/dlq/clear/{messageId}:
+    post:
+      tags: [queue]
+      operationId: clearQueueDlqEntry
+      summary: Clear a DLQ entry (super_admin only)
+      x-baseline-source: packages/backend/src/controllers/queue.controller.ts:497 @98db628
+      parameters:
+        - {name: messageId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Entry cleared
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '403': {description: Only super_admin, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '404': {description: Entry not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /api/queue/dlq/by-reason/{reason}:
+    get:
+      tags: [queue]
+      operationId: getQueueDlqByReason
+      summary: DLQ entries filtered by failure reason (manager+)
+      x-baseline-source: packages/backend/src/controllers/queue.controller.ts:556 @98db628
+      parameters:
+        - {name: reason, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Filtered DLQ entries
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+
+  # =====================================================================
+  # IRCIntegrationController — @Controller('/api/integrations/irc') (non-JsonController)
+  # =====================================================================
+  /api/integrations/irc/config:
+    post:
+      tags: [irc-integration]
+      operationId: saveIrcConfig
+      summary: Save IRC configuration (super_admin only; audit-logged)
+      x-baseline-source: packages/backend/src/controllers/ircIntegration.controller.ts:62 @98db628
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/IrcConfigBody'}
+      responses:
+        '200':
+          description: Saved config (sanitized; hasPassword flag, never the secret)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      server: {type: string}
+                      port: {type: integer}
+                      username: {type: string}
+                      channels: {type: array, items: {type: string}}
+                      hasPassword: {type: boolean}
+                      updatedAt: {type: string}
+        '400':
+          description: validation_error or encryption_key_missing
+          content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}
+        '403': {description: Only super_admin, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '500': {description: internal_error, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+  /api/integrations/irc/connect:
+    post:
+      tags: [irc-integration]
+      operationId: connectIrc
+      summary: Manual connect using stored config (super_admin only; idempotent; body ignored)
+      description: 409 irc_not_configured when neither DB config nor env fallback exists.
+      x-baseline-source: packages/backend/src/controllers/ircIntegration.controller.ts:152 @98db628
+      responses:
+        '200':
+          description: Current connection status (status=retrying, attemptCount=0 on fresh connect)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: {$ref: '#/components/schemas/IrcConnectionStatus'}
+        '409': {description: irc_not_configured, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '500': {description: internal_error, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+  /api/integrations/irc/test:
+    post:
+      tags: [irc-integration]
+      operationId: testIrcConnection
+      summary: Test IRC connection without side effects (super_admin only; 10s hard timeout)
+      description: Body-first test; if body omitted entirely, uses stored config (DB else env → 409 if none).
+      x-baseline-source: packages/backend/src/controllers/ircIntegration.controller.ts:248 @98db628
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/IrcConfigBody'}
+      responses:
+        '200':
+          description: Sanitized test result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [success, message]
+                    properties:
+                      success: {type: boolean}
+                      message: {type: string}
+        '400': {description: validation_error (partial body), content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '409': {description: irc_not_configured, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '500': {description: internal_error, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+  /api/integrations/irc/status:
+    get:
+      tags: [irc-integration]
+      operationId: getIrcStatus
+      summary: IRC connection status (admin+; works when unconfigured; no secrets exposed)
+      x-baseline-source: packages/backend/src/controllers/ircIntegration.controller.ts:390 @98db628
+      responses:
+        '200':
+          description: Connection status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: {$ref: '#/components/schemas/IrcConnectionStatus'}
+        '500': {description: internal_error, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+
+  # =====================================================================
+  # IRCProfileController — @JsonController('/api/integrations/irc/profiles')
+  # =====================================================================
+  /api/integrations/irc/profiles:
+    post:
+      tags: [irc-profiles]
+      operationId: createIrcProfile
+      summary: Create IRC profile (super_admin only; in-code RBAC)
+      x-baseline-source: packages/backend/src/controllers/ircProfile.controller.ts:67 @98db628
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/IrcProfileWrite'}
+      responses:
+        '201':
+          description: Created profile
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IrcProfile'}
+        '400': {description: Validation error, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '401': {description: Unauthorized, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '403': {description: Only super_admin, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+    get:
+      tags: [irc-profiles]
+      operationId: listIrcProfiles
+      summary: List IRC profiles (admin/manager/super_admin; in-code RBAC)
+      x-baseline-source: packages/backend/src/controllers/ircProfile.controller.ts:133 @98db628
+      responses:
+        '200':
+          description: Profiles array (raw array, not enveloped)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/IrcProfile'}
+        '401': {description: Unauthorized, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '403': {description: admin/manager/super_admin only, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+  /api/integrations/irc/profiles/{id}:
+    get:
+      tags: [irc-profiles]
+      operationId: getIrcProfile
+      summary: Get IRC profile by numeric ID (admin/manager/super_admin)
+      x-baseline-source: packages/backend/src/controllers/ircProfile.controller.ts:166 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}, description: Numeric profile ID}
+      responses:
+        '200':
+          description: Profile (raw object, not enveloped)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IrcProfile'}
+        '400': {description: Invalid profile ID, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '403': {description: admin/manager/super_admin only, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '404': {description: Profile not found, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+    put:
+      tags: [irc-profiles]
+      operationId: updateIrcProfile
+      summary: Update IRC profile (super_admin only)
+      x-baseline-source: packages/backend/src/controllers/ircProfile.controller.ts:209 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/IrcProfileWrite'}
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IrcProfile'}
+        '400': {description: Validation error, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '403': {description: Only super_admin, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '404': {description: Profile not found, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+    delete:
+      tags: [irc-profiles]
+      operationId: deleteIrcProfile
+      summary: Delete IRC profile (super_admin only)
+      x-baseline-source: packages/backend/src/controllers/ircProfile.controller.ts:388 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '204':
+          description: Deleted (no body)
+        '403': {description: Only super_admin, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '404': {description: Profile not found, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+  /api/integrations/irc/profiles/{id}/activate:
+    post:
+      tags: [irc-profiles]
+      operationId: activateIrcProfile
+      summary: Activate profile (single active profile policy; super_admin only)
+      x-baseline-source: packages/backend/src/controllers/ircProfile.controller.ts:267 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Activated profile
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IrcProfile'}
+        '403': {description: Only super_admin, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '404': {description: Profile not found, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+  /api/integrations/irc/profiles/{id}/disable:
+    post:
+      tags: [irc-profiles]
+      operationId: disableIrcProfile
+      summary: Disable profile (super_admin only)
+      x-baseline-source: packages/backend/src/controllers/ircProfile.controller.ts:327 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Disabled profile
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IrcProfile'}
+        '403': {description: Only super_admin, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '404': {description: Profile not found, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+  /api/integrations/irc/profiles/{id}/test:
+    post:
+      tags: [irc-profiles]
+      operationId: testIrcProfileConnection
+      summary: Test stored profile credentials without switching active profile (super_admin only)
+      x-baseline-source: packages/backend/src/controllers/ircProfile.controller.ts:445 @98db628
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+        '403': {description: Only super_admin, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+        '404': {description: Profile not found, content: {application/json: {schema: {$ref: '#/components/schemas/IntegrationErrorResponse'}}}}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        Baseline JWT verified against BETTER_AUTH_SECRET (ADR-025 unwinds this coupling;
+        wire contract `Authorization: Bearer` is preserved by the Java target).
+
+  schemas:
+    # ---------- Cross-cutting envelopes ----------
+    BaseListResponse:
+      type: object
+      description: >-
+        Baseline pagination envelope (@yacc/common BaseListResponse). page is 1-indexed in
+        responses (controllers pass 0-indexed page internally). limit falls back to the
+        BaseListRequest default set [15,25,35,45,55,100,150,200,0] when not matched.
+      required: [data, page, limit, total]
+      properties:
+        data: {type: array, items: {}}
+        page: {type: integer, description: 1-indexed page}
+        limit: {type: integer}
+        total: {type: integer}
+    ErrorResponse:
+      type: object
+      description: Default routing-controllers error shape
+      required: [error]
+      properties:
+        error: {type: string}
+    IntegrationErrorResponse:
+      type: object
+      description: IRC integration error shape
+      required: [code, message]
+      properties:
+        code: {type: string, examples: [validation_error, encryption_key_missing, irc_not_configured, internal_error]}
+        message: {type: string}
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message: {type: string}
+    SuccessMessageResponse:
+      type: object
+      required: [success, message]
+      properties:
+        success: {type: boolean}
+        message: {type: string}
+
+    # ---------- Health ----------
+    HealthFullResponse:
+      type: object
+      required: [status, uptime, timestamp, dependencies]
+      properties:
+        status: {type: string}
+        uptime: {type: number}
+        timestamp: {type: string, format: date-time}
+        dependencies:
+          type: object
+          properties:
+            postgresql: {type: object, additionalProperties: true}
+            redis: {type: object, additionalProperties: true}
+            r2: {type: object, additionalProperties: true}
+        slo: {type: object, additionalProperties: true}
+    HealthLiveResponse:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status: {type: string, examples: [alive]}
+        timestamp: {type: string, format: date-time}
+    HealthReadyResponse:
+      type: object
+      required: [status, timestamp, dependencies]
+      properties:
+        status: {type: string, enum: [ready, not_ready]}
+        timestamp: {type: string, format: date-time}
+        dependencies:
+          type: object
+          properties:
+            postgresql: {type: boolean}
+            redis: {type: boolean}
+            r2: {type: boolean}
+
+    # ---------- Auth ----------
+    ForgotPasswordBody:
+      type: object
+      required: [email]
+      properties:
+        email: {type: string, format: email}
+    ResetPasswordBody:
+      type: object
+      required: [token, password]
+      properties:
+        token: {type: string, description: 64-char hex reset token}
+        password: {type: string}
+
+    # ---------- Users ----------
+    UserRole:
+      type: string
+      enum: [super_admin, admin, manager, user]
+    UserStatus:
+      type: string
+      enum: [active, inactive, suspended]
+    UserResponse:
+      type: object
+      description: Baseline shape packages/backend/src/types/users.types.ts UserResponse
+      required: [id, email, name, role, status, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        email: {type: string, format: email}
+        name: {type: string}
+        role: {$ref: '#/components/schemas/UserRole'}
+        status: {$ref: '#/components/schemas/UserStatus'}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        deletedAt: {type: [string, 'null'], format: date-time}
+    CreateUserBody:
+      type: object
+      required: [email, password, name, role]
+      properties:
+        email: {type: string, format: email}
+        password: {type: string}
+        name: {type: string}
+        role: {$ref: '#/components/schemas/UserRole'}
+    CreateUserResponse:
+      type: object
+      required: [id, email, name, role, status, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        email: {type: string, format: email}
+        name: {type: string}
+        role: {$ref: '#/components/schemas/UserRole'}
+        status: {$ref: '#/components/schemas/UserStatus'}
+        createdAt: {type: string, format: date-time}
+    UpdateUserBody:
+      type: object
+      description: Partial update
+      properties:
+        email: {type: string, format: email}
+        name: {type: string}
+        role: {$ref: '#/components/schemas/UserRole'}
+        status: {$ref: '#/components/schemas/UserStatus'}
+    UpdateUserResponse:
+      type: object
+      required: [id, email, name, role, status]
+      properties:
+        id: {type: string, format: uuid}
+        email: {type: string, format: email}
+        name: {type: string}
+        role: {$ref: '#/components/schemas/UserRole'}
+        status: {$ref: '#/components/schemas/UserStatus'}
+    DeleteUserResponse:
+      type: object
+      description: Soft-deleted user representation (baseline DeleteUserResponse)
+      properties:
+        id: {type: string, format: uuid}
+        deletedAt: {type: string, format: date-time}
+
+    # ---------- Conversations / assignments / bulk ----------
+    Conversation:
+      type: object
+      description: >-
+        Conversation entity as returned by conversations service. Field-level canonical
+        shape is reconciled in MIG-003; enums verified in baseline code
+        (status open|pending|resolved, priority low|normal|high|urgent).
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [open, pending, resolved]}
+        priority: {type: string, enum: [low, normal, high, urgent]}
+        assignedUserId: {type: [string, 'null']}
+      additionalProperties: true
+    AssignBody:
+      type: object
+      properties:
+        assignedUserId: {type: [string, 'null'], format: uuid}
+    AssignmentResponse:
+      type: object
+      description: Baseline shape packages/backend/src/types/assignments.types.ts
+      required: [id, conversationId, previouslyAssignedUserId, newlyAssignedUserId, assignedAt]
+      properties:
+        id: {type: string}
+        conversationId: {type: string, format: uuid}
+        previouslyAssignedUserId: {type: [string, 'null']}
+        newlyAssignedUserId: {type: string}
+        assignedAt: {type: string}
+    BulkActionRequest:
+      type: object
+      required: [conversationIds, action, data]
+      properties:
+        conversationIds:
+          type: array
+          maxItems: 100
+          minItems: 1
+          items: {type: string, format: uuid}
+        action: {type: string, enum: [assign, tag, status]}
+        data:
+          type: object
+          description: Action payload (assigneeId for assign; tagId for tag; status for status)
+          additionalProperties: true
+    BulkActionResponseData:
+      type: object
+      required: [successCount, failureCount, failures]
+      properties:
+        successCount: {type: integer}
+        failureCount: {type: integer}
+        failures:
+          type: array
+          items:
+            type: object
+            required: [id, reason]
+            properties:
+              id: {type: string}
+              reason: {type: string}
+
+    # ---------- Messages / notes / tags ----------
+    Message:
+      type: object
+      description: Baseline shape packages/backend/src/types/message.types.ts MessageResponseDTO
+      required: [id, conversationId, senderId, senderName, body, status, direction, metadata, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        conversationId: {type: string, format: uuid}
+        senderId: {type: [string, 'null']}
+        senderName: {type: string}
+        body: {type: string}
+        status: {type: string, enum: [pending, sent, failed]}
+        direction: {type: string, enum: [inbound, outbound]}
+        externalMessageId: {type: string}
+        metadata: {type: [object, 'null'], additionalProperties: true}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    MessageListResponse:
+      type: object
+      description: Custom list shape used by GET messages (NOT BaseListResponse)
+      required: [messages, total, page, limit]
+      properties:
+        messages:
+          type: array
+          items: {$ref: '#/components/schemas/Message'}
+        total: {type: integer}
+        page: {type: integer, default: 1}
+        limit: {type: integer, default: 50}
+    SendMessageBody:
+      type: object
+      description: Baseline packages/backend/src/types/message.types.ts SendMessageRequestSchema
+      required: [body]
+      properties:
+        body: {type: string, minLength: 1, maxLength: 10000}
+        attachmentIds:
+          type: array
+          items: {type: string, format: uuid}
+    CreateNoteBody:
+      type: object
+      description: Baseline @yacc/common CreateNoteRequest (class-validator)
+      required: [body]
+      properties:
+        body: {type: string}
+        replyToMessageId: {type: string, format: uuid}
+        isInternal: {type: boolean, default: false}
+    Note:
+      type: object
+      description: Note entity as returned by notes service; canonical shape reconciled in MIG-003.
+      properties:
+        id: {type: string, format: uuid}
+        conversationId: {type: string, format: uuid}
+        body: {type: string}
+      additionalProperties: true
+    Tag:
+      type: object
+      description: Tag entity (id, name, color, createdById); canonical shape reconciled in MIG-003.
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        color: {type: string}
+      additionalProperties: true
+    CreateTagBody:
+      type: object
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 255}
+        color: {type: string, pattern: '^#[0-9A-Fa-f]{6}$'}
+
+    # ---------- Routing rules ----------
+    RoutingRule:
+      type: object
+      description: Routing rule entity; condition/action JSON is lenient per ADR-021. Canonical shape reconciled in MIG-003.
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        enabled: {type: boolean}
+        priority: {type: integer}
+      additionalProperties: true
+    RoutingRuleWrite:
+      type: object
+      description: Create/update body; re-expresses ADR-021 lenient JSON validation in the Java target.
+      additionalProperties: true
+
+    # ---------- Notifications / audit ----------
+    Notification:
+      type: object
+      description: Notification entity as returned by notifications service (own-scope). Canonical shape reconciled in MIG-003.
+      properties:
+        id: {type: string, format: uuid}
+        userId: {type: string, format: uuid}
+        type: {type: string}
+        isRead: {type: boolean}
+      additionalProperties: true
+    AuditLog:
+      type: object
+      description: Baseline shape @yacc/common types/AuditLog.type.ts
+      required: [id, actorId, action, entityType, entityId, metadata, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        actorId: {type: [string, 'null']}
+        actorName: {type: string}
+        action: {type: string}
+        entityType: {type: string}
+        entityId: {type: string}
+        metadata: {type: object, additionalProperties: true}
+        ipAddress: {type: string}
+        createdAt: {type: string, format: date-time}
+
+    # ---------- DLQ / queue ----------
+    DlqEntry:
+      type: object
+      description: DLQ entry (packages/backend/src/types/message-queue.types.ts DLQEntry); canonical shape reconciled in MIG-003.
+      properties:
+        id: {type: string, format: uuid}
+        failureReason: {type: string}
+      additionalProperties: true
+
+    # ---------- IRC ----------
+    IrcConfigBody:
+      type: object
+      description: Baseline IRCConfigRequest — server/port/username required, password optional, channels ≥1 each starting '#'
+      required: [server, port, username, channels]
+      properties:
+        server: {type: string, minLength: 1}
+        port: {type: integer, minimum: 1, maximum: 65535}
+        username: {type: string, minLength: 1}
+        password: {type: string}
+        channels:
+          type: array
+          minItems: 1
+          items: {type: string, pattern: '^#'}
+    IrcConnectionStatus:
+      type: object
+      description: >-
+        Baseline @yacc/common types/irc-integration.types.ts IRCConnectionStatusModel —
+        status enum connected|retrying|disconnected|failed; includes attemptCount,
+        lastConnectedAt, lastError, reconnectIncidentId.
+      required: [status]
+      properties:
+        status: {type: string, enum: [connected, retrying, disconnected, failed]}
+        attemptCount: {type: integer}
+        lastConnectedAt: {type: [string, 'null'], format: date-time}
+        lastError: {type: [string, 'null']}
+        reconnectIncidentId: {type: string, format: uuid}
+      additionalProperties: true
+    IrcProfileWrite:
+      type: object
+      description: Create/update IRC profile body (CreateIrcProfileRequest/UpdateIrcProfileRequest); canonical shape reconciled in MIG-003.
+      properties:
+        name: {type: string}
+        server: {type: string}
+        port: {type: integer}
+        nick: {type: string}
+        channels: {type: array, items: {type: string}}
+      additionalProperties: true
+    IrcProfile:
+      type: object
+      description: IRC profile entity (numeric id, tenant-scoped); canonical shape reconciled in MIG-003.
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        isActive: {type: boolean}
+      additionalProperties: true
