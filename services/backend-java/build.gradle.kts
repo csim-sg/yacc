@@ -89,3 +89,22 @@ tasks.jacocoTestCoverageVerification {
 tasks.named("check") {
     dependsOn(tasks.jacocoTestCoverageVerification)
 }
+
+// MIG-013 contract-test gate (AC-MIG-013-2; SPEC-002 Testing Strategy):
+// contract tests carry @Tag("contract") and run via this dedicated task so
+// OpenAPI/AsyncAPI conformance (ADR-023) is a named CI gate alongside the
+// coverage gate above. The first contract tests land with MIG-041, which also
+// owns the final test/contract split and JaCoCo execution-data wiring; until
+// then the task tolerates zero matching tests so CI stays green.
+tasks.register<Test>("contractTest") {
+    group = "verification"
+    description = "Runs contract tests (JUnit @Tag(\"contract\")) — tests land with MIG-041."
+    testClassesDirs = sourceSets.getByName("test").output.classesDirs
+    classpath = sourceSets.getByName("test").runtimeClasspath
+    useJUnitPlatform {
+        includeTags("contract")
+    }
+    filter {
+        isFailOnNoMatchingTests = false
+    }
+}
