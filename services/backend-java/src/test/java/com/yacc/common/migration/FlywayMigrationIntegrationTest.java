@@ -2,6 +2,7 @@ package com.yacc.common.migration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,9 +64,10 @@ class FlywayMigrationIntegrationTest extends AbstractPostgresIntegrationTest {
 
         // Exactly the 19 re-expressed tables + websocket_backlog (ADR-028, V2)
         // + Flyway's own history table. Nothing else — no unrelated schema.
-        assertThat(tables).containsExactlyInAnyOrderElementsOf(BASELINE_TABLES)
-                .contains("websocket_backlog", "flyway_schema_history")
-                .hasSize(BASELINE_TABLES.size() + 2);
+        List<String> expected = new ArrayList<>(BASELINE_TABLES);
+        expected.add("websocket_backlog");
+        expected.add("flyway_schema_history");
+        assertThat(tables).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     @Test
