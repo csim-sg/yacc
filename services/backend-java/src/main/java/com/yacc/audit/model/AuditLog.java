@@ -6,6 +6,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * JPA entity for the {@code audit_logs} table (MIG-021; V1 baseline,
@@ -32,6 +34,7 @@ public class AuditLog {
     @Column(name = "entity_id", nullable = false, updatable = false)
     private UUID entityId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata")
     private String metadata;
 

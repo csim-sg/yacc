@@ -8,6 +8,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * JPA entity for the {@code raw_payloads} table (MIG-021; V1 baseline,
@@ -29,6 +31,7 @@ public class RawPayload {
     @Column(name = "platform", nullable = false, length = 50)
     private String platform;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "payload", nullable = false)
     private String payload;
 

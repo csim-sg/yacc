@@ -8,6 +8,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * JPA entity for the {@code routing_rule_executions} table (MIG-021; V1
@@ -29,9 +31,11 @@ public class RoutingRuleExecution {
     @Column(name = "conversation_id", nullable = false, updatable = false)
     private UUID conversationId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "matched_conditions")
     private String matchedConditions;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "applied_actions")
     private String appliedActions;
 

@@ -7,6 +7,8 @@ import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * JPA entity for the {@code conversations} table (MIG-021; V1 baseline,
@@ -48,6 +50,7 @@ public class Conversation {
     @Column(name = "assigned_user_id")
     private String assignedUserId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata")
     private String metadata;
 

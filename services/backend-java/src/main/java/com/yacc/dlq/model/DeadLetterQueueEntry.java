@@ -6,6 +6,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * JPA entity for the {@code dead_letter_queue} table (MIG-021; V1 baseline +
@@ -27,6 +29,7 @@ public class DeadLetterQueueEntry {
     @Column(name = "conversation_id", nullable = false, updatable = false)
     private UUID conversationId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "payload", nullable = false, updatable = false)
     private String payload;
 
@@ -66,6 +69,7 @@ public class DeadLetterQueueEntry {
     @Column(name = "retried_by")
     private UUID retriedBy;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata")
     private String metadata;
 

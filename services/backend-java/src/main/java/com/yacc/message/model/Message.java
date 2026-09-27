@@ -7,6 +7,8 @@ import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * JPA entity for the {@code messages} table (MIG-021; V1 baseline, ADR-027).
@@ -47,6 +49,7 @@ public class Message {
     @Column(name = "external_message_id", length = 255)
     private String externalMessageId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata")
     private String metadata;
 

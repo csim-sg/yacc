@@ -6,6 +6,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * JPA entity for the {@code routing_rules} table (MIG-021; V1 baseline,
@@ -34,9 +36,11 @@ public class RoutingRule {
     @Column(name = "priority", nullable = false)
     private Integer priority;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "conditions", nullable = false)
     private String conditions;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "actions", nullable = false)
     private String actions;
 

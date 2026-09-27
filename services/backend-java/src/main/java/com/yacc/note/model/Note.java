@@ -6,6 +6,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * JPA entity for the {@code notes} table (MIG-021; V1 baseline, ADR-027).
@@ -28,6 +30,7 @@ public class Note {
     @Column(name = "body", nullable = false)
     private String body;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "mentions")
     private String mentions;
 
