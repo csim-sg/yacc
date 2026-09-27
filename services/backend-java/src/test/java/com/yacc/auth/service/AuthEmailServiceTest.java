@@ -47,7 +47,7 @@ class AuthEmailServiceTest {
                 new AuthProperties.Email("no-reply@fixture.yacc.local", "smtp", null,
                         "http://frontend.fixture.yacc.local", 3,
                         java.time.Duration.ofNanos(1)),
-                null, null, null);
+                null, null, null, null);
         service = new AuthEmailService(sender, properties, audit);
     }
 

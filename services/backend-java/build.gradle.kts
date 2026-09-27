@@ -46,6 +46,16 @@ dependencies {
     // @ConfigurationProperties — ARCH-004 §4); no hard-coded IdP. The embedded
     // OIDC authorization server (AS) remains MIG-033 scope.
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+    // --- MIG-033 OIDC authorization server (SPEC-002 FR-04/TR-05; ADR-025) ---
+    // Embedded Spring Authorization Server (the founder-fixed dual-role OIDC
+    // AS; no Keycloak/broker — ADR-025). Brings the framework-standard
+    // authorization/token/JWKS/revocation/OIDC-discovery endpoints; the only
+    // approved dependency addition of MIG-033. Signing keys come from the
+    // SAME RS256 key family as the resource server (yacc.auth.token.*,
+    // MIG-030) — one token format, one signing-key source; no bespoke token
+    // crypto. The AS filter chain and registered-client policy live in
+    // auth/AuthorizationServerConfig (yacc.auth.as.* config binding).
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-authorization-server")
     // Bean validation (@Valid + jakarta.validation constraints) on inbound
     // request bodies — the replacement for the POC's Zod validation
     // (ARCH-004 §3; ADR-023 supersedes ADR-020).

@@ -160,6 +160,34 @@ yacc:
       #     user-info-uri: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_USER_INFO_URI:}
       #     # user-name-attribute: sub       # default sub
       #     # scopes: openid,profile,email   # default openid,profile,email
+    as:
+      # MIG-033 embedded OIDC authorization server (ADR-025 AS role;
+      # ARCH-004 §4/§8). Always-on (dual-role OIDC is founder-fixed). The AS
+      # signs with the SAME RS256 key family as the resource server
+      # (yacc.auth.token.signing-key above) — one token format, one
+      # signing-key source, no bespoke token crypto; there is deliberately NO
+      # second signing-key property. The issuer URL is stamped on AS-issued
+      # tokens and served by /.well-known/openid-configuration; the
+      # resource-server validator accepts it alongside the local `yacc`
+      # issuer (MIG-030 token contract). Production MUST override the
+      # localhost default with the deployment URL (K8s config/env).
+      issuer: ${YACC_AUTH_AS_ISSUER:http://localhost:8080}
+      clients:
+        # Registered-client policy (founder-fixed): the YACC frontend only,
+        # unless a third-party client is named at acceptance. Public OIDC SPA
+        # client: no client secret, authorization-code + PKCE (S256) +
+        # refresh; consent is always required. Redirect URIs are exact-match
+        # (no wildcards) — production binds the deployment origin via env.
+        # Client-credentials is deliberately absent (no machine client is
+        # named — KISS; add only via a recorded founder decision).
+        yacc-frontend:
+          client-id: ${YACC_AUTH_AS_CLIENT_YACC_FRONTEND_ID:yacc-frontend}
+          redirect-uris:
+            - ${YACC_AUTH_AS_CLIENT_YACC_FRONTEND_REDIRECT_URI:http://localhost:5173/auth/callback}
+          # scopes:            # default openid,profile,email
+          #   - openid
+          #   - profile
+          #   - email
   integration:
     encryption:
       # MIG-021 secret contract (ADR-027): the IRC credential master key is

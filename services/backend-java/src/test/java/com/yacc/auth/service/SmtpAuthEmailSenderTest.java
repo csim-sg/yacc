@@ -35,7 +35,7 @@ class SmtpAuthEmailSenderTest {
     void setUp() {
         sender = new SmtpAuthEmailSender(mailSender, new AuthProperties(null, null, null,
                 new AuthProperties.Email("no-reply@fixture.yacc.local", "smtp", null,
-                        null, 0, null), null, null, null));
+                        null, 0, null), null, null, null, null));
     }
 
     @Test

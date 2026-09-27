@@ -48,6 +48,17 @@
 #   registration (no hard-coded IdP); the success callback answers the same
 #   AuthSessionResponse shape as sign-in (MIG-034 adaptation surface), and all
 #   failures deny with the frozen 401 `{error}` body.
+#
+# MIG-033 contract-change findings (issue #350; same §1.5 rule):
+# - NO `/api/*` contract change. The embedded Spring Authorization Server
+#   (ADR-025 AS role) serves only framework-standard, non-API surface outside
+#   this contract: `/oauth2/authorize`, `/oauth2/token`, `/oauth2/jwks`,
+#   `/oauth2/revoke`, `/oauth2/consent`, `/.well-known/openid-configuration`,
+#   `/.well-known/oauth-authorization-server`, `/userinfo` (MIG-033
+#   AuthorizationServerConfig; recorded here for reviewer traceability).
+#   AS-issued tokens reuse the MIG-030 JWT contract (same signing key family,
+#   sub/role/email claims) and verify through the existing resource-server
+#   seam; no frozen endpoint, schema, or error shape was altered.
 openapi: 3.1.0
 info:
   title: YACC REST API (canonical)

@@ -5,11 +5,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.time.Instant;
 import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
 
 import org.springframework.security.oauth2.jwt.BadJwtException;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 
 import com.yacc.auth.AuthProperties;
 import com.yacc.auth.model.AuthUser;
@@ -28,7 +32,7 @@ class JwtTokenServiceTest {
         return new AuthProperties(
                 new AuthProperties.Token(signingKeyBase64, null, null),
                 new AuthProperties.Bootstrap("bootstrap@fixture.yacc.local", "initial"),
-                new AuthProperties.Recovery("", "", ""), null, null, null, null);
+                new AuthProperties.Recovery("", "", ""), null, null, null, null, null);
     }
 
     private static String generatedKey(int bits) {
@@ -92,7 +96,7 @@ class JwtTokenServiceTest {
                 new AuthProperties.Token(generatedKey(2048),
                         java.time.Duration.ofSeconds(1), java.time.Duration.ofDays(30)),
                 new AuthProperties.Bootstrap("bootstrap@fixture.yacc.local", "initial"),
-                new AuthProperties.Recovery("", "", ""), null, null, null, null));
+                new AuthProperties.Recovery("", "", ""), null, null, null, null, null));
 
         String token = service.issueAccessToken(user("user-1", UserRole.USER), "session-1");
         Thread.sleep(1500);
@@ -121,5 +125,90 @@ class JwtTokenServiceTest {
         assertThatThrownBy(() -> new JwtTokenService(properties(generatedKey(1024))))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("2048");
+    }
+
+    // --- MIG-033: embedded authorization-server token compatibility ---
+
+    /**
+     * MIG-033 compat: a token stamped with the embedded AS issuer but signed
+     * by the SAME shared key family decodes (the resource server verifies
+     * AS-issued tokens — one token format, one signing-key source).
+     */
+    @Test
+    void acceptsAsIssuedIssuerTokensFromTheSharedKey() {
+        AuthProperties props = properties(generatedKey(2048));
+        JwtTokenService service = new JwtTokenService(props);
+
+        String asIssuedToken = signedWith(service.signingKey(),
+                props.as().issuer(), "user-as-1");
+
+        var jwt = service.decodeAccessToken(asIssuedToken);
+        assertThat(jwt.getIssuer().toString()).isEqualTo(props.as().issuer());
+        assertThat(jwt.getSubject()).isEqualTo("user-as-1");
+    }
+
+    /** A correctly signed token carrying a foreign issuer is rejected. */
+    @Test
+    void rejectsForeignIssuerTokens() {
+        AuthProperties props = properties(generatedKey(2048));
+        JwtTokenService service = new JwtTokenService(props);
+
+        String foreignToken = signedWith(service.signingKey(), "https://evil.example", "user-1");
+
+        assertThatThrownBy(() -> service.decodeAccessToken(foreignToken))
+                .isInstanceOf(BadJwtException.class)
+                .hasMessageContaining("issuer");
+    }
+
+    /**
+     * Rotation (MIG-033; single signing-key source): rotating the env key
+     * rotates encoder, decoder and the AS JWKSource together — outstanding
+     * old-key tokens no longer verify, new-key tokens do, and the JWKS
+     * material served after rotation is exactly the new key.
+     */
+    @Test
+    void keyRotationSwitchesSigningVerificationAndJwksMaterial() {
+        JwtTokenService before = new JwtTokenService(properties(generatedKey(2048)));
+        String outstandingToken = before.issueAccessToken(user("user-1", UserRole.USER),
+                "session-1");
+
+        JwtTokenService after = new JwtTokenService(properties(generatedKey(2048)));
+
+        // The outstanding pre-rotation token no longer verifies...
+        assertThatThrownBy(() -> after.decodeAccessToken(outstandingToken))
+                .isInstanceOf(BadJwtException.class);
+        // ...and post-rotation signing works.
+        String rotatedToken = after.issueAccessToken(user("user-1", UserRole.USER), "session-2");
+        assertThat(after.decodeAccessToken(rotatedToken).getClaimAsString("iss")).isEqualTo("yacc");
+        // The JWKS material after rotation is the NEW key (different modulus).
+        assertThat(after.signingKey().toPublicJWK().getModulus())
+                .isNotEqualTo(before.signingKey().toPublicJWK().getModulus());
+    }
+
+    /**
+     * Mints an RS256 token with an explicit issuer using the SAME signing
+     * key (test-side mimicry of the AS token mint path; no production
+     * crypto involved).
+     */
+    private static String signedWith(com.nimbusds.jose.jwk.RSAKey key, String issuer,
+            String subject) {
+        try {
+            org.springframework.security.oauth2.jwt.JwtEncoder encoder = new NimbusJwtEncoder(
+                    new ImmutableJWKSet<>(new com.nimbusds.jose.jwk.JWKSet(key)));
+            Instant now = Instant.now();
+            var claims = org.springframework.security.oauth2.jwt.JwtClaimsSet.builder()
+                    .issuer(issuer)
+                    .issuedAt(now)
+                    .expiresAt(now.plusSeconds(60))
+                    .subject(subject)
+                    .claim(JwtTokenService.CLAIM_ROLE, "user")
+                    .claim(JwtTokenService.CLAIM_EMAIL, "user@fixture.yacc.local")
+                    .build();
+            return encoder
+                    .encode(org.springframework.security.oauth2.jwt.JwtEncoderParameters.from(claims))
+                    .getTokenValue();
+        } catch (org.springframework.security.oauth2.jwt.JwtEncodingException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }
