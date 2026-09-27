@@ -1,8 +1,15 @@
 # ============================================
-# YACC Backend Helm Values
+# YACC Backend Helm Values (Spring Boot era — MIG-012)
 # ============================================
+# Re-specified by SPEC-002 MIG-012 / ADR-029 (JVM deployment envelope):
+#   - Temurin 21 JRE image, non-root (uid 1000), read-only root filesystem
+#   - pod envelope >= 1Gi request / 2Gi limit (was 512Mi/1Gi — too small for the JVM)
+#   - probes on the frozen actuator health wire paths /health/live, /health/ready
+#     (ADR-019 amendment: /actuator/health/* semantics, wire paths preserved — MIG-003 §5)
+#   - Redis removed (ADR-028: Quartz + DB DLQ + PostgreSQL WS backlog replace it)
+#   - POC auth secrets (JWT_SECRET / BETTER_AUTH_SECRET) replaced by Spring auth +
+#     recovery secrets (ADR-025 bootstrap/recovery)
 # Default values for yacc-backend.
-# This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
 # ============================================
@@ -13,6 +20,7 @@ replicaCount: 1
 # ============================================
 # CONTAINER IMAGE
 # ============================================
+# Built from services/backend-java/Dockerfile (Temurin 21 JRE, non-root uid 1000).
 image:
   registry: ""  # e.g., ghcr.io
   repository: csim-sg/yacc/yacc-backend
@@ -50,17 +58,22 @@ serviceAccount:
 podAnnotations: {}
 
 # ============================================
-# POD SECURITY CONTEXT
+# POD SECURITY CONTEXT (ADR-029)
 # ============================================
 podSecurityContext:
   fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
 
 # ============================================
-# CONTAINER SECURITY CONTEXT
+# CONTAINER SECURITY CONTEXT (ADR-029)
 # ============================================
+# Non-root, read-only root filesystem, all capabilities dropped.
+# Writable paths are emptyDir volumes: /tmp, /app/heap-dumps, /app/logs.
 securityContext:
   runAsNonRoot: true
   runAsUser: 1000
+  runAsGroup: 1000
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:
@@ -70,50 +83,47 @@ securityContext:
 # ============================================
 # SERVICE
 # ============================================
+# Spring serves on container port 8080 (server.port); the Service maps it as-is.
 service:
   type: ClusterIP
   port: 8080
-  targetPort: 3000
+  targetPort: http
   annotations: {}
 
 # ============================================
-# RESOURCES
+# RESOURCES (ADR-029 envelope: >= 1Gi request / 2Gi limit)
 # ============================================
-# MVP allocations: backend pod uses ~200m CPU / 256 MB RAM at rest
-# Limits provide 2x buffer for spikes (safety margin)
+# The JVM sizes its heap from the limit (MaxRAMPercentage=75 in the image default),
+# so the memory limit is the authoritative envelope value.
 resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
   requests:
     cpu: 500m
-    memory: 512Mi
+    memory: 1Gi
+  limits:
+    cpu: "1"
+    memory: 2Gi
 
 # ============================================
-# LIVENESS AND READINESS PROBES
+# LIVENESS AND READINESS PROBES (ADR-029, MIG-003 §5)
 # ============================================
-# Liveness probe: Is the process running?
-# - Path: /health/live (simple check, returns 200 if process alive)
-# - Restart on failure (after failureThreshold * periodSeconds)
-# - MVP: 30 second threshold (10s initial delay + 3 failures * 10s period)
+# Both are Spring Boot actuator health endpoints: the management base path is "/"
+# in application.yml, so the frozen wire paths /health/live and /health/ready are
+# the actuator liveness/readiness groups (livenessState / readinessState only —
+# no external dependencies in the probe verdict).
 livenessProbe:
   enabled: true
   path: /health/live
-  port: 3000
-  initialDelaySeconds: 15
+  port: http
+  initialDelaySeconds: 30
   periodSeconds: 30
   timeoutSeconds: 5
   failureThreshold: 3
 
-# Readiness probe: Can the pod handle traffic?
-# - Path: /health/ready (checks PostgreSQL, Redis, R2 connectivity)
-# - Remove from LB on failure (stop sending traffic)
-# - MVP: 30 second threshold (5s initial delay + 3 failures * 10s period)
 readinessProbe:
   enabled: true
   path: /health/ready
-  port: 3000
-  initialDelaySeconds: 5
+  port: http
+  initialDelaySeconds: 10
   periodSeconds: 10
   timeoutSeconds: 3
   failureThreshold: 3
@@ -136,39 +146,35 @@ affinity: {}
 # ============================================
 # ENVIRONMENT CONFIGURATION
 # ============================================
-# Non-sensitive configuration (stored in ConfigMap)
+# Non-sensitive configuration (stored in ConfigMap), consumed by Spring via
+# relaxed binding / @ConfigurationProperties. Node-era runtime keys
+# (NODE_ENV, PORT, LOG_FORMAT, LOG_FILE_ENABLED, AUDIT_LOG_ENABLED, token TTLs)
+# are decommissioned with the POC; auth token TTL policy returns with MIG-030.
 config:
-  # Node environment
-  NODE_ENV: production
-  
-  # Application port
-  PORT: "3000"
-  
-  # Logging
-  LOG_LEVEL: info
-  LOG_FORMAT: json
-  LOG_FILE_ENABLED: "false"
-  AUDIT_LOG_ENABLED: "true"
-  
-  # Token TTLs (in seconds)
-  ACCESS_TOKEN_TTL_SECONDS: "172800"
-  REFRESH_TOKEN_TTL_SECONDS: "2592000"
-  RESET_PASSWORD_TOKEN_TTL_MINUTES: "60"
-  
-  # WebSocket
+  # Spring runtime
+  SPRING_PROFILES_ACTIVE: production
+  SERVER_PORT: "8080"
+
+  # JVM envelope (image default; override here if an environment needs different flags)
+  JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -XX:HeapDumpPath=/app/heap-dumps -Djava.io.tmpdir=/tmp"
+
+  # Logging level (structured JSON is selected by the `production` profile via logback-spring.xml)
+  LOGGING_LEVEL_ROOT: info
+
+  # WebSocket (envelope values for the real-time phases, MIG-050+)
   WS_HEARTBEAT_INTERVAL_SEC: "60"
   WS_BACKLOG_RETENTION_HOURS: "1"
-  
-  # Message retry
+
+  # Message retry (ADR-028 backoff schedule, MIG-063)
   MESSAGE_RETRY_ATTEMPTS: "3"
   MESSAGE_RETRY_BASE_DELAY_MS: "60000"
   MESSAGE_RETRY_BACKOFF_MULTIPLIER: "5"
-  
-  # Attachments
+
+  # Attachments / retention
   ATTACHMENT_MAX_SIZE_MB: "5"
   RAW_PAYLOAD_RETENTION_DAYS: "7"
   EXPORT_RETENTION_HOURS: "24"
-  
+
   # Frontend URL (update for your environment)
   FRONTEND_URL: https://app.example.com
   RESET_PASSWORD_URL: https://app.example.com/reset-password
@@ -176,7 +182,7 @@ config:
 # ============================================
 # EXTERNAL SERVICES CONFIGURATION
 # ============================================
-# PostgreSQL (pre-installed in cluster)
+# PostgreSQL (pre-installed in cluster). Redis is removed entirely (ADR-028).
 postgresql:
   # Service name of PostgreSQL in the cluster
   host: postgresql
@@ -187,29 +193,30 @@ postgresql:
   usernameKey: username
   passwordKey: password
 
-# Redis (pre-installed in cluster)
-redis:
-  # Service name of Redis in the cluster
-  host: redis
-  port: 6379
-  # Password from secret (optional)
-  existingSecret: redis-credentials
-  passwordKey: password
-
 # ============================================
 # SECRETS CONFIGURATION
 # ============================================
-# Reference to existing secrets (create these separately)
-# DO NOT put actual secret values here
+# Reference to existing secrets (create these separately).
+# DO NOT put actual secret values here.
+#
+# Spring auth + recovery secrets (ADR-025 bootstrap/recovery; ADR-029 re-spec):
+#   - one-time bootstrap Super Admin credential (forced password change on first login)
+#   - founder-controlled recovery (RECOVERY_MODE=once + founder-held RECOVERY_KEY)
+# The POC's JWT_SECRET / BETTER_AUTH_SECRET / SESSION_SECRET are decommissioned
+# (no bespoke token crypto in the Java service).
 secrets:
-  # Auth secrets
-  betterAuthSecret:
+  # Bootstrap Super Admin (deterministic first-run bootstrap, ADR-025)
+  bootstrap:
     existingSecret: yacc-auth-secrets
-    key: better-auth-secret
-  jwtSecret:
+    superAdminEmailKey: bootstrap-super-admin-email
+    superAdminPasswordKey: bootstrap-super-admin-password
+
+  # Founder-controlled recovery (env-gated restart flag; ADR-025/F4)
+  recovery:
     existingSecret: yacc-auth-secrets
-    key: jwt-secret
-  
+    modeKey: recovery-mode
+    keyKey: recovery-key
+
   # Cloudflare R2
   cloudflareR2:
     existingSecret: yacc-cloudflare-secrets
@@ -218,7 +225,7 @@ secrets:
     secretKeyKey: r2-secret-key
     bucketKey: r2-bucket
     cdnUrlKey: cdn-url
-  
+
   # Email (SendGrid or SMTP)
   email:
     existingSecret: yacc-email-secrets
@@ -233,7 +240,7 @@ secrets:
     smtpPasswordKey: smtp-password
     smtpFromEmailKey: smtp-from-email
     smtpFromNameKey: smtp-from-name
-  
+
   # Integrations (optional - may not be needed for all environments)
   integrations:
     existingSecret: yacc-integration-secrets

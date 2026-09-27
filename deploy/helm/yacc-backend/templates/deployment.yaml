@@ -34,7 +34,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.service.targetPort }}
+              containerPort: {{ .Values.service.port }}
               protocol: TCP
           envFrom:
             - configMapRef:
@@ -45,21 +45,31 @@ spec:
                 secretKeyRef:
                   name: yacc-backend-secrets
                   key: DATABASE_URL
-            - name: REDIS_URL
+            # Spring auth + recovery secrets (ADR-025 bootstrap/recovery; ADR-029).
+            # POC JWT_SECRET / BETTER_AUTH_SECRET / REDIS_URL are decommissioned.
+            - name: BOOTSTRAP_SUPER_ADMIN_EMAIL
               valueFrom:
                 secretKeyRef:
-                  name: yacc-backend-secrets
-                  key: REDIS_URL
-            - name: JWT_SECRET
+                  name: {{ .Values.secrets.bootstrap.existingSecret }}
+                  key: {{ .Values.secrets.bootstrap.superAdminEmailKey }}
+                  optional: true
+            - name: BOOTSTRAP_SUPER_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: yacc-backend-secrets
-                  key: JWT_SECRET
-            - name: BETTER_AUTH_SECRET
+                  name: {{ .Values.secrets.bootstrap.existingSecret }}
+                  key: {{ .Values.secrets.bootstrap.superAdminPasswordKey }}
+                  optional: true
+            - name: RECOVERY_MODE
               valueFrom:
                 secretKeyRef:
-                  name: yacc-backend-secrets
-                  key: BETTER_AUTH_SECRET
+                  name: {{ .Values.secrets.recovery.existingSecret }}
+                  key: {{ .Values.secrets.recovery.modeKey }}
+                  optional: true
+            - name: RECOVERY_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.recovery.existingSecret }}
+                  key: {{ .Values.secrets.recovery.keyKey }}
                   optional: true
             - name: CLOUDFLARE_R2_ENDPOINT
               valueFrom:
@@ -125,20 +135,22 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          # Read-only root filesystem (ADR-029): every writable path is an
+          # emptyDir volume — JVM tmpdir, heap dumps, logs.
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-            {{- if .Values.config.LOG_FILE_ENABLED | default "false" | eq "true" }}
+            - name: heap-dumps
+              mountPath: /app/heap-dumps
             - name: logs
               mountPath: /app/logs
-            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
-        {{- if .Values.config.LOG_FILE_ENABLED | default "false" | eq "true" }}
+        - name: heap-dumps
+          emptyDir: {}
         - name: logs
           emptyDir: {}
-        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

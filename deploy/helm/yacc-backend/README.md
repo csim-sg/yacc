@@ -14,22 +14,28 @@ This Helm chart deploys the YACC backend service to a Kubernetes cluster (K3s).
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     K3s Cluster                              │
-│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐   │
-│  │  PostgreSQL   │  │    Redis      │  │ YACC Backend  │   │
-│  │  (pre-installed)│  │ (pre-installed)│  │  (this chart) │   │
-│  └───────────────┘  └───────────────┘  └───────────────┘   │
+│  ┌───────────────┐  ┌───────────────┐                       │
+│  │  PostgreSQL   │  │ YACC Backend  │                       │
+│  │  (pre-installed)│ │ (this chart)  │                       │
+│  └───────────────┘  └───────────────┘                       │
 │                                                              │
 │  Secrets Required:                                          │
-│  - postgresql-credentials (database-url)                   │
-│  - redis-credentials (redis-url)                           │
-│  - yacc-auth-secrets (better-auth-secret, jwt-secret)      │
-│  - yacc-cloudflare-secrets (R2 credentials)                │
-│  - yacc-email-secrets (SendGrid/SMTP credentials)          │
-│  - yacc-integration-secrets (Telegram/IRC tokens)          │
+│  - yacc-backend-secrets (DATABASE_URL)                      │
+│  - yacc-auth-secrets (bootstrap-super-admin-email,          │
+│    bootstrap-super-admin-password, recovery-mode,           │
+│    recovery-key)                                            │
+│  - yacc-cloudflare-secrets (R2 credentials)                 │
+│  - yacc-email-secrets (SendGrid/SMTP credentials)           │
+│  - yacc-integration-secrets (Telegram/IRC tokens)           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Note:** PostgreSQL and Redis are pre-installed in the K3s cluster. This chart only deploys the backend application.
+**Note:** PostgreSQL is pre-installed in the K3s cluster. This chart only deploys the backend application.
+**Redis is removed** (ADR-028): async processing uses Quartz (DB-backed) + a PostgreSQL DLQ, and the WS
+backlog is re-homed to PostgreSQL — no Redis dependency exists in the migration target.
+
+The backend image is built from `services/backend-java/Dockerfile` (Temurin 21 JRE, non-root uid 1000,
+read-only root filesystem, pod envelope ≥ 1Gi request / 2Gi limit — ADR-029).
 
 ## Quick Start
 
@@ -40,7 +46,7 @@ This Helm chart deploys the YACC backend service to a Kubernetes cluster (K3s).
 k3d cluster create yacc-dev --registry-create yacc-registry:5000
 
 # 2. Build and push backend image
-docker build -t localhost:5000/yacc-backend:latest -f packages/backend/Dockerfile .
+docker build -t localhost:5000/yacc-backend:latest -f services/backend-java/Dockerfile services/backend-java
 docker push localhost:5000/yacc-backend:latest
 
 # 3. Create namespace and secrets
@@ -63,10 +69,10 @@ kubectl get pods -n yacc-dev
 kubectl logs -f deployment/yacc-backend -n yacc-dev
 
 # 6. Port-forward to access locally
-kubectl port-forward -n yacc-dev svc/yacc-backend 3000:3000
+kubectl port-forward -n yacc-dev svc/yacc-backend 8080:8080
 
 # 7. Test health endpoint
-curl http://localhost:3000/health
+curl http://localhost:8080/health
 ```
 
 ### Staging Deployment
@@ -102,23 +108,23 @@ image:
   repository: csim-sg/yacc/yacc-backend
   tag: ""  # Uses appVersion from Chart.yaml
 
-# Resources
+# Resources (ADR-029 envelope: >= 1Gi request / 2Gi limit)
 resources:
-  limits:
-    cpu: 500m
-    memory: 512Mi
   requests:
-    cpu: 100m
-    memory: 256Mi
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "1"
+    memory: 2Gi
 
-# Health probes
+# Health probes (Spring actuator health endpoints — ADR-029/MIG-003 §5)
 livenessProbe:
   path: /health/live
-  port: 3000
+  port: http   # container port 8080
 
 readinessProbe:
   path: /health/ready
-  port: 3000
+  port: http   # container port 8080
 ```
 
 ## Secrets
@@ -132,24 +138,13 @@ Create these secrets before deploying:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: postgresql-credentials
+  name: yacc-backend-secrets
 type: Opaque
 stringData:
-  database-url: postgresql://user:password@postgresql:5432/yacc_inbox
+  DATABASE_URL: postgresql://user:password@postgresql:5432/yacc_inbox
 ```
 
-#### 2. Redis Credentials
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: redis-credentials
-type: Opaque
-stringData:
-  redis-url: redis://:password@redis:6379
-```
-
-#### 3. Auth Secrets
+#### 2. Spring Auth + Recovery Secrets
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -157,11 +152,18 @@ metadata:
   name: yacc-auth-secrets
 type: Opaque
 stringData:
-  better-auth-secret: "your-secret-min-32-chars"
-  jwt-secret: "your-jwt-secret-min-32-chars"
+  # Deterministic first-run Super Admin bootstrap (ADR-025)
+  bootstrap-super-admin-email: "founder@example.com"
+  bootstrap-super-admin-password: "one-time-initial-credential"
+  # Founder-controlled recovery (env-gated restart flag, ADR-025/F4)
+  recovery-mode: "once"        # only set when a recovery restart is intended
+  recovery-key: "founder-held-recovery-key"
 ```
 
-#### 4. Cloudflare R2 Secrets
+**Decommissioned POC secrets:** `better-auth-secret`, `jwt-secret`, `redis-credentials` — the Java
+service uses Spring Security (no bespoke token crypto) and no Redis (ADR-028).
+
+#### 3. Cloudflare R2 Secrets
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -176,7 +178,7 @@ stringData:
   cdn-url: "https://cdn.example.com"
 ```
 
-#### 5. Email Secrets
+#### 4. Email Secrets
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -189,7 +191,7 @@ stringData:
   sendgrid-from-name: "YACC Inbox"
 ```
 
-#### 6. Integration Secrets (Optional)
+#### 5. Integration Secrets (Optional)
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -203,11 +205,13 @@ stringData:
 
 ## Health Endpoints
 
-| Endpoint | Purpose | Response |
-|----------|---------|----------|
-| `/health` | Full health check with dependencies | `{"status":"healthy",...}` |
-| `/health/live` | Liveness probe (process alive) | `{"status":"alive"}` |
-| `/health/ready` | Readiness probe (can handle traffic) | `{"status":"ready"}` |
+Spring Boot actuator health endpoints (management base path `/`, ADR-029/MIG-003 §5):
+
+| Endpoint | Purpose | Backed by |
+|----------|---------|-----------|
+| `/health` | Aggregate health | actuator `health` endpoint |
+| `/health/live` | Liveness probe (process alive) | `livenessState` group |
+| `/health/ready` | Readiness probe (can handle traffic) | `readinessState` group |
 
 ## Rollback
 
@@ -241,8 +245,8 @@ kubectl logs <pod-name> -n yacc-staging
 ### Health check fails
 ```bash
 # Port-forward and test
-kubectl port-forward -n yacc-staging svc/yacc-backend 3000:3000 &
-curl http://localhost:3000/health
+kubectl port-forward -n yacc-staging svc/yacc-backend 8080:8080 &
+curl http://localhost:8080/health
 ```
 
 ### Database connection issues
