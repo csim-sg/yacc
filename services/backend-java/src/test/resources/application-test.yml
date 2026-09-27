@@ -1,0 +1,19 @@
+# MIG-014 deterministic test profile (SPEC-002 Testing Strategy).
+# Activated by @ActiveProfiles("test") in the shared test support; inherits
+# src/main/resources/application.yml and overrides only what determinism
+# requires. Values are fixed — no environment-specific or random state.
+# MIG-011 owns future observability additions to test configuration.
+spring:
+  application:
+    name: yacc-backend
+  main:
+    banner-mode: "off"
+
+yacc:
+  name: yacc-backend
+  environment: test
+
+logging:
+  level:
+    root: INFO
+    com.github.dockerjava: WARN
