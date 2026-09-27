@@ -18,7 +18,9 @@ import com.yacc.audit.model.AuditRecord;
 
 /**
  * Tests the Spring Security event → audit pipeline (SPEC-002 TR-07; ledger
- * REST-XSRV-004 audit evidence).
+ * REST-XSRV-004 audit evidence). MIG-030: sign-in events carry the POC
+ * action vocabulary ({@code user.login} / {@code user.login.failed}); other
+ * security events keep their event-class action name.
  */
 class SecurityAuditEventListenerTest {
 
@@ -27,7 +29,7 @@ class SecurityAuditEventListenerTest {
             new SecurityAuditEventListener(persistence, new ObjectMapper());
 
     @Test
-    void persistsSuccessEventAsAuditRecord() {
+    void persistsSuccessEventWithLoginVocabulary() {
         AuthenticationSuccessEvent event =
                 new AuthenticationSuccessEvent(new TestingAuthenticationToken("user-1", "n/a", "ROLE_USER"));
 
@@ -35,7 +37,7 @@ class SecurityAuditEventListenerTest {
 
         assertThat(persistence.records).hasSize(1);
         AuditRecord record = persistence.records.get(0);
-        assertThat(record.action()).isEqualTo("AuthenticationSuccessEvent");
+        assertThat(record.action()).isEqualTo("user.login");
         assertThat(record.entityType()).isEqualTo("user");
         assertThat(record.actorId()).isEqualTo("user-1");
         assertThat(record.createdAt()).isNotNull();
@@ -43,7 +45,7 @@ class SecurityAuditEventListenerTest {
     }
 
     @Test
-    void persistsFailureEventWithExceptionMetadata() {
+    void persistsFailureEventWithLoginFailedVocabulary() {
         TestingAuthenticationToken authentication = new TestingAuthenticationToken("user-2", "bad", "ROLE_USER");
         AuthenticationException exception = new BadCredentialsException("nope");
         AuthenticationFailureBadCredentialsEvent event =
@@ -53,7 +55,7 @@ class SecurityAuditEventListenerTest {
 
         assertThat(persistence.records).hasSize(1);
         AuditRecord record = persistence.records.get(0);
-        assertThat(record.action()).isEqualTo("AuthenticationFailureBadCredentialsEvent");
+        assertThat(record.action()).isEqualTo("user.login.failed");
         assertThat(record.actorId()).isEqualTo("user-2");
         JsonNode metadata = record.metadata();
         assertThat(metadata.get("exception").asText()).isEqualTo("BadCredentialsException");

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -22,7 +23,9 @@ import org.springframework.test.web.servlet.MockMvc;
  *
  * <p>The {@code @WebMvcTest} slice keeps this test DB-free and fast; data
  * integration tests extend {@code com.yacc.common.testsupport.AbstractPostgresIntegrationTest}
- * instead.</p>
+ * instead. Since the MIG-030 filter chain, the app denies unauthenticated
+ * access by default — the slice boots Boot's default security, so the wire
+ * call authenticates with a mock user.</p>
  */
 @WebMvcTest(ServiceInfoController.class)
 @EnableConfigurationProperties(YaccProperties.class)
@@ -33,6 +36,7 @@ class ServiceInfoControllerTest {
     private MockMvc mockMvc;
 
     @Test
+    @WithMockUser
     void servesServiceInfoFromTheDeterministicTestProfile() throws Exception {
         mockMvc.perform(get("/api"))
                 .andExpect(status().isOk())

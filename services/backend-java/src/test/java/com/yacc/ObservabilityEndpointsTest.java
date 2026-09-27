@@ -6,8 +6,6 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -15,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 
+import com.yacc.common.testsupport.AbstractPostgresIntegrationTest;
 import com.yacc.realtime.model.WebSocketMetric;
 import com.yacc.realtime.service.MetricsSink;
 
@@ -25,24 +24,19 @@ import com.yacc.realtime.service.MetricsSink;
  * REST-HEALTH-001..003). Uses the real servlet environment because MockMvc
  * does not route remapped multi-segment actuator paths.
  *
- * <p>{@code DataSourceAutoConfiguration} is excluded: MIG-014's JDBC test
- * harness activates it on the test classpath, but no database exists in
- * MIG-011 scope (the data stack lands in MIG-020/021). The
- * {@code UserDetailsServiceAutoConfiguration} exclusion mirrors
- * {@code application.yml} (MIG-030 owns identity). {@code @AutoConfigureObservability}
- * opts back into metrics export, which the test framework disables by default
- * — without it the {@code /actuator/prometheus} endpoint is not registered.</p>
+ * <p>MIG-030 note: since the identity subsystem landed, a full application
+ * boot always includes the data layer and the security filter chain — the
+ * former DB-free exclusion no longer matches the application shape, so this
+ * test now boots on the shared Testcontainers PostgreSQL. The probe and
+ * scrape paths are permit-all wire surface, which the unauthenticated calls
+ * here double-check. {@code @AutoConfigureObservability} opts back into
+ * metrics export, which the test framework disables by default — without it
+ * the {@code /actuator/prometheus} endpoint is not registered.</p>
  */
 @AutoConfigureObservability
-@SpringBootTest(
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "spring.autoconfigure.exclude="
-                        + "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
-                        + "org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration"
-        })
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-class ObservabilityEndpointsTest {
+class ObservabilityEndpointsTest extends AbstractPostgresIntegrationTest {
 
     @Autowired
     private TestRestTemplate restTemplate;
@@ -69,7 +63,10 @@ class ObservabilityEndpointsTest {
 
     @Test
     void prometheusPathIsNotDuplicatedAtRoot() {
+        // The root /prometheus path is unmapped AND not public wire surface:
+        // the MIG-030 chain denies it with 401 before routing (deny by
+        // default), which equally proves no duplicated scrape endpoint exists.
         assertThat(restTemplate.getForEntity("/prometheus", String.class).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 }

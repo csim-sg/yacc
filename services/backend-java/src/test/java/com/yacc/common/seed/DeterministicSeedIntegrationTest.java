@@ -130,10 +130,18 @@ class DeterministicSeedIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(state.telegramConversationId())
                 .isEqualTo(UUID.fromString("00000000-0000-0000-0000-000000001001"));
 
-        // Bootstrap-ready: fixture identities exist, but NO super_admin —
-        // the first SUPER_ADMIN comes only from the MIG-030 bootstrap.
-        assertThat(users.findAll()).hasSize(3)
+        // Bootstrap-ready: the three fixture identities exist, and the only
+        // SUPER_ADMIN is the deterministic MIG-030 bootstrap identity created
+        // at context startup (application-test.yml configuration) — the seed
+        // itself still never creates privileged identities (ADR-025).
+        assertThat(users.findAll()).hasSize(4);
+        assertThat(users.findAll().stream()
+                .filter(user -> !user.getEmail().endsWith("bootstrap@fixture.yacc.local"))
+                .toList())
+                .hasSize(3)
                 .allSatisfy(user -> assertThat(user.getRole()).isNotEqualTo(UserRole.SUPER_ADMIN));
+        assertThat(users.findByEmail("bootstrap@fixture.yacc.local").orElseThrow().getRole())
+                .isEqualTo(UserRole.SUPER_ADMIN);
         assertThat(users.findById(state.adminId()).orElseThrow().getRole())
                 .isEqualTo(UserRole.ADMIN);
 

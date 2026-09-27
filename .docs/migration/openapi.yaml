@@ -19,6 +19,15 @@
 # - Auth type drift resolved: `User.id` = uuid string; role wire enum = lowercase
 #   super_admin|admin|manager|user; the non-existent `/simple-auth/*` frontend surface has
 #   no contract existence.
+#
+# MIG-030 contract-change findings (issue #347; per contract-canonicalization §1.5 —
+# deviations needed by MIG-030..034 are recorded here, never silent drift):
+# - `mustChangePassword: boolean` added to AuthSessionResponse and AuthSessionGetResponse —
+#   the ADR-025 forced-password-change state of the bootstrap/recovery identity must be
+#   wire-visible for MIG-034; UserResponse itself is unchanged.
+# - `POST /api/auth/change-password` (authenticated) added — the credential-replacement
+#   endpoint that clears the forced change flag (MIG-031's reset/verification flows are
+#   separate and remain token/email-based).
 openapi: 3.1.0
 info:
   title: YACC REST API (canonical)
@@ -340,6 +349,45 @@ paths:
               schema: {$ref: '#/components/schemas/AuthRefreshResponse'}
         '401':
           description: Invalid, expired, or revoked refresh token
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+  /api/auth/change-password:
+    post:
+      tags: [auth]
+      operationId: authChangePassword
+      summary: Replace the credential (authenticated; MIG-030 contract-change finding)
+      description: |
+        Authenticated password change that clears the ADR-025 forced-password-change
+        state of the bootstrap/recovery identity (MIG-030). The current credential is
+        verified; every refresh grant of the identity is revoked on success. MIG-031's
+        email-token reset/verification flows are separate and unchanged.
+      security:
+        - bearerAuth: []
+      x-mig-030-contract-change: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: {type: string}
+                newPassword: {type: string, minLength: 8}
+      responses:
+        '200':
+          description: Credential replaced; forced-change state cleared
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthSignOutResponse'}
+        '400':
+          description: Validation error (e.g. password below minimum length)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '401':
+          description: Missing/invalid token or wrong current password
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ErrorResponse'}
@@ -1712,12 +1760,13 @@ components:
     # ---------- Auth (canonicalized in MIG-003; ledger rows REST-AUTH-001..004) ----------
     AuthSessionResponse:
       type: object
-      description: "Sign-in / self-registration response. `user.role` is always lowercase; sign-up always creates `role: user`. Token claims/lifecycle are ADR-025/MIG-033 implementation detail."
-      required: [user, accessToken, refreshToken]
+      description: "Sign-in / self-registration response. `user.role` is always lowercase; sign-up always creates `role: user`. Token claims/lifecycle are ADR-025/MIG-033 implementation detail. `mustChangePassword` is a MIG-030 contract-change finding (ADR-025 forced-password-change state)."
+      required: [user, accessToken, refreshToken, mustChangePassword]
       properties:
         user: {$ref: '#/components/schemas/UserResponse'}
         accessToken: {type: string, description: Stateless JWT access token (ADR-025 default)}
         refreshToken: {type: string, description: Refresh token (rotated on refresh-grant use)}
+        mustChangePassword: {type: boolean, description: True while the bootstrap/recovery identity must replace its credential (MIG-030)}
     AuthSignOutResponse:
       type: object
       required: [success]
@@ -1725,10 +1774,11 @@ components:
         success: {type: boolean, enum: [true]}
     AuthSessionGetResponse:
       type: object
-      description: Session lookup — the user resolved from the Bearer access token (no server-side session object; ADR-025 stateless default).
-      required: [user]
+      description: "Session lookup — the user resolved from the Bearer access token (no server-side session object; ADR-025 stateless default). `mustChangePassword` is a MIG-030 contract-change finding."
+      required: [user, mustChangePassword]
       properties:
         user: {$ref: '#/components/schemas/UserResponse'}
+        mustChangePassword: {type: boolean, description: True while the bootstrap/recovery identity must replace its credential (MIG-030)}
     AuthRefreshResponse:
       type: object
       description: Rotated token pair.
