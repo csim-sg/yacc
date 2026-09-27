@@ -1,9 +1,5 @@
 package com.yacc.realtime;
 
-import java.util.Objects;
-
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
@@ -11,13 +7,12 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 
 import com.yacc.realtime.service.YaccWebSocketHandler;
 import com.yacc.realtime.service.WebSocketHandshakeAuthInterceptor;
-import com.yacc.realtime.service.WebSocketSessionRegistry;
 
 /**
- * Raw WebSocket wiring (MIG-050; ADR-026; guardrails 004 §4). Registers the
- * raw endpoint — handler + auth-on-handshake interceptor — and declares the
- * in-memory session registry singleton. Raw WebSocket only: no broker
- * subprotocols, no fallback transports (founder-fixed; AC-MIG-050-2).
+ * Raw WebSocket wiring (MIG-050; ADR-026; guardrails 004 §2). Registers the
+ * raw endpoint — handler + auth-on-handshake interceptor — through plain
+ * constructor injection. Raw WebSocket only: no broker subprotocols, no
+ * fallback transports (founder-fixed; AC-MIG-050-2).
  *
  * <p>Authorization is enforced fail-closed in the handshake interceptor (the
  * security filter chain cannot see the upgrade's {@code token} query
@@ -25,10 +20,10 @@ import com.yacc.realtime.service.WebSocketSessionRegistry;
  * and every upgrade is authenticated or denied with 401 before any session
  * exists.</p>
  *
- * <p>The handler and interceptor beans are resolved through
- * {@link ObjectProvider} at registration time (not config construction):
- * both depend on the registry {@code @Bean} declared here, so eager
- * constructor injection would create a bean-creation cycle.</p>
+ * <p>The registry bean is declared by {@link RealtimeSessionRegistryConfig};
+ * that separation breaks the bean-creation cycle, so this config can
+ * constructor-inject the handler and interceptor directly (no
+ * {@code ObjectProvider} service-locator lookup).</p>
  */
 @Configuration
 @EnableWebSocket
@@ -36,29 +31,23 @@ public class RealtimeWebSocketConfig implements WebSocketConfigurer {
 
     private final RealtimeProperties properties;
 
-    private final ObjectProvider<YaccWebSocketHandler> handler;
+    private final YaccWebSocketHandler handler;
 
-    private final ObjectProvider<WebSocketHandshakeAuthInterceptor> handshakeAuthInterceptor;
+    private final WebSocketHandshakeAuthInterceptor handshakeAuthInterceptor;
 
     public RealtimeWebSocketConfig(RealtimeProperties properties,
-            ObjectProvider<YaccWebSocketHandler> handler,
-            ObjectProvider<WebSocketHandshakeAuthInterceptor> handshakeAuthInterceptor) {
+            YaccWebSocketHandler handler,
+            WebSocketHandshakeAuthInterceptor handshakeAuthInterceptor) {
         this.properties = properties;
         this.handler = handler;
         this.handshakeAuthInterceptor = handshakeAuthInterceptor;
     }
 
-    /** In-memory session registry — the (userId, conversationId) index. */
-    @Bean
-    public WebSocketSessionRegistry webSocketSessionRegistry() {
-        return new WebSocketSessionRegistry();
-    }
-
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         RealtimeProperties.WebSocket binding = properties.websocket();
-        registry.addHandler(Objects.requireNonNull(handler.getObject()), binding.path())
-                .addInterceptors(Objects.requireNonNull(handshakeAuthInterceptor.getObject()))
+        registry.addHandler(handler, binding.path())
+                .addInterceptors(handshakeAuthInterceptor)
                 .setAllowedOrigins(binding.allowedOrigins().toArray(String[]::new));
     }
 }
