@@ -18,9 +18,5 @@ data:
   POSTGRES_HOST: {{ .Values.postgresql.host | quote }}
   POSTGRES_PORT: {{ .Values.postgresql.port | quote }}
   POSTGRES_DB: {{ .Values.postgresql.database | quote }}
-  
-  # ============================================
-  # REDIS CONFIG (non-sensitive)
-  # ============================================
-  REDIS_HOST: {{ .Values.redis.host | quote }}
-  REDIS_PORT: {{ .Values.redis.port | quote }}
+  # Redis is removed entirely (ADR-028): Quartz + DB DLQ + PostgreSQL WS backlog
+  # replace BullMQ/Redis. No REDIS_* keys are emitted.

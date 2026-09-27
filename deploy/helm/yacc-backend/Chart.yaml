@@ -6,7 +6,7 @@ description: YACC Backend Service - Unified inbox for multi-channel social commu
 type: application
 
 # Chart version (SemVer 2)
-version: 0.1.0
+version: 0.2.0
 
 # Application version
 appVersion: "0.1.0"
@@ -32,6 +32,10 @@ sources:
   - https://github.com/csim-sg/yacc
 
 # Notes:
-# - PostgreSQL and Redis are pre-installed in the K3s cluster
-# - This chart only deploys the backend application
-# - Secrets are managed via Kubernetes Secrets (created separately)
+# - PostgreSQL is pre-installed in the K3s cluster; this chart only deploys the
+#   backend application. Redis was removed from the dependency set (ADR-028).
+# - Backend image: services/backend-java/Dockerfile (Temurin 21 JRE, non-root
+#   uid 1000, read-only root filesystem — ADR-029).
+# - Secrets are managed via Kubernetes Secrets (created separately); POC
+#   JWT_SECRET/BETTER_AUTH_SECRET are replaced by Spring auth + recovery
+#   secrets (ADR-025/ADR-029).

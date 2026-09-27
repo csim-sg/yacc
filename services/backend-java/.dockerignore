@@ -1,0 +1,5 @@
+# Keep the MIG-012 image build context minimal (local state must not leak in).
+build/
+.gradle/
+*.iml
+.idea/

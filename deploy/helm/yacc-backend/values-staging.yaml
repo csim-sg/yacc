@@ -13,26 +13,21 @@ image:
   pullPolicy: IfNotPresent
   tag: "latest"
 
-# MVP resources (same as development)
+# ADR-029 envelope (>= 1Gi request / 2Gi limit)
 resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
   requests:
     cpu: 500m
-    memory: 512Mi
+    memory: 1Gi
+  limits:
+    cpu: "1"
+    memory: 2Gi
 
-# Staging configuration
+# Staging configuration (Spring Boot)
 config:
-  NODE_ENV: production
-  PORT: "3000"
-  LOG_LEVEL: info
-  LOG_FORMAT: json
-  LOG_FILE_ENABLED: "false"
-  AUDIT_LOG_ENABLED: "true"
-  ACCESS_TOKEN_TTL_SECONDS: "172800"
-  REFRESH_TOKEN_TTL_SECONDS: "2592000"
-  RESET_PASSWORD_TOKEN_TTL_MINUTES: "60"
+  SPRING_PROFILES_ACTIVE: production
+  SERVER_PORT: "8080"
+  JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -XX:HeapDumpPath=/app/heap-dumps -Djava.io.tmpdir=/tmp"
+  LOGGING_LEVEL_ROOT: info
   WS_HEARTBEAT_INTERVAL_SEC: "60"
   WS_BACKLOG_RETENTION_HOURS: "1"
   MESSAGE_RETRY_ATTEMPTS: "3"
@@ -53,21 +48,19 @@ postgresql:
   usernameKey: username
   passwordKey: password
 
-# Redis (K3s cluster)
-redis:
-  host: redis
-  port: 6379
-  existingSecret: redis-credentials
-  passwordKey: password
+# Redis is removed (ADR-028) — no redis block in any environment.
 
-# Secrets references (create these secrets before deploying)
+# Secrets references (create these secrets before deploying).
+# Spring auth + recovery secrets replace the POC JWT_SECRET/BETTER_AUTH_SECRET.
 secrets:
-  betterAuthSecret:
+  bootstrap:
     existingSecret: yacc-auth-secrets
-    key: better-auth-secret
-  jwtSecret:
+    superAdminEmailKey: bootstrap-super-admin-email
+    superAdminPasswordKey: bootstrap-super-admin-password
+  recovery:
     existingSecret: yacc-auth-secrets
-    key: jwt-secret
+    modeKey: recovery-mode
+    keyKey: recovery-key
   cloudflareR2:
     existingSecret: yacc-cloudflare-secrets
     endpointKey: r2-endpoint

@@ -6,33 +6,28 @@
 # Single replica for development (k3d local testing)
 replicaCount: 1
 
-# Container image (local k3d build)
+# Container image (local k3d build from services/backend-java/Dockerfile)
 image:
   registry: ""  # No registry for local k3d
   repository: yacc-backend
   pullPolicy: IfNotPresent  # Use local image if available
   tag: "latest"
 
-# Development resources (same as MVP)
+# ADR-029 envelope (>= 1Gi request / 2Gi limit) applies to all environments
 resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
   requests:
     cpu: 500m
-    memory: 512Mi
+    memory: 1Gi
+  limits:
+    cpu: "1"
+    memory: 2Gi
 
-# Development configuration
+# Development configuration (Spring Boot)
 config:
-  NODE_ENV: development
-  PORT: "3000"
-  LOG_LEVEL: debug
-  LOG_FORMAT: pretty
-  LOG_FILE_ENABLED: "false"
-  AUDIT_LOG_ENABLED: "true"
-  ACCESS_TOKEN_TTL_SECONDS: "172800"
-  REFRESH_TOKEN_TTL_SECONDS: "2592000"
-  RESET_PASSWORD_TOKEN_TTL_MINUTES: "60"
+  SPRING_PROFILES_ACTIVE: local
+  SERVER_PORT: "8080"
+  JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -XX:HeapDumpPath=/app/heap-dumps -Djava.io.tmpdir=/tmp"
+  LOGGING_LEVEL_ROOT: debug
   WS_HEARTBEAT_INTERVAL_SEC: "60"
   WS_BACKLOG_RETENTION_HOURS: "1"
   MESSAGE_RETRY_ATTEMPTS: "3"
@@ -53,21 +48,19 @@ postgresql:
   usernameKey: username
   passwordKey: password
 
-# Redis (local k3d cluster)
-redis:
-  host: redis
-  port: 6379
-  existingSecret: redis-credentials
-  passwordKey: password
+# Redis is removed (ADR-028) — no redis block in any environment.
 
-# Secrets references (create these secrets before deploying)
+# Secrets references (create these secrets before deploying).
+# Spring auth + recovery secrets replace the POC JWT_SECRET/BETTER_AUTH_SECRET.
 secrets:
-  betterAuthSecret:
+  bootstrap:
     existingSecret: yacc-auth-secrets
-    key: better-auth-secret
-  jwtSecret:
+    superAdminEmailKey: bootstrap-super-admin-email
+    superAdminPasswordKey: bootstrap-super-admin-password
+  recovery:
     existingSecret: yacc-auth-secrets
-    key: jwt-secret
+    modeKey: recovery-mode
+    keyKey: recovery-key
   cloudflareR2:
     existingSecret: yacc-cloudflare-secrets
     endpointKey: r2-endpoint
