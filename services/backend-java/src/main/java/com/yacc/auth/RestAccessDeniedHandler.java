@@ -12,11 +12,17 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Writes the canonical {@code {error}} body for filter-level authorization
- * denials (MIG-030; 403 — authenticated but not permitted).
+ * denials (MIG-030; 403 — authenticated but not permitted). Wired as a bean
+ * by {@code AuthSecurityConfig} with the shared Spring {@code ObjectMapper}
+ * (constructor injection only — guardrails 004 §2; ADR-024; ADR-030).
  */
 public class RestAccessDeniedHandler implements AccessDeniedHandler {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper;
+
+    public RestAccessDeniedHandler(ObjectMapper mapper) {
+        this.mapper = mapper;
+    }
 
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,

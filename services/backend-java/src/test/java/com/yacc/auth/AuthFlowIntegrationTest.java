@@ -41,13 +41,23 @@ class AuthFlowIntegrationTest extends AbstractPostgresIntegrationTest {
     private static final String BOOTSTRAP_EMAIL = "bootstrap@fixture.yacc.local";
     private static final String BOOTSTRAP_INITIAL_CREDENTIAL = "bootstrap-initial-credential";
 
-    @Autowired
-    private MockMvc mockMvc;
+    private final MockMvc mockMvc;
 
-    @Autowired
-    private UserRepository users;
+    private final UserRepository users;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper;
+
+    /**
+     * Constructor injection only (guardrails 004 §2; ADR-024; ADR-030):
+     * the single {@code @Autowired}-annotated constructor — never field
+     * injection.
+     */
+    @Autowired
+    AuthFlowIntegrationTest(MockMvc mockMvc, UserRepository users, ObjectMapper mapper) {
+        this.mockMvc = mockMvc;
+        this.users = users;
+        this.mapper = mapper;
+    }
 
     private void seedUser(String id, String email, UserRole role, UserStatus status) {
         users.save(new User(id, email, "Fixture " + role.getLabel(),

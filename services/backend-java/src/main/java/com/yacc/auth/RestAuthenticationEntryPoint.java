@@ -15,10 +15,17 @@ import jakarta.servlet.http.HttpServletResponse;
  * (MIG-030): missing, invalid, expired tokens and inactive/suspended
  * identities are all denied with 401 (parity with the POC
  * {@code UnauthorizedError} shape; ARCH-004 §5 centralized error contract).
+ * Wired as a bean by {@code AuthSecurityConfig} with the shared Spring
+ * {@code ObjectMapper} (constructor injection only — guardrails 004 §2;
+ * ADR-024; ADR-030).
  */
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper;
+
+    public RestAuthenticationEntryPoint(ObjectMapper mapper) {
+        this.mapper = mapper;
+    }
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,

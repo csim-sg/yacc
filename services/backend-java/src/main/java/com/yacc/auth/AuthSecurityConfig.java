@@ -14,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yacc.auth.service.BearerTokenAuthenticationConverter;
 import com.yacc.auth.service.JwtTokenService;
 import com.yacc.auth.service.TokenAuthenticationService;
@@ -51,7 +52,10 @@ public class AuthSecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             BearerTokenAuthenticationConverter bearerConverter,
-            JwtTokenService tokenService) throws Exception {
+            JwtTokenService tokenService,
+            RestAuthenticationEntryPoint authenticationEntryPoint,
+            RestAccessDeniedHandler accessDeniedHandler,
+            ForcedPasswordChangeFilter forcedPasswordChangeFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session
@@ -69,14 +73,43 @@ public class AuthSecurityConfig {
                         .permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .authenticationEntryPoint(new RestAuthenticationEntryPoint())
-                        .accessDeniedHandler(new RestAccessDeniedHandler())
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
                         .jwt(jwt -> jwt
                                 .decoder(tokenService.jwtDecoder())
                                 .jwtAuthenticationConverter(bearerConverter)))
-                .addFilterAfter(new ForcedPasswordChangeFilter(),
+                .addFilterAfter(forcedPasswordChangeFilter,
                         BearerTokenAuthenticationFilter.class);
         return http.build();
+    }
+
+    /**
+     * Centralized 401 error body, built with the shared Spring
+     * {@code ObjectMapper} (constructor injection only — guardrails 004 §2).
+     */
+    @Bean
+    public RestAuthenticationEntryPoint restAuthenticationEntryPoint(
+            ObjectMapper objectMapper) {
+        return new RestAuthenticationEntryPoint(objectMapper);
+    }
+
+    /**
+     * Centralized 403 error body, built with the shared Spring
+     * {@code ObjectMapper} (constructor injection only — guardrails 004 §2).
+     */
+    @Bean
+    public RestAccessDeniedHandler restAccessDeniedHandler(ObjectMapper objectMapper) {
+        return new RestAccessDeniedHandler(objectMapper);
+    }
+
+    /**
+     * Forced-password-change gate, built with the shared Spring
+     * {@code ObjectMapper} (constructor injection only — guardrails 004 §2).
+     */
+    @Bean
+    public ForcedPasswordChangeFilter forcedPasswordChangeFilter(
+            ObjectMapper objectMapper) {
+        return new ForcedPasswordChangeFilter(objectMapper);
     }
 
     /**

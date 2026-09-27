@@ -53,11 +53,20 @@ class SuperAdminBootstrapIntegrationTest {
         registry.add("spring.datasource.password", EMPTY_DB::getPassword);
     }
 
-    @Autowired
-    private UserRepository users;
+    private final UserRepository users;
 
+    private final SuperAdminBootstrap bootstrap;
+
+    /**
+     * Constructor injection only (guardrails 004 §2; ADR-024; ADR-030):
+     * the single {@code @Autowired}-annotated constructor — never field
+     * injection.
+     */
     @Autowired
-    private SuperAdminBootstrap bootstrap;
+    SuperAdminBootstrapIntegrationTest(UserRepository users, SuperAdminBootstrap bootstrap) {
+        this.users = users;
+        this.bootstrap = bootstrap;
+    }
 
     @Test
     void bootstrapsExactlyOneForcedChangeSuperAdminFromAnEmptyDatabase() {

@@ -22,6 +22,9 @@ import jakarta.servlet.http.HttpServletResponse;
  * sign-up, sign-out, session, refresh, credential replacement) plus the
  * probe/scrape surface — every other path is denied with 403 so a
  * bootstrap credential cannot operate the platform before being replaced.
+ * Wired as a bean by {@code AuthSecurityConfig} with the shared Spring
+ * {@code ObjectMapper} (constructor injection only — guardrails 004 §2;
+ * ADR-024; ADR-030).
  */
 public class ForcedPasswordChangeFilter extends OncePerRequestFilter {
 
@@ -29,7 +32,11 @@ public class ForcedPasswordChangeFilter extends OncePerRequestFilter {
     private static final List<String> ALLOWED_PREFIXES =
             List.of("/api/auth/", "/health", "/actuator");
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper;
+
+    public ForcedPasswordChangeFilter(ObjectMapper mapper) {
+        this.mapper = mapper;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
