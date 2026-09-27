@@ -7,12 +7,20 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,13 +118,14 @@ class EmailVerificationServiceTest {
                 passwordEncoder.encode(rawToken), LocalDateTime.now().plusMinutes(30));
         User user = user(false);
         when(verifications.findAll()).thenReturn(List.of(challenge));
+        when(verifications.deleteUnexpiredById(eq("v-1"), any())).thenReturn(1);
         when(users.findByEmail(EMAIL)).thenReturn(Optional.of(user));
         when(users.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.confirm(rawToken);
 
-        // Consumption by deletion: a replayed token resolves to nothing.
-        verify(verifications).delete(challenge);
+        // Single-winner consumption by deletion: the claim deleted the row.
+        verify(verifications).deleteUnexpiredById(eq("v-1"), any());
         verify(users).save(argThat(saved -> saved.isEmailVerified()));
         verify(audit).persist(auditCaptor.capture());
         assertThat(auditCaptor.getValue().action())
@@ -149,7 +158,7 @@ class EmailVerificationServiceTest {
 
         assertThatThrownBy(() -> service.confirm(rawToken))
                 .isInstanceOf(InvalidTokenException.class);
-        verify(verifications, never()).delete(any());
+        verify(verifications, never()).deleteUnexpiredById(anyString(), any());
         verify(users, never()).save(any());
     }
 
@@ -171,10 +180,62 @@ class EmailVerificationServiceTest {
         Verification challenge = new Verification("v-3", EMAIL,
                 passwordEncoder.encode(rawToken), LocalDateTime.now().plusMinutes(30));
         when(verifications.findAll()).thenReturn(List.of(challenge));
+        when(verifications.deleteUnexpiredById(eq("v-3"), any())).thenReturn(1);
         when(users.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.confirm(rawToken))
                 .isInstanceOf(InvalidTokenException.class);
         verify(users, never()).save(any());
+    }
+
+    @Test
+    void concurrentConfirmationsElectExactlyOneWinnerAndOneSuccessAudit()
+            throws Exception {
+        // Race premise: two concurrent confirmations both match the same
+        // un-consumed challenge before either deletion commits.
+        String rawToken = "f".repeat(64);
+        Verification challenge = new Verification("v-4", EMAIL,
+                passwordEncoder.encode(rawToken), LocalDateTime.now().plusMinutes(30));
+        when(verifications.findAll()).thenReturn(List.of(challenge));
+        when(users.findByEmail(EMAIL)).thenReturn(Optional.of(user(false)));
+        when(users.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // The atomic claim is the single-winner gate: deterministic first
+        // call wins with 1 affected row, every later call sees 0 — exactly
+        // what the conditional DELETE returns under concurrent presents.
+        AtomicInteger claims = new AtomicInteger();
+        when(verifications.deleteUnexpiredById(anyString(), any()))
+                .thenAnswer(invocation -> claims.getAndIncrement() == 0 ? 1 : 0);
+
+        int racers = 2;
+        CyclicBarrier start = new CyclicBarrier(racers);
+        ExecutorService pool = Executors.newFixedThreadPool(racers);
+        List<Future<Boolean>> outcomes = new ArrayList<>();
+        try {
+            for (int i = 0; i < racers; i++) {
+                outcomes.add(pool.submit(() -> {
+                    start.await();
+                    try {
+                        service.confirm(rawToken);
+                        return true;
+                    } catch (InvalidTokenException expected) {
+                        return false;
+                    }
+                }));
+            }
+        } finally {
+            pool.shutdown();
+        }
+        List<Boolean> results = new ArrayList<>();
+        for (Future<Boolean> outcome : outcomes) {
+            results.add(outcome.get(10, TimeUnit.SECONDS));
+        }
+
+        // Deterministic outcome: exactly one success and one rejection,
+        // one user update, and one success audit — no duplicate events.
+        assertThat(results).containsExactlyInAnyOrder(true, false);
+        verify(users, times(1)).save(any());
+        verify(audit, times(1)).persist(argThat(record ->
+                "email.verification_successful".equals(record.action())));
     }
 }
