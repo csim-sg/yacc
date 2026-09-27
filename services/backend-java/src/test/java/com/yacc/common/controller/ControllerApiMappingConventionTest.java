@@ -55,7 +55,11 @@ class ControllerApiMappingConventionTest {
                 continue;
             }
             for (var method : controller.getDeclaredMethods()) {
-                RequestMapping methodMapping = method.getAnnotation(RequestMapping.class);
+                // findMergedAnnotation resolves composed annotations
+                // (@GetMapping/@PostMapping/...) to their @RequestMapping
+                // meta-annotation; getAnnotation would silently skip them.
+                RequestMapping methodMapping = AnnotatedElementUtils
+                        .findMergedAnnotation(method, RequestMapping.class);
                 if (methodMapping == null) {
                     continue;
                 }
