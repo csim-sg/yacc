@@ -8,10 +8,22 @@ spring:
     name: yacc-backend
   main:
     banner-mode: "off"
+  jpa:
+    hibernate:
+      # Schema/entity consistency gate (MIG-021): every context boot validates
+      # all JPA mappings against the Flyway-built schema. Hibernate never
+      # creates or alters schema (ARCH-004 §7 — Flyway-only).
+      ddl-auto: validate
 
 yacc:
   name: yacc-backend
   environment: test
+  integration:
+    encryption:
+      # Deterministic test-only key (32 bytes of 0x2A, base64). Test fixture —
+      # never a production secret; production binds the K8s Secret via
+      # YACC_INTEGRATION_ENCRYPTION_MASTER_KEY (ADR-027, MIG-021).
+      master-key: "KioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKio="
 
 logging:
   level:

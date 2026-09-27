@@ -14,10 +14,27 @@ spring:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/yacc_inbox}
     username: ${POSTGRES_USER:yacc_user}
     password: ${POSTGRES_PASSWORD:yacc_password}
+    hikari:
+      data-source-properties:
+        # MIG-021: pgjdbc must bind string parameters untyped so PostgreSQL
+        # infers the native enum types (user_role, user_status, channel_type,
+        # conversation_status, conversation_priority, message_status,
+        # message_direction) from context — JPA enum AttributeConverters bind
+        # exact PG enum labels as strings (ADR-027). Applies to the pooled
+        # driver connection regardless of the DATABASE_URL host/port contract.
+        stringtype: unspecified
   flyway:
     # Flyway-only schema management (ARCH-004 §7). The single V1 full-reset
     # baseline lives in classpath:db/migration; later changes append V2+.
     locations: classpath:db/migration
+  jpa:
+    hibernate:
+      # MIG-021: every runtime context boot validates all JPA entity mappings
+      # against the Flyway-built schema; Hibernate never creates or alters
+      # schema (ARCH-004 §7 — Flyway-only). The test profile
+      # (application-test.yml) pins the same value explicitly for the
+      # schema/entity consistency gate.
+      ddl-auto: validate
 
 server:
   port: 8080
@@ -55,3 +72,11 @@ management:
 yacc:
   name: yacc-backend
   environment: local
+  integration:
+    encryption:
+      # MIG-021 secret contract (ADR-027): the IRC credential master key is
+      # base64-encoded 32-byte AES-256 material sourced from the environment
+      # / K8s Secret (YACC_INTEGRATION_ENCRYPTION_MASTER_KEY). There is
+      # deliberately NO default — EncryptionService fails startup (fail-closed)
+      # when the key is absent; no hardcoded secret exists anywhere.
+      master-key: ${YACC_INTEGRATION_ENCRYPTION_MASTER_KEY:}
