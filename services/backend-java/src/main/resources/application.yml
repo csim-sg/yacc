@@ -1,12 +1,6 @@
 spring:
   application:
     name: yacc-backend
-  autoconfigure:
-    exclude:
-      # spring-security-core is on the classpath (MIG-011 audit consumes Spring
-      # Security events) but the identity subsystem + security filter chain are
-      # MIG-030; until then the auto-configured in-memory user must not exist.
-      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
     # MIG-020: the service now owns the PostgreSQL data layer (ADR-027).
     # DATABASE_URL is the deployment contract wired by deploy/helm/yacc-backend;
@@ -72,6 +66,40 @@ management:
 yacc:
   name: yacc-backend
   environment: local
+  auth:
+    # MIG-030 identity contract (ADR-025; ARCH-004 §8). All secret material is
+    # sourced from the environment / K8s Secrets — no defaults, no legacy
+    # BETTER_AUTH_SECRET coupling (unwound per ADR-025).
+    token:
+      # RS256 signing key: base64-encoded PKCS#8 RSA private key (>= 2048
+      # bits). The public key is derived from the private CRT material; the
+      # same key family is the foundation for the embedded OIDC authorization
+      # server JWKS (MIG-033). JwtTokenService fails startup (fail-closed)
+      # when the key is absent or too weak.
+      signing-key: ${YACC_AUTH_TOKEN_SIGNING_KEY:}
+      # Stateless JWT access default (ADR-025): short-lived access tokens
+      # rotated by long-lived refresh grants (session table rows).
+      access-ttl: 30m
+      refresh-ttl: 30d
+    bootstrap:
+      # Deterministic first-run Super Admin bootstrap (ADR-025; SPEC AC-08):
+      # when no SUPER_ADMIN exists at startup, exactly one is created from
+      # this email + one-time initial credential, marked
+      # must-change-password-on-first-login, and audit-logged. Idempotent.
+      # Missing configuration on an admin-less database fails startup.
+      email: ${YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL:}
+      initial-credential: ${YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL:}
+    recovery:
+      # Founder-controlled recovery (ADR-025): env-gated restart flag, never
+      # a public endpoint. RECOVERY_MODE=once + founder-presented RECOVERY_KEY
+      # re-provisions the bootstrap Super Admin (fresh credential, forced
+      # password change, ACTIVE status) when the presented key's SHA-256
+      # digest matches the founder-pinned YACC_RECOVERY_KEY_HASH. The hash
+      # pin is the durable verification material; only the founder holds the
+      # preimage. Audit-logged on every use; unset RECOVERY_MODE afterwards.
+      mode: ${RECOVERY_MODE:}
+      key: ${RECOVERY_KEY:}
+      key-hash: ${YACC_RECOVERY_KEY_HASH:}
   integration:
     encryption:
       # MIG-021 secret contract (ADR-027): the IRC credential master key is

@@ -17,15 +17,22 @@ import com.yacc.audit.model.AuditRecord;
  * pipeline (SPEC-002 TR-07; ADR-029 "audit via Spring Security events"; ledger
  * REST-CONV-003 "audit event parity via Spring Security events + audit table").
  *
- * <p>Action names are currently the Spring Security event class names (e.g.
- * {@code AuthenticationSuccessEvent}); the POC action vocabulary
- * ({@code user.login.failed} etc.) is applied when the auth flows land in
- * MIG-030 and emit audit events through the same persistence hook. Authorization
- * events follow in MIG-030 together with the security filter chain that raises
- * them; MIG-011 delivers the consumable seam.</p>
+ * <p>MIG-030 applies the POC action vocabulary to the authentication event
+ * families the local auth flows emit: sign-in success
+ * ({@code user.login}) and failure ({@code user.login.failed}); other
+ * security events keep their event-class action name. Auth lifecycle events
+ * beyond sign-in (registration, bootstrap, recovery, credential change) are
+ * persisted directly by the auth services through the same
+ * {@link AuditPersistence} hook.</p>
  */
 @Component
 public class SecurityAuditEventListener {
+
+    /** POC vocabulary action for a successful sign-in. */
+    private static final String ACTION_LOGIN = "user.login";
+
+    /** POC vocabulary action for a failed sign-in. */
+    private static final String ACTION_LOGIN_FAILED = "user.login.failed";
 
     private final AuditPersistence persistence;
 
@@ -52,12 +59,22 @@ public class SecurityAuditEventListener {
         }
         String principalName = principalName(event);
         persistence.persist(new AuditRecord(
-                event.getClass().getSimpleName(),
+                actionOf(event),
                 "user",
                 principalName,
                 principalName,
                 metadata,
                 Instant.now()));
+    }
+
+    private static String actionOf(AbstractAuthenticationEvent event) {
+        if (event instanceof org.springframework.security.authentication.event.AuthenticationSuccessEvent) {
+            return ACTION_LOGIN;
+        }
+        if (event instanceof org.springframework.security.authentication.event.AuthenticationFailureBadCredentialsEvent) {
+            return ACTION_LOGIN_FAILED;
+        }
+        return event.getClass().getSimpleName();
     }
 
     private String principalName(AbstractAuthenticationEvent event) {

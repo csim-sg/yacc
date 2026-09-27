@@ -18,6 +18,21 @@ spring:
 yacc:
   name: yacc-backend
   environment: test
+  auth:
+    token:
+      # Deterministic test-only RS256 signing key (2048-bit RSA, PKCS#8,
+      # base64). Test fixture — never a production secret; production binds
+      # the K8s Secret via YACC_AUTH_TOKEN_SIGNING_KEY (ADR-025, MIG-030).
+      signing-key: "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDpBghQlVRxC6RNWCTd7BA3FeaRUWgDPOr43+y5OvBS4RK/1N5LHQp4+s/pbrhAFddNVgGT5YwoD1sSFaiweLJHxsxvyLjZ8Av7VjTlyVeeMfTay8KcgpZg8bnrJZAUp96HiIyDQBrDOVo98HXosDsxAkloSPQ4ePP4mTRRGK0anaY1CweCwmyEeR+bCfcUrnEAyF9CjTEHrizx/fujgCos8A35mvaYidzU7TxjBIh0m0yhEZo+8+Fyj/3RvcqLb7oMlD9nIfxeK27WLC2kzP/It69DSV/wq48eoaNkCiU5BHIyuW70SCg59X6jDxjPoC/I/tREbJVvvrJmURa4qBuJAgMBAAECggEAAl6R8doK3bXYUQN2J534mOevDHJyvOqUYUtZmZU8c1ifwpImCvGYQ2NvRhw0C/iM4hC03xEr2kdQzgbFWoIEHoG4l+OAN+eJH6dneKA8wx36JVgQgT88rsQ6Ba3OYL9kAe1aPjD32ECsNRFb7R+Au3dXir5PKWq6xFja5puIdby/jt/8/JW7kwInpvnH07rfQiTFc9ttXvP5golgVtqUcSCVmCcWbtPW4ZOlIS3WlfnD8kB+5lrdO9zWHRmaoBLfSVsomQh4eprUXtYhKRpt8SMi2HI1901m4WMUl2KPSzFFVA2S3pKacPHdPjQZycgmXjCyW0Tn/ApwoMo5aeNEhwKBgQD27vWd+RpaSULRXO8Jz9IF77Jhq2hwrxErrn88L7OiFK0dQdurWfD/CwUiGRywLUhq8q9C9cYdKTSpjBLj+7ZAm1E7UuMYog2J4VQ3PItFV9JyEcYbr5IzLIXvT8GPmI3X3ZwddQBUOgSoI9ZcccaH7wMOG0GW9+Yj2VifyujP0wKBgQDxlFPpq3E+9RQz+/LhFBpWJTNBqlrk842cLrrqpV2GGCqA8V2I9MbHWPmRFURIcIHiw1Jh+L7GP44XENNzHfiuAYjzZrUDokJxFvhGm3cAoZxyhHLIDw9CEx5LTVvPJ2gf9bWwXwWIqiJoY0Jiu09ttnH4f7dp7N9+Aess71IpswKBgA8jo2dmCFmUuEYBvp4JYcT/Zx5Z1fNiqFjXP/G+svKy9dIfYYpl30KjuFLY20tp21DDRD+Etfq/tfzXG6lim0/mtdo/QLEX7mCPsgwY6Cj+M2bO9ChqYTpF9ogviZx2K+waKCIeNED1tadhWxkb2KIo4zUQMrtAw5lbD/XsCM4FAoGBAIYdAWTE/86iwj+FzLV1spVGe6klyOY369LcAnrHqR8LhXUmCfZBZaU/2PTZaJoKk6DvLGolbMukdt6JQcozxl3bjksKJs3Io7git1yDbFJWZgMRUqOL8L2O3Y+Sd7iOOPkdMGukpO7U/NsU18L2F8dhtO3vAUT18rECoavFhMiPAoGAMqoOCagw+grj1F2TWtyYR0zcWIhx738l9XnuRSNk7nd0RBefndAE6LFwTorBgOcCQ6/gHNStyV7IZnxoIxxJFxM6rviJTNySNMgaC2bqvWRDJ0Aro5AcCPaogVrrPLZa995I2c8eu3zoYeTjn/x38V5352BtVvdKc7Fq60TYCZA="
+      access-ttl: 30m
+      refresh-ttl: 30d
+    bootstrap:
+      # Deterministic test-only bootstrap identity. Every full-context test
+      # boot runs the MIG-030 first-run bootstrap against the shared test
+      # database; the run is idempotent and the identity is created with the
+      # forced-password-change flag (fixture material only).
+      email: "bootstrap@fixture.yacc.local"
+      initial-credential: "bootstrap-initial-credential"
   integration:
     encryption:
       # Deterministic test-only key (32 bytes of 0x2A, base64). Test fixture —

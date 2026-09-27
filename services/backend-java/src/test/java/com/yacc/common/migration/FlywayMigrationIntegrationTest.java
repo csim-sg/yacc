@@ -80,9 +80,10 @@ class FlywayMigrationIntegrationTest extends AbstractPostgresIntegrationTest {
                 Boolean.class);
 
         // AC-MIG-020-2: the duplicate 0005/0006 POC numbering collapses into
-        // one clean sequence (V1 baseline + V2 backlog), all applied cleanly.
-        assertThat(versions).containsExactly("1", "2");
-        assertThat(successes).containsExactly(true, true);
+        // one clean sequence, all applied cleanly. V1 baseline + V2 backlog
+        // (ADR-028) + V3 forced-password-change flag (MIG-030, ADR-025).
+        assertThat(versions).containsExactly("1", "2", "3");
+        assertThat(successes).containsExactly(true, true, true);
     }
 
     @Test

@@ -27,9 +27,20 @@ dependencies {
     // --- MIG-011 observability (SPEC-002 TR-07, ADR-029) ---
     // Micrometer Prometheus registry: /actuator/prometheus scrape endpoint.
     implementation("io.micrometer:micrometer-registry-prometheus")
-    // Spring Security event API only (audit listener). The filter chain and
-    // identity subsystem are MIG-030; no security auto-configuration is used.
-    implementation("org.springframework.security:spring-security-core")
+
+    // --- MIG-030 auth/identity (SPEC-002 FR-04, TR-05; ADR-025) ---
+    // Spring Security filter chain + JWT resource server (inbound Bearer JWT).
+    // Brings spring-security-config/web and the Nimbus JOSE stack used by the
+    // stateless access-token encoder/decoder. No bespoke token crypto: signing
+    // keys are standard RS256 (RSA) material via @ConfigurationProperties; the
+    // same asymmetric key family is the foundation the embedded OIDC
+    // authorization server (MIG-033) and the relying party (MIG-032) build on.
+    // The Spring Authorization Server dependency itself is MIG-033 scope.
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    // Bean validation (@Valid + jakarta.validation constraints) on inbound
+    // request bodies — the replacement for the POC's Zod validation
+    // (ARCH-004 §3; ADR-023 supersedes ADR-020).
+    implementation("org.springframework.boot:spring-boot-starter-validation")
 
     // --- MIG-020 data foundation (SPEC-002 FR-03; ADR-027) ---
     // Flyway is the only schema-change mechanism (ARCH-004 §7); the
@@ -48,6 +59,7 @@ dependencies {
     // Versions are managed by the Spring Boot dependency-management BOM.
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

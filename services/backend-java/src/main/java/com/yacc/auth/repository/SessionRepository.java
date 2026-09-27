@@ -6,8 +6,11 @@ import com.yacc.auth.model.Session;
 
 /**
  * Spring Data JPA repository for {@link Session} (MIG-021; ADR-027/ARCH-004 §7).
+ * Refresh grants (MIG-030) persist here. Derived queries only — no raw SQL.
  */
 public interface SessionRepository extends JpaRepository<Session, String> {
 
     Optional<Session> findByToken(String token);
+
+    void deleteByUserId(String userId);
 }

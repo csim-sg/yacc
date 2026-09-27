@@ -43,6 +43,14 @@ public class User {
     @Column(name = "email_verified", nullable = false)
     private boolean emailVerified;
 
+    /**
+     * Forced-password-change flag (MIG-030; V3; ADR-025). Set only by the
+     * deterministic bootstrap and the founder-controlled recovery — cleared
+     * when the credential is replaced.
+     */
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
+
     @Column(name = "image")
     private String image;
 
@@ -103,6 +111,10 @@ public class User {
         return emailVerified;
     }
 
+    public boolean isMustChangePassword() {
+        return mustChangePassword;
+    }
+
     public String getImage() {
         return image;
     }
@@ -145,6 +157,10 @@ public class User {
 
     public void setEmailVerified(boolean emailVerified) {
         this.emailVerified = emailVerified;
+    }
+
+    public void setMustChangePassword(boolean mustChangePassword) {
+        this.mustChangePassword = mustChangePassword;
     }
 
     public void setImage(String image) {
