@@ -188,6 +188,17 @@ yacc:
           #   - openid
           #   - profile
           #   - email
+  realtime:
+    websocket:
+      # MIG-050 raw WebSocket endpoint (ADR-026; SPEC-002 FR-06/TR-04).
+      # The path is public at the servlet filter chain — the handshake
+      # interceptor validates the access token (query parameter `token`:
+      # browser WS clients cannot set headers on the upgrade) and enforces
+      # ACTIVE status before any session exists, so no unauthenticated
+      # upgrade is possible (ledger WS-BHV-016). Allowed origins mirror the
+      # baseline Socket.io CORS origin (the frontend URL).
+      path: ${YACC_REALTIME_WS_PATH:/ws}
+      allowed-origins: ${YACC_REALTIME_WS_ALLOWED_ORIGINS:http://localhost:5173}
   integration:
     encryption:
       # MIG-021 secret contract (ADR-027): the IRC credential master key is
