@@ -1,0 +1,297 @@
+name: Backend Java CI
+
+# MIG-013 (SPEC-002): build/test/package/deploy for the Java/Spring backend
+# (services/backend-java), per ADR-024 (Gradle/Temurin 21), ADR-029 (JVM
+# deployment envelope) and ADR-019 (K3s + Helm deploy target).
+#
+# Gates preserved from the Node CI contract (MIG-013 guardrails):
+#   - JUnit test suite + Testcontainers integration harness (MIG-014)
+#   - JaCoCo coverage >= 85% enforced by `./gradlew check`
+#   - contract tests as a named gate (JUnit @Tag("contract"); tests land with
+#     MIG-041) via the `contractTest` Gradle task
+#   - Docker image build/push + Helm deploy trigger (AC-MIG-013-3)
+#
+# Publish/deploy parity: the image is published (ghcr login + push)
+# exactly for the events the deploy job consumes (push on dev, manual
+# workflow_dispatch on dev), so deploy never references an unpublished
+# sha-<sha> tag.
+#
+# The Node CI workflows (backend-ci.yml, lint.yml, tests.yml, deploy-staging.yaml)
+# remain in place until decommissioning in MIG-080.
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'services/backend-java/**'
+      - 'deploy/helm/yacc-backend/**'
+      - '.github/workflows/backend-java-ci.yml'
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'services/backend-java/**'
+      - 'deploy/helm/yacc-backend/**'
+      - '.github/workflows/backend-java-ci.yml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: csim-sg/yacc/yacc-backend
+  IMAGE_TAG: sha-${{ github.sha }}
+  GRADLE_PROJECT_DIR: services/backend-java
+  CHART_PATH: deploy/helm/yacc-backend
+  NAMESPACE: yacc-staging
+  RELEASE_NAME: yacc-backend
+
+jobs:
+  # ------------------------------------------------------------------
+  # Build + test + coverage gate (JUnit 5 + Testcontainers + JaCoCo)
+  # ------------------------------------------------------------------
+  build-test:
+    name: build-test (JUnit + Testcontainers + coverage >=85%)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Temurin 21 (satisfies the Gradle toolchain, ADR-024)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Build, test, verify coverage gate
+        working-directory: ${{ env.GRADLE_PROJECT_DIR }}
+        # `build` = assemble + check; `check` runs the full test suite
+        # (Testcontainers PostgreSQL harness included) and the JaCoCo
+        # >= 85% instruction-coverage verification (MIG-014 wiring).
+        run: ./gradlew --no-daemon build
+
+      - name: Upload test + coverage reports (evidence)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-test-coverage-reports
+          path: |
+            ${{ env.GRADLE_PROJECT_DIR }}/build/reports/tests/test/
+            ${{ env.GRADLE_PROJECT_DIR }}/build/reports/jacoco/test/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # ------------------------------------------------------------------
+  # Contract-test gate (OpenAPI/AsyncAPI conformance — MIG-041 lands the
+  # tests; the named CI gate is wired here per AC-MIG-013-2)
+  # ------------------------------------------------------------------
+  contract-tests:
+    name: contract-tests (OpenAPI/AsyncAPI gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Temurin 21 (satisfies the Gradle toolchain, ADR-024)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Run contract tests (JUnit @Tag("contract"))
+        working-directory: ${{ env.GRADLE_PROJECT_DIR }}
+        # Runs the contractTest task (tag-filtered). Until MIG-041 lands the
+        # first @Tag("contract") test the task tolerates zero matching tests,
+        # so this gate stays green and enforces automatically afterwards.
+        run: ./gradlew --no-daemon contractTest
+
+      - name: Upload contract test results (evidence)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-contract-test-results
+          path: ${{ env.GRADLE_PROJECT_DIR }}/build/test-results/contractTest/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # ------------------------------------------------------------------
+  # Package: Docker image (Temurin 21 JRE, ADR-029) + Helm chart gate.
+  # Publishes (login + push) exactly for the events the deploy job
+  # consumes: push on dev or manual workflow_dispatch on dev. PRs (and
+  # dispatch from other refs) validate the build without pushing.
+  # ------------------------------------------------------------------
+  package:
+    name: package (Docker image + Helm chart)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build-test, contract-tests]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # Single source of truth for image publish. MUST stay equivalent to
+      # the deploy job's trigger condition so deploy never references an
+      # unpublished sha-<sha> tag (review loop 1: manual dispatch on dev
+      # previously built without pushing, then deployed that tag).
+      IMAGE_PUBLISH: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: env.IMAGE_PUBLISH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image (publish on dev push / dispatch)
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.GRADLE_PROJECT_DIR }}
+          push: ${{ env.IMAGE_PUBLISH == 'true' }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+
+      - name: Helm lint + template (chart gate)
+        run: |
+          helm lint "$CHART_PATH" --values "$CHART_PATH/values-staging.yaml"
+          helm template "$RELEASE_NAME" "$CHART_PATH" \
+            --namespace "$NAMESPACE" \
+            --values "$CHART_PATH/values-staging.yaml" \
+            --set image.registry="$REGISTRY" \
+            --set image.repository="$IMAGE_NAME" \
+            --set image.tag="$IMAGE_TAG" > /dev/null
+          echo "Helm chart lint + template OK (image ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG})"
+
+  # ------------------------------------------------------------------
+  # Deploy: Helm upgrade to the K3s staging cluster (ADR-019) on dev.
+  # Trigger condition is exactly the package job's IMAGE_PUBLISH
+  # condition: given this workflow's triggers (push:dev, pull_request:
+  # dev, workflow_dispatch), `ref == dev && event != pull_request`
+  # selects only push-on-dev and dispatch-on-dev — the events for which
+  # the sha-<sha> image is guaranteed published to ghcr.
+  # Skips with a visible warning while KUBE_CONFIG_STAGING is not
+  # configured, so CI stays green until ops wires cluster access; the
+  # deploy then runs and gates automatically. No rollback is automated
+  # (manual `helm rollback` per .docs/runbooks/helm-rollback.md).
+  # ------------------------------------------------------------------
+  deploy:
+    name: deploy (Helm -> K3s staging)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: package
+    # == package job's IMAGE_PUBLISH condition (image guaranteed on ghcr)
+    if: github.ref == 'refs/heads/dev' && github.event_name != 'pull_request'
+    permissions:
+      contents: read
+    environment: staging
+    concurrency:
+      group: backend-java-deploy-staging
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check staging cluster access
+        id: kube
+        env:
+          KUBE_CONFIG_STAGING: ${{ secrets.KUBE_CONFIG_STAGING }}
+        run: |
+          if [ -n "$KUBE_CONFIG_STAGING" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::KUBE_CONFIG_STAGING is not set - Helm deploy skipped (staging cluster access not wired yet). Build/test/package gates all passed."
+            {
+              echo "### Deploy skipped — staging cluster access not configured"
+              echo ""
+              echo "Set the \`KUBE_CONFIG_STAGING\` secret (base64 kubeconfig) to enable the Helm deploy step."
+              echo "Build/test/coverage/contract/package gates all passed."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Set up Helm
+        if: steps.kube.outputs.configured == 'true'
+        uses: azure/setup-helm@v3
+
+      - name: Set up kubectl
+        if: steps.kube.outputs.configured == 'true'
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        if: steps.kube.outputs.configured == 'true'
+        env:
+          KUBE_CONFIG_STAGING: ${{ secrets.KUBE_CONFIG_STAGING }}
+        run: |
+          echo "$KUBE_CONFIG_STAGING" | base64 -d > /tmp/kubeconfig
+          chmod 600 /tmp/kubeconfig
+          echo "KUBECONFIG=/tmp/kubeconfig" >> "$GITHUB_ENV"
+
+      - name: Verify cluster connectivity
+        if: steps.kube.outputs.configured == 'true'
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Create namespace if not exists
+        if: steps.kube.outputs.configured == 'true'
+        run: kubectl get namespace "$NAMESPACE" || kubectl create namespace "$NAMESPACE"
+
+      - name: Helm upgrade --install (deploy Java image)
+        if: steps.kube.outputs.configured == 'true'
+        run: |
+          helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \
+            --namespace "$NAMESPACE" \
+            --values "$CHART_PATH/values-staging.yaml" \
+            --set image.registry="$REGISTRY" \
+            --set image.repository="$IMAGE_NAME" \
+            --set image.tag="$IMAGE_TAG" \
+            --wait \
+            --timeout 5m
+
+      - name: Verify deployment rollout
+        if: steps.kube.outputs.configured == 'true'
+        run: |
+          kubectl rollout status "deployment/$RELEASE_NAME" \
+            -n "$NAMESPACE" \
+            --timeout=5m
+          kubectl get pods -n "$NAMESPACE" \
+            -l "app.kubernetes.io/name=$RELEASE_NAME"
+
+      - name: Smoke health check (/health/live)
+        if: steps.kube.outputs.configured == 'true'
+        run: |
+          kubectl port-forward -n "$NAMESPACE" "svc/$RELEASE_NAME" 8080:8080 &
+          sleep 3
+          for i in {1..10}; do
+            if curl -sf http://localhost:8080/health/live; then
+              echo "Liveness probe PASSED"
+              exit 0
+            fi
+            echo "Attempt $i/10 - waiting for health endpoint..."
+            sleep 3
+          done
+          echo "Liveness probe FAILED"
+          exit 1
+
+      - name: Deploy summary
+        if: steps.kube.outputs.configured == 'true'
+        run: |
+          {
+            echo "### Deployed to staging (K3s + Helm)"
+            echo ""
+            echo "- Release: \`$RELEASE_NAME\` in \`$NAMESPACE\`"
+            echo "- Image: \`$REGISTRY/$IMAGE_NAME:$IMAGE_TAG\`"
+            echo "- Commit: ${{ github.sha }}"
+            echo "- Rollback: manual \`helm rollback $RELEASE_NAME -n $NAMESPACE\` (.docs/runbooks/helm-rollback.md)"
+          } >> "$GITHUB_STEP_SUMMARY"
