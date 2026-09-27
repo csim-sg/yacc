@@ -11,6 +11,11 @@ name: Backend Java CI
 #     MIG-041) via the `contractTest` Gradle task
 #   - Docker image build/push + Helm deploy trigger (AC-MIG-013-3)
 #
+# Publish/deploy parity: the image is published (ghcr login + push)
+# exactly for the events the deploy job consumes (push on dev, manual
+# workflow_dispatch on dev), so deploy never references an unpublished
+# sha-<sha> tag.
+#
 # The Node CI workflows (backend-ci.yml, lint.yml, tests.yml, deploy-staging.yaml)
 # remain in place until decommissioning in MIG-080.
 
@@ -112,7 +117,9 @@ jobs:
 
   # ------------------------------------------------------------------
   # Package: Docker image (Temurin 21 JRE, ADR-029) + Helm chart gate.
-  # Push only on dev pushes; PRs validate the build without pushing.
+  # Publishes (login + push) exactly for the events the deploy job
+  # consumes: push on dev or manual workflow_dispatch on dev. PRs (and
+  # dispatch from other refs) validate the build without pushing.
   # ------------------------------------------------------------------
   package:
     name: package (Docker image + Helm chart)
@@ -122,6 +129,12 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      # Single source of truth for image publish. MUST stay equivalent to
+      # the deploy job's trigger condition so deploy never references an
+      # unpublished sha-<sha> tag (review loop 1: manual dispatch on dev
+      # previously built without pushing, then deployed that tag).
+      IMAGE_PUBLISH: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -130,18 +143,18 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
-        if: github.event_name == 'push'
+        if: env.IMAGE_PUBLISH == 'true'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Docker image (push on dev)
+      - name: Build Docker image (publish on dev push / dispatch)
         uses: docker/build-push-action@v5
         with:
           context: ${{ env.GRADLE_PROJECT_DIR }}
-          push: ${{ github.event_name == 'push' }}
+          push: ${{ env.IMAGE_PUBLISH == 'true' }}
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -162,6 +175,11 @@ jobs:
 
   # ------------------------------------------------------------------
   # Deploy: Helm upgrade to the K3s staging cluster (ADR-019) on dev.
+  # Trigger condition is exactly the package job's IMAGE_PUBLISH
+  # condition: given this workflow's triggers (push:dev, pull_request:
+  # dev, workflow_dispatch), `ref == dev && event != pull_request`
+  # selects only push-on-dev and dispatch-on-dev — the events for which
+  # the sha-<sha> image is guaranteed published to ghcr.
   # Skips with a visible warning while KUBE_CONFIG_STAGING is not
   # configured, so CI stays green until ops wires cluster access; the
   # deploy then runs and gates automatically. No rollback is automated
@@ -172,6 +190,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: package
+    # == package job's IMAGE_PUBLISH condition (image guaranteed on ghcr)
     if: github.ref == 'refs/heads/dev' && github.event_name != 'pull_request'
     permissions:
       contents: read
