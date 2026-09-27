@@ -40,7 +40,7 @@ class SendGridAuthEmailSenderTest {
         sender = new SendGridAuthEmailSender(builder, new AuthProperties(null, null, null,
                 new AuthProperties.Email("no-reply@fixture.yacc.local", "sendgrid",
                         API_KEY, null, 0, null),
-                null, null, null));
+                null, null, null, null));
     }
 
     @Test

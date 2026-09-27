@@ -79,7 +79,7 @@ class PasswordResetServiceTest {
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
         service = new PasswordResetService(users, resetTokens, passwordEncoder,
-                sessions, emails, new AuthProperties(null, null, null, null, null, null, null),
+                sessions, emails, new AuthProperties(null, null, null, null, null, null, null, null),
                 audit);
     }
 

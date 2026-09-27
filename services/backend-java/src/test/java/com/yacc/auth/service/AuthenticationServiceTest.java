@@ -100,7 +100,7 @@ class AuthenticationServiceTest {
         return new JwtTokenService(new AuthProperties(
                 new AuthProperties.Token(signingKey, null, null),
                 new AuthProperties.Bootstrap("bootstrap@fixture.yacc.local", "initial"),
-                new AuthProperties.Recovery("", "", ""), null, null, null, null));
+                new AuthProperties.Recovery("", "", ""), null, null, null, null, null));
     }
 
     private User persistedUser(String id, UserRole role, UserStatus status, String rawPassword) {

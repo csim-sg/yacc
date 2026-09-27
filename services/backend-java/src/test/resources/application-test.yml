@@ -51,6 +51,22 @@ yacc:
       token-ttl: 60m
     email-verification:
       token-ttl: 60m
+    as:
+      # MIG-033 deterministic test-only AS policy. The issuer targets the
+      # mock server.port; the client fixture mirrors the dev defaults. The
+      # signing key is the SAME deterministic test key bound above
+      # (yacc.auth.token.signing-key) — the AS never has separate key
+      # material. Fixture only; production binds via YACC_AUTH_AS_* env.
+      issuer: "http://localhost:8080"
+      clients:
+        yacc-frontend:
+          client-id: "yacc-frontend"
+          redirect-uris:
+            - "http://localhost:5173/auth/callback"
+          scopes:
+            - openid
+            - profile
+            - email
   integration:
     encryption:
       # Deterministic test-only key (32 bytes of 0x2A, base64). Test fixture —

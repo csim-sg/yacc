@@ -40,7 +40,24 @@ public class TokenAuthenticationService {
      *         silently accepted
      */
     public AuthUser authenticate(Jwt accessToken) {
-        User user = users.findById(accessToken.getSubject()).orElse(null);
+        return requireActive(accessToken.getSubject());
+    }
+
+    /**
+     * Resolves a persisted identity by id and enforces {@code ACTIVE}
+     * status — the status policy for integration points that hold the
+     * owner's id without a bearer token (the AS grant store reloads the
+     * authorization owner through this seam before refresh, revocation,
+     * code exchange, and userinfo resolution; ADR-025).
+     *
+     * @param userId the persisted identity id
+     * @return the authenticated principal
+     * @throws InvalidBearerTokenException when the identity no longer exists
+     *         or its status is not {@code ACTIVE} — denied, never silently
+     *         accepted
+     */
+    public AuthUser requireActive(String userId) {
+        User user = users.findById(userId).orElse(null);
         if (user == null) {
             throw new InvalidBearerTokenException("Unknown identity");
         }

@@ -16,15 +16,17 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param passwordReset     password-reset token policy (MIG-031; BE-003 parity)
  * @param emailVerification email-verification token policy (MIG-031)
  * @param oauth2            OIDC relying-party client registrations (MIG-032)
+ * @param as                embedded OIDC authorization-server policy (MIG-033)
  */
 @ConfigurationProperties(prefix = "yacc.auth")
 public record AuthProperties(Token token, Bootstrap bootstrap, Recovery recovery,
         Email email, PasswordReset passwordReset, EmailVerification emailVerification,
-        OAuth2 oauth2) {
+        OAuth2 oauth2, As as) {
 
     /**
-     * Applies the KISS defaults when the optional MIG-031/MIG-032 sections are
-     * absent from configuration (mirrors the {@link Token} TTL defaults).
+     * Applies the KISS defaults when the optional MIG-031/MIG-032/MIG-033
+     * sections are absent from configuration (mirrors the {@link Token} TTL
+     * defaults).
      *
      * @param token             stateless JWT access-token policy
      * @param bootstrap         deterministic first-run bootstrap inputs
@@ -33,6 +35,7 @@ public record AuthProperties(Token token, Bootstrap bootstrap, Recovery recovery
      * @param passwordReset     password-reset token policy
      * @param emailVerification email-verification token policy
      * @param oauth2            OIDC relying-party client registrations
+     * @param as                embedded OIDC authorization-server policy
      */
     public AuthProperties {
         if (email == null) {
@@ -46,6 +49,9 @@ public record AuthProperties(Token token, Bootstrap bootstrap, Recovery recovery
         }
         if (oauth2 == null) {
             oauth2 = new OAuth2(false, java.util.Map.of());
+        }
+        if (as == null) {
+            as = new As(null, java.util.Map.of());
         }
     }
 
@@ -226,6 +232,69 @@ public record AuthProperties(Token token, Bootstrap bootstrap, Recovery recovery
                 String issuerUri, String authorizationUri, String tokenUri,
                 String jwkSetUri, String userInfoUri, String userNameAttribute,
                 java.util.List<String> scopes) {
+        }
+    }
+
+    /**
+     * Embedded OIDC authorization-server policy (MIG-033; ADR-025 AS role;
+     * ARCH-004 §4/§8). The AS is always-on (dual-role OIDC is founder-fixed)
+     * and signs with the SAME RS256 key family as the resource server
+     * ({@link Token#signingKey()} — one token format, one signing-key
+     * source; no bespoke token crypto).
+     *
+     * <p>The registered-client policy is founder-fixed: the YACC frontend
+     * only, unless a third-party client is named at acceptance. Registered
+     * clients are public OIDC SPA clients (no client secret — OAuth 2.1
+     * authorization-code + PKCE) plus the refresh grant; client-credentials
+     * is deliberately absent (no machine client is named — KISS, do not add
+     * speculatively). Consent is required for every client. No defaults for
+     * client material beyond the localhost dev convenience values — real
+     * deployments bind everything from the environment / K8s Secrets.</p>
+     *
+     * @param issuer  the OIDC issuer URL — stamped on AS-issued tokens and
+     *                served by {@code /.well-known/openid-configuration};
+     *                the resource-server validator accepts it in addition to
+     *                the local {@code yacc} issuer (MIG-030 compatibility)
+     *                (env {@code YACC_AUTH_AS_ISSUER})
+     * @param clients registered clients keyed by registration id; must
+     *                contain at least the YACC frontend client (fail-closed
+     *                validation in {@code AsClientPolicy})
+     */
+    public record As(String issuer, java.util.Map<String, AsClient> clients) {
+
+        /** The issuer default when configuration omits it (local dev). */
+        public static final String DEFAULT_ISSUER = "http://localhost:8080";
+
+        /** The registration id reserved for the YACC frontend client. */
+        public static final String YACC_FRONTEND_REGISTRATION_ID = "yacc-frontend";
+
+        public As {
+            if (issuer == null || issuer.isBlank()) {
+                issuer = DEFAULT_ISSUER;
+            }
+            if (clients == null) {
+                clients = java.util.Map.of();
+            }
+        }
+
+        /**
+         * One registered AS client (the YACC frontend unless the founder
+         * names a third-party client).
+         *
+         * @param clientId     the OAuth 2.0 client id (public client — no
+         *                     secret; PKCE {@code S256} is mandatory)
+         * @param redirectUris exact registered redirect URIs (fail-closed:
+         *                     at least one is required — no wildcard
+         *                     matching, no open redirect)
+         * @param scopes       granted scopes (default openid,profile,email)
+         */
+        public record AsClient(String clientId,
+                java.util.List<String> redirectUris,
+                java.util.List<String> scopes) {
+
+            /** The default AS scopes (mirror of the RP default scopes). */
+            public static final java.util.List<String> DEFAULT_SCOPES =
+                    java.util.List.of("openid", "profile", "email");
         }
     }
 }

@@ -25,7 +25,7 @@ class OAuth2LoginConfigTest {
     }
 
     private static AuthProperties properties(AuthProperties.OAuth2 oauth2) {
-        return new AuthProperties(null, null, null, null, null, null, oauth2);
+        return new AuthProperties(null, null, null, null, null, null, oauth2, null);
     }
 
     @Test

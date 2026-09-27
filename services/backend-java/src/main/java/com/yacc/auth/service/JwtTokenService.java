@@ -19,11 +19,13 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwtEncodingException;
-import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -63,21 +65,45 @@ public class JwtTokenService {
 
     private final JwtEncoder encoder;
     private final JwtDecoder decoder;
+    private final RSAKey signingKey;
     private final AuthProperties.Token policy;
 
     public JwtTokenService(AuthProperties properties) {
         this.policy = properties.token();
-        RSAKey rsaKey = parseKey(properties.token().signingKey());
-        this.encoder = new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(rsaKey)));
-        this.decoder = buildDecoder(rsaKey);
+        this.signingKey = parseKey(properties.token().signingKey());
+        this.encoder = new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(this.signingKey)));
+        this.decoder = buildDecoder(this.signingKey, trustedIssuers(properties));
     }
 
-    /** The decoder backing the resource-server filter chain (single instance). */
+    /**
+     * The decoder backing the resource-server filter chain (single instance).
+     */
     public JwtDecoder jwtDecoder() {
         return decoder;
     }
 
-    private static JwtDecoder buildDecoder(RSAKey rsaKey) {
+    /**
+     * The parsed signing key of the shared RS256 key family — the single
+     * signing-key source the embedded OIDC authorization server reuses for
+     * its JWKSource (MIG-033; one token format, no second key material).
+     *
+     * @return the current signing JWK (private key attached; the AS JWKS
+     *         endpoint publishes only its public half)
+     */
+    public RSAKey signingKey() {
+        return signingKey;
+    }
+
+    /**
+     * Issuers trusted by the decoder: the local {@link #ISSUER} (MIG-030
+     * sign-in tokens) plus the embedded AS issuer URL (MIG-033 AS-issued
+     * tokens) — one token contract, verified by one decoder.
+     */
+    private static java.util.Set<String> trustedIssuers(AuthProperties properties) {
+        return java.util.Set.of(ISSUER, properties.as().issuer());
+    }
+
+    private static JwtDecoder buildDecoder(RSAKey rsaKey, java.util.Set<String> issuers) {
         java.security.interfaces.RSAPublicKey publicKey;
         try {
             publicKey = rsaKey.toRSAPublicKey();
@@ -88,8 +114,23 @@ public class JwtTokenService {
         // Zero clock skew: issuer and verifier share the single-instance host
         // clock (KISS; ADR-029 single-instance envelope).
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                new JwtTimestampValidator(Duration.ZERO), new JwtIssuerValidator(ISSUER)));
+                new JwtTimestampValidator(Duration.ZERO), issuerValidator(issuers)));
         return decoder;
+    }
+
+    /**
+     * Accepts a token when its {@code iss} is one of the trusted issuers
+     * (local + embedded AS). The framework {@code JwtIssuerValidator} is
+     * single-issuer, and the delegating validator AND-combines results — so
+     * the dual-issuer check is expressed here directly (fail-closed: any
+     * other issuer is rejected). The claim is read as the raw string: the
+     * local {@code yacc} issuer is not a URL.
+     */
+    private static OAuth2TokenValidator<Jwt> issuerValidator(java.util.Set<String> issuers) {
+        return jwt -> issuers.contains(jwt.getClaimAsString("iss"))
+                ? OAuth2TokenValidatorResult.success()
+                : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token",
+                        "Token issuer is not trusted", null));
     }
 
     /**
