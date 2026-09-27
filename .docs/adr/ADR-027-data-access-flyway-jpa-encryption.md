@@ -8,11 +8,11 @@
 
 ## Context
 
-Drizzle does not exist on the JVM. The founder fixed a full reset (no legacy data migration). The POC has 20 tables, 11 hand-written Drizzle migrations (duplicate `0005_*` + `0006_*` numbering to resolve), and IRC AES-256-GCM credential encryption.
+Drizzle does not exist on the JVM. The founder fixed a full reset (no legacy data migration). The POC has 19 tables (code-verified: `packages/backend/src/schemas/*.schema.ts` excluding `index.ts`), 11 hand-written Drizzle migrations (duplicate `0005_*` + `0006_*` numbering to resolve), and IRC AES-256-GCM credential encryption.
 
 ## Decision
 
-- **Migrations:** Flyway, single clean `V1` baseline re-expressing all 20 tables; resolve duplicate numbering into a monotonic sequence. Enums mapped to Java enums.
+- **Migrations:** Flyway, single clean `V1` baseline re-expressing all 19 tables; resolve duplicate numbering into a monotonic sequence. Enums mapped to Java enums.
 - **Data access:** Spring Data JPA (repositories + entities); no raw SQL in services; no query-builder sprawl.
 - **Encryption:** `AES/GCM/NoPadding` for new IRC credentials (fresh key/IV from secret); no POC-format replication (full reset).
 - **Seed:** deterministic fresh seed, not migrated data.

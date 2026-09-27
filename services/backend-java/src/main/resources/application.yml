@@ -7,6 +7,17 @@ spring:
       # Security events) but the identity subsystem + security filter chain are
       # MIG-030; until then the auto-configured in-memory user must not exist.
       - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  datasource:
+    # MIG-020: the service now owns the PostgreSQL data layer (ADR-027).
+    # DATABASE_URL is the deployment contract wired by deploy/helm/yacc-backend;
+    # the default targets the local docker-compose PostgreSQL.
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/yacc_inbox}
+    username: ${POSTGRES_USER:yacc_user}
+    password: ${POSTGRES_PASSWORD:yacc_password}
+  flyway:
+    # Flyway-only schema management (ARCH-004 §7). The single V1 full-reset
+    # baseline lives in classpath:db/migration; later changes append V2+.
+    locations: classpath:db/migration
 
 server:
   port: 8080
