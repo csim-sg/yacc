@@ -43,10 +43,6 @@ dependencies {
     // Brings spring-boot-starter-jdbc (DataSource + JdbcTemplate for Flyway)
     // transitively — no separate JDBC starter declaration.
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    // Flyway is the only schema-change mechanism (ARCH-004 §7); the
-    // database-specific module is required from Flyway 10 onward.
-    implementation("org.flywaydb:flyway-core")
-    implementation("org.flywaydb:flyway-database-postgresql")
 
     // MIG-014 test infrastructure (SPEC-002 Testing Strategy; ARCH-004 §13 #10).
     // Versions are managed by the Spring Boot dependency-management BOM.
