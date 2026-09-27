@@ -14,7 +14,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yacc.audit.model.AuditFilters;
 import com.yacc.audit.model.AuditLog;
+import com.yacc.audit.model.AuditPage;
+import com.yacc.audit.model.Export;
 import com.yacc.audit.repository.AuditLogRepository;
 import com.yacc.common.controller.BadRequestException;
 
@@ -192,39 +195,5 @@ public class AuditLogsQueryService {
             return '"' + safe.replace("\"", "\"\"") + '"';
         }
         return safe;
-    }
-
-    /** Query filters (frozen GET /api/audit-logs parameter set). */
-    public record AuditFilters(String actorId, String action, String entityType, String entityId,
-            String dateFrom, String dateTo, Integer page, Integer limit) {
-    }
-
-    /** One audit-log page.
-     *
-     * @param items page items
-     * @param total matching logs
-     * @param page 1-indexed page
-     * @param limit page size
-     */
-    public record AuditPage(List<AuditLog> items, long total, int page, int limit) {
-
-        /** Pages in the POC payload sense: ceil(total/limit), ≥1 when total>0. */
-        public int pages() {
-            return (int) Math.max(1, (total + limit() - 1) / limit());
-        }
-    }
-
-    /**
-     * Export outcome.
-     *
-     * @param data file body
-     * @param format csv | json
-     */
-    public record Export(String data, String format) {
-
-        /** Suggested download filename (frozen contract parity). */
-        public String filename() {
-            return "audit-logs-" + java.time.Instant.now() + "." + format();
-        }
     }
 }

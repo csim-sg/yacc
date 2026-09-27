@@ -17,6 +17,11 @@ import com.yacc.common.controller.BadRequestException;
 import com.yacc.common.controller.InternalServerErrorException;
 import com.yacc.common.controller.NotFoundException;
 import com.yacc.dlq.model.DlqEntryResponse;
+import com.yacc.dlq.model.DlqListResponse;
+import com.yacc.dlq.model.DlqStatistics;
+import com.yacc.dlq.model.RemoveResponse;
+import com.yacc.dlq.model.RemovedEntry;
+import com.yacc.dlq.model.ReQueueResponse;
 import com.yacc.dlq.service.DlqService;
 
 /**
@@ -55,7 +60,7 @@ public class DlqController {
 
     @GetMapping("/stats")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
-    public DlqService.DlqStatistics stats() {
+    public DlqStatistics stats() {
         return dlq.stats();
     }
 
@@ -80,47 +85,5 @@ public class DlqController {
         return new RemoveResponse("DLQ entry deleted successfully",
                 new RemovedEntry(entry.getId().toString(), entry.getMessageId().toString(),
                         entry.getConversationId().toString(), entry.getFailureReason()));
-    }
-
-    /**
-     * DLQ list payload (frozen custom shape).
-     *
-     * @param entries page items
-     * @param total matching entries
-     * @param page 1-indexed page
-     * @param limit page size
-     */
-    public record DlqListResponse(java.util.List<DlqEntryResponse> entries, long total, int page,
-            int limit) {
-    }
-
-    /**
-     * Re-queue outcome (POC parity shape).
-     *
-     * @param message human-readable confirmation
-     * @param entry updated entry
-     */
-    public record ReQueueResponse(String message, DlqEntryResponse entry) {
-    }
-
-    /**
-     * Removal outcome (POC parity shape).
-     *
-     * @param message human-readable confirmation
-     * @param deletedEntry removed entry identity
-     */
-    public record RemoveResponse(String message, RemovedEntry deletedEntry) {
-    }
-
-    /**
-     * Removed entry identity.
-     *
-     * @param id DLQ entry id
-     * @param messageId message UUID
-     * @param conversationId conversation UUID
-     * @param failureReason failure reason
-     */
-    public record RemovedEntry(String id, String messageId, String conversationId,
-            String failureReason) {
     }
 }

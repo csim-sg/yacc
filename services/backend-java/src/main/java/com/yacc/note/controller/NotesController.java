@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.yacc.auth.model.AuthUser;
 import com.yacc.common.model.BaseListResponse;
 import com.yacc.note.model.CreateNoteRequest;
+import com.yacc.note.model.NoteEnvelope;
 import com.yacc.note.model.NoteResponse;
 import com.yacc.note.service.NoteService;
 
@@ -61,13 +62,5 @@ public class NotesController {
         } catch (NumberFormatException failure) {
             return fallback;
         }
-    }
-
-    /**
-     * Single-note envelope {@code {data: Note}}.
-     *
-     * @param data the created note
-     */
-    public record NoteEnvelope(NoteResponse data) {
     }
 }

@@ -23,6 +23,8 @@ import com.yacc.conversation.model.ChannelType;
 import com.yacc.conversation.model.Conversation;
 import com.yacc.conversation.model.ConversationDetail;
 import com.yacc.conversation.model.ConversationListItem;
+import com.yacc.conversation.model.ConversationPage;
+import com.yacc.conversation.model.ConversationUpdate;
 import com.yacc.conversation.model.ListConversationsQuery;
 import com.yacc.conversation.model.Participant;
 import com.yacc.conversation.model.TagRef;
@@ -289,24 +291,5 @@ public class ConversationService {
             }
         }
         return false;
-    }
-
-    /** One enriched list page.
-     *
-     * @param items page items
-     * @param total matching conversations
-     * @param page 1-indexed page
-     * @param limit page size
-     */
-    public record ConversationPage(List<ConversationListItem> items, long total, int page, int limit) {
-    }
-
-    /**
-     * Mutation outcome.
-     *
-     * @param conversation enriched conversation after the change
-     * @param oldValue previous status/priority/assignee (audit parity)
-     */
-    public record ConversationUpdate(ConversationDetail conversation, String oldValue) {
     }
 }

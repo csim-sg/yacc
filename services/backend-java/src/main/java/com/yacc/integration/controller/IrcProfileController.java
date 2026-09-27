@@ -14,10 +14,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
+import com.yacc.integration.model.ProfileResponse;
+import com.yacc.integration.model.ProfileTestResult;
+import com.yacc.integration.model.ProfileWrite;
 import com.yacc.integration.service.IrcProfileService;
-import com.yacc.integration.service.IrcProfileService.ProfileResponse;
-import com.yacc.integration.service.IrcProfileService.ProfileWrite;
-import com.yacc.integration.service.IrcProfileService.TestResult;
 
 import jakarta.validation.Valid;
 
@@ -94,7 +94,7 @@ public class IrcProfileController {
 
     @PostMapping("/{id}/test")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public TestResult test(@PathVariable("id") int id) {
+    public ProfileTestResult test(@PathVariable("id") int id) {
         return profiles.test(DEFAULT_TENANT_ID, id);
     }
 }

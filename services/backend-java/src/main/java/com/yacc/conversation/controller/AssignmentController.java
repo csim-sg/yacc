@@ -10,11 +10,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
+import com.yacc.conversation.model.AssignBody;
+import com.yacc.conversation.model.AssignmentEnvelope;
 import com.yacc.conversation.model.AssignmentResponse;
 import com.yacc.conversation.service.AssignmentService;
 import com.yacc.common.controller.ForbiddenException;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
 
 /**
  * POST-surface assignment (ledger row REST-ASSIGN-001; frozen contract op
@@ -34,24 +36,12 @@ public class AssignmentController {
 
     @PostMapping
     public AssignmentEnvelope assign(@PathVariable("conversationId") UUID conversationId,
-            @jakarta.validation.Valid @RequestBody AssignBody body,
+            @Valid @RequestBody AssignBody body,
             @AuthenticationPrincipal AuthUser principal) {
         if (principal.getRole() == com.yacc.auth.model.UserRole.USER) {
             throw new ForbiddenException("Only manager or higher can assign conversations");
         }
         return new AssignmentEnvelope(
                 assignments.assign(conversationId, body.assignedUserId(), principal.getId()));
-    }
-
-    /** Assignment body (frozen contract op {@code assignConversationByPost}). */
-    public record AssignBody(@NotBlank String assignedUserId) {
-    }
-
-    /**
-     * Assignment result envelope {@code {data: AssignmentResponse}}.
-     *
-     * @param data the assignment result
-     */
-    public record AssignmentEnvelope(AssignmentResponse data) {
     }
 }

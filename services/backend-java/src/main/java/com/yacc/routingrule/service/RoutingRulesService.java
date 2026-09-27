@@ -17,6 +17,7 @@ import com.yacc.audit.service.AuditPersistence;
 import com.yacc.auth.service.UserDirectoryService;
 import com.yacc.common.controller.BadRequestException;
 import com.yacc.common.controller.NotFoundException;
+import com.yacc.routingrule.model.ExecutionPage;
 import com.yacc.routingrule.model.RoutingRule;
 import com.yacc.routingrule.model.RoutingRuleWrite;
 import com.yacc.routingrule.repository.RoutingRuleExecutionRepository;
@@ -228,14 +229,4 @@ public class RoutingRulesService {
         return null;
     }
 
-    /** One execution-log page.
-     *
-     * @param items page items
-     * @param total all executions of the rule
-     * @param page 1-indexed page
-     * @param limit page size
-     */
-    public record ExecutionPage(List<com.yacc.routingrule.model.RoutingRuleExecution> items,
-            long total, int page, int limit) {
-    }
 }

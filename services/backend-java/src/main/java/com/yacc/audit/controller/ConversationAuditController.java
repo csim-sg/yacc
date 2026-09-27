@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yacc.audit.model.AuditFilters;
+import com.yacc.audit.model.AuditLogResponse;
+import com.yacc.audit.model.ConversationAuditResponse;
 import com.yacc.audit.service.AuditLogsQueryService;
 
 /**
@@ -38,29 +41,16 @@ public class ConversationAuditController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer limit) {
         var conversationPage = audit.queryConversation(conversationId,
-                new AuditLogsQueryService.AuditFilters(null, null, null, null, null, null,
+                new AuditFilters(null, null, null, null, null, null,
                         page, limit));
         int safeLimit = conversationPage.limit();
         return new ConversationAuditResponse(
                 conversationPage.items().stream()
-                        .map(entry -> com.yacc.audit.model.AuditLogResponse.from(entry, null, mapper))
+                        .map(entry -> AuditLogResponse.from(entry, null, mapper))
                         .toList(),
                 conversationPage.total(),
                 conversationPage.page(),
                 safeLimit,
                 (int) Math.ceil(conversationPage.total() / (double) safeLimit));
-    }
-
-    /**
-     * Frozen custom page shape (contract op {@code getConversationAuditLogs}).
-     *
-     * @param items page items
-     * @param total matching entries
-     * @param page 1-indexed page
-     * @param limit page size
-     * @param pages page count
-     */
-    public record ConversationAuditResponse(java.util.List<com.yacc.audit.model.AuditLogResponse> items,
-            long total, int page, int limit, int pages) {
     }
 }

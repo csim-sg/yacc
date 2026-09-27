@@ -1,7 +1,6 @@
 package com.yacc.auth.service;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.PageRequest;
@@ -12,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.yacc.auth.model.User;
+import com.yacc.auth.model.UserPage;
 import com.yacc.auth.model.UserRole;
 import com.yacc.auth.model.UserStatus;
 import com.yacc.auth.repository.UserRepository;
@@ -29,15 +29,6 @@ import com.yacc.auth.repository.UserRepository;
  */
 @Service
 public class UserDirectoryService {
-
-    /**
-     * One page of directory results.
-     *
-     * @param users page items
-     * @param total matching identities across all pages
-     */
-    public record UserPage(List<User> users, long total) {
-    }
 
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;

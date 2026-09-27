@@ -1,6 +1,5 @@
 package com.yacc.tag.controller;
 
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -16,13 +15,12 @@ import org.springframework.web.bind.annotation.RestController;
 import com.yacc.auth.model.AuthUser;
 import com.yacc.common.controller.ForbiddenException;
 import com.yacc.common.controller.NotFoundException;
-import com.yacc.conversation.model.TagRef;
 import com.yacc.conversation.service.ConversationAccessService;
 import com.yacc.conversation.service.ConversationService;
+import com.yacc.tag.model.AddTagBody;
+import com.yacc.tag.model.ConversationTagsEnvelope;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 
 /**
  * Conversation tag-link wire surface (ledger rows REST-TAG-003/004; frozen
@@ -84,26 +82,5 @@ public class ConversationTagController {
         if (!access.exists(conversationId)) {
             throw new NotFoundException("Conversation not found");
         }
-    }
-
-    /**
-     * Conversation-tags envelope {@code {data: {tags: [...]}}} (POC parity
-     * for link/unlink results; contract `data` is a loose object).
-     *
-     * @param data wrapper holding the conversation's tags
-     */
-    public record ConversationTagsEnvelope(TagsWrapper data) {
-
-        public ConversationTagsEnvelope(List<TagRef> tags) {
-            this(new TagsWrapper(tags));
-        }
-
-        /** POC {@code {tags: [...]}} holder. */
-        public record TagsWrapper(List<TagRef> tags) {
-        }
-    }
-
-    /** Link-tag body (frozen contract: integer tagId ≥ 1). */
-    public record AddTagBody(@NotNull @Positive Integer tagId) {
     }
 }

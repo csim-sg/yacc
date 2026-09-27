@@ -14,7 +14,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.yacc.common.controller.NotFoundException;
+import com.yacc.dlq.model.BulkRetryError;
+import com.yacc.dlq.model.BulkRetryResult;
 import com.yacc.dlq.model.DeadLetterQueueEntry;
+import com.yacc.dlq.model.DlqPage;
+import com.yacc.dlq.model.DlqStatistics;
 import com.yacc.dlq.repository.DeadLetterQueueEntryRepository;
 
 /**
@@ -133,46 +137,5 @@ public class DlqService {
     @Transactional(readOnly = true)
     public List<DeadLetterQueueEntry> byReason(String failureReason) {
         return entries.findByFailureReason(failureReason);
-    }
-
-    /** One DLQ page.
-     *
-     * @param entries page items
-     * @param total matching entries
-     * @param page 1-indexed page
-     * @param limit page size
-     */
-    public record DlqPage(List<DeadLetterQueueEntry> entries, long total, int page, int limit) {
-    }
-
-    /**
-     * DLQ statistics payload.
-     *
-     * @param total entry count
-     * @param byFailureReason counts keyed by failure reason
-     * @param oldest earliest moved-at
-     * @param newest latest moved-at
-     */
-    public record DlqStatistics(long total, Map<String, Long> byFailureReason,
-            LocalDateTime oldest, LocalDateTime newest) {
-    }
-
-    /**
-     * Bulk-retry outcome.
-     *
-     * @param successful retried entries
-     * @param failed skipped entries
-     * @param errors per-id failure reasons
-     */
-    public record BulkRetryResult(int successful, int failed, List<BulkRetryError> errors) {
-    }
-
-    /**
-     * One bulk-retry failure.
-     *
-     * @param messageId failed message
-     * @param error safe reason
-     */
-    public record BulkRetryError(String messageId, String error) {
     }
 }

@@ -16,12 +16,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yacc.auth.model.AuthUser;
+import com.yacc.audit.model.AuditFilters;
+import com.yacc.audit.model.AuditLogResponse;
+import com.yacc.audit.model.ExportRequest;
 import com.yacc.audit.service.AuditLogsQueryService;
 import com.yacc.common.model.BaseListResponse;
-import com.yacc.audit.model.AuditLogResponse;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 
 /**
  * Audit-log query/export wire surface (ledger rows REST-AUDITLOG-001..003;
@@ -54,7 +55,7 @@ public class AuditLogsQueryController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer limit) {
         var result = audit.query(
-                new AuditLogsQueryService.AuditFilters(actorId, action, entityType, entityId,
+                new AuditFilters(actorId, action, entityType, entityId,
                         dateFrom, dateTo, page, limit));
         return BaseListResponse.of(
                 result.items().stream().map(entry -> AuditLogResponse.from(entry, null, mapper)).toList(),
@@ -72,7 +73,7 @@ public class AuditLogsQueryController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer limit) {
         var result = audit.queryConversation(conversationId,
-                new AuditLogsQueryService.AuditFilters(null, action, entityType, null,
+                new AuditFilters(null, action, entityType, null,
                         dateFrom, dateTo, page, limit));
         return BaseListResponse.of(
                 result.items().stream().map(entry -> AuditLogResponse.from(entry, null, mapper)).toList(),
@@ -82,7 +83,7 @@ public class AuditLogsQueryController {
     @PostMapping("/export")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     public ResponseEntity<byte[]> export(@Valid @RequestBody ExportRequest request) {
-        var filters = new AuditLogsQueryService.AuditFilters(
+        var filters = new AuditFilters(
                 request.filters() == null ? null : request.filters().actorId(),
                 request.filters() == null ? null : request.filters().action(),
                 request.filters() == null ? null : request.filters().entityType(),
@@ -98,20 +99,5 @@ public class AuditLogsQueryController {
                 .filename(export.filename()).build());
         return ResponseEntity.ok().contentType(contentType)
                 .headers(headers).body(export.data().getBytes());
-    }
-
-    /**
-     * Export body (frozen contract op {@code exportAuditLogs}).
-     *
-     * @param format csv | json
-     * @param filters same filter fields as GET /api/audit-logs
-     */
-    public record ExportRequest(@jakarta.validation.constraints.NotNull @NotBlank String format,
-            Filters filters) {
-
-        /** Export filter subset (POC parity). */
-        public record Filters(String actorId, String action, String entityType, String entityId,
-                String dateFrom, String dateTo) {
-        }
     }
 }

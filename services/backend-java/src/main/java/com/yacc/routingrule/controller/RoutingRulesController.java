@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
 import com.yacc.common.model.BaseListResponse;
+import com.yacc.routingrule.model.RuleEnvelope;
 import com.yacc.routingrule.model.RoutingRuleExecutionResponse;
 import com.yacc.routingrule.model.RoutingRuleResponse;
 import com.yacc.routingrule.model.RoutingRuleWrite;
@@ -92,13 +93,5 @@ public class RoutingRulesController {
                         .map(execution -> RoutingRuleExecutionResponse.from(execution, objectMapper))
                         .toList(),
                 result.page(), result.limit(), result.total());
-    }
-
-    /**
-     * Single-rule envelope {@code {data: RoutingRule}}.
-     *
-     * @param data the rule
-     */
-    public record RuleEnvelope(RoutingRuleResponse data) {
     }
 }

@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.yacc.auth.service.UserDirectoryService;
 import com.yacc.common.controller.NotFoundException;
 import com.yacc.notification.model.Notification;
+import com.yacc.notification.model.NotificationPage;
 import com.yacc.notification.repository.NotificationRepository;
 
 /**
@@ -88,13 +89,4 @@ public class NotificationService {
                 .orElseThrow(() -> new NotFoundException("Notification not found or access denied"));
     }
 
-    /** One own-scope page.
-     *
-     * @param items page items
-     * @param total all notifications of the user
-     * @param page 1-indexed page
-     * @param limit page size
-     */
-    public record NotificationPage(java.util.List<Notification> items, long total, int page, int limit) {
-    }
 }

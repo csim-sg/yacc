@@ -1,7 +1,5 @@
 package com.yacc.message.controller;
 
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -22,13 +20,15 @@ import com.yacc.auth.model.UserRole;
 import com.yacc.common.controller.ForbiddenException;
 import com.yacc.conversation.service.ConversationAccessService;
 import com.yacc.message.model.Message;
+import com.yacc.message.model.MessageEnvelope;
+import com.yacc.message.model.MessageListResponse;
 import com.yacc.message.model.MessageResponse;
+import com.yacc.message.model.MessageStatusResponse;
+import com.yacc.message.model.SendMessageBody;
 import com.yacc.message.service.MessageService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 
 /**
  * Message wire surface (ledger rows REST-MSG-001..004; frozen contract ops
@@ -98,49 +98,5 @@ public class MessageController {
         MessageResponse message = messages.status(conversationId, messageId);
         return new MessageStatusResponse(message.id(), message.status(), message.createdAt(),
                 message.updatedAt());
-    }
-
-    /**
-     * The frozen custom message-list shape (contract component
-     * {@code MessageListResponse} — deliberately NOT BaseListResponse).
-     *
-     * @param messages page items
-     * @param total all messages of the conversation
-     * @param page 1-indexed page
-     * @param limit page size
-     */
-    public record MessageListResponse(List<MessageResponse> messages, long total, int page,
-            int limit) {
-    }
-
-    /**
-     * Message envelope {@code {data: Message}} (frozen POST-send shape).
-     *
-     * @param data the message
-     */
-    public record MessageEnvelope(MessageResponse data) {
-    }
-
-    /**
-     * Message status lookup (POC parity shape).
-     *
-     * @param messageId message UUID
-     * @param status lowercase wire status
-     * @param createdAt creation timestamp
-     * @param updatedAt last-update timestamp
-     */
-    public record MessageStatusResponse(UUID messageId, String status, LocalDateTime createdAt,
-            LocalDateTime updatedAt) {
-    }
-
-    /**
-     * Send-message body (frozen contract component {@code SendMessageBody}).
-     *
-     * @param body message text (1..10000)
-     * @param attachmentIds optional attachment references (Phase 6 storage)
-     */
-    public record SendMessageBody(
-            @NotBlank @Size(min = 1, max = 10000) String body,
-            List<UUID> attachmentIds) {
     }
 }

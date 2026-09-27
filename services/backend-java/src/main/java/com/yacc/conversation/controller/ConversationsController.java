@@ -16,6 +16,7 @@ import com.yacc.auth.model.AuthUser;
 import com.yacc.common.model.BaseListResponse;
 import com.yacc.conversation.model.AssignRequest;
 import com.yacc.conversation.model.ConversationDetail;
+import com.yacc.conversation.model.ConversationEnvelope;
 import com.yacc.conversation.model.ConversationListItem;
 import com.yacc.conversation.model.ConversationPriority;
 import com.yacc.conversation.model.ConversationStatus;
@@ -95,14 +96,5 @@ public class ConversationsController {
             @AuthenticationPrincipal AuthUser principal) {
         return new ConversationEnvelope(
                 conversations.assignByPatch(id, request.assignedUserId(), principal.user()).conversation());
-    }
-
-    /**
-     * Single-result envelope {@code {data: <conversation>}} (frozen
-     * contract convention).
-     *
-     * @param data the conversation
-     */
-    public record ConversationEnvelope(ConversationDetail data) {
     }
 }

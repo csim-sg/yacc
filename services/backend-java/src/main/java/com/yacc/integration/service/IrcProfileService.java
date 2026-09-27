@@ -6,19 +6,20 @@ import java.net.Socket;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yacc.audit.model.AuditRecord;
 import com.yacc.audit.service.AuditPersistence;
 import com.yacc.common.controller.IntegrationApiException;
 import com.yacc.common.controller.NotFoundException;
-import com.yacc.common.model.IntegrationErrorResponse;
 import com.yacc.integration.model.IntegrationConnectionProfile;
+import com.yacc.integration.model.Profile;
+import com.yacc.integration.model.ProfileResponse;
+import com.yacc.integration.model.ProfileTestResult;
+import com.yacc.integration.model.ProfileWrite;
 import com.yacc.integration.repository.IntegrationConnectionProfileRepository;
 
 /**
@@ -168,7 +169,7 @@ public class IrcProfileService {
 
     /** Tests the stored credentials without switching the active profile. */
     @Transactional
-    public TestResult test(String tenantId, int id) {
+    public ProfileTestResult test(String tenantId, int id) {
         IntegrationConnectionProfile profile = fetch(tenantId, id);
         Profile config = parseConfig(profile.getConfig());
         long startedAt = System.nanoTime();
@@ -187,7 +188,7 @@ public class IrcProfileService {
         profile.setLastTestedAt(LocalDateTime.now());
         profile.setLastTestPassed(passed);
         profiles.save(profile);
-        return new TestResult(passed, reason, elapsedMs);
+        return new ProfileTestResult(passed, reason, elapsedMs);
     }
 
     private IntegrationConnectionProfile fetch(String tenantId, int id) {
@@ -245,32 +246,5 @@ public class IrcProfileService {
         } catch (IOException ignored) {
             return new Profile(null, null, null, List.of());
         }
-    }
-
-    /** Non-secret profile config (POC {@code IrcProfileConfig} parity). */
-    public record Profile(String server, Integer port, String username, List<String> channels) {
-    }
-
-    /**
-     * Create/update body (frozen contract component {@code IrcProfileWrite};
-     * canonicalized flat shape, password as documented additional property).
-     */
-    public record ProfileWrite(String name, String server, Integer port, String nick,
-            List<String> channels, String password, Boolean enabled) {
-    }
-
-    /**
-     * Profile response (never carries secrets; POC {@code IrcProfileResponse}
-     * parity).
-     */
-    public record ProfileResponse(Integer id, String name, boolean isEnabled, boolean isActive,
-            Profile config, boolean hasPassword, LocalDateTime lastTestedAt,
-            Boolean lastTestPassed, LocalDateTime createdAt, LocalDateTime updatedAt) {
-    }
-
-    /**
-     * Stored-credential test outcome (POC {@code TestConnectionResult} parity).
-     */
-    public record TestResult(boolean passed, String reason, long durationMs) {
     }
 }

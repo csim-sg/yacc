@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
 import com.yacc.common.model.BaseListResponse;
+import com.yacc.notification.model.MarkAllReadEnvelope;
 import com.yacc.notification.model.MarkNotificationReadRequest;
+import com.yacc.notification.model.NotificationEnvelope;
 import com.yacc.notification.model.NotificationResponse;
 import com.yacc.notification.service.NotificationService;
 
@@ -77,21 +79,5 @@ public class NotificationsController {
         ObjectNode data = mapper.createObjectNode();
         data.put("markedCount", marked);
         return new MarkAllReadEnvelope(data);
-    }
-
-    /**
-     * Single-notification envelope {@code {data: Notification}}.
-     *
-     * @param data the notification
-     */
-    public record NotificationEnvelope(NotificationResponse data) {
-    }
-
-    /**
-     * Bulk-mark envelope {@code {data: {markedCount}}} (POC parity).
-     *
-     * @param data bulk outcome
-     */
-    public record MarkAllReadEnvelope(ObjectNode data) {
     }
 }

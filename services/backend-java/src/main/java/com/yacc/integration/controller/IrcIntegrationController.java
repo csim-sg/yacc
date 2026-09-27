@@ -1,6 +1,5 @@
 package com.yacc.integration.controller;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,10 +15,15 @@ import com.yacc.audit.model.AuditRecord;
 import com.yacc.audit.service.AuditPersistence;
 import com.yacc.common.controller.IntegrationApiException;
 import com.yacc.common.model.IntegrationErrorResponse;
+import com.yacc.integration.model.IrcConfigEnvelope;
 import com.yacc.integration.model.IrcConfigRequest;
 import com.yacc.integration.model.IrcConfigResponse;
 import com.yacc.integration.model.IrcConnectionStatus;
+import com.yacc.integration.model.IrcStatusEnvelope;
+import com.yacc.integration.model.IrcTestEnvelope;
 import com.yacc.integration.model.IrcTestRequest;
+import com.yacc.integration.model.IrcTestResult;
+import com.yacc.integration.model.SanitizedResult;
 import com.yacc.integration.service.IrcConfigService;
 
 import jakarta.validation.Valid;
@@ -83,7 +87,7 @@ public class IrcIntegrationController {
     public IrcTestEnvelope test(
             @Valid @RequestBody(required = false) IrcTestRequest request,
             @AuthenticationPrincipal AuthUser principal) {
-        IrcConfigService.TestResult result = irc.test(request);
+        IrcTestResult result = irc.test(request);
         ObjectNode metadata = mapper.createObjectNode();
         metadata.put("source", result.source());
         metadata.put("success", result.success());
@@ -102,38 +106,5 @@ public class IrcIntegrationController {
         ObjectNode node = mapper.createObjectNode();
         node.put(key, value);
         return node;
-    }
-
-    /**
-     * Saved-config envelope {@code {data: {...}}}.
-     *
-     * @param data sanitized saved config
-     */
-    public record IrcConfigEnvelope(IrcConfigResponse data) {
-    }
-
-    /**
-     * Status envelope {@code {data: IrcConnectionStatus}}.
-     *
-     * @param data connection status
-     */
-    public record IrcStatusEnvelope(IrcConnectionStatus data) {
-    }
-
-    /**
-     * Test envelope {@code {data: {success,message}}} (sanitized).
-     *
-     * @param data sanitized test result
-     */
-    public record IrcTestEnvelope(SanitizedResult data) {
-    }
-
-    /**
-     * Sanitized test result.
-     *
-     * @param success connection established
-     * @param message human-readable outcome
-     */
-    public record SanitizedResult(boolean success, String message) {
     }
 }

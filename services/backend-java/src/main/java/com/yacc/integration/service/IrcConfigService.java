@@ -16,11 +16,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yacc.common.controller.IntegrationApiException;
 import com.yacc.common.model.IntegrationErrorResponse;
-import com.yacc.integration.EncryptionProperties;
 import com.yacc.integration.model.IrcConfigResponse;
 import com.yacc.integration.model.IrcConfigRequest;
 import com.yacc.integration.model.IrcTestRequest;
+import com.yacc.integration.model.IrcTestResult;
 import com.yacc.integration.model.IntegrationConfig;
+import com.yacc.integration.model.StoredConfig;
 import com.yacc.integration.repository.IntegrationConfigRepository;
 
 /**
@@ -106,7 +107,7 @@ public class IrcConfigService {
      * config (409 when none).
      */
     @Transactional(readOnly = true)
-    public TestResult test(IrcTestRequest request) {
+    public IrcTestResult test(IrcTestRequest request) {
         StoredConfig config;
         if (request != null) {
             config = new StoredConfig(request.server(), request.port(), request.username(),
@@ -121,7 +122,7 @@ public class IrcConfigService {
             socket.connect(new InetSocketAddress(config.server(), config.port()),
                     (int) TEST_TIMEOUT.toMillis());
             long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
-            return new TestResult(true, "Connected to " + config.server() + ":" + config.port()
+            return new IrcTestResult(true, "Connected to " + config.server() + ":" + config.port()
                     + " in " + elapsedMs + "ms", config.source());
         } catch (IOException failure) {
             throw new IntegrationApiException(IntegrationErrorResponse.INTERNAL_ERROR, 500,
@@ -152,28 +153,5 @@ public class IrcConfigService {
         } catch (IOException ignored) {
             return List.of();
         }
-    }
-
-    /** Stored configuration (credential decrypted for the connector only).
-     *
-     * @param server IRC host
-     * @param port IRC port
-     * @param username IRC nick/user
-     * @param password decrypted password or null
-     * @param channels configured channels
-     * @param source db | env | body
-     */
-    public record StoredConfig(String server, int port, String username, String password,
-            List<String> channels, String source) {
-    }
-
-    /**
-     * Test outcome.
-     *
-     * @param success connection established
-     * @param message sanitized result message
-     * @param source body | db | env
-     */
-    public record TestResult(boolean success, String message, String source) {
     }
 }

@@ -13,6 +13,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.yacc.auth.service.EmailAlreadyRegisteredException;
 import com.yacc.auth.service.InvalidTokenException;
+import com.yacc.common.model.ErrorResponse;
 import com.yacc.common.model.IntegrationErrorResponse;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -166,13 +167,5 @@ public class ApiExceptionHandler {
 
     private static ResponseEntity<ErrorResponse> respond(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(new ErrorResponse(message));
-    }
-
-    /**
-     * Frozen error wire shape: {@code {error: string}}.
-     *
-     * @param error human-readable error message
-     */
-    public record ErrorResponse(String error) {
     }
 }

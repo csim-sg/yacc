@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
+import com.yacc.conversation.model.BulkActionEnvelope;
 import com.yacc.conversation.model.BulkActionRequest;
 import com.yacc.conversation.model.BulkActionResponseData;
 import com.yacc.conversation.service.BulkActionService;
@@ -35,13 +36,6 @@ public class BulkActionController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public BulkActionEnvelope bulkAction(@Valid @RequestBody BulkActionRequest request,
             @AuthenticationPrincipal AuthUser principal) {
-        return new BulkActionEnvelope(bulkActions.apply(request, principal.getId()));    }
-
-    /**
-     * Bulk-result envelope {@code {data: BulkActionResponseData}}.
-     *
-     * @param data best-effort outcome
-     */
-    public record BulkActionEnvelope(BulkActionResponseData data) {
+        return new BulkActionEnvelope(bulkActions.apply(request, principal.getId()));
     }
 }

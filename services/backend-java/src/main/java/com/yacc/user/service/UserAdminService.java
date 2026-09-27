@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.yacc.auth.model.User;
+import com.yacc.auth.model.UserPage;
 import com.yacc.auth.model.UserRole;
 import com.yacc.auth.model.UserStatus;
 import com.yacc.auth.service.UserDirectoryService;
@@ -48,7 +49,7 @@ public class UserAdminService {
      * Lists live users, filtered and paginated (POC parity: page ≥ 1, limit
      * restricted to 20/50/100), and audits {@code users.list}.
      */
-    public UserDirectoryService.UserPage list(int page, int limit, UserRole role,
+    public UserPage list(int page, int limit, UserRole role,
             UserStatus status, String search, User actor) {
         if (page < 1) {
             throw new BadRequestException("Page must be >= 1");

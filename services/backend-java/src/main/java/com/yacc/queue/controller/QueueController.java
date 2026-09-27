@@ -1,7 +1,5 @@
 package com.yacc.queue.controller;
 
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,11 +13,19 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
+import com.yacc.queue.model.BulkRetryRequest;
+import com.yacc.queue.model.ClearResponse;
+import com.yacc.queue.model.JobDetails;
+import com.yacc.queue.model.JobResponse;
+import com.yacc.queue.model.BulkRetryResult;
+import com.yacc.queue.model.DlqStatsPayload;
+import com.yacc.queue.model.QueueDlqPage;
+import com.yacc.queue.model.QueueStatistics;
+import com.yacc.queue.model.ReasonPage;
+import com.yacc.queue.model.RetryResult;
 import com.yacc.queue.service.QueueService;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.Size;
 
 /**
  * Queue wire surface (ledger rows REST-QUEUE-001..008; frozen contract ops
@@ -41,13 +47,13 @@ public class QueueController {
 
     @GetMapping("/stats")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
-    public QueueService.QueueStatistics stats() {
+    public QueueStatistics stats() {
         return queue.stats();
     }
 
     @GetMapping("/dlq")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
-    public QueueService.QueueDlqPage dlqEntries(
+    public QueueDlqPage dlqEntries(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
         return queue.dlqEntries(page, pageSize);
@@ -55,21 +61,21 @@ public class QueueController {
 
     @PostMapping("/retry/{messageId}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
-    public QueueService.RetryResult retry(@PathVariable("messageId") UUID messageId,
+    public RetryResult retry(@PathVariable("messageId") UUID messageId,
             @AuthenticationPrincipal AuthUser principal) {
         return queue.retry(messageId, UUID.fromString(principal.getId()));
     }
 
     @PostMapping("/dlq/retry")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
-    public QueueService.BulkRetryResult bulkRetry(@Valid @RequestBody BulkRetryRequest request,
+    public BulkRetryResult bulkRetry(@Valid @RequestBody BulkRetryRequest request,
             @AuthenticationPrincipal AuthUser principal) {
         return queue.bulkRetry(request.messageIds(), UUID.fromString(principal.getId()));
     }
 
     @GetMapping("/dlq/stats")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
-    public QueueService.DlqStatsPayload dlqStats() {
+    public DlqStatsPayload dlqStats() {
         return queue.dlqStats();
     }
 
@@ -94,37 +100,7 @@ public class QueueController {
 
     @GetMapping("/dlq/by-reason/{reason}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
-    public QueueService.ReasonPage byReason(@PathVariable("reason") String reason) {
+    public ReasonPage byReason(@PathVariable("reason") String reason) {
         return queue.byReason(reason);
-    }
-
-    /**
-     * Job lookup envelope (POC parity: success flag + job + 404 body twin).
-     *
-     * @param success always true on the 200 path
-     * @param job job details
-     */
-    public record JobResponse(boolean success, QueueService.JobDetails job) {
-    }
-
-    /**
-     * Clear outcome (POC parity shape).
-     *
-     * @param success always true on the 200 path
-     * @param messageId cleared message
-     * @param message confirmation text
-     * @param timestamp payload timestamp
-     */
-    public record ClearResponse(boolean success, String messageId, String message,
-            java.time.LocalDateTime timestamp) {
-    }
-
-    /**
-     * Bulk-retry body (frozen contract op {@code bulkRetryDlq}).
-     *
-     * @param messageIds target messages (POC cap 100)
-     */
-    public record BulkRetryRequest(
-            @NotEmpty @Size(max = 100) List<UUID> messageIds) {
     }
 }

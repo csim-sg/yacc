@@ -15,6 +15,7 @@ import com.yacc.audit.service.AuditPersistence;
 import com.yacc.common.controller.NotFoundException;
 import com.yacc.conversation.service.ConversationAccessService;
 import com.yacc.note.model.Note;
+import com.yacc.note.model.NotePage;
 import com.yacc.note.model.NoteResponse;
 import com.yacc.note.repository.NoteRepository;
 import com.yacc.notification.service.NotificationService;
@@ -117,15 +118,5 @@ public class NoteService {
         if (!conversations.exists(conversationId)) {
             throw new NotFoundException("Conversation not found");
         }
-    }
-
-    /** One note page.
-     *
-     * @param items page items
-     * @param total all notes of the conversation
-     * @param page 1-indexed page
-     * @param limit page size
-     */
-    public record NotePage(List<NoteResponse> items, long total, int page, int limit) {
     }
 }

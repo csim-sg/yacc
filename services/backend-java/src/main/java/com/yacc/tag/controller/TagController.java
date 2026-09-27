@@ -1,8 +1,5 @@
 package com.yacc.tag.controller;
 
-import java.util.List;
-import java.util.UUID;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,7 +11,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
 import com.yacc.tag.model.CreateTagRequest;
+import com.yacc.tag.model.TagEnvelope;
 import com.yacc.tag.model.TagResponse;
+import com.yacc.tag.model.TagsEnvelope;
 import com.yacc.tag.service.TagService;
 
 import jakarta.validation.Valid;
@@ -46,13 +45,5 @@ public class TagController {
     public TagEnvelope create(@Valid @RequestBody CreateTagRequest request,
             @AuthenticationPrincipal AuthUser principal) {
         return new TagEnvelope(TagResponse.from(tags.create(request, principal.getId())));
-    }
-
-    /** Tag-list envelope {@code {data: [Tag]}}. */
-    public record TagsEnvelope(List<TagResponse> data) {
-    }
-
-    /** Single-tag envelope {@code {data: Tag}}. */
-    public record TagEnvelope(TagResponse data) {
     }
 }

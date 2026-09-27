@@ -16,6 +16,7 @@ import com.yacc.conversation.service.ConversationAccessService;
 import com.yacc.dlq.service.DlqService;
 import com.yacc.message.model.Message;
 import com.yacc.message.model.MessageDirection;
+import com.yacc.message.model.MessagePage;
 import com.yacc.message.model.MessageStatus;
 import com.yacc.message.model.MessageResponse;
 import com.yacc.message.repository.MessageRepository;
@@ -110,15 +111,5 @@ public class MessageService {
         if (!conversations.exists(conversationId)) {
             throw new NotFoundException("Conversation not found");
         }
-    }
-
-    /** One message page (frozen custom shape).
-     *
-     * @param messages page items
-     * @param total all messages of the conversation
-     * @param page 1-indexed page
-     * @param limit page size
-     */
-    public record MessagePage(java.util.List<Message> messages, long total, int page, int limit) {
     }
 }
