@@ -1,6 +1,12 @@
 spring:
   application:
     name: yacc-backend
+  autoconfigure:
+    exclude:
+      # spring-security-core is on the classpath (MIG-011 audit consumes Spring
+      # Security events) but the identity subsystem + security filter chain are
+      # MIG-030; until then the auto-configured in-memory user must not exist.
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
 
 server:
   port: 8080
@@ -10,11 +16,14 @@ management:
     web:
       # Health probes keep the frozen wire paths /health, /health/live,
       # /health/ready (ledger LEDGER-MIG-003 reconciliation #3; ADR-029).
-      # Only `health` is exposed; observability endpoints (/actuator/prometheus
-      # etc.) are re-enabled by MIG-011, which owns their final mapping.
+      # MIG-011 re-enabled the Prometheus endpoint: it is remapped under
+      # /actuator/prometheus (ADR-029 frozen scrape path) while base-path
+      # stays / so the probe wire paths are untouched.
       base-path: /
       exposure:
-        include: health
+        include: health,prometheus
+      path-mapping:
+        prometheus: actuator/prometheus
   endpoint:
     health:
       # probes.enabled provides the livenessState/readinessState contributors

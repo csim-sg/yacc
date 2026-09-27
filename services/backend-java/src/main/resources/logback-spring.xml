@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logging configuration (SPEC-002 TR-07; ADR-029).
+
+  Production: structured JSON on stdout with field-shape parity to the POC's
+  pino logger (packages/backend/src/infrastructure/logger.ts):
+    {"level":"info","time":"2026-09-27T12:34:56.789Z","msg":"...","correlationId":"..."}
+  - level  : lowercase label (pino formatters.level)
+  - time   : ISO-8601 UTC (pino stdTimeFunctions.isoTime)
+  - msg    : message field (pino's "msg")
+  - MDC entries (correlationId) are included at the top level (pino child bindings)
+  Non-production: human-readable console (parity with the POC's pino-pretty dev mode).
+-->
+<configuration>
+    <springProfile name="production">
+        <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <!-- Structured JSON with pino field shape; encoder contract tested in
+                 com.yacc.logging.PinoFieldShapeParityTest. -->
+            <encoder class="com.yacc.common.logging.PinoJsonEncoder"/>
+        </appender>
+        <root level="INFO">
+            <appender-ref ref="JSON_CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="!production">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+</configuration>
