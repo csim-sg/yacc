@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import com.yacc.auth.model.User;
 import com.yacc.auth.model.UserRole;
 import com.yacc.auth.model.UserStatus;
 import com.yacc.auth.repository.UserRepository;
+import com.yacc.auth.service.AuthEmailSender;
 import com.yacc.common.testsupport.AbstractPostgresIntegrationTest;
 
 /**
@@ -31,7 +33,8 @@ import com.yacc.common.testsupport.AbstractPostgresIntegrationTest;
  *
  * <p>Rollback isolation: the shared Testcontainers database persists the
  * idempotent bootstrap identity; every other row this test creates is rolled
- * back per test method.</p>
+ * back per test method. The MIG-031 auth-email transport is mocked — sign-up
+ * issues the verification challenge, but no provider is ever contacted.</p>
  */
 @AutoConfigureMockMvc
 @Transactional
@@ -40,6 +43,9 @@ class AuthFlowIntegrationTest extends AbstractPostgresIntegrationTest {
     private static final String TEST_PASSWORD = "test-password-123";
     private static final String BOOTSTRAP_EMAIL = "bootstrap@fixture.yacc.local";
     private static final String BOOTSTRAP_INITIAL_CREDENTIAL = "bootstrap-initial-credential";
+
+    @MockitoBean
+    private AuthEmailSender authEmailSender;
 
     private final MockMvc mockMvc;
 

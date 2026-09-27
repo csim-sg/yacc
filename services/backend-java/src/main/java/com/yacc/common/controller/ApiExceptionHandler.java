@@ -12,6 +12,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.yacc.auth.service.EmailAlreadyRegisteredException;
+import com.yacc.auth.service.InvalidTokenException;
 
 /**
  * Centralized REST error contract (ARCH-004 §5): every error response uses
@@ -35,6 +36,15 @@ public class ApiExceptionHandler {
     /** Duplicate self-registration email — generic, anti-enumeration. */
     @ExceptionHandler(EmailAlreadyRegisteredException.class)
     public ResponseEntity<ErrorResponse> duplicateEmail(EmailAlreadyRegisteredException exception) {
+        return respond(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
+    /**
+     * Unknown/expired/consumed auth token (MIG-031 reset + verification) —
+     * one generic message for every reason, anti-enumeration.
+     */
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<ErrorResponse> invalidToken(InvalidTokenException exception) {
         return respond(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 

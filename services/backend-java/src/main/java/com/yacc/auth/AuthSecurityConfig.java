@@ -26,8 +26,9 @@ import com.yacc.auth.service.YaccUserDetailsService;
  *
  * <ul>
  *   <li>public wire surface: health probes, Prometheus scrape, sign-in,
- *       self-registration, refresh-token — everything else requires a valid
- *       access token (deny by default);</li>
+ *       self-registration, refresh-token, plus the MIG-031 token flows
+ *       (forgot-password, reset-password, verify-email) — everything else
+ *       requires a valid access token (deny by default);</li>
  *   <li>status enforcement per request via
  *       {@link BearerTokenAuthenticationConverter} — inactive/suspended
  *       identities are denied (401) on every protected REST path, and the
@@ -55,7 +56,8 @@ public class AuthSecurityConfig {
             JwtTokenService tokenService,
             RestAuthenticationEntryPoint authenticationEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler,
-            ForcedPasswordChangeFilter forcedPasswordChangeFilter) throws Exception {
+            ForcedPasswordChangeFilter forcedPasswordChangeFilter,
+            PasswordResetRateLimitFilter passwordResetRateLimitFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session
@@ -69,7 +71,10 @@ public class AuthSecurityConfig {
                                 "/error",
                                 "/api/auth/sign-in/email",
                                 "/api/auth/sign-up/email",
-                                "/api/auth/refresh-token")
+                                "/api/auth/refresh-token",
+                                "/api/auth/forgot-password",
+                                "/api/auth/reset-password",
+                                "/api/auth/verify-email")
                         .permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
@@ -78,6 +83,8 @@ public class AuthSecurityConfig {
                         .jwt(jwt -> jwt
                                 .decoder(tokenService.jwtDecoder())
                                 .jwtAuthenticationConverter(bearerConverter)))
+                .addFilterAfter(passwordResetRateLimitFilter,
+                        BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(forcedPasswordChangeFilter,
                         BearerTokenAuthenticationFilter.class);
         return http.build();
@@ -110,6 +117,16 @@ public class AuthSecurityConfig {
     public ForcedPasswordChangeFilter forcedPasswordChangeFilter(
             ObjectMapper objectMapper) {
         return new ForcedPasswordChangeFilter(objectMapper);
+    }
+
+    /**
+     * Password-reset rate limiter (MIG-031), built with the shared Spring
+     * {@code ObjectMapper} (constructor injection only — guardrails 004 §2).
+     */
+    @Bean
+    public PasswordResetRateLimitFilter passwordResetRateLimitFilter(
+            ObjectMapper objectMapper) {
+        return new PasswordResetRateLimitFilter(objectMapper);
     }
 
     /**
