@@ -27,13 +27,14 @@ import com.yacc.audit.model.AuditRecord;
 @Component
 public class SecurityAuditEventListener {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     private final AuditPersistence persistence;
 
-    /** Constructor injection only (guardrails 004 §2). */
-    public SecurityAuditEventListener(AuditPersistence persistence) {
+    private final ObjectMapper mapper;
+
+    /** Constructor injection only (guardrails 004 §2; ADR-024; ADR-030). */
+    public SecurityAuditEventListener(AuditPersistence persistence, ObjectMapper mapper) {
         this.persistence = persistence;
+        this.mapper = mapper;
     }
 
     /**
@@ -44,7 +45,7 @@ public class SecurityAuditEventListener {
      */
     @EventListener(AbstractAuthenticationEvent.class)
     public void onAuthenticationEvent(AbstractAuthenticationEvent event) {
-        ObjectNode metadata = MAPPER.createObjectNode();
+        ObjectNode metadata = mapper.createObjectNode();
         if (event instanceof AbstractAuthenticationFailureEvent failure) {
             metadata.put("exception", failure.getException().getClass().getSimpleName());
             metadata.put("message", failure.getException().getMessage());

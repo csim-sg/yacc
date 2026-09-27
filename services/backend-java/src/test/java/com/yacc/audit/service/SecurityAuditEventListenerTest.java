@@ -13,6 +13,7 @@ import org.springframework.security.authentication.event.AuthenticationSuccessEv
 import org.springframework.security.core.AuthenticationException;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yacc.audit.model.AuditRecord;
 
 /**
@@ -22,7 +23,8 @@ import com.yacc.audit.model.AuditRecord;
 class SecurityAuditEventListenerTest {
 
     private final CapturingAuditPersistence persistence = new CapturingAuditPersistence();
-    private final SecurityAuditEventListener listener = new SecurityAuditEventListener(persistence);
+    private final SecurityAuditEventListener listener =
+            new SecurityAuditEventListener(persistence, new ObjectMapper());
 
     @Test
     void persistsSuccessEventAsAuditRecord() {
