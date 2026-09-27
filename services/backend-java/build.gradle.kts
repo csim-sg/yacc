@@ -86,6 +86,10 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.springframework.security:spring-security-test")
+    // MIG-040 route-coverage conformance check: parses the frozen
+    // .docs/migration/openapi.yaml (copied to the test classpath) with
+    // Jackson's YAML dataformat (ADR-023 contract-first verification).
+    testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
