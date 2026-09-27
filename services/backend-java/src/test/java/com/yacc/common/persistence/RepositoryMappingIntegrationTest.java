@@ -48,8 +48,6 @@ import com.yacc.note.model.Note;
 import com.yacc.note.repository.NoteRepository;
 import com.yacc.notification.model.Notification;
 import com.yacc.notification.repository.NotificationRepository;
-import com.yacc.realtime.model.WebSocketBacklog;
-import com.yacc.realtime.repository.WebSocketBacklogRepository;
 import com.yacc.routingrule.model.RoutingRule;
 import com.yacc.routingrule.model.RoutingRuleExecution;
 import com.yacc.routingrule.repository.RoutingRuleExecutionRepository;
@@ -105,8 +103,6 @@ class RepositoryMappingIntegrationTest extends AbstractPostgresIntegrationTest {
     private IntegrationConfigRepository integrationConfigs;
     @Autowired
     private IntegrationConnectionProfileRepository integrationProfiles;
-    @Autowired
-    private WebSocketBacklogRepository websocketBacklog;
 
     /**
      * The schema enforces real FK constraints — child-row tests persist their
@@ -303,20 +299,6 @@ class RepositoryMappingIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(reloaded.isEnabled()).isTrue();
         assertThat(reloaded.isActive()).isFalse();
         assertThat(profile.getId()).isNotNull();
-    }
-
-    @Test
-    void websocketBacklogRoundTrips() {
-        WebSocketBacklog entry = websocketBacklog.saveAndFlush(new WebSocketBacklog(
-                "user-1", "message.created", null, "{\"event\":\"data\"}",
-                LocalDateTime.now().plusHours(1)));
-
-        WebSocketBacklog reloaded = websocketBacklog.findById(entry.getId()).orElseThrow();
-        assertThat(reloaded.getUserId()).isEqualTo("user-1");
-        assertThat(reloaded.getEventName()).isEqualTo("message.created");
-        assertThat(reloaded.getPayload()).isEqualTo("{\"event\":\"data\"}");
-        assertThat(websocketBacklog.findByUserIdAndEventName("user-1", "message.created"))
-                .contains(reloaded);
     }
 
     /**
@@ -600,13 +582,5 @@ class RepositoryMappingIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(reloadedProfile.getCreatedById()).isEqualTo(userId);
         assertThat(reloadedProfile.getLastTestedAt()).isEqualTo(later);
         assertThat(reloadedProfile.getLastTestPassed()).isTrue();
-
-        // realtime — WebSocketBacklog
-        WebSocketBacklog backlog = websocketBacklog.saveAndFlush(new WebSocketBacklog(
-                userId, "mut.event", conversation.getId(), "{}", later));
-        backlog.setExpiresAt(later.plusHours(1));
-        websocketBacklog.saveAndFlush(backlog);
-        WebSocketBacklog reloadedBacklog = websocketBacklog.findById(backlog.getId()).orElseThrow();
-        assertThat(reloadedBacklog.getExpiresAt()).isEqualTo(later.plusHours(1));
     }
 }

@@ -3,7 +3,6 @@ package com.yacc.common.seed;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.stereotype.Component;
 import com.yacc.auth.model.Account;
 import com.yacc.auth.model.PasswordResetToken;
 import com.yacc.auth.model.Session;
@@ -70,13 +69,13 @@ import com.yacc.tag.repository.TagRepository;
  *   <li><strong>Idempotent.</strong> Every insert is insert-if-absent (fixed
  *       ids / natural keys), so re-running against a seeded database is a
  *       no-op and yields the same logical state.</li>
- *   <li><strong>Not wired to startup.</strong> The seed runs only when
- *       explicitly invoked (tests, reset/bootstrap tooling, MIG-071's full
- *       reset); application startup never seeds fixture rows. It is a
- *       cross-cutting {@code common} data-layer component (ADR-030 §4).</li>
+ *   <li><strong>Not wired to startup.</strong> The seed is an explicitly
+ *       invoked tool (tests, reset/bootstrap tooling, MIG-071's full reset) —
+ *       a plain class, not a startup bean — so application startup never
+ *       seeds fixture rows and DB-free Spring contexts are unaffected. It is
+ *       a cross-cutting {@code common} data-layer component (ADR-030 §4).</li>
  * </ul>
  */
-@Component
 public class DeterministicSeed {
 
     /** Fixture plaintext sealed into the IRC profile (fixture-only material). */
