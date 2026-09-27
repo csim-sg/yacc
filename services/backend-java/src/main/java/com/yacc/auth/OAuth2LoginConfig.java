@@ -128,6 +128,11 @@ public class OAuth2LoginConfig {
         String prefix = "yacc.auth.oauth2.registrations." + registrationId;
         requireNonNull(prefix + ".client-id", registration.clientId());
         requireNonNull(prefix + ".client-secret", registration.clientSecret());
+        // Fail-closed on the issuer (Review Loop 1, finding 1): Spring Security
+        // applies its OIDC issuer validator only when an issuer is configured,
+        // so a registration without issuer-uri would accept a correctly signed
+        // token from the configured JWKS carrying a foreign `iss`.
+        requireNonNull(prefix + ".issuer-uri", registration.issuerUri());
         requireNonNull(prefix + ".authorization-uri", registration.authorizationUri());
         requireNonNull(prefix + ".token-uri", registration.tokenUri());
         requireNonNull(prefix + ".jwk-set-uri", registration.jwkSetUri());

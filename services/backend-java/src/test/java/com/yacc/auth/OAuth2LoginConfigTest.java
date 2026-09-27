@@ -46,6 +46,21 @@ class OAuth2LoginConfigTest {
     }
 
     @Test
+    void enablingWithAMissingIssuerUriFailsStartupNamingTheProperty() {
+        // Regression (Review Loop 1, finding 1): Spring Security validates the
+        // ID-token issuer only when an issuer is configured — a registration
+        // without issuer-uri would fail startup-closed, never boot with the
+        // issuer check silently absent.
+        assertThatThrownBy(() -> config.clientRegistrationRepository(
+                properties(new AuthProperties.OAuth2(true, Map.of("fixture-idp",
+                        new AuthProperties.OAuth2.Registration("client-id", "secret", null,
+                                "https://idp.fixture/authorize", "https://idp.fixture/token",
+                                "https://idp.fixture/jwks", null, null, null))))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("yacc.auth.oauth2.registrations.fixture-idp.issuer-uri");
+    }
+
+    @Test
     void aCompleteRegistrationBuildsWithTheKissDefaults() {
         ClientRegistrationRepository repository = config.clientRegistrationRepository(
                 properties(new AuthProperties.OAuth2(true, Map.of("fixture-idp",

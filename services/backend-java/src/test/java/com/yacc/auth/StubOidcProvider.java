@@ -54,14 +54,19 @@ final class StubOidcProvider {
      * One minted external identity, bound to a single-use code. The nonce is
      * the value received on the authorization request — Spring Security's
      * client sends its hash there and expects the ID token's nonce claim to
-     * carry exactly that value (OIDC core §3.1.2.1 nonce binding).
+     * carry exactly that value (OIDC core §3.1.2.1 nonce binding). The
+     * override fields back the negative tests: an attacker-chosen issuer or
+     * audience, and/or a signature from a key never published in the JWKS.
      */
-    record Identity(String subject, String email, boolean emailVerified, String nonce) {
+    record Identity(String subject, String email, boolean emailVerified, String nonce,
+            String issuerOverride, String audienceOverride, boolean signWithHiddenKey) {
     }
 
     private final HttpServer server;
 
     private final RSAKey signingKey;
+
+    private final RSAKey hiddenKey;
 
     private final Map<String, Identity> minted = new ConcurrentHashMap<>();
 
@@ -70,9 +75,14 @@ final class StubOidcProvider {
             KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
             generator.initialize(2048);
             KeyPair pair = generator.generateKeyPair();
+            KeyPair other = generator.generateKeyPair();
             this.signingKey = new RSAKey.Builder((RSAPublicKey) pair.getPublic())
                     .privateKey((RSAPrivateKey) pair.getPrivate())
                     .keyID("stub-oidc-key")
+                    .build();
+            this.hiddenKey = new RSAKey.Builder((RSAPublicKey) other.getPublic())
+                    .privateKey((RSAPrivateKey) other.getPrivate())
+                    .keyID("stub-oidc-hidden-key")
                     .build();
             this.server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
             this.server.createContext("/token", this::handleToken);
@@ -93,8 +103,20 @@ final class StubOidcProvider {
      * authorization-request nonce (mirrors a real IdP authorization step).
      */
     String mint(String subject, String email, boolean emailVerified, String nonce) {
+        return mintWith(subject, email, emailVerified, nonce, null, null, false);
+    }
+
+    /**
+     * The negative-test seam: mints a code whose ID token carries
+     * attacker-controlled issuer/audience values and/or a signature produced
+     * with a key that is never published in the JWKS — exactly the tampered
+     * tokens the relying party must deny.
+     */
+    String mintWith(String subject, String email, boolean emailVerified, String nonce,
+            String issuerOverride, String audienceOverride, boolean signWithHiddenKey) {
         String code = "code-" + UUID.randomUUID();
-        minted.put(code, new Identity(subject, email, emailVerified, nonce));
+        minted.put(code, new Identity(subject, email, emailVerified, nonce, issuerOverride,
+                audienceOverride, signWithHiddenKey));
         return code;
     }
 
@@ -133,10 +155,12 @@ final class StubOidcProvider {
 
     private String idToken(Identity identity) {
         try {
+            RSAKey signerKey = identity.signWithHiddenKey() ? hiddenKey : signingKey;
             JWTClaimsSet claims = new JWTClaimsSet.Builder()
-                    .issuer(issuer())
+                    .issuer(identity.issuerOverride() == null ? issuer() : identity.issuerOverride())
                     .subject(identity.subject())
-                    .audience(List.of(CLIENT_ID))
+                    .audience(identity.audienceOverride() == null ? List.of(CLIENT_ID)
+                            : List.of(identity.audienceOverride()))
                     .issueTime(Date.from(Instant.now()))
                     .expirationTime(Date.from(Instant.now().plusSeconds(300)))
                     .claim("nonce", identity.nonce())
@@ -144,9 +168,9 @@ final class StubOidcProvider {
                     .claim("email_verified", identity.emailVerified())
                     .build();
             SignedJWT jwt = new SignedJWT(
-                    new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(signingKey.getKeyID()).build(),
+                    new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(signerKey.getKeyID()).build(),
                     claims);
-            jwt.sign(new RSASSASigner(signingKey.toPrivateKey()));
+            jwt.sign(new RSASSASigner(signerKey.toPrivateKey()));
             return jwt.serialize();
         } catch (Exception ex) {
             throw new IllegalStateException("stub ID-token minting failed", ex);

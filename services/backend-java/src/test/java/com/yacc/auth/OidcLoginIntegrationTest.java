@@ -107,6 +107,13 @@ class OidcLoginIntegrationTest extends AbstractPostgresIntegrationTest {
     /** The authorization step: entry redirect, then a code minted for its nonce. */
     private MintedSession beginLogin(String subject, String email, boolean emailVerified)
             throws Exception {
+        MintedAuthorization authorization = beginAuthorization();
+        String code = STUB_IDP.mint(subject, email, emailVerified, authorization.nonce());
+        return new MintedSession(authorization.session(), authorization.state(), code);
+    }
+
+    /** The authorization step only: entry redirect capturing session, state, nonce. */
+    private MintedAuthorization beginAuthorization() throws Exception {
         MvcResult entry = mockMvc
                 .perform(get("/api/auth/oidc/authorization/{id}", REGISTRATION_ID))
                 .andExpect(status().is3xxRedirection())
@@ -115,8 +122,10 @@ class OidcLoginIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(location).startsWith(STUB_IDP.issuer() + "/authorize?");
         MockHttpSession session = (MockHttpSession) entry.getRequest().getSession(false);
         Map<String, String> query = queryParams(location);
-        String code = STUB_IDP.mint(subject, email, emailVerified, query.get("nonce"));
-        return new MintedSession(session, query.get("state"), code);
+        return new MintedAuthorization(session, query.get("state"), query.get("nonce"));
+    }
+
+    private record MintedAuthorization(MockHttpSession session, String state, String nonce) {
     }
 
     private record MintedSession(MockHttpSession session, String state, String code) {
@@ -141,6 +150,18 @@ class OidcLoginIntegrationTest extends AbstractPostgresIntegrationTest {
                         .param("state", login.state()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("Authentication required"));
+    }
+
+    /**
+     * Negative-dance closure (Review Loop 1, finding 2): the tampered dance is
+     * denied, and nothing moved — no {@code account} link row, no provisioned
+     * identity (bootstrap user only), no success audit event.
+     */
+    private void assertNoProvisioningLinkingOrSuccessAudit(String subject,
+            org.springframework.test.context.event.ApplicationEvents events) {
+        assertThat(accounts.findByProviderIdAndAccountId(REGISTRATION_ID, subject)).isEmpty();
+        assertThat(users.count()).isOne();
+        assertThat(events.stream(InteractiveAuthenticationSuccessEvent.class).count()).isZero();
     }
 
     private static Map<String, String> queryParams(String location) {
@@ -291,6 +312,83 @@ class OidcLoginIntegrationTest extends AbstractPostgresIntegrationTest {
         // Fail-closed before linking: the non-active account gains no link.
         assertThat(accounts.findByProviderIdAndAccountId(REGISTRATION_ID, "sub-suspended"))
                 .isEmpty();
+    }
+
+    @Test
+    void oidcLoginDeniesAMismatchedStateWithoutProvisioningLinkingOrSuccessAudit(
+            org.springframework.test.context.event.ApplicationEvents events) throws Exception {
+        // Review Loop 1, finding 2 (state): the callback state must match the
+        // authorization request's saved state — replay/forgery denied.
+        MintedAuthorization authorization = beginAuthorization();
+        String code = STUB_IDP.mint("sub-evil-state", "state@fixture.yacc.local", true,
+                authorization.nonce());
+
+        completeLoginExpectingDenial(
+                new MintedSession(authorization.session(), "attacker-forged-state", code));
+
+        assertNoProvisioningLinkingOrSuccessAudit("sub-evil-state", events);
+    }
+
+    @Test
+    void oidcLoginDeniesAMismatchedNonceWithoutProvisioningLinkingOrSuccessAudit(
+            org.springframework.test.context.event.ApplicationEvents events) throws Exception {
+        // Review Loop 1, finding 2 (nonce): the ID token must bind the nonce
+        // of this authorization request — a token minted for another nonce
+        // (replay/injection) is denied after a valid code exchange.
+        MintedAuthorization authorization = beginAuthorization();
+        String code = STUB_IDP.mintWith("sub-evil-nonce", "nonce@fixture.yacc.local", true,
+                "attacker-chosen-nonce", null, null, false);
+
+        completeLoginExpectingDenial(
+                new MintedSession(authorization.session(), authorization.state(), code));
+
+        assertNoProvisioningLinkingOrSuccessAudit("sub-evil-nonce", events);
+    }
+
+    @Test
+    void oidcLoginDeniesAForeignIssuerWithoutProvisioningLinkingOrSuccessAudit(
+            org.springframework.test.context.event.ApplicationEvents events) throws Exception {
+        // Review Loop 1, finding 2 (issuer): a correctly signed (JWKS) token
+        // carrying a foreign `iss` must be denied — the attack surface that
+        // making issuer-uri mandatory fail-closed removes.
+        MintedAuthorization authorization = beginAuthorization();
+        String code = STUB_IDP.mintWith("sub-evil-issuer", "issuer@fixture.yacc.local", true,
+                authorization.nonce(), "https://evil.fixture", null, false);
+
+        completeLoginExpectingDenial(
+                new MintedSession(authorization.session(), authorization.state(), code));
+
+        assertNoProvisioningLinkingOrSuccessAudit("sub-evil-issuer", events);
+    }
+
+    @Test
+    void oidcLoginDeniesAWrongAudienceWithoutProvisioningLinkingOrSuccessAudit(
+            org.springframework.test.context.event.ApplicationEvents events) throws Exception {
+        // Review Loop 1, finding 2 (audience): an ID token minted for another
+        // client is denied even when correctly signed by the trusted key.
+        MintedAuthorization authorization = beginAuthorization();
+        String code = STUB_IDP.mintWith("sub-evil-audience", "aud@fixture.yacc.local", true,
+                authorization.nonce(), null, "another-client", false);
+
+        completeLoginExpectingDenial(
+                new MintedSession(authorization.session(), authorization.state(), code));
+
+        assertNoProvisioningLinkingOrSuccessAudit("sub-evil-audience", events);
+    }
+
+    @Test
+    void oidcLoginDeniesAnIdTokenSignedOutsideTheJwksWithoutProvisioningLinkingOrSuccessAudit(
+            org.springframework.test.context.event.ApplicationEvents events) throws Exception {
+        // Review Loop 1, finding 2 (signature/JWKS): a token signed by a key
+        // never published in the IdP's JWKS is denied.
+        MintedAuthorization authorization = beginAuthorization();
+        String code = STUB_IDP.mintWith("sub-evil-signature", "signature@fixture.yacc.local",
+                true, authorization.nonce(), null, null, true);
+
+        completeLoginExpectingDenial(
+                new MintedSession(authorization.session(), authorization.state(), code));
+
+        assertNoProvisioningLinkingOrSuccessAudit("sub-evil-signature", events);
     }
 
     @Test

@@ -206,8 +206,13 @@ public record AuthProperties(Token token, Bootstrap bootstrap, Recovery recovery
          * @param clientId           IdP-issued client id
          *                           ({@code YACC_AUTH_OAUTH2_REGISTRATIONS_<ID>_CLIENT_ID})
          * @param clientSecret       IdP-issued client secret (env/secret only)
-         * @param issuerUri          expected ID-token {@code iss} value
-         *                           (validated per OIDC core §3.1.3.7; optional)
+         * @param issuerUri          expected ID-token {@code iss} value;
+         *                           required (fail-closed): the OIDC issuer
+         *                           validator is applied only when an issuer
+         *                           is configured, so an absent issuer-uri
+         *                           would accept a correctly signed token
+         *                           carrying a foreign {@code iss}
+         *                           (validated per OIDC core §3.1.3.7)
          * @param authorizationUri   IdP authorization endpoint
          * @param tokenUri           IdP token endpoint (code exchange)
          * @param jwkSetUri          IdP JWKS endpoint (ID-token signature)

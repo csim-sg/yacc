@@ -153,7 +153,7 @@ yacc:
       #   <idp-name>:                       # e.g. the founder-named IdP at acceptance
       #     client-id: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_CLIENT_ID:}
       #     client-secret: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_CLIENT_SECRET:}
-      #     issuer-uri: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_ISSUER_URI:}
+      #     issuer-uri: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_ISSUER_URI:}   # required (fail-closed)
       #     authorization-uri: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_AUTHORIZATION_URI:}
       #     token-uri: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_TOKEN_URI:}
       #     jwk-set-uri: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_JWK_SET_URI:}
