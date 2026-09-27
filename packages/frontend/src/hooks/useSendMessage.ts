@@ -42,10 +42,11 @@
 
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 import { useCallback } from 'react';
-import { apiClient } from '../api/client';
 import { SendMessageResponseSchema, type SendMessageResponse } from '../api/schemas';
-import { queryKeys } from '../lib/queryClient';
+import { api as apiClient } from '../lib/apiClient';
 import { generateTempId } from '../lib/generateTempId';
+import { logger } from '../lib/logger';
+import { queryKeys } from '../lib/queryClient';
 
 /**
  * Send message request payload
@@ -147,7 +148,7 @@ export function useSendMessage(): UseMutationResult<SendMessageResponse, Error, 
     onError: (error) => {
       // Additional mutation-level error handling can be added here
       // For now, error will be available in the mutation result
-      console.error('[useSendMessage] Mutation failed:', {
+      logger.error('[useSendMessage] Mutation failed', {
         message: error.message,
       });
     },

@@ -12,8 +12,9 @@
  */
 
 import { useState, type FormEvent } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { logger } from '../lib/logger';
 
 export function LoginPage(): JSX.Element {
   const [email, setEmail] = useState('');
@@ -27,11 +28,13 @@ export function LoginPage(): JSX.Element {
     clearError();
 
     try {
-      await login(email, password);
-      navigate('/inbox');
+      const mustChangePassword = await login(email, password);
+      // Bootstrap/recovery identities must replace their one-time
+      // credential before anything else is usable (ADR-025).
+      navigate(mustChangePassword ? '/change-password' : '/inbox');
     } catch (err: unknown) {
       // Error is handled by AuthContext and displayed in the form
-      console.error('Login failed:', err instanceof Error ? err.message : String(err));
+      logger.error('Login failed', { error: err instanceof Error ? err.message : String(err) });
     }
   };
 

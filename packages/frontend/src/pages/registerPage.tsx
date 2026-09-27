@@ -3,9 +3,11 @@
  * User registration form
  */
 
-import { useState, FormEvent } from 'react';
-import { useAuthStore } from '../stores/auth.store';
+import type { FormEvent } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { logger } from '../lib/logger';
 
 export function RegisterPage() {
   const [name, setName] = useState('');
@@ -14,7 +16,7 @@ export function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState('');
-  const { register, isLoading, error, clearError } = useAuthStore();
+  const { register, isLoading, error, clearError } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
@@ -36,7 +38,7 @@ export function RegisterPage() {
       await register(email, password, name);
       navigate('/login');
     } catch (err) {
-      console.error('Registration failed:', err);
+      logger.error('Registration failed', { error: err instanceof Error ? err.message : String(err) });
     }
   };
 

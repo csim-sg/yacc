@@ -21,11 +21,13 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { logger } from './lib/logger';
 import { queryClient } from './lib/queryClient';
 import { AuditLogsPage } from './pages/AuditLogsPage';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ConversationPage } from './pages/ConversationPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { InboxPage } from './pages/InboxPage';
 import { IrcProfilesPage } from './pages/IrcProfilesPage';
 import { LoginPage } from './pages/LoginPage';
+import { OidcCallbackPage } from './pages/OidcCallbackPage';
 import { RegisterPage } from './pages/registerPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { RoutingRulesPage } from './pages/RoutingRulesPage';
@@ -146,7 +148,7 @@ function WebSocketInitializer(): null {
  * Separated from App to have access to AuthProvider context
  */
 function AppRoutes(): ReactElement {
-  const { isLoading } = useAuth();
+  const { isLoading, isAuthenticated, mustChangePassword } = useAuth();
 
   // Global loading state
   if (isLoading) {
@@ -157,6 +159,19 @@ function AppRoutes(): ReactElement {
           <p className="mt-4 text-base-content/70">Loading...</p>
         </div>
       </div>
+    );
+  }
+
+  // Deterministic forced credential change (ADR-025): a bootstrap/recovery
+  // identity with mustChangePassword is held on /change-password until the
+  // one-time credential is replaced — the backend's ForcedPasswordChangeFilter
+  // denies every other /api surface in that state anyway (MIG-030).
+  if (isAuthenticated && mustChangePassword) {
+    return (
+      <Routes>
+        <Route path="/change-password" element={<ChangePasswordPage />} />
+        <Route path="*" element={<Navigate to="/change-password" replace />} />
+      </Routes>
     );
   }
 
@@ -196,6 +211,18 @@ function AppRoutes(): ReactElement {
           <PublicRoute>
             <ResetPasswordPage />
           </PublicRoute>
+        }
+      />
+      {/* OIDC callback: registered public-client redirect URI (MIG-033). */}
+      <Route path="/auth/callback" element={<OidcCallbackPage />} />
+
+      {/* Forced credential replacement (bootstrap/recovery identity). */}
+      <Route
+        path="/change-password"
+        element={
+          <ProtectedRoute>
+            <ChangePasswordPage />
+          </ProtectedRoute>
         }
       />
 

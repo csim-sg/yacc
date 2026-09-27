@@ -1,127 +1,56 @@
 /**
- * Authentication Service
- * Handles all auth-related API calls using BetterAuth
+ * Authentication Service (MIG-034; ADR-025)
+ *
+ * All auth endpoint calls against the Spring auth contract (frozen
+ * `.docs/migration/openapi.yaml` §auth). Transport, token persistence and
+ * refresh live in the single API client (`lib/apiClient`); this service is
+ * the endpoint map only.
  */
 
-import { api, clearToken } from '../lib/apiClient';
+import { api, clearTokens, setTokens } from '../lib/apiClient';
+import type {
+  AuthSessionGetResponse,
+  AuthSessionResponse,
+  AuthSignOutResponse,
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
+  MessageResponse,
+  ResetPasswordRequest,
+  SignInRequest,
+  SignUpRequest,
+  SuccessMessageResponse,
+  VerifyEmailRequest,
+} from '../types/auth.types';
 
-export interface User {
-   id: number;
-   email: string;
-   name: string;
-   role: 'super_admin' | 'admin' | 'manager' | 'user';
-   status: 'active' | 'inactive' | 'suspended';
-   emailVerified?: boolean;
-   image?: string;
-   createdAt: string;
-   updatedAt?: string;
-}
+/** `User` re-exported under its canonical contract name. */
+export type User = AuthSessionGetResponse['user'];
 
-export interface LoginRequest {
-   email: string;
-   password: string;
-}
-
-// BetterAuth response format
-export interface BetterAuthSession {
-  id: string;
-  userId: number;
-  expiresAt: string;
-  token: string;
-  ipAddress?: string;
-  userAgent?: string;
-}
-
-export interface LoginResponse {
-  user: User;
-  session: BetterAuthSession;
-}
-
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  name: string;
-}
-
-export interface RegisterResponse {
-  user: User;
-  session?: BetterAuthSession;
-}
-
-export interface ForgotPasswordRequest {
-  email: string;
-}
-
-export interface ForgotPasswordResponse {
-  success: boolean;
-  message: string;
-}
-
-export interface ResetPasswordRequest {
-  token: string;
-  password: string;
-}
-
-export interface ResetPasswordResponse {
-  success: boolean;
-  message: string;
-}
-
-export interface SessionResponse {
-  user: User;
-  session: BetterAuthSession;
-}
-
-/**
- * Auth Service
- * Integrated with BetterAuth endpoints
- */
 export const authService = {
   /**
-   * Login user (MVP simple auth)
-   * Endpoint: POST /simple-auth/login
+   * Email/password sign-in. Stores the returned token pair (local grant).
+   * The `mustChangePassword` flag drives the forced credential change.
    */
-  async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const response = await api.post<LoginResponse>('/simple-auth/login', credentials);
-    
-    // Token is automatically extracted from 'set-auth-token' header in api-client
-    // Refresh token is automatically sent via HttpOnly cookie
-    
-    return response;
+  async signIn(credentials: SignInRequest): Promise<AuthSessionResponse> {
+    const session = await api.post<AuthSessionResponse>('/api/auth/sign-in/email', credentials);
+    setTokens(session.accessToken, session.refreshToken, 'local');
+    return session;
   },
 
   /**
-   * Register new user
-   * Endpoint: POST /auth/sign-up/email
+   * Self-registration (always creates `role: user`). The returned session
+   * is deliberately not stored — the register flow hands the user to the
+   * login page (no auto-login, POC parity).
    */
-  async register(data: RegisterRequest): Promise<RegisterResponse> {
-    return api.post<RegisterResponse>('/auth/sign-up/email', data);
+  async signUp(request: SignUpRequest): Promise<AuthSessionResponse> {
+    return api.post<AuthSessionResponse>('/api/auth/sign-up/email', request);
   },
 
-  /**
-   * Logout user
-   * Endpoint: POST /simple-auth/logout
-   */
-  async logout(): Promise<void> {
+  /** Current session user from the Bearer access token. */
+  async getSession(): Promise<AuthSessionGetResponse | null> {
     try {
-      await api.post('/simple-auth/logout');
-    } finally {
-      // Always clear token even if API call fails
-      clearToken();
-    }
-  },
-
-  /**
-   * Get current session (user + session info)
-   * Endpoint: GET /simple-auth/session
-   */
-  async getSession(): Promise<SessionResponse | null> {
-    try {
-      const response = await api.get<SessionResponse>('/simple-auth/session');
-      return response;
-    } catch (error: any) {
-      // Session not found or expired
-      if (error.status === 401) {
+      return await api.get<AuthSessionGetResponse>('/api/auth/get-session');
+    } catch (error: unknown) {
+      if (error instanceof Error && 'statusCode' in error && error.statusCode === 401) {
         return null;
       }
       throw error;
@@ -129,18 +58,39 @@ export const authService = {
   },
 
   /**
-   * Request password reset
-   * Endpoint: POST /auth/forgot-password
+   * Sign out: revokes the refresh grant named by the access token's
+   * `sid` claim, then clears all local auth state (always, even on API
+   * failure).
    */
-  async forgotPassword(data: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
-    return api.post<ForgotPasswordResponse>('/auth/forgot-password', data);
+  async signOut(): Promise<AuthSignOutResponse | null> {
+    try {
+      return await api.post<AuthSignOutResponse>('/api/auth/sign-out');
+    } finally {
+      clearTokens();
+    }
   },
 
   /**
-   * Reset password with token
-   * Endpoint: POST /auth/reset-password
+   * Replace the credential (authenticated). Clears the ADR-025
+   * forced-password-change state of the bootstrap/recovery identity and
+   * revokes every refresh grant of the identity on success.
    */
-  async resetPassword(data: ResetPasswordRequest): Promise<ResetPasswordResponse> {
-    return api.post<ResetPasswordResponse>('/auth/reset-password', data);
+  async changePassword(request: ChangePasswordRequest): Promise<AuthSignOutResponse> {
+    return api.post<AuthSignOutResponse>('/api/auth/change-password', request);
+  },
+
+  /** Forgot password — constant anti-enumeration answer. */
+  async forgotPassword(request: ForgotPasswordRequest): Promise<MessageResponse> {
+    return api.post<MessageResponse>('/api/auth/forgot-password', request);
+  },
+
+  /** Reset password with the emailed token. */
+  async resetPassword(request: ResetPasswordRequest): Promise<SuccessMessageResponse> {
+    return api.post<SuccessMessageResponse>('/api/auth/reset-password', request);
+  },
+
+  /** Confirm the email address with the emailed token. */
+  async verifyEmail(request: VerifyEmailRequest): Promise<SuccessMessageResponse> {
+    return api.post<SuccessMessageResponse>('/api/auth/verify-email', request);
   },
 };

@@ -236,7 +236,7 @@ export const useWebSocketStore = create<WebSocketState>()(
     {
       // DevTools options
       name: 'WebSocketStore',
-      enabled: process.env.NODE_ENV === 'development',
+      enabled: import.meta.env.DEV,
     },
   ),
 );

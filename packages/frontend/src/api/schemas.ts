@@ -21,6 +21,7 @@
  */
 
 import { z } from 'zod';
+import { logger } from '../lib/logger';
 
 /**
  * User Schema
@@ -29,10 +30,12 @@ import { z } from 'zod';
 export const UserSchema = z.object({
   id: z.string().uuid('Invalid user ID format'),
   email: z.string().email('Invalid email format'),
-  name: z.string().nullable().optional(),
-  role: z.enum(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'USER']),
-  status: z.enum(['active', 'disabled']).optional(),
-  createdAt: z.string().datetime().transform((date) => new Date(date)),
+  name: z.string(),
+  role: z.enum(['super_admin', 'admin', 'manager', 'user']),
+  status: z.enum(['active', 'inactive', 'suspended']),
+  emailVerified: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 export type User = z.infer<typeof UserSchema>;
@@ -146,20 +149,6 @@ export const MessagesListSchema = PaginatedSchema(MessageSchema);
 export type MessagesList = z.infer<typeof MessagesListSchema>;
 
 /**
- * Error Response Schema
- * Standard error format from API
- */
-export const ErrorResponseSchema = z.object({
-  error: z.object({
-    code: z.string(),
-    message: z.string(),
-    details: z.record(z.string()).optional(),
-  }),
-});
-
-export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
-
-/**
  * API Response Envelope
  * Wraps successful API responses
  */
@@ -250,7 +239,7 @@ export function parseWithLogging<T extends z.ZodTypeAny>(
   const result = schema.safeParse(data);
 
   if (!result.success) {
-    console.error(`[${context}] Validation Error:`, result.error.flatten());
+    logger.error(`[${context}] Validation Error`, result.error.flatten());
     return null;
   }
 

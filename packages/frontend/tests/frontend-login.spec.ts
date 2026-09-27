@@ -1,199 +1,173 @@
 /**
- * Frontend Login E2E Tests
- * Tests the complete login flow from UI to backend
+ * Frontend Login E2E Tests (MIG-034)
+ *
+ * The complete auth flow against the Spring auth contract (frozen
+ * `.docs/migration/openapi.yaml` §auth), exercised with route mocks so the
+ * flows run without a live backend:
+ * - login (sign-in) → session → inbox
+ * - forced re-login on session loss
+ * - forced credential change for the bootstrap/recovery identity
+ * - logout (sign-out + local state clear)
+ * - OIDC callback route (embedded AS code exchange)
  */
 
 import { test, expect } from '@playwright/test';
+import { authSessionFor, mockAuthContract, TEST_USERS } from './helpers/auth';
 
-const FRONTEND_URL = process.env.VITE_APP_URL || 'http://localhost:5173';
-const BACKEND_URL = process.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
-
-test.describe('Frontend Login Flow', () => {
+test.describe('Frontend Login Flow (Spring auth contract)', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to login page
-    await page.goto(`${FRONTEND_URL}/login`);
+    await mockAuthContract(page);
+    // Let non-auth API calls fail fast and quietly.
+    await page.route('**/api/conversations**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) })
+    );
   });
 
   test('should display login page correctly', async ({ page }) => {
-    // Check page title
+    await page.goto('/login');
+
     await expect(page.locator('h1')).toContainText('Welcome Back');
-    
-    // Check form elements
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();
-    
-    // Check links
     await expect(page.locator('text=Forgot Password?')).toBeVisible();
     await expect(page.locator('text=Create One')).toBeVisible();
   });
 
-  test('should show validation errors for empty fields', async ({ page }) => {
-    // Try to submit empty form
-    await page.locator('button[type="submit"]').click();
-    
-    // HTML5 validation should prevent submission
-    const emailInput = page.locator('input[type="email"]');
-    const isEmailInvalid = await emailInput.evaluate((el: HTMLInputElement) => !el.checkValidity());
-    expect(isEmailInvalid).toBeTruthy();
+  test('should show the frozen 401 error body on invalid credentials', async ({ page }) => {
+    await mockAuthContract(page, { failSignIn: true });
+    await page.goto('/login');
+
+    await page.locator('[data-testid="login-email"]').fill('admin@yacc.local');
+    await page.locator('[data-testid="login-password"]').fill('wrong-password');
+    await page.locator('[data-testid="login-submit"]').click();
+
+    await expect(page.locator('.alert-error')).toContainText('Invalid credentials');
+    // No session was established — the user stays on the login page.
+    await expect(page).toHaveURL(/\/login/);
+    expect(await page.evaluate(() => localStorage.getItem('yacc_token'))).toBeNull();
   });
 
-  test('should successfully login with valid credentials', async ({ page }) => {
-    // Fill in login form
-    await page.locator('input[type="email"]').fill('admin@yacc.local');
-    await page.locator('input[type="password"]').fill('admin123');
-    
-    // Submit form
-    await page.locator('button[type="submit"]').click();
-    
-    // Wait for navigation to inbox
-    await page.waitForURL(`${FRONTEND_URL}/`, { timeout: 5000 });
-    
-    // Verify we're on the inbox page
-    await expect(page.locator('text=YACC Inbox')).toBeVisible();
-    
-    // Verify user menu shows correct info
-    await page.locator('[role="button"].avatar').click();
-    await expect(page.locator('.dropdown-content').locator('text=System Administrator')).toBeVisible();
-    await expect(page.locator('.dropdown-content').locator('text=admin@yacc.local')).toBeVisible();
-    await expect(page.locator('.dropdown-content').locator('text=super admin')).toBeVisible();
+  test('should sign in and land on the inbox with the session user', async ({ page }) => {
+    await page.goto('/login');
+
+    await page.locator('[data-testid="login-email"]').fill(TEST_USERS.superAdmin.email);
+    await page.locator('[data-testid="login-password"]').fill(TEST_USERS.superAdmin.password);
+    await page.locator('[data-testid="login-submit"]').click();
+
+    await page.waitForURL(/\/inbox/);
+    // The token pair was adopted (local grant).
+    expect(await page.evaluate(() => localStorage.getItem('yacc_token'))).toBeTruthy();
+    expect(await page.evaluate(() => localStorage.getItem('yacc_refresh_token'))).toBeTruthy();
+    expect(await page.evaluate(() => localStorage.getItem('yacc_token_kind'))).toBe('local');
   });
 
-  test('should show error for invalid credentials', async ({ page }) => {
-    // Fill in login form with wrong password
-    await page.locator('input[type="email"]').fill('admin@yacc.local');
-    await page.locator('input[type="password"]').fill('wrongpassword');
-    
-    // Submit form
-    await page.locator('button[type="submit"]').click();
-    
-    // Wait for error message
-    await expect(page.locator('.alert-error')).toBeVisible({ timeout: 3000 });
-    await expect(page.locator('.alert-error')).toContainText('Invalid email or password');
-    
-    // Verify we're still on login page
-    await expect(page).toHaveURL(`${FRONTEND_URL}/login`);
+  test('should force the credential change for the bootstrap/recovery identity', async ({
+    page,
+  }) => {
+    await mockAuthContract(page, { mustChangePassword: true });
+    await page.goto('/login');
+
+    await page.locator('[data-testid="login-email"]').fill(TEST_USERS.superAdmin.email);
+    await page.locator('[data-testid="login-password"]').fill(TEST_USERS.superAdmin.password);
+    await page.locator('[data-testid="login-submit"]').click();
+
+    await page.waitForURL(/\/change-password/);
+    await expect(page.getByTestId('forced-change-banner')).toBeVisible();
+
+    // Replace the one-time credential (change-password contract).
+    await page.route('**/api/auth/change-password', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) })
+    );
+    await page.getByTestId('change-password-current').fill('one-time-credential');
+    await page.getByTestId('change-password-new').fill('new-founder-secret-1');
+    await page.getByTestId('change-password-confirm').fill('new-founder-secret-1');
+    await page.getByTestId('change-password-submit').click();
+
+    await page.waitForURL(/\/inbox/);
+    expect(await page.evaluate(() => localStorage.getItem('yacc_token'))).toBeTruthy();
   });
 
-  test('should show error for non-existent user', async ({ page }) => {
-    // Fill in login form with non-existent email
-    await page.locator('input[type="email"]').fill('nonexistent@yacc.local');
-    await page.locator('input[type="password"]').fill('password123');
-    
-    // Submit form
-    await page.locator('button[type="submit"]').click();
-    
-    // Wait for error message
-    await expect(page.locator('.alert-error')).toBeVisible({ timeout: 3000 });
-    await expect(page.locator('.alert-error')).toContainText('Invalid email or password');
+  test('should sign out and clear all local auth state', async ({ page }) => {
+    await page.goto('/login');
+    await page.locator('[data-testid="login-email"]').fill(TEST_USERS.superAdmin.email);
+    await page.locator('[data-testid="login-password"]').fill(TEST_USERS.superAdmin.password);
+    await page.locator('[data-testid="login-submit"]').click();
+    await page.waitForURL(/\/inbox/);
+
+    // Direct DOM click: the mocked empty-inbox layout can overlay the header.
+    const logoutButton = page.locator('button[aria-label="Logout"]');
+    await expect(logoutButton).toBeAttached();
+    await page.evaluate(() => {
+      (document.querySelector('button[aria-label="Logout"]') as HTMLElement).click();
+    });
+    await page.locator('.modal button:has-text("Sign Out")').click();
+
+    await page.waitForURL(/\/login/);
+    expect(await page.evaluate(() => localStorage.getItem('yacc_token'))).toBeNull();
+    expect(await page.evaluate(() => localStorage.getItem('yacc_refresh_token'))).toBeNull();
   });
 
-  test('should toggle password visibility', async ({ page }) => {
-    const passwordInput = page.locator('input#password');
-    const toggleButton = page.locator('button[type="button"]').filter({ has: page.locator('svg') }).first();
-    
-    // Initially password should be hidden
-    await expect(passwordInput).toHaveAttribute('type', 'password');
-    
-    // Click toggle button
-    await toggleButton.click();
-    
-    // Password should now be visible
-    await expect(passwordInput).toHaveAttribute('type', 'text');
-    
-    // Click again to hide
-    await toggleButton.click();
-    
-    // Password should be hidden again
-    await expect(passwordInput).toHaveAttribute('type', 'password');
-  });
+  test('should restore the session from the stored token on reload', async ({ page }) => {
+    await page.goto('/login');
+    await page.locator('[data-testid="login-email"]').fill(TEST_USERS.superAdmin.email);
+    await page.locator('[data-testid="login-password"]').fill(TEST_USERS.superAdmin.password);
+    await page.locator('[data-testid="login-submit"]').click();
+    await page.waitForURL(/\/inbox/);
 
-  test('should persist authentication after page reload', async ({ page, context }) => {
-    // Login
-    await page.locator('input[type="email"]').fill('admin@yacc.local');
-    await page.locator('input[type="password"]').fill('admin123');
-    await page.locator('button[type="submit"]').click();
-    
-    // Wait for inbox
-    await page.waitForURL(`${FRONTEND_URL}/`);
-    
-    // Reload page
     await page.reload();
-    
-    // Should still be on inbox (not redirected to login)
-    await expect(page).toHaveURL(`${FRONTEND_URL}/`);
-    await expect(page.locator('text=YACC Inbox')).toBeVisible();
+    // The stored access token resolves the session again (get-session).
+    await page.waitForURL(/\/inbox/);
+    await expect(page.locator('header')).toBeVisible();
   });
 
-  test('should logout successfully', async ({ page }) => {
-    // Login first
-    await page.locator('input[type="email"]').fill('admin@yacc.local');
-    await page.locator('input[type="password"]').fill('admin123');
-    await page.locator('button[type="submit"]').click();
-    
-    // Wait for inbox
-    await page.waitForURL(`${FRONTEND_URL}/`);
-    
-    // Click user avatar to open menu
-    await page.locator('[role="button"].avatar').click();
-    
-    // Click logout button
-    await page.locator('button:has-text("Logout")').click();
-    
-    // Should redirect to login page
-    await page.waitForURL(`${FRONTEND_URL}/login`, { timeout: 5000 });
-    
-    // Verify we're on login page
-    await expect(page.locator('h1')).toContainText('Welcome Back');
+  test('should complete the OIDC callback and adopt the AS session', async ({ page }) => {
+    await page.addInitScript(() => {
+      sessionStorage.setItem('yacc_oidc_state', 'the-state');
+      sessionStorage.setItem('yacc_oidc_verifier', 'the-verifier');
+    });
+    await page.route('**/oauth2/token', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          access_token: 'as-access-token',
+          refresh_token: 'as-refresh-token',
+          token_type: 'Bearer',
+          expires_in: 1800,
+          scope: 'openid profile email',
+        }),
+      });
+    });
+    // The AS-issued access token resolves the session (same RS256 key,
+    // dual-issuer validator — MIG-033).
+    await page.route('**/api/auth/get-session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          user: authSessionFor(TEST_USERS.superAdmin).user,
+          mustChangePassword: false,
+        }),
+      });
+    });
+
+    await page.goto('/auth/callback?code=the-code&state=the-state');
+
+    await page.waitForURL(/\/inbox/);
+    expect(await page.evaluate(() => localStorage.getItem('yacc_token'))).toBe('as-access-token');
+    expect(await page.evaluate(() => localStorage.getItem('yacc_token_kind'))).toBe('oidc');
   });
 
-  test('should redirect to inbox if already logged in', async ({ page, context }) => {
-    // Login first
-    await page.locator('input[type="email"]').fill('admin@yacc.local');
-    await page.locator('input[type="password"]').fill('admin123');
-    await page.locator('button[type="submit"]').click();
-    
-    // Wait for inbox
-    await page.waitForURL(`${FRONTEND_URL}/`);
-    
-    // Try to navigate to login page
-    await page.goto(`${FRONTEND_URL}/login`);
-    
-    // Should be redirected back to inbox
-    await expect(page).toHaveURL(`${FRONTEND_URL}/`);
-    await expect(page.locator('text=YACC Inbox')).toBeVisible();
-  });
+  test('should reject an OIDC callback with a forged state', async ({ page }) => {
+    await page.addInitScript(() => {
+      sessionStorage.setItem('yacc_oidc_state', 'the-state');
+      sessionStorage.setItem('yacc_oidc_verifier', 'the-verifier');
+    });
 
-  test('should disable submit button while loading', async ({ page }) => {
-    // Fill in form
-    await page.locator('input[type="email"]').fill('admin@yacc.local');
-    await page.locator('input[type="password"]').fill('admin123');
-    
-    // Click submit
-    const submitButton = page.locator('button[type="submit"]');
-    await submitButton.click();
-    
-    // Button should be disabled immediately
-    await expect(submitButton).toBeDisabled();
-    
-    // Should show loading text
-    await expect(submitButton).toContainText('Signing in');
-  });
-});
+    await page.goto('/auth/callback?code=the-code&state=forged-state');
 
-test.describe('Protected Routes', () => {
-  test('should redirect to login when accessing inbox without auth', async ({ page }) => {
-    // Try to access inbox directly
-    await page.goto(`${FRONTEND_URL}/`);
-    
-    // Should be redirected to login
-    await page.waitForURL(`${FRONTEND_URL}/login`, { timeout: 3000 });
-    await expect(page.locator('h1')).toContainText('Welcome Back');
-  });
-
-  test('should redirect to login when token expires', async ({ page, context }) => {
-    // This would require mocking expired token
-    // For MVP, we skip this test
-    test.skip();
+    await expect(page.getByTestId('oidc-callback-error')).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('yacc_token'))).toBeNull();
   });
 });

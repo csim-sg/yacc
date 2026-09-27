@@ -306,8 +306,8 @@ class SocketClientClass {
  * Created with default configuration (will be initialized with proper config)
  */
 const socketClientInstance = new SocketClientClass({
-  url: process.env.VITE_WS_URL || 'ws://localhost:3000',
-  debug: process.env.NODE_ENV === 'development',
+  url: (import.meta.env.VITE_WS_URL as string | undefined) || 'ws://localhost:3000',
+  debug: import.meta.env.DEV,
 });
 
 /**

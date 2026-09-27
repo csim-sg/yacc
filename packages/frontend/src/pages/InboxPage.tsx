@@ -3,12 +3,13 @@
  * Main conversation list view with hideable sidebar
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../stores/auth.store';
 import { UnreadBadge } from '../components/UnreadBadge';
+import { useAuth } from '../contexts/AuthContext';
 import { useUnreadBadges } from '../hooks/useUnreadBadges';
+import { logger } from '../lib/logger';
 import {
   conversationsService,
   type ConversationListItem,
@@ -44,7 +45,7 @@ const CHANNEL_VALUES: Phase1ChannelType[] = [...PHASE1_CHANNELS];
 
 export function InboxPage() {
   const navigate = useNavigate();
-  const { user, logout, isLoading: authLoading } = useAuthStore();
+  const { user, logout, isLoading: authLoading } = useAuth();
   const { markAsRead } = useUnreadBadges();
   const [searchParams, setSearchParams] = useSearchParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -202,7 +203,7 @@ export function InboxPage() {
 
   useEffect(() => {
     if (error && error.error === 'Authorization is required') {
-      console.warn('Authorization failed for conversations list. Token may be missing or expired.');
+      logger.warn('Authorization failed for conversations list. Token may be missing or expired.');
     }
   }, [error]);
 
