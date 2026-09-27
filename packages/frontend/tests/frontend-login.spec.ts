@@ -7,7 +7,7 @@
  * - login (sign-in) → session → inbox
  * - forced re-login on session loss
  * - forced credential change for the bootstrap/recovery identity
- * - logout (sign-out + local state clear)
+ * - logout (sign-out + `/oauth2/revoke` for oidc sessions + local state clear)
  * - OIDC callback route (embedded AS code exchange)
  */
 
@@ -169,5 +169,63 @@ test.describe('Frontend Login Flow (Spring auth contract)', () => {
 
     await expect(page.getByTestId('oidc-callback-error')).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('yacc_token'))).toBeNull();
+  });
+
+  test('should revoke the AS grant at /oauth2/revoke when logging out an OIDC session', async ({
+    page,
+  }) => {
+    const revokeBodies: string[] = [];
+    await page.route('**/oauth2/revoke', async (route) => {
+      revokeBodies.push(route.request().postData() ?? '');
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+    await page.addInitScript(() => {
+      sessionStorage.setItem('yacc_oidc_state', 'the-state');
+      sessionStorage.setItem('yacc_oidc_verifier', 'the-verifier');
+    });
+    await page.route('**/oauth2/token', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          access_token: 'as-access-token',
+          refresh_token: 'as-refresh-token',
+          token_type: 'Bearer',
+          expires_in: 1800,
+          scope: 'openid profile email',
+        }),
+      });
+    });
+    await page.route('**/api/auth/get-session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          user: authSessionFor(TEST_USERS.superAdmin).user,
+          mustChangePassword: false,
+        }),
+      });
+    });
+
+    // Establish the OIDC session through the callback (AS token pair).
+    await page.goto('/auth/callback?code=the-code&state=the-state');
+    await page.waitForURL(/\/inbox/);
+    expect(await page.evaluate(() => localStorage.getItem('yacc_token_kind'))).toBe('oidc');
+
+    const logoutButton = page.locator('button[aria-label="Logout"]');
+    await expect(logoutButton).toBeAttached();
+    await page.evaluate(() => {
+      (document.querySelector('button[aria-label="Logout"]') as HTMLElement).click();
+    });
+    await page.locator('.modal button:has-text("Sign Out")').click();
+
+    await page.waitForURL(/\/login/);
+    // Logout revokes the AS refresh grant — local cleanup alone is not
+    // sufficient for an oidc session (review loop 1, blocker finding 1).
+    expect(revokeBodies).toHaveLength(1);
+    expect(revokeBodies[0]).toContain('token=as-refresh-token');
+    expect(revokeBodies[0]).toContain('client_id=yacc-frontend');
+    expect(await page.evaluate(() => localStorage.getItem('yacc_token'))).toBeNull();
+    expect(await page.evaluate(() => localStorage.getItem('yacc_refresh_token'))).toBeNull();
   });
 });

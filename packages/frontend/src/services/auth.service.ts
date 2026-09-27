@@ -7,7 +7,7 @@
  * the endpoint map only.
  */
 
-import { api, clearTokens, setTokens } from '../lib/apiClient';
+import { api, clearTokens, getRefreshToken, getTokenKind, setTokens } from '../lib/apiClient';
 import type {
   AuthSessionGetResponse,
   AuthSessionResponse,
@@ -21,6 +21,7 @@ import type {
   SuccessMessageResponse,
   VerifyEmailRequest,
 } from '../types/auth.types';
+import { revokeOidcGrant } from './oidc.service';
 
 /** `User` re-exported under its canonical contract name. */
 export type User = AuthSessionGetResponse['user'];
@@ -59,13 +60,21 @@ export const authService = {
 
   /**
    * Sign out: revokes the refresh grant named by the access token's
-   * `sid` claim, then clears all local auth state (always, even on API
-   * failure).
+   * `sid` claim, revokes the AS grant at `/oauth2/revoke` for `oidc`
+   * sessions (guardrail: local cleanup alone is not sufficient there),
+   * then clears all local auth state (always, even on API failure).
    */
   async signOut(): Promise<AuthSignOutResponse | null> {
+    // Captured before any cleanup: revocation needs the stored refresh
+    // token, and the local state clear below must stay unconditional.
+    const refreshToken = getRefreshToken();
+    const tokenKind = getTokenKind();
     try {
       return await api.post<AuthSignOutResponse>('/api/auth/sign-out');
     } finally {
+      if (tokenKind === 'oidc' && refreshToken) {
+        await revokeOidcGrant(refreshToken);
+      }
       clearTokens();
     }
   },

@@ -5,7 +5,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearTokens, getToken, getTokenKind } from '../../lib/apiClient';
+import { clearTokens, getToken, getTokenKind, setTokens } from '../../lib/apiClient';
 import { authService } from '../auth.service';
 
 const SESSION_RESPONSE = {
@@ -92,6 +92,49 @@ describe('authService (Spring auth contract)', () => {
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('/api/auth/sign-out');
+    expect(getToken()).toBeNull();
+  });
+
+  it('revokes the AS grant at /oauth2/revoke when signing out an oidc session', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { success: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    setTokens('as-access', 'as-refresh', 'oidc');
+
+    await authService.signOut();
+
+    const urls = fetchMock.mock.calls.map((call) => call[0]);
+    expect(urls).toEqual(['/api/auth/sign-out', '/oauth2/revoke']);
+    const [revokeUrl, revokeInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(revokeUrl).toBe('/oauth2/revoke');
+    const revokeBody = String(revokeInit.body);
+    expect(revokeBody).toContain('token=as-refresh');
+    expect(revokeBody).toContain('client_id=yacc-frontend');
+    // Revocation is not a substitute for local cleanup: both happen.
+    expect(getToken()).toBeNull();
+    expect(getTokenKind()).toBeNull();
+  });
+
+  it('signs out a local session without touching /oauth2/revoke', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { success: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    setTokens('local-access', 'local-refresh', 'local');
+
+    await authService.signOut();
+
+    const urls = fetchMock.mock.calls.map((call) => call[0]);
+    expect(urls).toEqual(['/api/auth/sign-out']);
+    expect(getToken()).toBeNull();
+  });
+
+  it('still revokes the AS grant and clears local state when sign-out fails', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(401, { error: 'expired' }));
+    vi.stubGlobal('fetch', fetchMock);
+    setTokens('as-access', 'as-refresh', 'oidc');
+
+    await expect(authService.signOut()).rejects.toBeDefined();
+
+    const urls = fetchMock.mock.calls.map((call) => call[0]);
+    expect(urls).toEqual(['/api/auth/sign-out', '/oauth2/revoke']);
     expect(getToken()).toBeNull();
   });
 
