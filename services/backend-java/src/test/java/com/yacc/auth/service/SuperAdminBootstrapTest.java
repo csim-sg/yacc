@@ -65,7 +65,7 @@ class SuperAdminBootstrapTest {
                 new AuthProperties(
                         new AuthProperties.Token("ignored", null, null),
                         new AuthProperties.Bootstrap(BOOTSTRAP_EMAIL, INITIAL_CREDENTIAL),
-                        new AuthProperties.Recovery("", "", ""), null, null, null),
+                        new AuthProperties.Recovery("", "", ""), null, null, null, null),
                 audit);
     }
 
@@ -102,7 +102,7 @@ class SuperAdminBootstrapTest {
                 new AuthProperties(
                         new AuthProperties.Token("ignored", null, null),
                         new AuthProperties.Bootstrap("", ""),
-                        new AuthProperties.Recovery("", "", ""), null, null, null),
+                        new AuthProperties.Recovery("", "", ""), null, null, null, null),
                 audit);
         when(users.existsByRole(UserRole.SUPER_ADMIN)).thenReturn(false);
 

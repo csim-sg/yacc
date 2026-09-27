@@ -59,7 +59,7 @@ class SuperAdminRecoveryTest {
                 new AuthProperties(
                         new AuthProperties.Token("ignored", null, null),
                         new AuthProperties.Bootstrap(BOOTSTRAP_EMAIL, FRESH_CREDENTIAL),
-                        new AuthProperties.Recovery(mode, key, keyHash), null, null, null),
+                        new AuthProperties.Recovery(mode, key, keyHash), null, null, null, null),
                 provisioner,
                 audit);
     }

@@ -46,12 +46,21 @@ public class SecurityAuditEventListener {
 
     /**
      * Persists every Spring Security authentication event (success and failure
-     * subclasses alike) as an audit record.
+     * subclasses alike) as an audit record. The interactive-login twin event
+     * ({@code InteractiveAuthenticationSuccessEvent}, published by the login
+     * filter) is skipped: for interactive flows — local sign-in publishes its
+     * own event, and the OIDC relying party (MIG-032) already yields the
+     * {@code user.login} record through the provider manager's
+     * {@code AuthenticationSuccessEvent} — persisting the twin would
+     * double-count one sign-in.
      *
      * @param event the published security event
      */
     @EventListener(AbstractAuthenticationEvent.class)
     public void onAuthenticationEvent(AbstractAuthenticationEvent event) {
+        if (event instanceof org.springframework.security.authentication.event.InteractiveAuthenticationSuccessEvent) {
+            return;
+        }
         ObjectNode metadata = mapper.createObjectNode();
         if (event instanceof AbstractAuthenticationFailureEvent failure) {
             metadata.put("exception", failure.getException().getClass().getSimpleName());

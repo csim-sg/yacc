@@ -1,5 +1,6 @@
 package com.yacc.auth;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -11,8 +12,14 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yacc.auth.service.BearerTokenAuthenticationConverter;
@@ -43,6 +50,16 @@ import com.yacc.auth.service.YaccUserDetailsService;
  *   <li>no bespoke token crypto, no server-side HTTP session, no CSRF token
  *       (Bearer tokens are not cookie-authenticated).</li>
  * </ul>
+ *
+ * <p>MIG-032 OIDC relying party (ADR-025 RP role; TR-05): when the RP is
+ * enabled in configuration ({@code yacc.auth.oauth2.enabled=true}, see
+ * {@link OAuth2LoginConfig}), the chain additionally carries the
+ * {@code oauth2Login} segment under {@code /api/auth/oidc/**} — permitAll
+ * login/callback entry points backed by config-driven client registrations
+ * and explicit account linking. With the RP disabled (the default) the chain
+ * is exactly as above; tokenless non-browser requests keep the frozen 401
+ * JSON contract in both modes (the resource-server entry point is registered
+ * first, so it remains the fallback for non-matched request profiles).</p>
  */
 @Configuration
 @EnableWebSecurity
@@ -57,26 +74,37 @@ public class AuthSecurityConfig {
             RestAuthenticationEntryPoint authenticationEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler,
             ForcedPasswordChangeFilter forcedPasswordChangeFilter,
-            PasswordResetRateLimitFilter passwordResetRateLimitFilter) throws Exception {
+            PasswordResetRateLimitFilter passwordResetRateLimitFilter,
+            ObjectProvider<ClientRegistrationRepository> oidcClientRegistrations,
+            ObjectProvider<OAuth2UserService<OidcUserRequest, OidcUser>> oidcUserService,
+            ObjectProvider<AuthenticationSuccessHandler> oidcLoginSuccessHandler,
+            ObjectProvider<AuthenticationFailureHandler> oidcLoginFailureHandler)
+            throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(
-                                "/health",
-                                "/health/**",
-                                "/actuator/health/**",
-                                "/actuator/prometheus",
-                                "/error",
-                                "/api/auth/sign-in/email",
-                                "/api/auth/sign-up/email",
-                                "/api/auth/refresh-token",
-                                "/api/auth/forgot-password",
-                                "/api/auth/reset-password",
-                                "/api/auth/verify-email")
-                        .permitAll()
-                        .anyRequest().authenticated())
+                .authorizeHttpRequests(authorize -> {
+                    authorize.requestMatchers(
+                                    "/health",
+                                    "/health/**",
+                                    "/actuator/health/**",
+                                    "/actuator/prometheus",
+                                    "/error",
+                                    "/api/auth/sign-in/email",
+                                    "/api/auth/sign-up/email",
+                                    "/api/auth/refresh-token",
+                                    "/api/auth/forgot-password",
+                                    "/api/auth/reset-password",
+                                    "/api/auth/verify-email")
+                            .permitAll();
+                    // MIG-032 RP public surface — present only when the RP is
+                    // configured (OAuth2LoginConfig provides the beans).
+                    if (oidcClientRegistrations.getIfAvailable() != null) {
+                        authorize.requestMatchers(OAuth2LoginConfig.PUBLIC_MATCHER).permitAll();
+                    }
+                    authorize.anyRequest().authenticated();
+                })
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler)
@@ -87,6 +115,21 @@ public class AuthSecurityConfig {
                         BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(forcedPasswordChangeFilter,
                         BearerTokenAuthenticationFilter.class);
+        if (oidcClientRegistrations.getIfAvailable() != null) {
+            // MIG-032 relying-party segment (ADR-025 RP role): config-driven
+            // client registrations, explicit linking in the OIDC user
+            // service, canonical session contract on success, frozen 401 on
+            // failure. The IdP redirect_uri is
+            // {baseUrl}/api/auth/oidc/callback/{registrationId}.
+            http.oauth2Login(oauth2 -> oauth2
+                    .authorizationEndpoint(authorization -> authorization
+                            .baseUri(OAuth2LoginConfig.AUTHORIZATION_ENDPOINT_BASE_URI))
+                    .loginProcessingUrl(OAuth2LoginConfig.CALLBACK_BASE_URI + "/{registrationId}")
+                    .userInfoEndpoint(userInfo -> userInfo
+                            .oidcUserService(oidcUserService.getObject()))
+                    .successHandler(oidcLoginSuccessHandler.getObject())
+                    .failureHandler(oidcLoginFailureHandler.getObject()));
+        }
         return http.build();
     }
 

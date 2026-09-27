@@ -37,6 +37,15 @@ dependencies {
     // authorization server (MIG-033) and the relying party (MIG-032) build on.
     // The Spring Authorization Server dependency itself is MIG-033 scope.
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    // --- MIG-032 OIDC relying party (SPEC-002 FR-04/TR-05; ADR-025) ---
+    // oauth2Login filter-chain segment + OIDC client-registration support for
+    // external IdP login with explicit account linking. No bespoke token
+    // crypto: ID-token signature/issuer/audience validation is Spring
+    // Security's standard JwtDecoder/OidcIdTokenValidator path. The provider/
+    // client registration is config-driven (typed yacc.auth.oauth2.*
+    // @ConfigurationProperties — ARCH-004 §4); no hard-coded IdP. The embedded
+    // OIDC authorization server (AS) remains MIG-033 scope.
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
     // Bean validation (@Valid + jakarta.validation constraints) on inbound
     // request bodies — the replacement for the POC's Zod validation
     // (ARCH-004 §3; ADR-023 supersedes ADR-020).

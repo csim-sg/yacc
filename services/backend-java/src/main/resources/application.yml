@@ -137,6 +137,29 @@ yacc:
     email-verification:
       # MIG-031 verification-token policy (single use, 60-minute expiry).
       token-ttl: 60m
+    oauth2:
+      # MIG-032 OIDC relying party (ADR-025 RP role; ARCH-004 §4/§8). The
+      # external IdP is NOT hard-coded: the founder names the IdP(s) at
+      # acceptance and each is wired purely through configuration. Disabled by
+      # default — the RP surface (/api/auth/oidc/**) exists only when
+      # YACC_AUTH_OAUTH2_ENABLED=true. Enabling without at least one complete
+      # registration fails startup (fail-closed). Secrets arrive only from the
+      # environment / K8s Secrets (YACC_AUTH_OAUTH2_REGISTRATIONS_<ID>_*),
+      # never defaults, never logged. ID-token signature/issuer/audience
+      # validation is Spring Security's standard JwtDecoder path — no bespoke
+      # token crypto (the embedded AS is MIG-033 scope).
+      enabled: ${YACC_AUTH_OAUTH2_ENABLED:false}
+      # registrations:
+      #   <idp-name>:                       # e.g. the founder-named IdP at acceptance
+      #     client-id: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_CLIENT_ID:}
+      #     client-secret: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_CLIENT_SECRET:}
+      #     issuer-uri: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_ISSUER_URI:}
+      #     authorization-uri: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_AUTHORIZATION_URI:}
+      #     token-uri: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_TOKEN_URI:}
+      #     jwk-set-uri: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_JWK_SET_URI:}
+      #     user-info-uri: ${YACC_AUTH_OAUTH2_REGISTRATIONS_<IDP>_USER_INFO_URI:}
+      #     # user-name-attribute: sub       # default sub
+      #     # scopes: openid,profile,email   # default openid,profile,email
   integration:
     encryption:
       # MIG-021 secret contract (ADR-027): the IRC credential master key is

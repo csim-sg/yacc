@@ -81,7 +81,7 @@ class EmailVerificationServiceTest {
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
         service = new EmailVerificationService(users, verifications, passwordEncoder,
-                emails, new AuthProperties(null, null, null, null, null, null), audit);
+                emails, new AuthProperties(null, null, null, null, null, null, null), audit);
     }
 
     private User user(boolean emailVerified) {
