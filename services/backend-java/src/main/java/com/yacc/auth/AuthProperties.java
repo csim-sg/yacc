@@ -15,21 +15,24 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param email             outbound email delivery policy (MIG-031; SMTP/SendGrid)
  * @param passwordReset     password-reset token policy (MIG-031; BE-003 parity)
  * @param emailVerification email-verification token policy (MIG-031)
+ * @param oauth2            OIDC relying-party client registrations (MIG-032)
  */
 @ConfigurationProperties(prefix = "yacc.auth")
 public record AuthProperties(Token token, Bootstrap bootstrap, Recovery recovery,
-        Email email, PasswordReset passwordReset, EmailVerification emailVerification) {
+        Email email, PasswordReset passwordReset, EmailVerification emailVerification,
+        OAuth2 oauth2) {
 
     /**
-     * Applies the KISS defaults when the optional MIG-031 sections are
+     * Applies the KISS defaults when the optional MIG-031/MIG-032 sections are
      * absent from configuration (mirrors the {@link Token} TTL defaults).
      *
      * @param token             stateless JWT access-token policy
      * @param bootstrap         deterministic first-run bootstrap inputs
-     * @param recovery          founder-controlled recovery gate
+     * @param recovery         founder-controlled recovery gate
      * @param email             outbound email delivery policy
      * @param passwordReset     password-reset token policy
      * @param emailVerification email-verification token policy
+     * @param oauth2            OIDC relying-party client registrations
      */
     public AuthProperties {
         if (email == null) {
@@ -40,6 +43,9 @@ public record AuthProperties(Token token, Bootstrap bootstrap, Recovery recovery
         }
         if (emailVerification == null) {
             emailVerification = new EmailVerification(null);
+        }
+        if (oauth2 == null) {
+            oauth2 = new OAuth2(false, java.util.Map.of());
         }
     }
 
@@ -162,6 +168,64 @@ public record AuthProperties(Token token, Bootstrap bootstrap, Recovery recovery
             if (tokenTtl == null) {
                 tokenTtl = Duration.ofMinutes(60);
             }
+        }
+    }
+
+    /**
+     * OIDC relying-party client registrations (MIG-032; ADR-025 RP role;
+     * ARCH-004 §4). Disabled by default — enabling without at least one
+     * complete registration fails startup (fail-closed). No IdP is
+     * hard-coded: the founder names the external IdP(s) at acceptance and
+     * each is wired purely through configuration; secrets arrive only from
+     * the environment / K8s Secrets and are never logged.
+     *
+     * @param enabled       turns the {@code oauth2Login} RP surface on
+     *                      ({@code YACC_AUTH_OAUTH2_ENABLED})
+     * @param registrations config-driven client registrations keyed by
+     *                      registration id (the {@code providerId} stored on
+     *                      the {@code account} link rows); each registration
+     *                      becomes
+     *                      {@code /api/auth/oidc/authorization/<id>} (login
+     *                      entry) and
+     *                      {@code /api/auth/oidc/callback/<id>} (RP callback)
+     */
+    public record OAuth2(boolean enabled, java.util.Map<String, Registration> registrations) {
+
+        /** The single user-info attribute that identifies the IdP subject. */
+        public static final String DEFAULT_USER_NAME_ATTRIBUTE = "sub";
+
+        /** The default OIDC scopes (SPEC-002 FR-04: identity + email claims). */
+        public static final java.util.List<String> DEFAULT_SCOPES =
+                java.util.List.of("openid", "profile", "email");
+
+        /**
+         * One external IdP client registration (all endpoint material comes
+         * from the IdP's documented configuration; no discovery call is made
+         * at startup, keeping the service network-independent at boot).
+         *
+         * @param clientId           IdP-issued client id
+         *                           ({@code YACC_AUTH_OAUTH2_REGISTRATIONS_<ID>_CLIENT_ID})
+         * @param clientSecret       IdP-issued client secret (env/secret only)
+         * @param issuerUri          expected ID-token {@code iss} value;
+         *                           required (fail-closed): the OIDC issuer
+         *                           validator is applied only when an issuer
+         *                           is configured, so an absent issuer-uri
+         *                           would accept a correctly signed token
+         *                           carrying a foreign {@code iss}
+         *                           (validated per OIDC core §3.1.3.7)
+         * @param authorizationUri   IdP authorization endpoint
+         * @param tokenUri           IdP token endpoint (code exchange)
+         * @param jwkSetUri          IdP JWKS endpoint (ID-token signature)
+         * @param userInfoUri        IdP user-info endpoint (optional — claims
+         *                           may come from the ID token alone)
+         * @param userNameAttribute  IdP subject claim (default {@code sub})
+         * @param scopes             requested scopes
+         *                           (default openid,profile,email)
+         */
+        public record Registration(String clientId, String clientSecret,
+                String issuerUri, String authorizationUri, String tokenUri,
+                String jwkSetUri, String userInfoUri, String userNameAttribute,
+                java.util.List<String> scopes) {
         }
     }
 }

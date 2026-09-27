@@ -36,6 +36,18 @@
 #   ADR-025); the canonicalized wildcard sub-path set did not include it, so the
 #   confirmation endpoint is recorded here as an explicit deviation. Single-use,
 #   expiring email token; generic anti-enumeration 400 on invalid tokens.
+#
+# MIG-032 contract-change findings (issue #349; same §1.5 rule):
+# - `/api/auth/oidc/authorization/{registrationId}` (GET, public) and
+#   `/api/auth/oidc/callback/{registrationId}` (GET, public) added — the OIDC
+#   relying-party login surface (ADR-025 RP role; TR-05 oauth2Login + explicit
+#   linking). The baseline social-login surface lived inside the BetterAuth
+#   wildcard (ledger row REST-AUTH-004); these are its canonical replacement,
+#   recorded here as an explicit deviation. Config-gated: the paths exist only
+#   when `yacc.auth.oauth2.enabled=true` with at least one complete client
+#   registration (no hard-coded IdP); the success callback answers the same
+#   AuthSessionResponse shape as sign-in (MIG-034 adaptation surface), and all
+#   failures deny with the frozen 401 `{error}` body.
 openapi: 3.1.0
 info:
   title: YACC REST API (canonical)
@@ -229,6 +241,75 @@ paths:
               schema: {$ref: '#/components/schemas/SuccessMessageResponse'}
         '400':
           description: Invalid or expired token (generic, anti-enumeration)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+  /api/auth/oidc/authorization/{registrationId}:
+    get:
+      tags: [auth]
+      operationId: authOidcAuthorization
+      summary: Start the OIDC relying-party login (public; config-gated MIG-032 deviation)
+      description: |
+        MIG-032 OIDC RP login entry. Builds the authorization-code request
+        (state + PKCE-grade nonce binding) and redirects the browser to the
+        configured IdP's authorization endpoint. The registration id names a
+        config-driven client registration (`yacc.auth.oauth2.registrations.*`,
+        no hard-coded IdP); an unknown id is denied outright. The redirect
+        handed to the IdP carries
+        `redirect_uri={baseUrl}/api/auth/oidc/callback/{registrationId}`.
+      security: []
+      parameters:
+        - name: registrationId
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '302':
+          description: Redirect to the configured IdP authorization endpoint
+        '500':
+          description: Unknown registration id (Spring Security default deny — never starts a login)
+  /api/auth/oidc/callback/{registrationId}:
+    get:
+      tags: [auth]
+      operationId: authOidcCallback
+      summary: OIDC relying-party callback — code exchange, explicit linking, session issuance (public; config-gated MIG-032 deviation)
+      description: |
+        MIG-032 RP callback. Exchanges the authorization code (ID token
+        validated for signature via the IdP JWKS, issuer, audience, timestamps,
+        and the nonce binding), then resolves the YACC identity with explicit
+        account linking: existing link → sign in; verified e-mail match →
+        explicit `account` link row (audit `user.oidc.linked`); otherwise a
+        new USER-role identity with an unusable local credential is
+        provisioned and linked (audit `user.oidc.provisioned`). Status is
+        enforced — inactive/suspended matches are denied and never linked.
+        Success answers the canonical AuthSessionResponse (refresh grant +
+        stateless RS256 access token); every failure denies with the frozen
+        401 `{error}` body (anti-enumeration; reasons stay in the audit
+        trail).
+      security: []
+      parameters:
+        - name: registrationId
+          in: path
+          required: true
+          schema: {type: string}
+        - name: code
+          in: query
+          required: true
+          schema: {type: string}
+        - name: state
+          in: query
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: |
+            RP login complete; the canonical session contract for the linked
+            identity (same shape as authSignInEmail).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthSessionResponse'}
+        '401':
+          description: Login denied (generic; anti-enumeration)
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ErrorResponse'}

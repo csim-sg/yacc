@@ -28,7 +28,7 @@ class JwtTokenServiceTest {
         return new AuthProperties(
                 new AuthProperties.Token(signingKeyBase64, null, null),
                 new AuthProperties.Bootstrap("bootstrap@fixture.yacc.local", "initial"),
-                new AuthProperties.Recovery("", "", ""), null, null, null);
+                new AuthProperties.Recovery("", "", ""), null, null, null, null);
     }
 
     private static String generatedKey(int bits) {
@@ -92,7 +92,7 @@ class JwtTokenServiceTest {
                 new AuthProperties.Token(generatedKey(2048),
                         java.time.Duration.ofSeconds(1), java.time.Duration.ofDays(30)),
                 new AuthProperties.Bootstrap("bootstrap@fixture.yacc.local", "initial"),
-                new AuthProperties.Recovery("", "", ""), null, null, null));
+                new AuthProperties.Recovery("", "", ""), null, null, null, null));
 
         String token = service.issueAccessToken(user("user-1", UserRole.USER), "session-1");
         Thread.sleep(1500);
