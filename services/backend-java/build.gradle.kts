@@ -24,6 +24,13 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+    // --- MIG-011 observability (SPEC-002 TR-07, ADR-029) ---
+    // Micrometer Prometheus registry: /actuator/prometheus scrape endpoint.
+    implementation("io.micrometer:micrometer-registry-prometheus")
+    // Spring Security event API only (audit listener). The filter chain and
+    // identity subsystem are MIG-030; no security auto-configuration is used.
+    implementation("org.springframework.security:spring-security-core")
+
     // MIG-014 test infrastructure (SPEC-002 Testing Strategy; ARCH-004 §13 #10).
     // Versions are managed by the Spring Boot dependency-management BOM.
     testImplementation("org.springframework.boot:spring-boot-starter-test")
