@@ -1,7 +1,6 @@
 package com.yacc.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.Base64;
@@ -9,14 +8,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
-import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
-import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 
 import com.nimbusds.jose.jwk.KeyType;
 import com.nimbusds.jose.jwk.JWK;
@@ -25,17 +18,16 @@ import com.nimbusds.jose.jwk.JWKSelector;
 import com.yacc.auth.service.JwtTokenService;
 
 /**
- * Unit tests for the embedded authorization-server policy (MIG-033;
- * ADR-025 AS role): fail-closed registered-client validation, the
- * founder-fixed public-client/PKCE/consent posture, shared token TTLs, the
- * configured issuer, and the JWKS source backed by the SAME key family as
- * the resource server (no second signing-key source).
+ * Unit tests for the AS configuration wiring (MIG-033; review loop 1: the
+ * configuration is the single AS entry point and wiring only — policy lives
+ * in the focused auth components, e.g. {@link AsClientPolicyTest}): the
+ * configured issuer, the JWKS source backed by the SAME key family as the
+ * resource server (no second signing-key source), and the shared property
+ * defaults.
  */
 class AuthorizationServerConfigTest {
 
-    private static final String KEY = generatedKey(2048);
-
-    private static String generatedKey(int bits) {
+    static String generatedKey(int bits) {
         try {
             java.security.KeyPairGenerator generator =
                     java.security.KeyPairGenerator.getInstance("RSA");
@@ -49,7 +41,7 @@ class AuthorizationServerConfigTest {
 
     private static AuthProperties asProperties(AuthProperties.As as) {
         return new AuthProperties(
-                new AuthProperties.Token(KEY, null, null),
+                new AuthProperties.Token(generatedKey(2048), null, null),
                 new AuthProperties.Bootstrap("bootstrap@fixture.yacc.local", "initial"),
                 new AuthProperties.Recovery("", "", ""), null, null, null, null, as);
     }
@@ -58,90 +50,6 @@ class AuthorizationServerConfigTest {
         return new AuthProperties.As("https://yacc.fixture.local", Map.of(
                 "yacc-frontend", new AuthProperties.As.AsClient("yacc-frontend",
                         List.of("http://localhost:5173/auth/callback"), null)));
-    }
-
-    @Test
-    void registeredClientPolicyIsPublicPkceConsentCodePlusRefresh() {
-        RegisteredClientRepository repository = new AuthorizationServerConfig()
-                .registeredClientRepository(asProperties(defaultAs()));
-
-        RegisteredClient client = repository.findByClientId("yacc-frontend");
-        assertThat(client).isNotNull();
-        assertThat(client.getClientAuthenticationMethods())
-                .containsExactly(ClientAuthenticationMethod.NONE);
-        assertThat(client.getAuthorizationGrantTypes()).containsExactlyInAnyOrder(
-                AuthorizationGrantType.AUTHORIZATION_CODE,
-                AuthorizationGrantType.REFRESH_TOKEN);
-        assertThat(client.getAuthorizationGrantTypes())
-                .doesNotContain(AuthorizationGrantType.CLIENT_CREDENTIALS);
-        ClientSettings clientSettings = client.getClientSettings();
-        assertThat(clientSettings.isRequireProofKey()).isTrue();
-        assertThat(clientSettings.isRequireAuthorizationConsent()).isTrue();
-        assertThat(client.getRedirectUris())
-                .containsExactly("http://localhost:5173/auth/callback");
-    }
-
-    @Test
-    void tokenSettingsReuseTheSharedTtlPolicyAndRotateRefreshTokens() {
-        AuthProperties properties = asProperties(defaultAs());
-        RegisteredClient client = new AuthorizationServerConfig()
-                .registeredClientRepository(properties).findByClientId("yacc-frontend");
-
-        TokenSettings tokenSettings = client.getTokenSettings();
-        assertThat(tokenSettings.getAccessTokenTimeToLive())
-                .isEqualTo(properties.token().accessTtl());
-        assertThat(tokenSettings.getRefreshTokenTimeToLive())
-                .isEqualTo(properties.token().refreshTtl());
-        assertThat(tokenSettings.isReuseRefreshTokens()).isFalse();
-    }
-
-    @Test
-    void scopesDefaultToOidcProfileEmail() {
-        RegisteredClient client = new AuthorizationServerConfig()
-                .registeredClientRepository(asProperties(defaultAs()))
-                .findByClientId("yacc-frontend");
-        assertThat(client.getScopes()).containsExactly("openid", "profile", "email");
-    }
-
-    @Test
-    void emptyClientRegistryFailsStartup() {
-        assertThatThrownBy(() -> new AuthorizationServerConfig()
-                .registeredClientRepository(asProperties(new AuthProperties.As(null, Map.of()))))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("at least one client");
-    }
-
-    @Test
-    void missingClientIdFailsStartup() {
-        AuthProperties.As.AsClient client = new AuthProperties.As.AsClient("  ",
-                List.of("http://localhost:5173/auth/callback"), null);
-        assertThatThrownBy(() -> new AuthorizationServerConfig()
-                .registeredClientRepository(asProperties(new AuthProperties.As(null,
-                        Map.of("yacc-frontend", client)))))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("client-id");
-    }
-
-    @Test
-    void missingRedirectUrisFailStartup() {
-        AuthProperties.As.AsClient client = new AuthProperties.As.AsClient("yacc-frontend",
-                List.of(), null);
-        assertThatThrownBy(() -> new AuthorizationServerConfig()
-                .registeredClientRepository(asProperties(new AuthProperties.As(null,
-                        Map.of("yacc-frontend", client)))))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("redirect-uris");
-    }
-
-    @Test
-    void missingOpenidScopeFailsStartup() {
-        AuthProperties.As.AsClient client = new AuthProperties.As.AsClient("yacc-frontend",
-                List.of("http://localhost:5173/auth/callback"), List.of("profile"));
-        assertThatThrownBy(() -> new AuthorizationServerConfig()
-                .registeredClientRepository(asProperties(new AuthProperties.As(null,
-                        Map.of("yacc-frontend", client)))))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("openid");
     }
 
     @Test

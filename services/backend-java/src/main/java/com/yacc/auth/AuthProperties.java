@@ -258,7 +258,7 @@ public record AuthProperties(Token token, Bootstrap bootstrap, Recovery recovery
      *                (env {@code YACC_AUTH_AS_ISSUER})
      * @param clients registered clients keyed by registration id; must
      *                contain at least the YACC frontend client (fail-closed
-     *                validation in {@code AuthorizationServerConfig})
+     *                validation in {@code AsClientPolicy})
      */
     public record As(String issuer, java.util.Map<String, AsClient> clients) {
 

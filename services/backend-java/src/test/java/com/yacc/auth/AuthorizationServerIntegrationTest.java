@@ -8,8 +8,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +30,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -375,6 +383,97 @@ class AuthorizationServerIntegrationTest extends AbstractPostgresIntegrationTest
                 .andExpect(status().isBadRequest());
     }
 
+    /**
+     * Review loop 1 — deterministic concurrent replay/race regression: two
+     * simultaneous refresh requests presenting the SAME rotation-on-use
+     * token. The refresh-grant operation is serialized per presented token
+     * ({@code AsRefreshTokenSerializationFilter} in the AS chain), so the
+     * first request consumes the grant and the replayed one finds the
+     * rotated-out grant and receives {@code invalid_grant} — exactly one
+     * success and one denial for ANY interleaving (without serialization
+     * both requests could observe the still-active grant and both succeed).
+     */
+    @Test
+    void concurrentReuseOfOneRefreshTokenYieldsExactlyOneSuccessAndOneInvalidGrant()
+            throws Exception {
+        seedUser("88888888-8888-8888-8888-888888888888", "race@fixture.yacc.local",
+                UserRole.USER, UserStatus.ACTIVE);
+        String bearer = signIn("race@fixture.yacc.local");
+        Pkce pkce = Pkce.generate();
+        String code = approveConsent(bearer,
+                authorizeExpectingConsent(bearer, pkce, "state-race-1", "nonce-race-1"));
+        JsonNode tokens = exchangeCode(code, pkce);
+        String refreshToken = tokens.get("refresh_token").asText();
+
+        record Attempt(int status, String body) {
+        }
+        int racers = 2;
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(racers);
+        // The status-enforcing grant store reloads the owner from the
+        // database on EVERY resolution — and the racer threads run OUTSIDE
+        // the test transaction — so the seeded identity is committed before
+        // the race (and removed after, keeping the class rollback model).
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+        try {
+            List<Future<Attempt>> attempts = new ArrayList<>();
+            for (int i = 0; i < racers; i++) {
+                attempts.add(pool.submit(() -> {
+                    start.await();
+                    MvcResult result = mockMvc
+                            .perform(post("/oauth2/token")
+                                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                                    .param("grant_type", "refresh_token")
+                                    .param("refresh_token", refreshToken)
+                                    .param("client_id", CLIENT_ID))
+                            .andReturn();
+                    return new Attempt(result.getResponse().getStatus(),
+                            result.getResponse().getContentAsString());
+                }));
+            }
+            // Both racers fire simultaneously; the serialized refresh path
+            // makes the outcome deterministic regardless of scheduling.
+            start.countDown();
+
+            int successes = 0;
+            int invalidGrants = 0;
+            String winnerRefresh = null;
+            for (Future<Attempt> attempt : attempts) {
+                Attempt outcome = attempt.get(10, TimeUnit.SECONDS);
+                if (outcome.status() == 200) {
+                    successes++;
+                    winnerRefresh = mapper.readTree(outcome.body())
+                            .get("refresh_token").asText();
+                }
+                else if (outcome.status() == 400) {
+                    invalidGrants++;
+                    assertThat(outcome.body()).contains("invalid_grant");
+                }
+            }
+            assertThat(successes).as("exactly one refresh success").isEqualTo(1);
+            assertThat(invalidGrants).as("exactly one invalid_grant replay denial")
+                    .isEqualTo(1);
+            assertThat(winnerRefresh)
+                    .isNotNull()
+                    .isNotEqualTo(refreshToken);
+
+            // The replay is permanently dead: the presented token stays
+            // single-use after the race (checked before the cleanup below so
+            // the denial is attributable to the rotated-out grant).
+            mockMvc.perform(post("/oauth2/token")
+                            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                            .param("grant_type", "refresh_token")
+                            .param("refresh_token", refreshToken)
+                            .param("client_id", CLIENT_ID))
+                    .andExpect(status().isBadRequest());
+        }
+        finally {
+            pool.shutdownNow();
+            users.deleteById("88888888-8888-8888-8888-888888888888");
+        }
+    }
+
     @Test
     void userInfoServesScopeFilteredClaimsFromTheGrantedIdentity() throws Exception {
         seedUser("44444444-4444-4444-4444-444444444444", "userinfo@fixture.yacc.local",
@@ -500,6 +599,120 @@ class AuthorizationServerIntegrationTest extends AbstractPostgresIntegrationTest
                         .param("client_id", "not-registered")
                         .param("code_verifier", "verifier"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Review loop 1 — status-aware refresh regression: the grant was issued
+     * while the owner was ACTIVE, then the account is suspended. A refresh
+     * request carries no bearer token, so the grant owner is re-loaded from
+     * the database before the grant is processed
+     * ({@code AsStatusEnforcingAuthorizationService}) — the suspended
+     * identity receives {@code invalid_grant} and no new access token, and
+     * the stale AS access token is equally dead at the AS role (userinfo).
+     */
+    @Test
+    void refreshIsDeniedAfterTheAccountIsSuspended() throws Exception {
+        seedUser("aaaaaaa1-0000-0000-0000-000000000001",
+                "suspend-refresh@fixture.yacc.local", UserRole.USER, UserStatus.ACTIVE);
+        String bearer = signIn("suspend-refresh@fixture.yacc.local");
+        Pkce pkce = Pkce.generate();
+        String code = approveConsent(bearer, authorizeExpectingConsent(bearer, pkce,
+                "state-susp-refresh-1", "nonce-sr-1"));
+        JsonNode tokens = exchangeCode(code, pkce);
+
+        // ACTIVE → SUSPENDED after the grant was issued.
+        User user = users.findById("aaaaaaa1-0000-0000-0000-000000000001")
+                .orElseThrow();
+        user.setStatus(UserStatus.SUSPENDED);
+        users.save(user);
+
+        // Fail-closed at the AS grant store: the suspended identity cannot
+        // mint a new access token from the stored grant.
+        mockMvc.perform(post("/oauth2/token")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("grant_type", "refresh_token")
+                        .param("refresh_token", tokens.get("refresh_token").asText())
+                        .param("client_id", CLIENT_ID))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_grant"));
+
+        // The stale AS access token no longer serves the AS role either.
+        mockMvc.perform(get("/userinfo")
+                        .header("Authorization",
+                                "Bearer " + tokens.get("access_token").asText()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Review loop 1 — revocation behavior for a suspended identity: the
+     * revocation request is rejected before processing (the grant store
+     * resolves nothing for a non-ACTIVE owner), which per RFC 7009 §2.2
+     * still answers 200 so token validity stays private — and the grant
+     * stays unusable either way: the follow-up refresh is denied too.
+     */
+    @Test
+    void revocationForSuspendedIdentityIsRejectedAndTheGrantStaysUnusable()
+            throws Exception {
+        seedUser("aaaaaaa1-0000-0000-0000-000000000002",
+                "suspend-revoke@fixture.yacc.local", UserRole.USER, UserStatus.ACTIVE);
+        String bearer = signIn("suspend-revoke@fixture.yacc.local");
+        Pkce pkce = Pkce.generate();
+        String code = approveConsent(bearer, authorizeExpectingConsent(bearer, pkce,
+                "state-susp-revoke-1", "nonce-sr-2"));
+        JsonNode tokens = exchangeCode(code, pkce);
+
+        User user = users.findById("aaaaaaa1-0000-0000-0000-000000000002")
+                .orElseThrow();
+        user.setStatus(UserStatus.SUSPENDED);
+        users.save(user);
+
+        mockMvc.perform(post("/oauth2/revoke")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("token", tokens.get("refresh_token").asText())
+                        .param("client_id", CLIENT_ID))
+                .andExpect(status().isOk());
+
+        // Suspension — not revocation — is what denies the identity, and it
+        // denies it completely: no new access token from the stored grant.
+        mockMvc.perform(post("/oauth2/token")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("grant_type", "refresh_token")
+                        .param("refresh_token", tokens.get("refresh_token").asText())
+                        .param("client_id", CLIENT_ID))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_grant"));
+    }
+
+    /**
+     * Review loop 1 — a pending authorization code cannot mint tokens for a
+     * suspended identity: the code was issued while ACTIVE, then the
+     * account is suspended BEFORE the exchange — the token endpoint answers
+     * {@code invalid_grant} instead of issuing access/ID/refresh tokens.
+     */
+    @Test
+    void authorizationCodeExchangeIsDeniedAfterTheAccountIsSuspended()
+            throws Exception {
+        seedUser("aaaaaaa1-0000-0000-0000-000000000003",
+                "suspend-code@fixture.yacc.local", UserRole.USER, UserStatus.ACTIVE);
+        String bearer = signIn("suspend-code@fixture.yacc.local");
+        Pkce pkce = Pkce.generate();
+        String code = approveConsent(bearer, authorizeExpectingConsent(bearer, pkce,
+                "state-susp-code-1", "nonce-sc-1"));
+
+        User user = users.findById("aaaaaaa1-0000-0000-0000-000000000003")
+                .orElseThrow();
+        user.setStatus(UserStatus.SUSPENDED);
+        users.save(user);
+
+        mockMvc.perform(post("/oauth2/token")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("grant_type", "authorization_code")
+                        .param("code", code)
+                        .param("redirect_uri", REDIRECT_URI)
+                        .param("client_id", CLIENT_ID)
+                        .param("code_verifier", pkce.verifier()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_grant"));
     }
 
 }

@@ -1,75 +1,52 @@
 package com.yacc.auth;
 
-import jakarta.servlet.http.HttpServletRequest;
-
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.ProviderManager;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
-import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
-import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
-import org.springframework.security.oauth2.core.oidc.OidcIdToken;
-import org.springframework.security.oauth2.core.oidc.OidcScopes;
-import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
-import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
+import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
-import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
-import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
-import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OidcConfigurer;
-import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationContext;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
-import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
-import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
-import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2AccessTokenGenerator;
-import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
-import org.springframework.security.oauth2.server.authorization.web.OAuth2AuthorizationEndpointFilter;
-import org.springframework.security.oauth2.server.authorization.web.authentication.ClientSecretBasicAuthenticationConverter;
-import org.springframework.security.oauth2.server.authorization.web.authentication.ClientSecretPostAuthenticationConverter;
-import org.springframework.security.oauth2.server.authorization.web.authentication.DelegatingAuthenticationConverter;
-import org.springframework.security.oauth2.server.authorization.web.authentication.JwtClientAssertionAuthenticationConverter;
-import org.springframework.security.oauth2.server.authorization.web.authentication.PublicClientAuthenticationConverter;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
-import org.springframework.security.web.authentication.AuthenticationConverter;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.header.HeaderWriterFilter;
 import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
-import com.yacc.auth.model.AuthUser;
 import com.yacc.auth.service.BearerTokenAuthenticationConverter;
 import com.yacc.auth.service.JwtTokenService;
 
 /**
- * Embedded OIDC authorization server (MIG-033; ADR-025 AS role; ARCH-004 §8).
- * The founder-fixed dual-role OIDC posture: YACC is both relying party
+ * Embedded OIDC authorization server — the ONE AS configuration entry point
+ * (MIG-033; ADR-025 AS role; ARCH-004 §8). This class is WIRING ONLY
+ * (review loop 1): the security-critical policy/projection/converter
+ * responsibilities live in focused constructor-injected auth components —
+ * {@link AsClientPolicy} (registered-client policy), {@link AsOidcTokenCustomizer}
+ * (JWT claim policy), {@link AsUserInfoProjection} (UserInfo projection),
+ * {@link AsClientAuthenticationConverter} (client-request conversion) and
+ * {@link AsRefreshTokenSerializationFilter} (per-token refresh serialization).
+ *
+ * <p>The founder-fixed dual-role OIDC posture: YACC is both relying party
  * (MIG-032) and authorization server — the AS is embedded in the single
- * backend via Spring Authorization Server; no Keycloak/broker (ADR-025).
+ * backend via Spring Authorization Server; no Keycloak/broker (ADR-025).</p>
  *
  * <p>Framework-standard endpoints only — {@code /oauth2/authorize},
  * {@code /oauth2/token}, {@code /oauth2/jwks}, {@code /oauth2/revoke},
@@ -91,13 +68,10 @@ import com.yacc.auth.service.JwtTokenService;
  * (no machine client is named — KISS); no second token format, no second
  * signing-key source.</p>
  *
- * <p>Registered-client policy (founder-fixed): the YACC frontend only,
- * config-driven through {@code yacc.auth.as.clients.*} (ARCH-004 §4). The
- * frontend is a public OIDC SPA client — no client secret, authorization-code
- * + PKCE (S256) + refresh; consent is always required. Grants/codes/consents
- * use the framework's in-process stores: outstanding AS grants are
- * process-local (a restart re-arms the dance), while the durable session
- * contract remains the MIG-030 refresh-grant table.</p>
+ * <p>Grants/codes/consents use the framework's in-process stores:
+ * outstanding AS grants are process-local (a restart re-arms the dance),
+ * while the durable session contract remains the MIG-030 refresh-grant
+ * table.</p>
  */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
@@ -119,6 +93,15 @@ public class AuthorizationServerConfig {
      * (API clients; browser UX is MIG-034 scope). CSRF is disabled on this
      * chain — every authentication on it is token- or PKCE-bound, never
      * cookie-authenticated (same rationale as the API chain).
+     *
+     * <p>Review loop 1: refresh-grant requests additionally pass through the
+     * {@link AsRefreshTokenSerializationFilter} positioned immediately
+     * before the {@link AuthorizationFilter} — Spring Authorization Server
+     * registers its token endpoint filter AFTER the {@link AuthorizationFilter},
+     * so the complete refresh operation (client authentication → grant
+     * find/consume → successor save → response) runs inside the per-token
+     * lock and a concurrent replay deterministically answers
+     * {@code invalid_grant}.</p>
      */
     @Bean
     @Order(1)
@@ -126,7 +109,10 @@ public class AuthorizationServerConfig {
             HttpSecurity http,
             JwtTokenService tokenService,
             BearerTokenAuthenticationConverter bearerConverter,
+            AsClientAuthenticationConverter clientAuthenticationConverter,
+            AsRefreshTokenSerializationFilter refreshTokenSerializationFilter,
             RegisteredClientRepository registeredClientRepository,
+            AsUserInfoProjection userInfoProjection,
             AuthenticationEntryPoint authenticationEntryPoint,
             AccessDeniedHandler accessDeniedHandler) throws Exception {
         OAuth2AuthorizationServerConfigurer authorizationServer =
@@ -152,12 +138,17 @@ public class AuthorizationServerConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 .addFilterAfter(resourceOwnerAuthFilter, HeaderWriterFilter.class)
+                // Review loop 1: serialize the complete refresh-grant
+                // operation per presented token (race-safe rotation).
+                .addFilterBefore(refreshTokenSerializationFilter,
+                        AuthorizationFilter.class)
                 .with(authorizationServer, as -> as
                         .clientAuthentication(clientAuthentication -> clientAuthentication
-                                .authenticationConverter(clientAuthenticationConverter())
+                                .authenticationConverter(clientAuthenticationConverter)
                                 .authenticationProvider(new AsPublicClientAuthenticationProvider(
                                         registeredClientRepository)))
-                        .oidc(oidcConfigurer()))
+                        .oidc(oidc -> oidc.userInfoEndpoint(userInfo -> userInfo
+                                .userInfoMapper(userInfoProjection))))
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated());
         return http.build();
     }
@@ -189,71 +180,6 @@ public class AuthorizationServerConfig {
     }
 
     /**
-     * Registered clients from {@code yacc.auth.as.clients.*} (founder-fixed
-     * policy: YACC frontend only unless a third-party client is named).
-     * Public OIDC SPA clients: authorization-code + refresh, PKCE (S256)
-     * mandatory, consent always required; token TTLs reuse the shared
-     * {@code yacc.auth.token} policy (single source); refresh tokens rotate
-     * on use (MIG-030 {@code SessionService.rotate} parity). Validation is
-     * eager and fail-closed: no clients, missing id, missing redirect URI,
-     * or a missing {@code openid} scope fails startup.
-     */
-    @Bean
-    public RegisteredClientRepository registeredClientRepository(AuthProperties properties) {
-        Map<String, AuthProperties.As.AsClient> clients = properties.as().clients();
-        if (clients.isEmpty()) {
-            throw new IllegalStateException(
-                    "yacc.auth.as.clients must register at least one client"
-                            + " (the YACC frontend); refusing to start the"
-                            + " authorization server with no registered clients");
-        }
-        List<RegisteredClient> registered = clients.entrySet().stream()
-                .map(entry -> registeredClient(entry.getKey(), entry.getValue(), properties))
-                .toList();
-        return new InMemoryRegisteredClientRepository(registered);
-    }
-
-    /**
-     * Claims alignment (guardrail): AS-issued tokens carry the same role and
-     * email claims as MIG-030 sign-in tokens (lowercase wire role from the
-     * persisted identity — authorities always re-resolve from the database,
-     * so the claim stays informational). ID tokens additionally carry the
-     * OIDC profile/email claims the granted scopes authorize (OIDC core
-     * §5.4) — account status is never a token claim; it is enforced against
-     * the database per request.
-     */
-    @Bean
-    public OAuth2TokenCustomizer<JwtEncodingContext> oidcTokenCustomizer() {
-        return context -> {
-            // The token context principal is the resource-owner
-            // authentication; the AuthUser identity rides as its principal.
-            Authentication authentication = context.getPrincipal();
-            if (!(authentication.getPrincipal() instanceof AuthUser user)) {
-                return;
-            }
-            context.getClaims()
-                    .claim(JwtTokenService.CLAIM_ROLE, user.getRole().getLabel())
-                    .claim(JwtTokenService.CLAIM_EMAIL, user.getEmail());
-            if (OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue())) {
-                Set<String> scopes = context.getAuthorizedScopes();
-                if (scopes.contains(OidcScopes.PROFILE)) {
-                    context.getClaims().claim("name", user.user().getName());
-                }
-                if (scopes.contains(OidcScopes.EMAIL)) {
-                    context.getClaims()
-                            .claim("email_verified", user.user().isEmailVerified());
-                }
-                if (user.isMustChangePassword()) {
-                    // Bootstrap/recovery identities: wire-visible forced
-                    // state so an OIDC client can react like the REST
-                    // AuthSessionResponse does (MIG-034 adaptation surface).
-                    context.getClaims().claim("must_change_password", true);
-                }
-            }
-        };
-    }
-
-    /**
      * Token generation for the AS: JWT access/ID tokens from the shared
      * JWKSource plus refresh tokens for ALL registered clients — including
      * the public YACC frontend, which the framework's default generator
@@ -261,9 +187,9 @@ public class AuthorizationServerConfig {
      * policy rationale and compensating controls).
      */
     @Bean
-    public org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator<? extends org.springframework.security.oauth2.core.OAuth2Token> tokenGenerator(
+    public OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator(
             JWKSource<com.nimbusds.jose.proc.SecurityContext> jwkSource,
-            OAuth2TokenCustomizer<JwtEncodingContext> jwtCustomizer) {
+            AsOidcTokenCustomizer jwtCustomizer) {
         JwtGenerator jwtGenerator = new JwtGenerator(new NimbusJwtEncoder(jwkSource));
         jwtGenerator.setJwtCustomizer(jwtCustomizer);
         OAuth2AccessTokenGenerator accessTokenGenerator = new OAuth2AccessTokenGenerator();
@@ -271,111 +197,32 @@ public class AuthorizationServerConfig {
                 new AsRefreshTokenGenerator());
     }
 
-    private static RegisteredClient registeredClient(String registrationId,
-            AuthProperties.As.AsClient client, AuthProperties properties) {
-        String prefix = "yacc.auth.as.clients." + registrationId;
-        if (client.clientId() == null || client.clientId().isBlank()) {
-            throw new IllegalStateException(prefix + ".client-id is required");
-        }
-        if (client.redirectUris() == null || client.redirectUris().isEmpty()) {
-            throw new IllegalStateException(
-                    prefix + ".redirect-uris must list at least one exact redirect URI");
-        }
-        List<String> scopes = client.scopes() == null || client.scopes().isEmpty()
-                ? AuthProperties.As.AsClient.DEFAULT_SCOPES
-                : client.scopes();
-        if (!scopes.contains(OidcScopes.OPENID)) {
-            throw new IllegalStateException(
-                    prefix + ".scopes must include the openid scope (OIDC client)");
-        }
-        return RegisteredClient.withId(UUID.randomUUID().toString())
-                .clientId(client.clientId())
-                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                .redirectUris(uris -> uris.addAll(client.redirectUris()))
-                .scopes(s -> s.addAll(scopes))
-                .clientSettings(ClientSettings.builder()
-                        .requireAuthorizationConsent(true)
-                        .requireProofKey(true)
-                        .build())
-                .tokenSettings(TokenSettings.builder()
-                        .accessTokenTimeToLive(properties.token().accessTtl())
-                        .refreshTokenTimeToLive(properties.token().refreshTtl())
-                        .reuseRefreshTokens(false)
-                        .build())
-                .build();
+    /**
+     * The per-token refresh serialization (review loop 1): a plain filter
+     * bean — deliberately NOT a {@code @Component}, so Spring Boot never
+     * registers it on the global servlet filter chain (same pattern as
+     * {@code ForcedPasswordChangeFilter}); it is wired into the AS chain
+     * only.
+     */
+    @Bean
+    public AsRefreshTokenSerializationFilter refreshTokenSerializationFilter() {
+        return new AsRefreshTokenSerializationFilter();
     }
 
     /**
-     * Client-authentication converters for the AS. The framework defaults
-     * (JWT assertion, basic, post, PKCE public client) plus an extension for
-     * the public YACC frontend on the refresh/revocation endpoints, which
-     * the framework otherwise refuses to authenticate (OAuth2.0 Security BCP
-     * posture — see {@link AsRefreshTokenGenerator}). The extension
-     * authenticates the client by its registered id only; the refresh token
-     * itself rotates on every use and is worthless to a thief (compensating
-     * controls in {@link AsRefreshTokenGenerator}).
+     * The AS grant store wrapped in per-resolution account-status
+     * enforcement (MIG-033 guardrail — suspended/revoked accounts are
+     * denied at BOTH AS and resource-server roles): a refresh or revocation
+     * request carries no bearer token, so every grant resolution re-loads
+     * the stored authorization's owner from the database and resolves the
+     * grant to {@code null} unless the owner is {@code ACTIVE}. The AS
+     * configurers discover this bean automatically; the in-process store
+     * itself stays the framework default (KISS).
      */
-    private static AuthenticationConverter clientAuthenticationConverter() {
-        return new DelegatingAuthenticationConverter(java.util.List.of(
-                new JwtClientAssertionAuthenticationConverter(),
-                new ClientSecretBasicAuthenticationConverter(),
-                new ClientSecretPostAuthenticationConverter(),
-                new PublicClientAuthenticationConverter(),
-                AuthorizationServerConfig::convertPublicRefreshOrRevokeClient));
-    }
-
-    private static Authentication convertPublicRefreshOrRevokeClient(HttpServletRequest request) {
-        String clientId = request.getParameter(OAuth2ParameterNames.CLIENT_ID);
-        if (!org.springframework.util.StringUtils.hasText(clientId)
-                || request.getParameter(OAuth2ParameterNames.CLIENT_SECRET) != null) {
-            return null;
-        }
-        boolean refreshRequest = "refresh_token"
-                .equals(request.getParameter(OAuth2ParameterNames.GRANT_TYPE));
-        boolean revokeRequest = "/oauth2/revoke".equals(request.getRequestURI());
-        if (!refreshRequest && !revokeRequest) {
-            return null;
-        }
-        // Non-code-grant additional parameters: tells the framework's
-        // code-verifier authenticator this dance carries no authorization
-        // code, so only the registered client id authenticates here.
-        return new OAuth2ClientAuthenticationToken(clientId,
-                ClientAuthenticationMethod.NONE, null, java.util.Map.of());
-    }
-
-    private static Customizer<OidcConfigurer> oidcConfigurer() {
-        return oidc -> oidc.userInfoEndpoint(userInfo -> userInfo
-                .userInfoMapper(AuthorizationServerConfig::oidcUserInfo));
-    }
-
-    /**
-     * Standard OIDC UserInfo claim mapping (OIDC core §5.3), sourced from
-     * the authorization's ID token and filtered by the granted scopes:
-     * {@code sub} always, {@code email}/{@code email_verified} under the
-     * email scope, {@code name} under the profile scope, plus the YACC
-     * {@code role} authorization claim.
-     */
-    private static OidcUserInfo oidcUserInfo(OidcUserInfoAuthenticationContext context) {
-        OAuth2Authorization authorization = context.getAuthorization();
-        OidcIdToken idToken = authorization
-                .getToken(OidcIdToken.class)
-                .getToken();
-        Set<String> scopes = authorization.getAuthorizedScopes();
-        Map<String, Object> claims = new LinkedHashMap<>();
-        claims.put("sub", idToken.getSubject());
-        if (scopes.contains(OidcScopes.EMAIL)) {
-            claims.put("email", idToken.getClaimAsString("email"));
-            claims.put("email_verified", idToken.getClaimAsBoolean("email_verified"));
-        }
-        if (scopes.contains(OidcScopes.PROFILE)) {
-            claims.put("name", idToken.getClaimAsString("name"));
-        }
-        String role = idToken.getClaimAsString(JwtTokenService.CLAIM_ROLE);
-        if (role != null) {
-            claims.put(JwtTokenService.CLAIM_ROLE, role);
-        }
-        return OidcUserInfo.builder().claims(map -> map.putAll(claims)).build();
+    @Bean
+    public OAuth2AuthorizationService authorizationService(
+            com.yacc.auth.service.TokenAuthenticationService tokenAuthenticationService) {
+        return new AsStatusEnforcingAuthorizationService(
+                new InMemoryOAuth2AuthorizationService(), tokenAuthenticationService);
     }
 }
