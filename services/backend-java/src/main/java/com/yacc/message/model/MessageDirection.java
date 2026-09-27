@@ -1,5 +1,8 @@
 package com.yacc.message.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
 /**
  * Java mapping of the PostgreSQL {@code message_direction} enum
  * (MIG-020, ADR-027).
@@ -21,11 +24,13 @@ public enum MessageDirection {
     }
 
     /** Exact PostgreSQL enum label for this direction. */
+    @JsonValue
     public String getLabel() {
         return label;
     }
 
-    /** Resolves a PostgreSQL {@code message_direction} label to its Java constant. */
+    /** Jackson creator: wire values are the PostgreSQL labels. */
+    @JsonCreator
     public static MessageDirection fromLabel(String label) {
         for (MessageDirection value : values()) {
             if (value.label.equals(label)) {

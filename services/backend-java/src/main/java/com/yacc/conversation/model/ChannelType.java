@@ -1,5 +1,8 @@
 package com.yacc.conversation.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
 /**
  * Java mapping of the PostgreSQL {@code channel_type} enum (MIG-020, ADR-027).
  *
@@ -25,11 +28,13 @@ public enum ChannelType {
     }
 
     /** Exact PostgreSQL enum label for this channel type. */
+    @JsonValue
     public String getLabel() {
         return label;
     }
 
-    /** Resolves a PostgreSQL {@code channel_type} label to its Java constant. */
+    /** Resolves a PostgreSQL {@code channel_type} label to its Java constant; Jackson creator. */
+    @JsonCreator
     public static ChannelType fromLabel(String label) {
         for (ChannelType value : values()) {
             if (value.label.equals(label)) {

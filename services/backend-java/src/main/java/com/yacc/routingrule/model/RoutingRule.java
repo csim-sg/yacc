@@ -117,8 +117,11 @@ public class RoutingRule {
         return updatedAt;
     }
 
-    public void setDescription(String description) {
-        this.description = description;
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setDescription(String description) {        this.description = description;
     }
 
     public void setStatus(String status) {

@@ -1,5 +1,8 @@
 package com.yacc.message.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
 /**
  * Java mapping of the PostgreSQL {@code message_status} enum (MIG-020, ADR-027).
  *
@@ -20,11 +23,13 @@ public enum MessageStatus {
     }
 
     /** Exact PostgreSQL enum label for this status. */
+    @JsonValue
     public String getLabel() {
         return label;
     }
 
-    /** Resolves a PostgreSQL {@code message_status} label to its Java constant. */
+    /** Jackson creator: wire values are the PostgreSQL labels. */
+    @JsonCreator
     public static MessageStatus fromLabel(String label) {
         for (MessageStatus value : values()) {
             if (value.label.equals(label)) {

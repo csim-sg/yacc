@@ -1,5 +1,8 @@
 package com.yacc.auth.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
 /**
  * Java mapping of the PostgreSQL {@code user_role} enum (MIG-020, ADR-027).
  *
@@ -21,11 +24,13 @@ public enum UserRole {
     }
 
     /** Exact PostgreSQL enum label for this role. */
+    @JsonValue
     public String getLabel() {
         return label;
     }
 
-    /** Resolves a PostgreSQL {@code user_role} label to its Java constant. */
+    /** Jackson creator: wire values are the PostgreSQL labels. */
+    @JsonCreator
     public static UserRole fromLabel(String label) {
         for (UserRole value : values()) {
             if (value.label.equals(label)) {
