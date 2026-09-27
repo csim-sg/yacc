@@ -112,5 +112,28 @@ class AuditLogsApiIntegrationTest extends AbstractApiIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.createObjectNode().put("format", "csv").toString()))
                 .andExpect(status().isForbidden());
+
+        // JSON export: typed AuditExportRow shape — metadata is an object
+        // (contract component AuditLog), never a stringified blob. Filtered to
+        // the seeded action (export filters mirror the query surface).
+        var jsonBody = mapper.createObjectNode().put("format", "json").set("filters",
+                mapper.createObjectNode().put("action", "bulk_action_applied"));
+        String json = mockMvc.perform(post("/api/audit-logs/export")
+                        .header("Authorization", adminAuth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonBody.toString()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/json"))
+                .andReturn().getResponse().getContentAsString();
+        var rows = mapper.readTree(json);
+        org.assertj.core.api.Assertions.assertThat(rows).hasSize(1);
+        var row = rows.get(0);
+        org.assertj.core.api.Assertions.assertThat(row.get("id").isTextual()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(row.get("action").asText())
+                .isEqualTo("bulk_action_applied");
+        org.assertj.core.api.Assertions.assertThat(row.get("entityId").asText())
+                .isEqualTo(conversationId.toString());
+        org.assertj.core.api.Assertions.assertThat(row.get("metadata").isObject()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(row.get("createdAt").isTextual()).isTrue();
     }
 }

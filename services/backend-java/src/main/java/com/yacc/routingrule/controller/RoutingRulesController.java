@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
@@ -32,6 +33,7 @@ import jakarta.validation.Valid;
  * {@code getRoutingRuleExecutions}): manager+ reads, admin+ writes.
  */
 @RestController
+@RequestMapping("/api/routing-rules")
 public class RoutingRulesController {
 
     private final RoutingRulesService rules;
@@ -42,7 +44,7 @@ public class RoutingRulesController {
         this.objectMapper = objectMapper;
     }
 
-    @GetMapping("/api/routing-rules")
+    @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public BaseListResponse<RoutingRuleResponse> list() {
         var all = rules.list();
@@ -51,7 +53,7 @@ public class RoutingRulesController {
                 1, all.size(), all.size());
     }
 
-    @PostMapping("/api/routing-rules")
+    @PostMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
     public RuleEnvelope create(@Valid @RequestBody RoutingRuleWrite request,
@@ -60,7 +62,7 @@ public class RoutingRulesController {
                 rules.create(UUID.fromString(principal.getId()), request), objectMapper));
     }
 
-    @PatchMapping("/api/routing-rules/{id}")
+    @PatchMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     public RuleEnvelope update(@PathVariable("id") UUID id,
             @Valid @RequestBody RoutingRuleWrite request,
@@ -69,7 +71,7 @@ public class RoutingRulesController {
                 rules.update(id, request, UUID.fromString(principal.getId())), objectMapper));
     }
 
-    @DeleteMapping("/api/routing-rules/{id}")
+    @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     public RuleEnvelope delete(@PathVariable("id") UUID id,
             @AuthenticationPrincipal AuthUser principal) {
@@ -78,7 +80,7 @@ public class RoutingRulesController {
         return new RuleEnvelope(RoutingRuleResponse.from(rule, objectMapper));
     }
 
-    @GetMapping("/api/routing-rules/{id}/executions")
+    @GetMapping("/{id}/executions")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public BaseListResponse<RoutingRuleExecutionResponse> executions(
             @PathVariable("id") UUID id,

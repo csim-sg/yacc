@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
@@ -32,6 +33,7 @@ import jakarta.validation.Valid;
  * operation is scoped to the authenticated user.
  */
 @RestController
+@RequestMapping("/api/notifications")
 public class NotificationsController {
 
     private final NotificationService notifications;
@@ -42,7 +44,7 @@ public class NotificationsController {
         this.mapper = mapper;
     }
 
-    @GetMapping("/api/notifications")
+    @GetMapping
     public BaseListResponse<NotificationResponse> list(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize,
@@ -55,7 +57,7 @@ public class NotificationsController {
                 result.page(), result.limit(), result.total());
     }
 
-    @PatchMapping("/api/notifications/{id}")
+    @PatchMapping("/{id}")
     public NotificationEnvelope markRead(@PathVariable("id") UUID id,
             @Valid @RequestBody MarkNotificationReadRequest request,
             @AuthenticationPrincipal AuthUser principal) {
@@ -63,13 +65,13 @@ public class NotificationsController {
                 NotificationResponse.from(notifications.markRead(id, principal.getId()), mapper));
     }
 
-    @DeleteMapping("/api/notifications/{id}")
+    @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void dismiss(@PathVariable("id") UUID id, @AuthenticationPrincipal AuthUser principal) {
         notifications.dismiss(id, principal.getId());
     }
 
-    @PostMapping("/api/notifications/mark-all-read")
+    @PostMapping("/mark-all-read")
     public MarkAllReadEnvelope markAllRead(@AuthenticationPrincipal AuthUser principal) {
         long marked = notifications.markAllRead(principal.getId());
         ObjectNode data = mapper.createObjectNode();

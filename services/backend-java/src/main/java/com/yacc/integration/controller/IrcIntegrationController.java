@@ -6,6 +6,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,6 +19,7 @@ import com.yacc.common.model.IntegrationErrorResponse;
 import com.yacc.integration.model.IrcConfigRequest;
 import com.yacc.integration.model.IrcConfigResponse;
 import com.yacc.integration.model.IrcConnectionStatus;
+import com.yacc.integration.model.IrcTestRequest;
 import com.yacc.integration.service.IrcConfigService;
 
 import jakarta.validation.Valid;
@@ -29,6 +31,7 @@ import jakarta.validation.Valid;
  * status. Errors use the frozen {@code {code,message}} shape.
  */
 @RestController
+@RequestMapping("/api/integrations/irc")
 public class IrcIntegrationController {
 
     private final IrcConfigService irc;
@@ -42,7 +45,7 @@ public class IrcIntegrationController {
         this.mapper = mapper;
     }
 
-    @PostMapping("/api/integrations/irc/config")
+    @PostMapping("/config")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public IrcConfigEnvelope saveConfig(@Valid @RequestBody IrcConfigRequest request,
             @AuthenticationPrincipal AuthUser principal) {
@@ -58,7 +61,7 @@ public class IrcIntegrationController {
         return new IrcConfigEnvelope(saved);
     }
 
-    @PostMapping("/api/integrations/irc/connect")
+    @PostMapping("/connect")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public IrcStatusEnvelope connect(@AuthenticationPrincipal AuthUser principal) {
         var config = irc.prepareConnect();
@@ -75,9 +78,10 @@ public class IrcIntegrationController {
         return new IrcStatusEnvelope(status);
     }
 
-    @PostMapping("/api/integrations/irc/test")
+    @PostMapping("/test")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public IrcTestEnvelope test(@RequestBody(required = false) IrcConfigService.TestRequest request,
+    public IrcTestEnvelope test(
+            @Valid @RequestBody(required = false) IrcTestRequest request,
             @AuthenticationPrincipal AuthUser principal) {
         IrcConfigService.TestResult result = irc.test(request);
         ObjectNode metadata = mapper.createObjectNode();
@@ -88,7 +92,7 @@ public class IrcIntegrationController {
         return new IrcTestEnvelope(new SanitizedResult(result.success(), result.message()));
     }
 
-    @GetMapping("/api/integrations/irc/status")
+    @GetMapping("/status")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     public IrcStatusEnvelope status() {
         return new IrcStatusEnvelope(irc.status());

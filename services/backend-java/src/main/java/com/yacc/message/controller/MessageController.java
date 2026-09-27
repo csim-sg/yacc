@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,6 +39,7 @@ import jakarta.validation.constraints.Size;
  * conversation assignment for {@code user}-role identities (POC RBAC).
  */
 @RestController
+@RequestMapping("/api/conversations/{conversationId}/messages")
 public class MessageController {
 
     private final MessageService messages;
@@ -51,7 +53,7 @@ public class MessageController {
         this.mapper = mapper;
     }
 
-    @GetMapping("/api/conversations/{conversationId}/messages")
+    @GetMapping
     public MessageListResponse list(
             @PathVariable("conversationId") UUID conversationId,
             @RequestParam(required = false) Integer page,
@@ -65,7 +67,7 @@ public class MessageController {
                 result.total(), result.page(), result.limit());
     }
 
-    @PostMapping("/api/conversations/{conversationId}/messages")
+    @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public MessageEnvelope send(@PathVariable("conversationId") UUID conversationId,
             @Valid @RequestBody SendMessageBody request,
@@ -76,7 +78,7 @@ public class MessageController {
         return new MessageEnvelope(MessageResponse.from(message, mapper));
     }
 
-    @PostMapping("/api/conversations/{conversationId}/messages/{messageId}/retry")
+    @PostMapping("/{messageId}/retry")
     public ResponseEntity<MessageEnvelope> retry(
             @PathVariable("conversationId") UUID conversationId,
             @PathVariable("messageId") UUID messageId,
@@ -89,7 +91,7 @@ public class MessageController {
         return ResponseEntity.ok(new MessageEnvelope(MessageResponse.from(message, mapper)));
     }
 
-    @GetMapping("/api/conversations/{conversationId}/messages/{messageId}/status")
+    @GetMapping("/{messageId}/status")
     public MessageStatusResponse status(
             @PathVariable("conversationId") UUID conversationId,
             @PathVariable("messageId") UUID messageId) {

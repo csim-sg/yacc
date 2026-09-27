@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
@@ -29,6 +30,7 @@ import jakarta.validation.Valid;
  * reads; responses never carry secrets.
  */
 @RestController
+@RequestMapping("/api/integrations/irc/profiles")
 public class IrcProfileController {
 
     /** Default single-tenant id (POC parity). */
@@ -40,7 +42,7 @@ public class IrcProfileController {
         this.profiles = profiles;
     }
 
-    @PostMapping("/api/integrations/irc/profiles")
+    @PostMapping
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
     public ProfileResponse create(@Valid @RequestBody ProfileWrite request,
@@ -48,19 +50,19 @@ public class IrcProfileController {
         return profiles.create(DEFAULT_TENANT_ID, request, principal.getId());
     }
 
-    @GetMapping("/api/integrations/irc/profiles")
+    @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public java.util.List<ProfileResponse> list() {
         return profiles.list(DEFAULT_TENANT_ID);
     }
 
-    @GetMapping("/api/integrations/irc/profiles/{id}")
+    @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public ProfileResponse get(@PathVariable("id") int id) {
         return profiles.get(DEFAULT_TENANT_ID, id);
     }
 
-    @PutMapping("/api/integrations/irc/profiles/{id}")
+    @PutMapping("/{id}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ProfileResponse update(@PathVariable("id") int id,
             @Valid @RequestBody ProfileWrite request,
@@ -68,21 +70,21 @@ public class IrcProfileController {
         return profiles.update(DEFAULT_TENANT_ID, id, request, principal.getId());
     }
 
-    @PostMapping("/api/integrations/irc/profiles/{id}/activate")
+    @PostMapping("/{id}/activate")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ProfileResponse activate(@PathVariable("id") int id,
             @AuthenticationPrincipal AuthUser principal) {
         return profiles.activate(DEFAULT_TENANT_ID, id, principal.getId());
     }
 
-    @PostMapping("/api/integrations/irc/profiles/{id}/disable")
+    @PostMapping("/{id}/disable")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ProfileResponse disable(@PathVariable("id") int id,
             @AuthenticationPrincipal AuthUser principal) {
         return profiles.disable(DEFAULT_TENANT_ID, id, principal.getId());
     }
 
-    @DeleteMapping("/api/integrations/irc/profiles/{id}")
+    @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable("id") int id,
@@ -90,7 +92,7 @@ public class IrcProfileController {
         profiles.delete(DEFAULT_TENANT_ID, id, principal.getId());
     }
 
-    @PostMapping("/api/integrations/irc/profiles/{id}/test")
+    @PostMapping("/{id}/test")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public TestResult test(@PathVariable("id") int id) {
         return profiles.test(DEFAULT_TENANT_ID, id);

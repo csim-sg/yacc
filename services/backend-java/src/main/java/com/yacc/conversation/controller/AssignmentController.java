@@ -2,11 +2,11 @@ package com.yacc.conversation.controller;
 
 import java.util.UUID;
 
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
@@ -23,6 +23,7 @@ import jakarta.validation.constraints.NotBlank;
  * explicit {@code user}-role denial with the same 403 message.
  */
 @RestController
+@RequestMapping("/api/conversations/{conversationId}/assign")
 public class AssignmentController {
 
     private final AssignmentService assignments;
@@ -31,7 +32,7 @@ public class AssignmentController {
         this.assignments = assignments;
     }
 
-    @PostMapping("/api/conversations/{conversationId}/assign")
+    @PostMapping
     public AssignmentEnvelope assign(@PathVariable("conversationId") UUID conversationId,
             @jakarta.validation.Valid @RequestBody AssignBody body,
             @AuthenticationPrincipal AuthUser principal) {

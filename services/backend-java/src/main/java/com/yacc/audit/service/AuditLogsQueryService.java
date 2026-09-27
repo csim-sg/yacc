@@ -77,17 +77,16 @@ public class AuditLogsQueryService {
         String safeFormat = "json".equalsIgnoreCase(format) ? "json" : "csv";
         String data;
         if ("json".equals(safeFormat)) {
-            List<java.util.Map<String, Object>> rows = new ArrayList<>();
+            List<com.yacc.audit.model.AuditExportRow> rows = new ArrayList<>();
             for (AuditLog entry : all) {
-                java.util.Map<String, Object> row = new java.util.LinkedHashMap<String, Object>();
-                row.put("id", entry.getId());
-                row.put("actorId", entry.getActorId());
-                row.put("action", entry.getAction());
-                row.put("entityType", entry.getEntityType());
-                row.put("entityId", entry.getEntityId() == null ? null : entry.getEntityId().toString());
-                row.put("metadata", entry.getMetadata());
-                row.put("createdAt", entry.getCreatedAt());
-                rows.add(row);
+                rows.add(new com.yacc.audit.model.AuditExportRow(
+                        entry.getId(),
+                        entry.getActorId(),
+                        entry.getAction(),
+                        entry.getEntityType(),
+                        entry.getEntityId() == null ? null : entry.getEntityId().toString(),
+                        metadataNode(entry),
+                        entry.getCreatedAt()));
             }
             try {
                 data = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(rows);
@@ -98,6 +97,15 @@ public class AuditLogsQueryService {
             data = toCsv(all);
         }
         return new Export(data, safeFormat);
+    }
+
+    /** Parses the stored metadata JSON (empty object when absent/invalid). */
+    private com.fasterxml.jackson.databind.JsonNode metadataNode(AuditLog entry) {
+        try {
+            return mapper.readTree(entry.getMetadata() == null ? "{}" : entry.getMetadata());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+            return mapper.createObjectNode();
+        }
     }
 
     private Specification<AuditLog> buildSpec(AuditFilters filters, LocalDateTime from,

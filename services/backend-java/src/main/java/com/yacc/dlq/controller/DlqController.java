@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
@@ -25,6 +26,7 @@ import com.yacc.dlq.service.DlqService;
  * super_admin-only removal.
  */
 @RestController
+@RequestMapping("/api/dlq")
 public class DlqController {
 
     private final DlqService dlq;
@@ -33,7 +35,7 @@ public class DlqController {
         this.dlq = dlq;
     }
 
-    @GetMapping("/api/dlq")
+    @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public DlqListResponse list(
             @RequestParam(required = false) Integer page,
@@ -51,13 +53,13 @@ public class DlqController {
                 result.total(), result.page(), result.limit());
     }
 
-    @GetMapping("/api/dlq/stats")
+    @GetMapping("/stats")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public DlqService.DlqStatistics stats() {
         return dlq.stats();
     }
 
-    @PostMapping("/api/dlq/{id}/re-queue")
+    @PostMapping("/{id}/re-queue")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     public ReQueueResponse reQueue(@PathVariable("id") UUID id,
             @AuthenticationPrincipal AuthUser principal) {
@@ -67,7 +69,7 @@ public class DlqController {
         return new ReQueueResponse("Entry marked for manual retry", DlqEntryResponse.from(updated));
     }
 
-    @DeleteMapping("/api/dlq/{id}")
+    @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public RemoveResponse remove(@PathVariable("id") UUID id) {
         var entry = dlq.findById(id)

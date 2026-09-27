@@ -1,7 +1,6 @@
 package com.yacc.queue.service;
 
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -49,7 +48,7 @@ public class QueueService {
         int safePage = Math.max(1, page);
         int safeSize = Math.max(1, pageSize);
         var result = dlq.list(safePage, safeSize, null);
-        List<Map<String, Object>> items = result.entries().stream().map(QueueService::entryRow)
+        List<QueueDlqEntryRow> items = result.entries().stream().map(QueueService::entryRow)
                 .toList();
         return new QueueDlqPage(items, result.total(), safePage, safeSize, LocalDateTime.now());
     }
@@ -115,21 +114,16 @@ public class QueueService {
     /** DLQ entries filtered by failure reason. */
     @Transactional(readOnly = true)
     public ReasonPage byReason(String reason) {
-        List<Map<String, Object>> items = dlq.byReason(reason).stream()
+        List<QueueDlqEntryRow> items = dlq.byReason(reason).stream()
                 .map(QueueService::entryRow)
                 .toList();
         return new ReasonPage(reason, items.size(), items, LocalDateTime.now());
     }
 
-    private static Map<String, Object> entryRow(com.yacc.dlq.model.DeadLetterQueueEntry entry) {
-        Map<String, Object> row = new LinkedHashMap<String, Object>();
-        row.put("messageId", entry.getMessageId());
-        row.put("conversationId", entry.getConversationId());
-        row.put("failedAt", entry.getMovedAt());
-        row.put("failureReason", entry.getFailureReason());
-        row.put("totalAttempts", entry.getTotalAttempts());
-        row.put("lastError", entry.getLastError());
-        return row;
+    private static QueueDlqEntryRow entryRow(com.yacc.dlq.model.DeadLetterQueueEntry entry) {
+        return new QueueDlqEntryRow(entry.getMessageId(), entry.getConversationId(),
+                entry.getMovedAt(), entry.getFailureReason(), entry.getTotalAttempts(),
+                entry.getLastError());
     }
 
     private static JobDetails toJob(com.yacc.dlq.model.DeadLetterQueueEntry entry) {
@@ -156,8 +150,23 @@ public class QueueService {
      * @param pageSize page size
      * @param timestamp payload timestamp
      */
-    public record QueueDlqPage(List<Map<String, Object>> entries, long total, int page, int pageSize,
+    public record QueueDlqPage(List<QueueDlqEntryRow> entries, long total, int page, int pageSize,
             LocalDateTime timestamp) {
+    }
+
+    /**
+     * Typed queue-surface DLQ row projection (POC key parity: messageId,
+     * conversationId, failedAt, failureReason, totalAttempts, lastError).
+     *
+     * @param messageId       originating message
+     * @param conversationId  originating conversation
+     * @param failedAt        when the entry was moved to the DLQ
+     * @param failureReason   failure reason label
+     * @param totalAttempts   delivery attempts before dead-lettering
+     * @param lastError       last delivery error
+     */
+    public record QueueDlqEntryRow(UUID messageId, UUID conversationId, LocalDateTime failedAt,
+            String failureReason, Integer totalAttempts, String lastError) {
     }
 
     /**
@@ -241,7 +250,7 @@ public class QueueService {
      * @param entries row projections
      * @param timestamp payload timestamp
      */
-    public record ReasonPage(String failureReason, int count, List<Map<String, Object>> entries,
+    public record ReasonPage(String failureReason, int count, List<QueueDlqEntryRow> entries,
             LocalDateTime timestamp) {
     }
 }

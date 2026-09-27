@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
@@ -26,6 +27,7 @@ import jakarta.validation.Valid;
  * Authenticated users read and create notes with mention parsing.
  */
 @RestController
+@RequestMapping("/api/conversations/{conversationId}/notes")
 public class NotesController {
 
     private final NoteService notes;
@@ -34,7 +36,7 @@ public class NotesController {
         this.notes = notes;
     }
 
-    @GetMapping("/api/conversations/{conversationId}/notes")
+    @GetMapping
     public BaseListResponse<NoteResponse> list(
             @PathVariable("conversationId") UUID conversationId,
             @RequestParam(defaultValue = "1") String page,
@@ -45,7 +47,7 @@ public class NotesController {
         return BaseListResponse.of(result.items(), result.page(), result.limit(), result.total());
     }
 
-    @PostMapping("/api/conversations/{conversationId}/notes")
+    @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public NoteEnvelope create(@PathVariable("conversationId") UUID conversationId,
             @Valid @RequestBody CreateNoteRequest request,

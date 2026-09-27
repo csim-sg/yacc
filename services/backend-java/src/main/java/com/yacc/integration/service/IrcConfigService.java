@@ -19,6 +19,7 @@ import com.yacc.common.model.IntegrationErrorResponse;
 import com.yacc.integration.EncryptionProperties;
 import com.yacc.integration.model.IrcConfigResponse;
 import com.yacc.integration.model.IrcConfigRequest;
+import com.yacc.integration.model.IrcTestRequest;
 import com.yacc.integration.model.IntegrationConfig;
 import com.yacc.integration.repository.IntegrationConfigRepository;
 
@@ -99,19 +100,15 @@ public class IrcConfigService {
 
     /**
      * Body-first, side-effect-free connection test (hard 10s timeout).
-     * Partial bodies are rejected; empty bodies fall back to the stored
+     * The controller validates an optional body against the frozen
+     * {@code IrcConfigBody} schema (bean validation); a present body is
+     * therefore always complete here. No body falls back to the stored
      * config (409 when none).
      */
     @Transactional(readOnly = true)
-    public TestResult test(TestRequest request) {
-        boolean hasBody = request != null
-                && (request.server() != null || request.port() != null || request.username() != null);
+    public TestResult test(IrcTestRequest request) {
         StoredConfig config;
-        if (hasBody) {
-            if (request.server() == null || request.port() == null || request.username() == null) {
-                throw new IntegrationApiException(IntegrationErrorResponse.VALIDATION_ERROR, 400,
-                        "Partial configuration provided: server, port, and username are required");
-            }
+        if (request != null) {
             config = new StoredConfig(request.server(), request.port(), request.username(),
                     request.password(), List.of(), "body");
         } else {
@@ -168,17 +165,6 @@ public class IrcConfigService {
      */
     public record StoredConfig(String server, int port, String username, String password,
             List<String> channels, String source) {
-    }
-
-    /**
-     * Body-first test request subset.
-     *
-     * @param server IRC host
-     * @param port IRC port
-     * @param username IRC nick/user
-     * @param password optional password
-     */
-    public record TestRequest(String server, Integer port, String username, String password) {
     }
 
     /**

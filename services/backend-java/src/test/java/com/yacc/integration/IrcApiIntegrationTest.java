@@ -95,11 +95,24 @@ class IrcApiIntegrationTest extends AbstractApiIntegrationTest {
         // User role denied status (admin+).
         // (seeded only admin/super here; 401/403 path covered by RBAC tests above)
 
-        // Test with a partial body → 400 validation_error.
+        // Test with a partial body → 400 validation_error (bean validation
+        // enforces the frozen IrcConfigBody schema at the controller boundary).
         mockMvc.perform(post("/api/integrations/irc/test")
                         .header("Authorization", superAuth)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.createObjectNode().put("server", "only-host").toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("validation_error"));
+
+        // Complete minus channels → 400 validation_error (same frozen schema).
+        mockMvc.perform(post("/api/integrations/irc/test")
+                        .header("Authorization", superAuth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.createObjectNode()
+                                .put("server", "irc.fixture.local")
+                                .put("port", 6667)
+                                .put("username", "yaccbot")
+                                .toString()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("validation_error"));
     }

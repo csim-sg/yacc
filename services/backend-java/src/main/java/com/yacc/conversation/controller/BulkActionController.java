@@ -6,6 +6,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
@@ -21,6 +22,7 @@ import jakarta.validation.Valid;
  * success semantics.
  */
 @RestController
+@RequestMapping("/api/conversations")
 public class BulkActionController {
 
     private final BulkActionService bulkActions;
@@ -29,7 +31,7 @@ public class BulkActionController {
         this.bulkActions = bulkActions;
     }
 
-    @PostMapping("/api/conversations/bulk")
+    @PostMapping("/bulk")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public BulkActionEnvelope bulkAction(@Valid @RequestBody BulkActionRequest request,
             @AuthenticationPrincipal AuthUser principal) {

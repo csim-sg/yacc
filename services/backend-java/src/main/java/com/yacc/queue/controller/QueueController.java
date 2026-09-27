@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yacc.auth.model.AuthUser;
@@ -29,6 +30,7 @@ import jakarta.validation.constraints.Size;
  * (ADR-028); Quartz job identity 1:1 mapping lands with MIG-063.
  */
 @RestController
+@RequestMapping("/api/queue")
 public class QueueController {
 
     private final QueueService queue;
@@ -37,13 +39,13 @@ public class QueueController {
         this.queue = queue;
     }
 
-    @GetMapping("/api/queue/stats")
+    @GetMapping("/stats")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public QueueService.QueueStatistics stats() {
         return queue.stats();
     }
 
-    @GetMapping("/api/queue/dlq")
+    @GetMapping("/dlq")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public QueueService.QueueDlqPage dlqEntries(
             @RequestParam(defaultValue = "1") int page,
@@ -51,27 +53,27 @@ public class QueueController {
         return queue.dlqEntries(page, pageSize);
     }
 
-    @PostMapping("/api/queue/retry/{messageId}")
+    @PostMapping("/retry/{messageId}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public QueueService.RetryResult retry(@PathVariable("messageId") UUID messageId,
             @AuthenticationPrincipal AuthUser principal) {
         return queue.retry(messageId, UUID.fromString(principal.getId()));
     }
 
-    @PostMapping("/api/queue/dlq/retry")
+    @PostMapping("/dlq/retry")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public QueueService.BulkRetryResult bulkRetry(@Valid @RequestBody BulkRetryRequest request,
             @AuthenticationPrincipal AuthUser principal) {
         return queue.bulkRetry(request.messageIds(), UUID.fromString(principal.getId()));
     }
 
-    @GetMapping("/api/queue/dlq/stats")
+    @GetMapping("/dlq/stats")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public QueueService.DlqStatsPayload dlqStats() {
         return queue.dlqStats();
     }
 
-    @GetMapping("/api/queue/job/{jobId}")
+    @GetMapping("/job/{jobId}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public JobResponse job(@PathVariable("jobId") String jobId) {
         var job = queue.job(jobId)
@@ -79,7 +81,7 @@ public class QueueController {
         return new JobResponse(true, job);
     }
 
-    @PostMapping("/api/queue/dlq/clear/{messageId}")
+    @PostMapping("/dlq/clear/{messageId}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ClearResponse clear(@PathVariable("messageId") UUID messageId,
             @AuthenticationPrincipal AuthUser principal) {
@@ -90,7 +92,7 @@ public class QueueController {
                 "DLQ entry cleared and marked as processed", java.time.LocalDateTime.now());
     }
 
-    @GetMapping("/api/queue/dlq/by-reason/{reason}")
+    @GetMapping("/dlq/by-reason/{reason}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
     public QueueService.ReasonPage byReason(@PathVariable("reason") String reason) {
         return queue.byReason(reason);
