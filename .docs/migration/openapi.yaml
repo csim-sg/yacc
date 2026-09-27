@@ -28,6 +28,14 @@
 # - `POST /api/auth/change-password` (authenticated) added — the credential-replacement
 #   endpoint that clears the forced change flag (MIG-031's reset/verification flows are
 #   separate and remain token/email-based).
+#
+# MIG-031 contract-change findings (issue #348; same §1.5 rule):
+# - `POST /api/auth/verify-email` (public) added — the MIG-031 email-verification
+#   confirmation endpoint. The baseline email-verification surface lived inside the
+#   BetterAuth wildcard (ledger row REST-AUTH-004, replaced by explicit endpoints per
+#   ADR-025); the canonicalized wildcard sub-path set did not include it, so the
+#   confirmation endpoint is recorded here as an explicit deviation. Single-use,
+#   expiring email token; generic anti-enumeration 400 on invalid tokens.
 openapi: 3.1.0
 info:
   title: YACC REST API (canonical)
@@ -192,6 +200,35 @@ paths:
               schema: {$ref: '#/components/schemas/ErrorResponse'}
         '429':
           description: Rate limit exceeded (passwordResetRateLimiter)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+  /api/auth/verify-email:
+    post:
+      tags: [auth]
+      operationId: authVerifyEmail
+      summary: Confirm an email address with the emailed token (public; MIG-031 deviation)
+      description: |
+        MIG-031 email-verification confirmation. The challenge is issued on
+        self-registration (sign-up) as a single-use, expiring 256-bit email
+        token; this endpoint consumes it (replay-safe by deletion), flips
+        `email_verified`, and audit-logs the event. Baseline lived inside the
+        BetterAuth wildcard (REST-AUTH-004); recorded per the MIG-031
+        contract-change note in this file's header.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/VerifyEmailBody'}
+      responses:
+        '200':
+          description: Email verified
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SuccessMessageResponse'}
+        '400':
+          description: Invalid or expired token (generic, anti-enumeration)
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ErrorResponse'}
@@ -1832,6 +1869,11 @@ components:
       required: [token, password]
       properties:
         token: {type: string, description: 64-char hex reset token}
+    VerifyEmailBody:
+      type: object
+      required: [token]
+      properties:
+        token: {type: string, description: 64-char hex verification token (MIG-031 deviation)}
         password: {type: string}
 
     # ---------- Users ----------

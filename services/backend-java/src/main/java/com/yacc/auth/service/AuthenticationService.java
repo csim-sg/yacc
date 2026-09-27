@@ -54,6 +54,7 @@ public class AuthenticationService {
     private final JwtTokenService tokens;
     private final ApplicationEventPublisher events;
     private final AuditPersistence audit;
+    private final EmailVerificationService emailVerification;
 
     public AuthenticationService(
             UserRepository users,
@@ -62,7 +63,8 @@ public class AuthenticationService {
             SessionService sessions,
             JwtTokenService tokens,
             ApplicationEventPublisher events,
-            AuditPersistence audit) {
+            AuditPersistence audit,
+            EmailVerificationService emailVerification) {
         this.users = users;
         this.authenticationManager = authenticationManager;
         this.passwordEncoder = passwordEncoder;
@@ -70,6 +72,7 @@ public class AuthenticationService {
         this.tokens = tokens;
         this.events = events;
         this.audit = audit;
+        this.emailVerification = emailVerification;
     }
 
     /**
@@ -112,7 +115,9 @@ public class AuthenticationService {
      * The created identity is always {@code role: user} with {@code active}
      * status — self-elevation is impossible; privileged provisioning stays
      * SUPER_ADMIN-only (tech-lead guardrail). A duplicate email fails with a
-     * generic validation error (anti-enumeration).
+     * generic validation error (anti-enumeration). The email-verification
+     * challenge is issued on registration (MIG-031) — delivery retries and
+     * audits without failing sign-up.
      *
      * @param request registration body (email, password, name — no role)
      * @return session response for the new {@code user}-role identity
@@ -133,6 +138,7 @@ public class AuthenticationService {
         created = users.save(created);
         audit.persist(new AuditRecord("user.registered", "user", created.getId(),
                 created.getId(), null, java.time.Instant.now()));
+        emailVerification.issue(created);
 
         Session session = sessions.issue(created);
         String accessToken = tokens.issueAccessToken(new AuthUser(created), session.getId());

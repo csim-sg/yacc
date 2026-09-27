@@ -1,6 +1,16 @@
 spring:
   application:
     name: yacc-backend
+  mail:
+    # MIG-031 auth-email SMTP transport (SPEC-002 integration table: Email
+    # SMTP/SendGrid). Host/port/credentials bind from the environment /
+    # K8s config; defaults target the local docker-compose Mailhog. Send
+    # failures retry and audit (never crash the flow); tests never contact
+    # a real provider.
+    host: ${YACC_SMTP_HOST:localhost}
+    port: ${YACC_SMTP_PORT:1025}
+    username: ${YACC_SMTP_USERNAME:}
+    password: ${YACC_SMTP_PASSWORD:}
   datasource:
     # MIG-020: the service now owns the PostgreSQL data layer (ADR-027).
     # DATABASE_URL is the deployment contract wired by deploy/helm/yacc-backend;
@@ -34,6 +44,14 @@ server:
   port: 8080
 
 management:
+  health:
+    mail:
+      # MIG-031: auth-email delivery is best-effort by design (retry, then
+      # audit — forgot-password keeps its constant 200 answer), so SMTP
+      # reachability must not fail service readiness. The auto-configured
+      # MailHealthIndicator is disabled; email outages surface through the
+      # email.send_failed audit trail instead.
+      enabled: false
   endpoints:
     web:
       # Health probes keep the frozen wire paths /health, /health/live,
@@ -100,6 +118,25 @@ yacc:
       mode: ${RECOVERY_MODE:}
       key: ${RECOVERY_KEY:}
       key-hash: ${YACC_RECOVERY_KEY_HASH:}
+    email:
+      # MIG-031 auth-email delivery policy (SPEC-002 integration table:
+      # Email SMTP/SendGrid; send failure → retry + audit). The provider
+      # adapter is selected by AuthEmailConfig; SMTP transport settings bind
+      # via spring.mail.* above. The SendGrid API key arrives only from the
+      # environment / K8s Secret — no default, never logged.
+      from: ${YACC_AUTH_EMAIL_FROM:no-reply@yacc.local}
+      provider: ${YACC_AUTH_EMAIL_PROVIDER:smtp}
+      send-grid-api-key: ${YACC_AUTH_EMAIL_SENDGRID_API_KEY:}
+      base-url: ${YACC_AUTH_EMAIL_BASE_URL:http://localhost:5173}
+      max-send-attempts: 3
+      retry-backoff: 500ms
+    password-reset:
+      # MIG-031 reset-token policy (BE-003 parity: 256-bit secure-random
+      # token, bcrypt digest at rest, single use, 60-minute expiry).
+      token-ttl: 60m
+    email-verification:
+      # MIG-031 verification-token policy (single use, 60-minute expiry).
+      token-ttl: 60m
   integration:
     encryption:
       # MIG-021 secret contract (ADR-027): the IRC credential master key is

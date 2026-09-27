@@ -69,6 +69,9 @@ class AuthenticationServiceTest {
     @Mock
     private AuditPersistence audit;
 
+    @Mock
+    private EmailVerificationService emailVerification;
+
     @Captor
     private ArgumentCaptor<AuditRecord> auditCaptor;
 
@@ -80,7 +83,7 @@ class AuthenticationServiceTest {
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
         service = new AuthenticationService(users, authenticationManager, passwordEncoder,
-                sessions, mockJwtTokenService(), events, audit);
+                sessions, mockJwtTokenService(), events, audit, emailVerification);
     }
 
     private JwtTokenService mockJwtTokenService() {
@@ -97,7 +100,7 @@ class AuthenticationServiceTest {
         return new JwtTokenService(new AuthProperties(
                 new AuthProperties.Token(signingKey, null, null),
                 new AuthProperties.Bootstrap("bootstrap@fixture.yacc.local", "initial"),
-                new AuthProperties.Recovery("", "", "")));
+                new AuthProperties.Recovery("", "", ""), null, null, null));
     }
 
     private User persistedUser(String id, UserRole role, UserStatus status, String rawPassword) {
@@ -161,6 +164,8 @@ class AuthenticationServiceTest {
                 && !saved.isMustChangePassword()));
         verify(audit).persist(auditCaptor.capture());
         assertThat(auditCaptor.getValue().action()).isEqualTo("user.registered");
+        // MIG-031: registration issues the email-verification challenge.
+        verify(emailVerification).issue(any(User.class));
     }
 
     @Test

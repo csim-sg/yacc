@@ -18,34 +18,53 @@ import com.yacc.auth.model.AuthSessionResponse;
 import com.yacc.auth.model.AuthSignOutResponse;
 import com.yacc.auth.model.AuthUser;
 import com.yacc.auth.model.ChangePasswordRequest;
+import com.yacc.auth.model.ForgotPasswordRequest;
+import com.yacc.auth.model.MessageResponse;
 import com.yacc.auth.model.RefreshTokenRequest;
+import com.yacc.auth.model.ResetPasswordRequest;
 import com.yacc.auth.model.SignInRequest;
 import com.yacc.auth.model.SignUpRequest;
+import com.yacc.auth.model.SuccessMessageResponse;
+import com.yacc.auth.model.VerifyEmailRequest;
 import com.yacc.auth.service.AuthenticationService;
+import com.yacc.auth.service.EmailVerificationService;
 import com.yacc.auth.service.JwtTokenService;
+import com.yacc.auth.service.PasswordResetService;
 
 import jakarta.validation.Valid;
 
 /**
  * Auth wire surface (MIG-030; frozen contract §1.4 — the canonical
  * {@code /api/auth/*} endpoint map). Public: sign-in, self-registration,
- * refresh. Authenticated: session lookup, sign-out, credential change.
+ * refresh, and the MIG-031 token flows (forgot-password, reset-password,
+ * verify-email). Authenticated: session lookup, sign-out, credential
+ * change.
  *
  * <p>The controller is a thin translation layer — every policy decision
  * (USER-only registration, status enforcement, forced password change,
- * grant rotation) lives in {@link AuthenticationService} and the security
- * chain. {@code /api} is declared at this controller level (no global
- * prefix, ARCH-004 §5).</p>
+ * grant rotation, reset-token lifecycle, anti-enumeration responses) lives
+ * in the auth services and the security chain. {@code /api} is declared at
+ * this controller level (no global prefix, ARCH-004 §5).</p>
  */
 @RestController
 @RequestMapping("/api/auth")
 @Validated
 public class AuthController {
 
-    private final AuthenticationService authenticationService;
+    /** Constant anti-enumeration answer of forgot-password (POC parity). */
+    static final String FORGOT_PASSWORD_RESPONSE =
+            "If an email exists, a password reset link has been sent";
 
-    public AuthController(AuthenticationService authenticationService) {
+    private final AuthenticationService authenticationService;
+    private final PasswordResetService passwordResetService;
+    private final EmailVerificationService emailVerificationService;
+
+    public AuthController(AuthenticationService authenticationService,
+            PasswordResetService passwordResetService,
+            EmailVerificationService emailVerificationService) {
         this.authenticationService = authenticationService;
+        this.passwordResetService = passwordResetService;
+        this.emailVerificationService = emailVerificationService;
     }
 
     @PostMapping("/sign-in/email")
@@ -62,6 +81,40 @@ public class AuthController {
     @PostMapping("/refresh-token")
     public AuthRefreshResponse refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
         return authenticationService.refresh(request);
+    }
+
+    /**
+     * Requests a password reset (frozen contract
+     * {@code authForgotPassword}). Always 200 with the constant message —
+     * the response is identical whether or not the address is registered
+     * (anti-enumeration). Rate limited (3/h/IP).
+     */
+    @PostMapping("/forgot-password")
+    public MessageResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        passwordResetService.initiate(request.email());
+        return new MessageResponse(FORGOT_PASSWORD_RESPONSE);
+    }
+
+    /**
+     * Resets the credential with the emailed token (frozen contract
+     * {@code authResetPassword}). Unknown/expired/consumed tokens fail
+     * generically with 400 (anti-enumeration). Rate limited (3/h/IP).
+     */
+    @PostMapping("/reset-password")
+    public SuccessMessageResponse resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.complete(request.token(), request.password());
+        return new SuccessMessageResponse(true, "Password reset successfully");
+    }
+
+    /**
+     * Confirms an email address with the emailed token (MIG-031; contract
+     * deviation recorded in {@code openapi.yaml}). Unknown/expired/consumed
+     * tokens fail generically with 400.
+     */
+    @PostMapping("/verify-email")
+    public SuccessMessageResponse verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        emailVerificationService.confirm(request.token());
+        return new SuccessMessageResponse(true, "Email verified successfully");
     }
 
     @PostMapping("/sign-out")

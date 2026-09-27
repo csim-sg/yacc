@@ -42,6 +42,13 @@ dependencies {
     // (ARCH-004 §3; ADR-023 supersedes ADR-020).
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
+    // --- MIG-031 auth email (SPEC-002 integration table: Email SMTP/SendGrid) ---
+    // SMTP transport for password-reset + email-verification messages via
+    // spring.mail.* binding; the provider adapter (SMTP default, SendGrid)
+    // is selected by AuthEmailConfig from yacc.auth.email.*. Send failures
+    // retry + audit; tests always mock the transport (never a real provider).
+    implementation("org.springframework.boot:spring-boot-starter-mail")
+
     // --- MIG-020 data foundation (SPEC-002 FR-03; ADR-027) ---
     // Flyway is the only schema-change mechanism (ARCH-004 §7); the
     // database-specific module is required from Flyway 10 onward.

@@ -9,12 +9,39 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * environment / K8s Secrets with no defaults — services validate eagerly and
  * fail startup (fail-closed) when required material is absent.
  *
- * @param token     stateless JWT access-token policy (signing key, TTLs)
- * @param bootstrap deterministic first-run Super Admin bootstrap inputs
- * @param recovery  founder-controlled recovery gate (env-gated restart flag)
+ * @param token             stateless JWT access-token policy (signing key, TTLs)
+ * @param bootstrap         deterministic first-run Super Admin bootstrap inputs
+ * @param recovery          founder-controlled recovery gate (env-gated restart flag)
+ * @param email             outbound email delivery policy (MIG-031; SMTP/SendGrid)
+ * @param passwordReset     password-reset token policy (MIG-031; BE-003 parity)
+ * @param emailVerification email-verification token policy (MIG-031)
  */
 @ConfigurationProperties(prefix = "yacc.auth")
-public record AuthProperties(Token token, Bootstrap bootstrap, Recovery recovery) {
+public record AuthProperties(Token token, Bootstrap bootstrap, Recovery recovery,
+        Email email, PasswordReset passwordReset, EmailVerification emailVerification) {
+
+    /**
+     * Applies the KISS defaults when the optional MIG-031 sections are
+     * absent from configuration (mirrors the {@link Token} TTL defaults).
+     *
+     * @param token             stateless JWT access-token policy
+     * @param bootstrap         deterministic first-run bootstrap inputs
+     * @param recovery          founder-controlled recovery gate
+     * @param email             outbound email delivery policy
+     * @param passwordReset     password-reset token policy
+     * @param emailVerification email-verification token policy
+     */
+    public AuthProperties {
+        if (email == null) {
+            email = new Email(null, null, null, null, 0, null);
+        }
+        if (passwordReset == null) {
+            passwordReset = new PasswordReset(null);
+        }
+        if (emailVerification == null) {
+            emailVerification = new EmailVerification(null);
+        }
+    }
 
     /**
      * Token policy (ADR-025 stateless JWT access + refresh default).
@@ -66,5 +93,75 @@ public record AuthProperties(Token token, Bootstrap bootstrap, Recovery recovery
 
         /** The only accepted recovery mode (env-gated restart flag). */
         public static final String MODE_ONCE = "once";
+    }
+
+    /**
+     * Outbound email delivery policy (MIG-031; SPEC-002 integration table:
+     * verification/reset email over SMTP or SendGrid; send failure → retry
+     * + audit). SMTP transport settings bind separately through Spring
+     * Boot's {@code spring.mail.*} properties.
+     *
+     * @param from            From address for auth emails
+     *                        ({@code YACC_AUTH_EMAIL_FROM})
+     * @param provider        delivery provider: {@code smtp} (default) or
+     *                        {@code sendgrid} ({@code YACC_AUTH_EMAIL_PROVIDER})
+     * @param sendGridApiKey  SendGrid API key — required only when the
+     *                        provider is {@code sendgrid}
+     *                        ({@code YACC_AUTH_EMAIL_SENDGRID_API_KEY})
+     * @param baseUrl         frontend base URL used in emailed action links
+     *                        ({@code YACC_AUTH_EMAIL_BASE_URL})
+     * @param maxSendAttempts total delivery attempts before the send is
+     *                        abandoned and audit-logged (default 3)
+     * @param retryBackoff    pause between attempts (default 500ms)
+     */
+    public record Email(String from, String provider, String sendGridApiKey,
+            String baseUrl, int maxSendAttempts, Duration retryBackoff) {
+
+        /** The SMTP provider selector (default). */
+        public static final String PROVIDER_SMTP = "smtp";
+
+        /** The SendGrid provider selector. */
+        public static final String PROVIDER_SENDGRID = "sendgrid";
+
+        public Email {
+            if (provider == null || provider.isBlank()) {
+                provider = PROVIDER_SMTP;
+            }
+            if (maxSendAttempts <= 0) {
+                maxSendAttempts = 3;
+            }
+            if (retryBackoff == null || retryBackoff.isNegative()) {
+                retryBackoff = Duration.ofMillis(500);
+            }
+        }
+    }
+
+    /**
+     * Password-reset token policy (MIG-031; BE-003 parity: 256-bit tokens,
+     * 60-minute expiry, single use).
+     *
+     * @param tokenTtl reset-token lifetime (default 60m)
+     */
+    public record PasswordReset(Duration tokenTtl) {
+
+        public PasswordReset {
+            if (tokenTtl == null) {
+                tokenTtl = Duration.ofMinutes(60);
+            }
+        }
+    }
+
+    /**
+     * Email-verification token policy (MIG-031; single-use, expiring).
+     *
+     * @param tokenTtl verification-token lifetime (default 60m)
+     */
+    public record EmailVerification(Duration tokenTtl) {
+
+        public EmailVerification {
+            if (tokenTtl == null) {
+                tokenTtl = Duration.ofMinutes(60);
+            }
+        }
     }
 }

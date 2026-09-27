@@ -8,6 +8,12 @@ spring:
     name: yacc-backend
   main:
     banner-mode: "off"
+  mail:
+    # Deterministic test-only SMTP coordinates. The transport is mocked in
+    # every test (@MockitoBean) — a real provider is never contacted
+    # (MIG-031 guardrail; AbstractPostgresIntegrationTest conventions).
+    host: localhost
+    port: 3025
   jpa:
     hibernate:
       # Schema/entity consistency gate (MIG-021): every context boot validates
@@ -33,6 +39,18 @@ yacc:
       # forced-password-change flag (fixture material only).
       email: "bootstrap@fixture.yacc.local"
       initial-credential: "bootstrap-initial-credential"
+    email:
+      # MIG-031 deterministic test-only delivery policy. The sender is
+      # mocked per test; retries are instant so failure-path tests stay fast.
+      from: "no-reply@fixture.yacc.local"
+      provider: "smtp"
+      base-url: "http://frontend.fixture.yacc.local"
+      max-send-attempts: 3
+      retry-backoff: 1ms
+    password-reset:
+      token-ttl: 60m
+    email-verification:
+      token-ttl: 60m
   integration:
     encryption:
       # Deterministic test-only key (32 bytes of 0x2A, base64). Test fixture —
