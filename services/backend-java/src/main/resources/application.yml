@@ -27,6 +27,14 @@ spring:
     # Flyway-only schema management (ARCH-004 §7). The single V1 full-reset
     # baseline lives in classpath:db/migration; later changes append V2+.
     locations: classpath:db/migration
+  jpa:
+    hibernate:
+      # MIG-021: every runtime context boot validates all JPA entity mappings
+      # against the Flyway-built schema; Hibernate never creates or alters
+      # schema (ARCH-004 §7 — Flyway-only). The test profile
+      # (application-test.yml) pins the same value explicitly for the
+      # schema/entity consistency gate.
+      ddl-auto: validate
 
 server:
   port: 8080

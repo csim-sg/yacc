@@ -65,44 +65,72 @@ import com.yacc.tag.repository.TagRepository;
 @Transactional
 class RepositoryMappingIntegrationTest extends AbstractPostgresIntegrationTest {
 
+    private final UserRepository users;
+    private final AccountRepository accounts;
+    private final SessionRepository sessions;
+    private final VerificationRepository verifications;
+    private final PasswordResetTokenRepository passwordResetTokens;
+    private final ConversationRepository conversations;
+    private final ConversationTagRepository conversationTags;
+    private final MessageRepository messages;
+    private final AttachmentRepository attachments;
+    private final RawPayloadRepository rawPayloads;
+    private final NoteRepository notes;
+    private final TagRepository tags;
+    private final RoutingRuleRepository routingRules;
+    private final RoutingRuleExecutionRepository routingRuleExecutions;
+    private final NotificationRepository notifications;
+    private final AuditLogRepository auditLogs;
+    private final DeadLetterQueueEntryRepository deadLetterQueue;
+    private final IntegrationConfigRepository integrationConfigs;
+    private final IntegrationConnectionProfileRepository integrationProfiles;
+
+    /**
+     * Constructor injection only (ARCH-004 §2 / ADR-024 / ADR-030) — also
+     * applies to Spring context tests: {@code SpringExtension} autowires the
+     * parameters of this single {@code @Autowired} constructor.
+     */
     @Autowired
-    private UserRepository users;
-    @Autowired
-    private AccountRepository accounts;
-    @Autowired
-    private SessionRepository sessions;
-    @Autowired
-    private VerificationRepository verifications;
-    @Autowired
-    private PasswordResetTokenRepository passwordResetTokens;
-    @Autowired
-    private ConversationRepository conversations;
-    @Autowired
-    private ConversationTagRepository conversationTags;
-    @Autowired
-    private MessageRepository messages;
-    @Autowired
-    private AttachmentRepository attachments;
-    @Autowired
-    private RawPayloadRepository rawPayloads;
-    @Autowired
-    private NoteRepository notes;
-    @Autowired
-    private TagRepository tags;
-    @Autowired
-    private RoutingRuleRepository routingRules;
-    @Autowired
-    private RoutingRuleExecutionRepository routingRuleExecutions;
-    @Autowired
-    private NotificationRepository notifications;
-    @Autowired
-    private AuditLogRepository auditLogs;
-    @Autowired
-    private DeadLetterQueueEntryRepository deadLetterQueue;
-    @Autowired
-    private IntegrationConfigRepository integrationConfigs;
-    @Autowired
-    private IntegrationConnectionProfileRepository integrationProfiles;
+    RepositoryMappingIntegrationTest(
+            UserRepository users,
+            AccountRepository accounts,
+            SessionRepository sessions,
+            VerificationRepository verifications,
+            PasswordResetTokenRepository passwordResetTokens,
+            ConversationRepository conversations,
+            ConversationTagRepository conversationTags,
+            MessageRepository messages,
+            AttachmentRepository attachments,
+            RawPayloadRepository rawPayloads,
+            NoteRepository notes,
+            TagRepository tags,
+            RoutingRuleRepository routingRules,
+            RoutingRuleExecutionRepository routingRuleExecutions,
+            NotificationRepository notifications,
+            AuditLogRepository auditLogs,
+            DeadLetterQueueEntryRepository deadLetterQueue,
+            IntegrationConfigRepository integrationConfigs,
+            IntegrationConnectionProfileRepository integrationProfiles) {
+        this.users = users;
+        this.accounts = accounts;
+        this.sessions = sessions;
+        this.verifications = verifications;
+        this.passwordResetTokens = passwordResetTokens;
+        this.conversations = conversations;
+        this.conversationTags = conversationTags;
+        this.messages = messages;
+        this.attachments = attachments;
+        this.rawPayloads = rawPayloads;
+        this.notes = notes;
+        this.tags = tags;
+        this.routingRules = routingRules;
+        this.routingRuleExecutions = routingRuleExecutions;
+        this.notifications = notifications;
+        this.auditLogs = auditLogs;
+        this.deadLetterQueue = deadLetterQueue;
+        this.integrationConfigs = integrationConfigs;
+        this.integrationProfiles = integrationProfiles;
+    }
 
     /**
      * The schema enforces real FK constraints — child-row tests persist their

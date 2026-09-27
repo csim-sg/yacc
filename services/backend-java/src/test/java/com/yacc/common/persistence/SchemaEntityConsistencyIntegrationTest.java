@@ -15,7 +15,7 @@ import com.yacc.common.testsupport.AbstractPostgresIntegrationTest;
  *
  * <p>Column-level fidelity is enforced continuously by Hibernate
  * {@code ddl-auto=validate} (application-test.yml): every context boot in the
- * test profile validates all 20 entity mappings against the MIG-020
+ * test profile validates all 19 entity mappings against the MIG-020
  * Flyway-built schema. This test adds the table-level 1:1 manifest check —
  * every mapped table exists and no table lacks an entity (the only
  * entity-less table is Flyway's own history).</p>
@@ -66,8 +66,17 @@ class SchemaEntityConsistencyIntegrationTest extends AbstractPostgresIntegration
     /** The V2 table intentionally left entity-less until MIG-051. */
     private static final String UNMAPPED_V2_TABLE = "websocket_backlog";
 
+    private final JdbcTemplate jdbcTemplate;
+
+    /**
+     * Constructor injection only (ARCH-004 §2 / ADR-024 / ADR-030) — also
+     * applies to Spring context tests: {@code SpringExtension} autowires the
+     * parameters of this single {@code @Autowired} constructor.
+     */
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    SchemaEntityConsistencyIntegrationTest(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     @Test
     void mapsExactlyNineteenBaselineTables() {
