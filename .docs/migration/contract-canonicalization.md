@@ -1,6 +1,6 @@
 ---
 doc_id: CONTRACT-CANONICALIZATION
-version: 1.0.0
+version: 1.1.0 # 1.1.0: §4.6 inbound-demux clarification (MIG-050, PR #402 tech-lead decision)
 spec: "https://github.com/Antpolis/documentation/blob/master/02-Architecture-Landscape/projects/yacc/spec/SPEC-002-java-spring-backend-migration.md"
 milestone: "https://github.com/csim-sg/yacc/milestone/3"
 task: "https://github.com/csim-sg/yacc/issues/338"
@@ -227,6 +227,18 @@ Baseline transport was Socket.io (websocket transport forced). The frozen target
 is raw WebSocket (ADR-026): JSON text frames only, no Socket.io/STOMP/SockJS/broker,
 polling fallback removed. `asyncapi.yaml` server protocol is updated to `ws` with the
 baseline noted in the description.
+
+**Inbound demux — bounded transport clarification (MIG-050 / PR #402 tech-lead decision,
+2026-09-27):** Socket.io carried the inbound event name in its own packet framing; raw
+WebSocket has no inherent event channel, so a demux key is mandatory for client→server
+routing. Frozen rule: **inbound client→server frames are
+`{ "event": "<frozen channel name>", "data": <frozen bare publish payload> }` — the
+`{event,data,timestamp}` envelope is outbound-only.** `event` is the frozen wire name
+(§4.2 — no new event name, no mapping layer at runtime); `data` is the channel's frozen
+bare `publish` payload; inbound frames carry no `timestamp` (§4.1). Clarification, not
+expansion: no new channel, no new payload, no ledger row. Recorded in `asyncapi.yaml`
+`info.description` canonical wire rules; asserted by the MIG-050 transport
+contract-alignment test.
 
 ---
 

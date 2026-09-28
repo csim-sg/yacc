@@ -26,6 +26,7 @@ import com.yacc.auth.service.BearerTokenAuthenticationConverter;
 import com.yacc.auth.service.JwtTokenService;
 import com.yacc.auth.service.TokenAuthenticationService;
 import com.yacc.auth.service.YaccUserDetailsService;
+import com.yacc.realtime.RealtimeProperties;
 
 /**
  * Spring Security filter chain for the YACC identity subsystem (MIG-030;
@@ -75,6 +76,7 @@ public class AuthSecurityConfig {
             RestAccessDeniedHandler accessDeniedHandler,
             ForcedPasswordChangeFilter forcedPasswordChangeFilter,
             PasswordResetRateLimitFilter passwordResetRateLimitFilter,
+            RealtimeProperties realtimeProperties,
             ObjectProvider<ClientRegistrationRepository> oidcClientRegistrations,
             ObjectProvider<OAuth2UserService<OidcUserRequest, OidcUser>> oidcUserService,
             ObjectProvider<AuthenticationSuccessHandler> oidcLoginSuccessHandler,
@@ -91,6 +93,16 @@ public class AuthSecurityConfig {
                                     "/actuator/health/**",
                                     "/actuator/prometheus",
                                     "/error",
+                                    // MIG-050 raw WebSocket upgrade path (ADR-026):
+                                    // public at the servlet filter chain because the
+                                    // access token arrives as a query parameter on the
+                                    // upgrade request (browsers cannot set an
+                                    // Authorization header there). The realtime
+                                    // handshake interceptor is the auth gate — it
+                                    // validates the token and enforces ACTIVE status
+                                    // before any session exists (WS-BHV-016), so no
+                                    // unauthenticated upgrade is possible.
+                                    realtimeProperties.websocket().path(),
                                     "/api/auth/sign-in/email",
                                     "/api/auth/sign-up/email",
                                     "/api/auth/refresh-token",

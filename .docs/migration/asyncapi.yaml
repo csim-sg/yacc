@@ -43,6 +43,12 @@ info:
       `x-disposition` recording the frozen MIG-003 decision instead.
     - Client→server messages (each `publish` operation below) are bare payloads — the
       envelope is outbound-only.
+    - Inbound client→server frames are
+      `{ "event": "<frozen channel name>", "data": <frozen bare publish payload> }`:
+      raw WebSocket replaces the Socket.io packet framing, so the frozen channel name
+      rides in the frame itself (bounded transport clarification, MIG-050 / PR #402
+      tech-lead decision; no new channel, no new payload, no ledger row — inbound
+      carries no `timestamp`).
     - ONE canonical event-name set of 23 named constants (the 20 @yacc/common contract
       constants + the 3 backend-only runtime constants: notification.dismissed,
       message.retry.scheduled, queue.message.dlq). Wire name = contract name; the Java

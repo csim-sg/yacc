@@ -61,6 +61,14 @@ dependencies {
     // (ARCH-004 §3; ADR-023 supersedes ADR-020).
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
+    // --- MIG-050 real-time transport (SPEC-002 FR-06/TR-04; ADR-026) ---
+    // Raw Spring WebSocket (WebSocketHandler + handshake interceptor + Tomcat
+    // WS upgrade support) — the founder-fixed transport, no broker-based
+    // subprotocols or Socket.io-compatible layers (AC-MIG-050-2); the
+    // {event,data,timestamp} envelope, rooms, and the (userId,
+    // conversationId) session registry are application-owned.
+    implementation("org.springframework.boot:spring-boot-starter-websocket")
+
     // --- MIG-031 auth email (SPEC-002 integration table: Email SMTP/SendGrid) ---
     // SMTP transport for password-reset + email-verification messages via
     // spring.mail.* binding; the provider adapter (SMTP default, SendGrid)
