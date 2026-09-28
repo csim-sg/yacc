@@ -34,8 +34,8 @@
  */
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
-import { ConversationsListSchema, type ConversationsList } from '../api/schemas';
+import { ConversationsListSchema, type Conversation, type ConversationsList } from '../api/schemas';
+import { api as apiClient } from '../lib/apiClient';
 import { queryKeys } from '../lib/queryClient';
 
 /**
@@ -152,7 +152,7 @@ export function useConversations(
  */
 export function useConversation(
   conversationId?: string
-): UseQueryResult<any, Error> {
+): UseQueryResult<Conversation, Error> {
   return useQuery({
     queryKey: conversationId
       ? queryKeys.conversations.detail(conversationId)
@@ -163,7 +163,7 @@ export function useConversation(
         throw new Error('Conversation ID is required');
       }
 
-      return apiClient.get(`/api/conversations/${conversationId}`);
+      return apiClient.get<Conversation>(`/api/conversations/${conversationId}`);
     },
 
     enabled: !!conversationId, // Only run query if conversationId is provided

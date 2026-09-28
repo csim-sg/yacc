@@ -26,8 +26,8 @@
  */
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
 import { UserSchema, type User } from '../api/schemas';
+import { api as apiClient } from '../lib/apiClient';
 import { queryKeys } from '../lib/queryClient';
 
 /**
@@ -52,10 +52,15 @@ export function useCurrentUser(): UseQueryResult<User, Error> {
 
     // Query function that fetches current user
     queryFn: async () => {
-      const response = await apiClient.get('/api/auth/me');
+      // Spring auth contract: the session lookup answers
+      // `{ user, mustChangePassword }` (frozen openapi.yaml).
+      const response = await apiClient.get<{
+        user: unknown;
+        mustChangePassword: boolean;
+      }>('/api/auth/get-session');
 
       // Validate response with Zod schema
-      const validatedData = UserSchema.parse(response);
+      const validatedData = UserSchema.parse(response.user);
       return validatedData;
     },
 

@@ -45,8 +45,9 @@
  */
 
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
 import { UpdateStatusResponseSchema, type UpdateStatusResponse } from '../api/schemas';
+import { api as apiClient } from '../lib/apiClient';
+import { logger } from '../lib/logger';
 import { queryKeys } from '../lib/queryClient';
 
 /**
@@ -139,7 +140,7 @@ export function useUpdateConversationStatus(): UseMutationResult<
     // Error handling
     onError: (error) => {
       // Additional mutation-level error handling can be added here
-      console.error('[useUpdateConversationStatus] Mutation failed:', {
+      logger.error('[useUpdateConversationStatus] Mutation failed', {
         message: error.message,
       });
     },

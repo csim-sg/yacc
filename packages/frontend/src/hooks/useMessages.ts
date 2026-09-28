@@ -31,8 +31,8 @@
  */
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { apiClient } from '../api/client';
-import { MessagesListSchema, MessageSchema, type MessagesList } from '../api/schemas';
+import { MessageSchema, MessagesListSchema, type Message, type MessagesList } from '../api/schemas';
+import { api as apiClient } from '../lib/apiClient';
 import { queryKeys } from '../lib/queryClient';
 
 /**
@@ -139,7 +139,7 @@ export function useMessages(
 export function useMessage(
   conversationId?: string,
   messageId?: string
-): UseQueryResult<any, Error> {
+): UseQueryResult<Message, Error> {
   return useQuery({
     queryKey:
       conversationId && messageId

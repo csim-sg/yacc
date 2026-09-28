@@ -22,7 +22,7 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 class Logger {
   private config: LoggerConfig = {
     enabled: true,
-    minLevel: process.env.NODE_ENV === 'development' ? 'debug' : 'info',
+    minLevel: import.meta.env.DEV ? 'debug' : 'info',
   };
 
   setConfig(config: Partial<LoggerConfig>): void {

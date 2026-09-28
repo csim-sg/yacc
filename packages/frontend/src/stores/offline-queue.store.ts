@@ -19,8 +19,8 @@
 
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { OfflineMessage, OfflineQueueState } from '../types/websocket.types';
 import { logger } from '../lib/logger';
+import type { OfflineMessage, OfflineQueueState } from '../types/websocket.types';
 
 /**
  * Max queue size (number of messages)
@@ -134,7 +134,7 @@ export const useOfflineQueue = create<OfflineQueueState>()(
     {
       // DevTools options
       name: 'OfflineQueueStore',
-      enabled: process.env.NODE_ENV === 'development',
+      enabled: import.meta.env.DEV,
     },
   ),
 );
