@@ -1,5 +1,8 @@
 package com.yacc.conversation.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
 /**
  * Java mapping of the PostgreSQL {@code conversation_priority} enum
  * (MIG-020, ADR-027).
@@ -23,11 +26,13 @@ public enum ConversationPriority {
     }
 
     /** Exact PostgreSQL enum label for this priority. */
+    @JsonValue
     public String getLabel() {
         return label;
     }
 
-    /** Resolves a PostgreSQL {@code conversation_priority} label to its Java constant. */
+    /** Jackson creator: wire values are the PostgreSQL labels. */
+    @JsonCreator
     public static ConversationPriority fromLabel(String label) {
         for (ConversationPriority value : values()) {
             if (value.label.equals(label)) {

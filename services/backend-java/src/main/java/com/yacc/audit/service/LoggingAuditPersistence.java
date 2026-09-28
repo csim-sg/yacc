@@ -2,7 +2,6 @@ package com.yacc.audit.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import com.yacc.audit.model.AuditRecord;
 
@@ -13,10 +12,11 @@ import com.yacc.audit.model.AuditRecord;
  * plus the audit fields. Correlation ids arrive via MDC when the record is
  * produced inside a request scope.
  *
- * <p>Replaced by the JPA-backed implementation when the {@code audit_logs}
- * table lands (MIG-020/MIG-021).</p>
+ * <p>Superseded by {@link JpaAuditPersistence} (MIG-040), which persists into
+ * the {@code audit_logs} table so the audit-query endpoints see the records.
+ * This class is kept as the log-shaped fallback; it is no longer a scanned
+ * bean.</p>
  */
-@Component
 public class LoggingAuditPersistence implements AuditPersistence {
 
     /** Dedicated audit logger (POC parity: {@code logger.child({ audit: true })}). */

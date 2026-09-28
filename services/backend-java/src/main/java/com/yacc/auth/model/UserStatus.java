@@ -1,5 +1,8 @@
 package com.yacc.auth.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
 /**
  * Java mapping of the PostgreSQL {@code user_status} enum (MIG-020, ADR-027).
  *
@@ -20,11 +23,13 @@ public enum UserStatus {
     }
 
     /** Exact PostgreSQL enum label for this status. */
+    @JsonValue
     public String getLabel() {
         return label;
     }
 
-    /** Resolves a PostgreSQL {@code user_status} label to its Java constant. */
+    /** Jackson creator: wire values are the PostgreSQL labels. */
+    @JsonCreator
     public static UserStatus fromLabel(String label) {
         for (UserStatus value : values()) {
             if (value.label.equals(label)) {

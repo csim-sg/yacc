@@ -3,20 +3,18 @@ package com.yacc.auth.model;
 import java.time.LocalDateTime;
 
 /**
- * Canonical wire user object (MIG-030; frozen contract
- * {@code openapi.yaml} / {@code UserResponse}; contract-canonicalization §1.2):
- * {@code id} is a uuid string, {@code role} is the lowercase wire enum
- * ({@code super_admin|admin|manager|user}), {@code status} the lowercase
- * status enum. This is the single user shape for every auth response.
+ * Wire representation of a user (frozen contract component
+ * {@code UserResponse}): {@code id} UUID string, lowercase {@code role},
+ * lowercase {@code status}, and the nullable soft-delete timestamp.
  *
- * @param id            user uuid
- * @param email         email address
- * @param name          display name
- * @param role          lowercase wire role label
- * @param status        lowercase wire status label
- * @param emailVerified whether the email is verified (optional on the wire)
- * @param createdAt     creation timestamp
- * @param updatedAt     last-update timestamp
+ * @param id user UUID
+ * @param email email address
+ * @param name display name
+ * @param role lowercase wire role (super_admin | admin | manager | user)
+ * @param status lowercase wire status (active | inactive | suspended)
+ * @param createdAt creation timestamp
+ * @param updatedAt last-update timestamp
+ * @param deletedAt soft-delete timestamp, null while the identity is live
  */
 public record UserResponse(
         String id,
@@ -24,11 +22,10 @@ public record UserResponse(
         String name,
         String role,
         String status,
-        boolean emailVerified,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt) {
+        LocalDateTime updatedAt,
+        LocalDateTime deletedAt) {
 
-    /** Maps a persisted identity to its canonical wire shape. */
     public static UserResponse from(User user) {
         return new UserResponse(
                 user.getId(),
@@ -36,8 +33,8 @@ public record UserResponse(
                 user.getName(),
                 user.getRole().getLabel(),
                 user.getStatus().getLabel(),
-                user.isEmailVerified(),
                 user.getCreatedAt(),
-                user.getUpdatedAt());
+                user.getUpdatedAt(),
+                user.getDeletedAt());
     }
 }
