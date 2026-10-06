@@ -1,10 +1,17 @@
 name: Deploy Frontend
 
+# Angular-target re-spec (ANG-001, SPEC-003 #371): builds @yacc/frontend-angular
+# with `ng build` (Node 20.x matrix) and syncs dist/frontend-angular/browser/ to S3.
+# PRODUCTION CUTOVER NOTE: production remains the React SPA until the approved
+# cutover (ANG-014 deploy enablement / ANG-016 cutover gate). Do not release
+# main with this pipeline pointing at the Angular shell before ANG-016 sign-off.
+
 on:
   push:
     branches: [main]
     paths:
       - 'packages/frontend/**'
+      - 'packages/frontend-angular/**'
       - '.github/workflows/frontend-deploy.yml'
 
 jobs:
@@ -12,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x]
+        node-version: [20.x]
 
     steps:
       - name: Checkout
@@ -32,10 +39,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build frontend
-        run: pnpm --filter @yacc/frontend build
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+      - name: Build frontend (Angular)
+        run: pnpm --filter @yacc/frontend-angular build
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -46,11 +51,11 @@ jobs:
 
       - name: Deploy to S3
         run: |
-          aws s3 sync packages/frontend/dist s3://${{ secrets.AWS_S3_BUCKET }}/ \
+          aws s3 sync packages/frontend-angular/dist/frontend-angular/browser s3://${{ secrets.AWS_S3_BUCKET }}/ \
             --delete \
             --cache-control "max-age=31536000,immutable" \
             --exclude "index.html"
-          aws s3 cp packages/frontend/dist/index.html s3://${{ secrets.AWS_S3_BUCKET }}/index.html \
+          aws s3 cp packages/frontend-angular/dist/frontend-angular/browser/index.html s3://${{ secrets.AWS_S3_BUCKET }}/index.html \
             --cache-control "max-age=0,no-cache,no-store,must-revalidate" \
             --content-type "text/html"
 
