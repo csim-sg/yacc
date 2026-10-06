@@ -93,10 +93,10 @@ The T2 mapping is canonical for implementation; summary of what each later issue
 | Output | `packages/frontend-angular/dist/frontend-angular/browser/` |
 | Production config | `fileReplacements` (`environment.ts` → `environment.prod.ts`), `outputHashing: all` (immutable hashed assets), budgets: initial 500kB warning / 1MB error; anyComponentStyle 4kB / 8kB |
 | Dev server | `pnpm --filter @yacc/frontend-angular dev` → `ng serve` (port 4200). Playwright `webServer` re-point is ANG-003 scope |
-| Deploy | S3 + CloudFront unchanged (ADR-019 frontend exclusion — **no Helm/K8s for the frontend**). `aws s3 sync` of `dist/frontend-angular/browser/`; immutable cache-control for hashed assets; `index.html` `no-cache`; CloudFront invalidation. Workflow: `.github/workflows/frontend-deploy.yml` re-specced in ANG-001 (Node **20.x** matrix, Angular build command, new output path) |
+| Deploy | Production (`main`) continues to deploy the **React SPA** (`packages/frontend/dist` → S3 + CloudFront; ADR-019 frontend exclusion — **no Helm/K8s for the frontend**). The Angular output (`dist/frontend-angular/browser/`) is **build-validated only** by this workflow — the validation job holds no AWS credentials and has no deploy steps. Re-pointing the production sync to the Angular output is ANG-014 (retention/enablement) + ANG-016 (cutover gate) work, done under review. Workflow: `.github/workflows/frontend-deploy.yml` (Node **20.x** matrices; `deploy` job = React production, push-to-`main` only; `build-angular` job = Angular build-only validation, also on PRs touching the Angular package) |
 | Rollback | Retained-asset re-point (CP-2 retention mechanism is ANG-014 scope — today's `--delete` sync cannot roll back) |
 
-**Deploy-safety note:** `frontend-deploy.yml` triggers on pushes to `main`. Until ANG-014 (deploy enablement) and ANG-016 (cutover gate) complete, a `dev`→`main` release would ship the Angular shell to production. The workflow carries a header comment; release sequencing is tech-lead-owned.
+**Deploy-safety note (fail-closed):** `.github/workflows/frontend-deploy.yml` production deploys on `main` pushes remain on the **React SPA**; the `deploy` job is gated to push events only. The Angular shell is validated build-only (no AWS credentials, no S3 sync in that job), so no `dev`→`main` release can ship the shell before the approved cutover. Production cutover happens exclusively via ANG-014 (deploy enablement) + ANG-016 (cutover gate), which must re-point the `deploy` job's build/sync target in a reviewed change — a workflow comment alone is not an execution gate.
 
 ## Stale-doc note
 
@@ -108,5 +108,6 @@ The T2 mapping is canonical for implementation; summary of what each later issue
 pnpm --filter @yacc/frontend-angular build          # green (AOT + budgets + type-check)
 ls packages/frontend-angular/dist/*/browser/        # output path
 rg -n "import.meta.env|@yacc/common|@tanstack|zustand|react" packages/frontend-angular --glob '!**/node_modules/**'   # expect 0
-rg -n "node-version|ng build|dist" .github/workflows/frontend-deploy.yml
+rg -n "node-version|frontend-angular build|build-angular" .github/workflows/frontend-deploy.yml              # Angular build-only validation (Node 20.x)
+rg -n "packages/frontend/dist" .github/workflows/frontend-deploy.yml                                         # production deploy stays on React until ANG-016
 ```
