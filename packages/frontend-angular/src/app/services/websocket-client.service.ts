@@ -44,10 +44,11 @@ export type SocketConnectionState =
  * client (`lib/socket.ts`): same URL source (environment `wsUrl`), same
  * handshake (`auth: { token }` — empty on the live path today, T3 §5.4;
  * capture semantics U6 → ANG-004), same native reconnection parameters,
- * same per-connection `X-Request-ID` correlation header, same effective
- * state mapping (React's socket-level `reconnect_attempt` listener never
- * fires in socket.io v4 — that event is Manager-level — so the
- * `reconnecting` state comes from the in-window disconnect branch only).
+ * same per-connection `X-Request-ID` correlation header, and the native
+ * retry lifecycle as the state source: socket.io-client v4 emits the
+ * reconnection events on the **Manager** (`socket.io`) — `reconnect_attempt`
+ * per retry, `reconnect_failed` when retries exhaust — while the socket's
+ * `disconnect` fires once per dropped connection (ANG-002 review loop 1).
  *
  * Server→client events fan out through per-event Subjects (T2 §3.4);
  * payloads are typed by the per-event wire contracts in
@@ -141,29 +142,52 @@ export class WebSocketClientService {
 
   /**
    * Built-in socket.io lifecycle listeners mapped to the connection-state
-   * signal — the effective transitions of the React client (connect →
-   * connected; disconnect while attempts remain → reconnecting; exhausted
-   * attempts → disconnected; connect_error → error).
+   * signal, following the native v4 retry lifecycle (Manager-owned — the
+   * socket's `disconnect` fires once per dropped connection, so it cannot
+   * count attempts):
+   *
+   * - `connect` → `connected` (initial connect or successful reconnect)
+   * - `disconnect` → `reconnecting` while the Manager will retry
+   *   (transport-level reasons); `disconnected` for `io server disconnect`
+   *   / `io client disconnect` — the v4 client does not auto-reconnect
+   *   after those (`destroy()` tears down the Manager reconnection), so
+   *   `reconnecting` would never resolve (intentional divergence from the
+   *   React mapping, which sets `reconnecting` and hangs there)
+   * - `reconnect_attempt` (Manager) → `reconnecting`
+   * - `reconnect_failed` (Manager) → `disconnected` (attempts exhausted;
+   *   terminal, matching the React store layer's `reconnect_failed` state)
+   * - `connect_error` → `error` only on the initial attempt (the v4 socket
+   *   re-emits it per failed retry while the Manager keeps cycling — those
+   *   attempts stay `reconnecting` and exhaustion is `reconnect_failed`'s
+   *   transition, not a terminal error)
    */
   private registerBuiltInListeners(socket: Socket): void {
-    let reconnectionAttempts = 0;
+    const manager = socket.io;
 
     socket.on('connect', () => {
-      reconnectionAttempts = 0;
       this.connectionStateSignal.set('connected');
     });
 
-    socket.on('disconnect', () => {
-      if (reconnectionAttempts < WS_MAX_RECONNECTION_ATTEMPTS) {
-        reconnectionAttempts++;
-        this.connectionStateSignal.set('reconnecting');
-      } else {
+    socket.on('disconnect', (reason: string) => {
+      if (reason === 'io server disconnect' || reason === 'io client disconnect') {
         this.connectionStateSignal.set('disconnected');
+      } else {
+        this.connectionStateSignal.set('reconnecting');
       }
     });
 
     socket.on('connect_error', () => {
-      this.connectionStateSignal.set('error');
+      if (this.connectionStateSignal() === 'connecting') {
+        this.connectionStateSignal.set('error');
+      }
+    });
+
+    manager.on('reconnect_attempt', () => {
+      this.connectionStateSignal.set('reconnecting');
+    });
+
+    manager.on('reconnect_failed', () => {
+      this.connectionStateSignal.set('disconnected');
     });
   }
 
