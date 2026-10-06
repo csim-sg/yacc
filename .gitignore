@@ -17,6 +17,7 @@ package-lock.json
 .pnpm-debug.log*
 coverage/
 .nyc_output/
+.angular/
 .cursor/
 playwright-report/
 packages/frontend/test-results/
