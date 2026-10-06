@@ -4,7 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "ng serve",
-    "build": "ng build"
+    "build": "ng build",
+    "test:unit": "ng test --watch=false",
+    "test:unit:coverage": "ng test --watch=false --coverage",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@angular/common": "^21.2.0",
@@ -22,9 +25,12 @@
     "@angular/build": "^21.2.25",
     "@angular/cli": "^21.2.25",
     "@angular/compiler-cli": "^21.2.0",
+    "@playwright/test": "^1.58.1",
     "@tailwindcss/postcss": "^4.0.0",
     "daisyui": "^5.0.0",
+    "jsdom": "^28.1.0",
     "tailwindcss": "^4.0.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.8"
   }
 }
