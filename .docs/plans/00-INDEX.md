@@ -21,7 +21,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - **Infrastructure Phase (DEV-013-015)**: ✅ **COMPLETE & MERGED** (K3s + Helm + GitHub Actions, production-ready)
 - Phase 2 (Collaboration + Rules): ✅ **EA APPROVED** (tags/notes/assignments/routing-rules/audit; EA final gate passed 2026-02-25; see `.docs/plans/02-PHASE2-PLANNING.md` + `.docs/governance/GOV-034-phase2-final-ea-approval.md` + `.docs/adr/ADR-021-...md`; ready for implementation kickoff 2026-03-05)
 - SPEC-002 (Java backend migration): 🟡 **IN IMPLEMENTATION** (ADRs 023..030 accepted; MIG issues executing)
-- SPEC-003 (React→Angular frontend migration): 🟡 **IN IMPLEMENTATION** (milestone #4, 17 issues ANG-001..017; founder override 2026-09-26: parallel-with-Java, React-contracts 1:1; ANG-001 scaffold + Angular-target ARCH `.docs/architecture/005-...` + ADR-031 committed; production stays React until ANG-016 cutover)
+- SPEC-003 (React→Angular frontend migration): 🟡 **IN IMPLEMENTATION** (milestone #4, 17 issues ANG-001..017; founder override 2026-09-26: parallel-with-Java, React-contracts 1:1; ANG-001 scaffold + Angular-target ARCH `.docs/architecture/005-...` + ADR-031 committed; ANG-002 local Zod contract layer + single HTTP/socket seam + contracts manifest committed in `packages/frontend-angular/src/app/contracts/`; production stays React until ANG-016 cutover)
 - QA: ⏳ Not Started
 
 ## Shared Code Hygiene Phase (SH-003, SH-004, SH-005)
