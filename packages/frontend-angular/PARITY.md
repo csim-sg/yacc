@@ -18,10 +18,16 @@ Playwright suite runs **unchanged**. The gate is the conjunction of:
 | **PB-3 — Unit gate** | Angular unit suite green **and** coverage thresholds met as a merge gate: ≥85% lines / statements / functions, ≥80% branches on new Angular code | `pnpm --filter @yacc/frontend-angular test:unit:coverage` | from ANG-003 (thresholds fail the run below target); CI wiring is ANG-015 |
 
 **Baseline precondition (blocking for PB-2, CP-3):** the React-baseline E2E green-state is
-archived at `parity/baseline/react-e2e-baseline-230bd226/` (full HTML report + per-case
+to be archived at `parity/baseline/react-e2e-baseline-230bd226/` (full HTML report + per-case
 listing + commit SHA + environment versions; capture procedure in the runbook). PB-2's
 "zero regression" anchors to that **recorded** state — red-at-baseline is recorded, never
 assumed green.
+**Current status (2026-10-08): NOT captured.** Capture attempts are environment-red:
+the `dev` backend login endpoint is broken (`0ba6edb`/#267 body-parser regression) and the
+in-memory login rate limiter makes full-suite runs structurally red. A labeled-invalid
+diagnostic lives at `parity/baseline/react-e2e-baseline-230bd226-DIAGNOSTIC-INVALID/` —
+it is **not** a PB-2 anchor. CP-3 is open pending a tech-lead decision (backend repair or
+re-scope); see the runbook §6 record.
 
 ## 2. Disposition-register discipline
 

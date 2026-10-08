@@ -1,0 +1,22 @@
+=== Per-project x status ===
+chromium   failed       272
+chromium   passed       36
+chromium   skipped      93
+chromium   timedOut     56
+firefox    failed       273
+firefox    passed       35
+firefox    skipped      93
+firefox    timedOut     56
+webkit     failed       272
+webkit     passed       36
+webkit     skipped      93
+webkit     timedOut     56
+
+=== Total by status ===
+failed       817
+passed       107
+skipped      279
+timedOut     168
+TOTAL        1371
+
+passed-after-retry (flaky at baseline): 0

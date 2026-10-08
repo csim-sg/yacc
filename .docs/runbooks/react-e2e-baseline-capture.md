@@ -5,9 +5,13 @@ pinned pre-implementation commit, so the Angular parity gate (PB-2, "zero regres
 SPEC-003 AC-03) anchors to a **recorded** state instead of an assumed-green suite.
 Blocking precondition for the parity gate (SPEC-001 T4 §5, T5 CP-3).
 
-**Baseline captured (ANG-003):** `dev` @ `230bd226` (ANG-001 merge — scaffold/architecture
-only, `packages/frontend` untouched), 2026-10-06. Archive:
-`packages/frontend-angular/parity/baseline/react-e2e-baseline-230bd226/`.
+**Baseline status (ANG-003, 2026-10-08):** NOT captured — capture attempts against the
+pinned commit `230bd226` are **environment-red** (backend login endpoint broken on `dev`
+since `0ba6edb`/#267; in-memory login rate limiter makes full-suite runs structurally
+red). A labeled-invalid diagnostic archive (not a baseline) is kept at
+`packages/frontend-angular/parity/baseline/react-e2e-baseline-230bd226-DIAGNOSTIC-INVALID/`.
+CP-3 remains open pending a tech-lead decision (backend repair is out of SPEC-003 scope).
+See §6 for the full record.
 
 ---
 
@@ -120,8 +124,35 @@ record: `node --version`, `pnpm --version`,
 `pnpm --filter @yacc/frontend exec playwright --version`, browser builds from the report,
 backend commit + `db:fixtures` result.
 
-## 6. 2026-10-06 capture record
+## 6. Capture record
 
-See `packages/frontend-angular/parity/baseline/react-e2e-baseline-230bd226/README.md`
-for the recorded evidence (commit, environment versions, per-case listing, results
-summary, and any red-at-baseline entries).
+### 2026-10-06 → 2026-10-08 attempts — INVALID (environment-red), no baseline captured
+
+Three attempts at the pinned commit `230bd226` (from the `task/ANG-003` worktree):
+
+| Run | Outcome | Cause |
+|---|---|---|
+| 2 | invalid — 1084 fail / 44 pass / 225 did-not-run | broken Firefox/WebKit browser cache |
+| 3 | invalid — died silently mid-run | process loss |
+| 4 | completed RED — 1371 cases: 107 pass / 817 fail / 168 timeout / 279 skip, 0 flaky, ~3.0 h | **RC-1 + RC-2 below** |
+
+**RC-1 — backend login broken on `dev`** (`0ba6edb`/#267 moved `bodyParserMiddleware`
+into the routing-controllers `middlewares` option; plain functions are silently dropped
+by the framework's decorator-metadata filtering, so `req.body` is `undefined` for the
+BetterAuth delegation path): every real login → `400 VALIDATION_ERROR`. Reproduced by
+raw `curl`; `0ba6edb` is an ancestor of the pin and `packages/backend` is byte-identical
+to `230bd226`. Not React behavior — route-mocked `frontend-login.spec.ts` is 9/9 green.
+
+**RC-2 — in-memory login rate limiter (5 / 15 min / IP)**: all Playwright workers share
+`127.0.0.1`, so any full-suite run exceeds 5 logins per window → `429` for everything
+after. 2290 of 2514 error snapshots in run 4 showed the 429 banner.
+
+Environment repair validated before declaring invalidity (2026-10-08): jsonwebtoken ESM
+patch verified, migrations applied, fixtures seeded, backend healthy on :3000, React
+canary 9/9 green, real-backend canary red with HTTP 400 (RC-1 confirmed with fresh
+limiter state). Full evidence:
+`packages/frontend-angular/parity/baseline/react-e2e-baseline-230bd226-DIAGNOSTIC-INVALID/README.md`.
+
+**A valid green-state capture requires a tech-lead decision first** (backend repair or
+CP-3 re-scope) — both are outside frontend-migration scope. Do not re-run the multi-hour
+suite until that decision is recorded.
