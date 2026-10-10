@@ -125,3 +125,66 @@ A valid CP-3 capture requires **either**:
 - Live evidence commands (backend on :3000):
   `curl -s -X POST http://localhost:3000/api/auth/sign-in/email -H 'Content-Type: application/json' -d '{"email":"manager@yacc.local","password":"admin123"}'`
   → HTTP 400 VALIDATION_ERROR (RC-1); any 6th login within 15 min → HTTP 429 (RC-2).
+
+---
+
+## 6. 2026-10-10 re-verification after prerequisite #409 (`2a7e7e2`) — RC-1 FIXED, RC-2 VERIFIED, NEW RC-3 BLOCKS CAPTURE
+
+Prerequisite **#408 / PR #409** (merged to `dev` at `2a7e7e2`, merged into
+`task/ANG-003` at `371c247`) restored the ADR-014 `app.use(bodyParserMiddleware)`
+ordering and added the deterministic non-production limiter posture
+(`packages/backend/src/config/rateLimit.config.ts`). Re-verification on 2026-10-10,
+backend booted per tech-lead directive `APP_ENV=test pnpm --filter @yacc/backend dev`:
+
+**RC-1 — FIXED.** `POST /api/auth/sign-in/email` with a valid JSON body now reaches
+BetterAuth's credential logic: the response changed from
+`400 VALIDATION_ERROR: expected object, received undefined` to
+`401 INVALID_EMAIL_OR_PASSWORD`. The React login form error correspondingly changed
+from "HTTP 400" to "HTTP 401" (canary `HP-AUTH-001` × chromium, 2026-10-10).
+
+**RC-2 — VERIFIED DETERMINISTIC, both directions (curl probes, 2026-10-10):**
+
+| Backend boot | Login attempts | Result |
+|---|---|---|
+| `APP_ENV=test` (test posture) | 8 sequential | **8×401, zero 429** — ceilings lifted |
+| `APP_ENV=development` (production values) | 7 sequential | **5×401 then 2×429** — contractual `max: 5` reasserted from the 6th request |
+
+The posture is exactly E2E-run configuration: production limiter values are unchanged
+and re-asserted by `packages/backend/tests/unit/middleware/rate-limit-posture.test.ts`
+(merged in #409).
+
+**RC-3 (NEW) — BetterAuth email/password is structurally non-functional against the
+app's DB schema; every real login 401s and sign-up 422s.** Pre-existing on the pinned
+commit (schema unchanged by #409), **outside #408's bounded scope**, not fixable within
+ANG-003:
+
+- `users.password_hash`, `users.role`, `users.status` are `NOT NULL`
+  (`packages/backend/src/schemas/user.schema.ts`), but BetterAuth's default user
+  creation inserts only its own fields → sign-up fails with
+  `422 {"code":"FAILED_TO_CREATE_USER"}` (empirically reproduced 2026-10-10;
+  BetterAuth log: `User not found` on the subsequent sign-in).
+- The `account` table/schema has **no `password` column**
+  (`packages/backend/src/schemas/account.schema.ts`), so BetterAuth's default
+  credential verification has no stored hash to compare → sign-in returns
+  `401 INVALID_EMAIL_OR_PASSWORD` even for correctly seeded fixture users
+  (`manager@yacc.local` / `admin123`, re-seeded via `db:fixtures` immediately before
+  the probe).
+- The codebase's own test infrastructure corroborates this:
+  `packages/backend/tests/test-helpers.ts` `createTestUser()` creates users **directly
+  in the DB, "bypasses BetterAuth signup issues"**, and hand-signs JWTs "since
+  BetterAuth handler … may not work properly in test environment"; the BE-003 auth
+  specs are fully mocked. Real email/password login through the BetterAuth HTTP
+  endpoints has never worked end-to-end against this schema — which is why the E2E
+  suite pivoted to route mocks (MIG-034) and why run 4's only passes were
+  mocked/no-login specs.
+
+**Consequence:** with RC-1 and RC-2 resolved, the real-login E2E subset now fails
+deterministically with **401** at the credential layer. A green-state React baseline
+therefore still cannot be captured on the current backend without a further,
+separately-authorized backend prerequisite (schema/auth alignment for BetterAuth
+email/password, or an equivalent deterministic credential seed path). Per the
+tech-lead directive (2026-10-10: "Run full baseline only when canary/env is healthy;
+if blockers persist, stop safely and record exact reason"), the multi-hour full-suite
+run was **not** attempted: the canary/env is deterministically unhealthy and a rerun
+would only reproduce ~900 downstream 401/timeOut failures. This archive therefore
+**remains `DIAGNOSTIC-INVALID`** and CP-3 stays open.

@@ -22,12 +22,16 @@ to be archived at `parity/baseline/react-e2e-baseline-230bd226/` (full HTML repo
 listing + commit SHA + environment versions; capture procedure in the runbook). PB-2's
 "zero regression" anchors to that **recorded** state — red-at-baseline is recorded, never
 assumed green.
-**Current status (2026-10-08): NOT captured.** Capture attempts are environment-red:
-the `dev` backend login endpoint is broken (`0ba6edb`/#267 body-parser regression) and the
-in-memory login rate limiter makes full-suite runs structurally red. A labeled-invalid
-diagnostic lives at `parity/baseline/react-e2e-baseline-230bd226-DIAGNOSTIC-INVALID/` —
-it is **not** a PB-2 anchor. CP-3 is open pending a tech-lead decision (backend repair or
-re-scope); see the runbook §6 record.
+**Current status (2026-10-10): NOT captured.** Prerequisite #408/#409 (`2a7e7e2`) fixed
+the backend body-parser regression (RC-1) and added a deterministic non-production
+limiter posture (RC-2, `APP_ENV=test` only; production values unchanged and
+test-asserted). A third pre-existing blocker remains: BetterAuth email/password is
+structurally non-functional against the current DB schema (`users.password_hash`/`role`/
+`status` NOT NULL break sign-up with `422`; `account` has no `password` column so every
+sign-in `401`s) — see the diagnostic README §6 and runbook §6 (RC-3). Capture attempts
+stay environment-red; a labeled-invalid diagnostic lives at
+`parity/baseline/react-e2e-baseline-230bd226-DIAGNOSTIC-INVALID/` — it is **not** a PB-2
+anchor. CP-3 is open pending a further separately-authorized backend prerequisite.
 
 ## 2. Disposition-register discipline
 

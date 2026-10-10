@@ -156,3 +156,31 @@ limiter state). Full evidence:
 **A valid green-state capture requires a tech-lead decision first** (backend repair or
 CP-3 re-scope) — both are outside frontend-migration scope. Do not re-run the multi-hour
 suite until that decision is recorded.
+
+### 2026-10-10 re-verification after prerequisite #409 (`2a7e7e2`) — RC-3 blocks capture
+
+Founder decision A authorized a bounded backend prerequisite (#408, merged via PR #409 at
+`2a7e7e2`); `task/ANG-003` merged `origin/dev` at `371c247` (no rebase/force). Boot:
+`APP_ENV=test pnpm --filter @yacc/backend dev` (⚠️ never `NODE_ENV=test` —
+`packages/backend/index.ts` skips `start()` under it).
+
+- **RC-1 fixed:** login body now parsed (`400 VALIDATION_ERROR` → `401
+  INVALID_EMAIL_OR_PASSWORD`; UI error "HTTP 400" → "HTTP 401").
+- **RC-2 verified deterministic:** `APP_ENV=test` → 8/8 logins, zero 429;
+  `APP_ENV=development` (production values) → 401×5 then 429 from the 6th —
+  contractual `max: 5` reasserted; posture is E2E-run configuration only
+  (`rateLimit.config.ts`, safety tests merged in #409).
+- **RC-3 (new blocker, pre-existing on pin, outside #408 scope):** BetterAuth
+  email/password cannot work against the current schema — `users.password_hash` /
+  `role` / `status` are `NOT NULL` (BetterAuth's default user insert omits them →
+  sign-up `422 FAILED_TO_CREATE_USER`), and the `account` table has **no `password`
+  column** (credential verify has no stored hash → every sign-in `401`). The backend's
+  own `tests/test-helpers.ts` bypasses BetterAuth signup/ login entirely (direct DB
+  inserts + hand-signed JWTs), and BE-003 auth specs are fully mocked — real
+  email/password login has never worked end-to-end on this codebase.
+- **Capture posture:** canary/env deterministically unhealthy → full run **not**
+  attempted (would only reproduce ~900 downstream 401/timeOut failures);
+  `react-e2e-baseline-230bd226-DIAGNOSTIC-INVALID/` §6 holds the full record. CP-3
+  stays open pending a further separately-authorized backend prerequisite
+  (schema/auth alignment for BetterAuth email/password, or an equivalent deterministic
+  credential seed path).
