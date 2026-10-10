@@ -20,7 +20,14 @@ import { WebSocketServer } from './websockets/websocket.server';
 import { getRetryWorker, closeRetryWorker } from './workers/messageRetryWorker';
 
 // ===== EXPRESS APP =====
-const app = express();
+export const app = express();
+
+// Register body parser middleware BEFORE routing-controllers (ADR-014).
+// BetterAuth delegated handlers rely on req.body being present before
+// routing-controllers processes the request; registering it in the
+// routing-controllers middlewares array parses the body too late and broke
+// live sign-in (commit ba71629, reverted here — see #408 / PREREQ-ANG-003).
+app.use(bodyParserMiddleware);
 
 useExpressServer(app, {
   controllers: controllers,
@@ -38,7 +45,6 @@ useExpressServer(app, {
     exposedHeaders: ['set-auth-token', 'x-total-count', 'x-current-page', 'x-total-pages'],
   },
   middlewares: [
-    bodyParserMiddleware,
     correlationIdMiddleware,
     requestLoggingMiddleware,
   ],
