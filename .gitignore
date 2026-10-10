@@ -21,5 +21,6 @@ coverage/
 .cursor/
 playwright-report/
 packages/frontend/test-results/
+packages/frontend-angular/test-results/
 packages/frontend/playwright-report/
 .worktrees/
