@@ -135,7 +135,7 @@ export class AuthController {
    */
   @Post('/sign-in/email')
   @UseBefore(loginRateLimiter)
-  async handleSignInEmail(@Req() req: Request, @Res() res: Response): Promise<void> {
+  async handleSignInEmail(@Req() req: Request, @Res() res: Response): Promise<Response> {
     return this.delegateToAuth(req, res);
   }
 
@@ -152,16 +152,22 @@ export class AuthController {
     * - /refresh-token (token refresh with Bearer plugin)
     */
    @All('/*')
-    async handleAuth(@Req() req: Request, @Res() res: Response): Promise<void> {
+    async handleAuth(@Req() req: Request, @Res() res: Response): Promise<Response> {
       return this.delegateToAuth(req, res);
     }
 
     /**
      * Helper method to delegate requests to BetterAuth handler
      * Reads body from request and converts to BetterAuth format
+     *
+     * Returns the response object so routing-controllers short-circuits result
+     * handling (returning undefined would make it throw a NotFoundError after
+     * the response was already sent — an unhandled rejection that crashes the
+     * process on Node 20). See #408.
+     *
      * @private
      */
-    private async delegateToAuth(req: Request, res: Response): Promise<void> {
+    private async delegateToAuth(req: Request, res: Response): Promise<Response> {
      const correlationId = req.correlationId || 'unknown';
 
      try {
@@ -227,6 +233,7 @@ export class AuthController {
        }
        
        res.send(responseBody);
+       return res;
      } catch (error: unknown) {
        const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
        logger.error('BetterAuth handler error - correlationId: %s, error: %s', correlationId, errorMessage);
@@ -235,6 +242,7 @@ export class AuthController {
        if (!res.headersSent) {
          res.status(500).json({ error: errorMessage });
        }
+       return res;
      }
    }
 }

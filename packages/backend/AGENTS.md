@@ -193,6 +193,7 @@ new SocketControllers({
 5. **Middleware Registration**
    - Register via routing-controllers `middlewares` option
    - NOT via `app.use()`
+   - Documented exception (ADR-014, Accepted): `bodyParserMiddleware` MUST be registered via `app.use()` **before** `useExpressServer()` — BetterAuth delegated handlers need `req.body` pre-parsed, and the routing-controllers `middlewares` array parses too late. See `.docs/adr/ADR-014-middleware-registration-exception.md` (this exception was accidentally inverted by commit `ba71629` and restored in #408).
 
 6. **Type-Safe Database Queries**
    - Use Drizzle query builder
