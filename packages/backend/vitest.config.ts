@@ -10,7 +10,9 @@
  * - Fast test execution with Vitest's parallelization
  */
 
+import path from 'node:path';
 import { defineConfig } from 'vitest/config';
+
 
 export default defineConfig({
   test: {
@@ -88,9 +90,12 @@ export default defineConfig({
 
   resolve: {
     alias: {
-      '@yacc/common': '../../common/src',
-      '@yacc/backend': './src',
-      '@': './src',
+      // Absolute paths are required: relative alias replacements resolve
+      // importer-relative, which breaks for importers under src/** (the old
+      // '../../common/src' value only worked from tests/**). PREREQ-ANG-003 (#408).
+      '@yacc/common': path.resolve(__dirname, '../common/src'),
+      '@yacc/backend': path.resolve(__dirname, './src'),
+      '@': path.resolve(__dirname, './src'),
     },
   },
 });
