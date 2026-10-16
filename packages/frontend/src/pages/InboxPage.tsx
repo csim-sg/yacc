@@ -843,16 +843,6 @@ export function InboxPage() {
                       {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-sm text-base-content/60 font-medium mb-1">Email Verified</div>
-                    <div className="text-base">
-                      {user?.emailVerified ? (
-                        <span className="badge badge-success badge-sm">Verified</span>
-                      ) : (
-                        <span className="badge badge-warning badge-sm">Not Verified</span>
-                      )}
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
