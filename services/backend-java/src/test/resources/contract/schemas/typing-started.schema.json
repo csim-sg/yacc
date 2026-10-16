@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yacc/ws/typing-started.schema.json",
+  "title": "typing.started payload",
+  "description": "SPEC-002 MIG-002 capture @98db628. Baseline: TypingStartedPayloadSchema in packages/backend/src/types/websocket.types.ts:56.",
+  "type": "object",
+  "required": ["conversationId", "userId", "name"],
+  "properties": {
+    "conversationId": {"type": "string", "format": "uuid"},
+    "userId": {"type": "string", "format": "uuid"},
+    "name": {"type": "string", "minLength": 1}
+  }
+}

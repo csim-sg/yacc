@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yacc/ws/message-received.schema.json",
+  "title": "message.received payload",
+  "description": "SPEC-002 MIG-002 capture @98db628. Baseline: MessageReceivedPayloadSchema in packages/backend/src/types/websocket.types.ts:29 (also matches connector.controller broadcast shape).",
+  "type": "object",
+  "required": ["messageId", "conversationId", "platform", "senderId", "senderName", "body", "timestamp"],
+  "properties": {
+    "messageId": {"type": "string", "format": "uuid"},
+    "conversationId": {"type": "string", "format": "uuid"},
+    "platform": {"type": "string", "enum": ["telegram", "irc"]},
+    "senderId": {"type": "string", "minLength": 1, "description": "Platform sender identifier (Telegram user ID or IRC nick)"},
+    "senderName": {"type": "string", "minLength": 1},
+    "body": {"type": "string", "minLength": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["url", "type", "name"],
+        "properties": {
+          "url": {"type": "string", "format": "uri"},
+          "type": {"type": "string", "minLength": 1},
+          "name": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}
