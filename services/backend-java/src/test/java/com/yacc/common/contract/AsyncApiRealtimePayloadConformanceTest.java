@@ -16,8 +16,6 @@ import org.junit.jupiter.api.TestInstance;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.networknt.schema.JsonSchema;
@@ -64,10 +62,13 @@ class AsyncApiRealtimePayloadConformanceTest {
     /** The frozen envelope member set (schemas/envelope.schema.json). */
     private static final Set<String> ENVELOPE_MEMBERS = Set.of("event", "data", "timestamp");
 
-    private final ObjectMapper mapper = JsonMapper.builder()
-            .addModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .build();
+    /**
+     * MIG-102: the production Jackson wire posture ({@code JacksonConfig}
+     * customizer via {@link ProductionJacksonPosture}) — no test-only
+     * override. The envelope {@code timestamp} ({@code Instant}) serializes
+     * as RFC 3339 UTC under the same posture as the REST date-time members.
+     */
+    private final ObjectMapper mapper = ProductionJacksonPosture.productionMapper();
 
     private Map<String, JsonSchema> payloadSchemas;
 
@@ -111,15 +112,18 @@ class AsyncApiRealtimePayloadConformanceTest {
         JsonNode wire = mapper.valueToTree(envelope);
         assertThat(errors("envelope", wire)).isEmpty();
 
-        // Verbatim member set + ISO-8601 timestamp at emit time (WS-BHV-001).
-        // The timestamp check here is deliberately shape-only: RFC 3339
-        // (offset-ful) date-time emission is an open defect owned by
-        // follow-up #414 (MIG-102), not an accepted deviation — do not
-        // widen this assertion to accept non-conforming formats.
+        // Verbatim member set + RFC 3339 UTC timestamp at emit time
+        // (WS-BHV-001). MIG-102: the emitted value is asserted, not just the
+        // member's presence — the envelope {@code timestamp} is an
+        // {@code Instant} and must carry the explicit UTC offset on the wire
+        // (the frozen envelope schema also enforces {@code format: date-time}
+        // with format assertions on above).
         assertThat(wire.fieldNames()).toIterable().containsExactlyInAnyOrderElementsOf(
                 ENVELOPE_MEMBERS);
         assertThat(wire.path("event").asText()).isEqualTo("message.sent");
-        assertThat(wire.path("timestamp").isTextual()).isTrue();
+        assertThat(wire.path("timestamp").asText())
+                .as("envelope timestamp is RFC 3339 with an explicit UTC offset")
+                .matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z");
     }
 
     @Test

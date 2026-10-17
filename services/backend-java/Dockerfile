@@ -52,6 +52,12 @@ COPY --from=build --chown=1000:1000 /workspace/build/libs/yacc-backend-*.jar app
 # - java.io.tmpdir on the emptyDir-backed /tmp.
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -XX:HeapDumpPath=/app/heap-dumps -Djava.io.tmpdir=/tmp"
 
+# MIG-102 (AC-MIG-102-4): the container starts on UTC — the pinned service
+# time basis. LocalDateTime values are UTC wall-clock (UtcTimeBasisConfig
+# re-anchors the JVM default zone at boot as well) and are serialized with a
+# truthful +00:00 offset. Mirrored as `TZ: "UTC"` in deploy/helm values.
+ENV TZ=UTC
+
 USER 1000
 EXPOSE 8080
 

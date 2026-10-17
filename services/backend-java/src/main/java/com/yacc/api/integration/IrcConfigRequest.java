@@ -2,6 +2,7 @@ package com.yacc.api.integration;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -24,6 +25,8 @@ public record IrcConfigRequest(
         @NotBlank String server,
         @Min(1) @Max(65535) int port,
         @NotBlank String username,
-        String password,
+        // Contract IrcConfigBody.password: optional, non-nullable — omitted when
+        // absent, never null (MIG-102).
+        @JsonInclude(JsonInclude.Include.NON_NULL) String password,
         @NotEmpty List<@Pattern(regexp = "^#.*") @Size(min = 2) String> channels) {
 }

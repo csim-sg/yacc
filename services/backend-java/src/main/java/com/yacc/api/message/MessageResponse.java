@@ -3,6 +3,7 @@ package com.yacc.api.message;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import com.yacc.entity.MessageStatus;
@@ -32,7 +33,9 @@ public record MessageResponse(
         String body,
         String status,
         String direction,
-        String externalMessageId,
+        // Contract Message.externalMessageId: optional, non-nullable — omitted
+        // when absent, never null (MIG-102). senderId/metadata stay required-nullable.
+        @JsonInclude(JsonInclude.Include.NON_NULL) String externalMessageId,
         JsonNode metadata,
         LocalDateTime createdAt,
         LocalDateTime updatedAt) {
