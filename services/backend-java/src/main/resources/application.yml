@@ -38,6 +38,34 @@ spring:
     # Flyway-only schema management (ARCH-004 §7). The single V1 full-reset
     # baseline lives in classpath:db/migration; later changes append V2+.
     locations: classpath:db/migration
+  quartz:
+    # MIG-063 retry scheduler (SPEC FR-07/TR-06; ADR-028): Quartz, DB-backed
+    # and in-process. The JDBC job store persists jobs/triggers in PostgreSQL
+    # (Flyway V4 owns the qrtz_* tables — the schema mechanism stays Flyway
+    # only, ARCH-004 §7), so scheduled redelivery survives a restart. The
+    # scheduler is deliberately NOT clustered: the deployment posture is a
+    # single backend instance (ADR-024/ADR-029), so non-clustered Quartz is
+    # the correct singleton assumption — a second instance must not be
+    # pointed at these tables without switching to clustered mode first.
+    job-store-type: jdbc
+    jdbc:
+      # V4__quartz_job_store.sql creates the store tables. Spring's own
+      # initializer stays off — Flyway is the only schema mechanism.
+      initialize-schema: never
+    properties:
+      org.quartz.scheduler.instanceName: yacc-backend
+      org.quartz.jobStore.driverDelegateClass: org.quartz.impl.jdbcjobstore.PostgreSQLDelegate
+      # Single-instance posture (ADR-024/029). Not a clustering toggle to
+      # flip casually: see the block comment above.
+      org.quartz.jobStore.isClustered: false
+      # Baseline retry-worker concurrency parity (messageRetryWorker.ts,
+      # WORKER_CONCURRENCY = 5) — one Quartz worker thread per concurrent
+      # redelivery attempt.
+      org.quartz.threadPool.threadCount: 5
+    # The DLQ 7-day retention sweep (MIG-063) is also Quartz-owned: a
+    # durable job (dlq-retention group) registered once at startup by
+    # DlqRetentionSchedule — hourly, first fire immediate. No config
+    # surface: hygiene cadence, not a contract value.
   jpa:
     hibernate:
       # MIG-021: every runtime context boot validates all JPA entity mappings
@@ -212,6 +240,18 @@ yacc:
       connect-timeout-ms: ${YACC_CONNECTOR_IRC_CONNECT_TIMEOUT_MS:30000}
       reconnect-base-delay-ms: ${YACC_CONNECTOR_IRC_RECONNECT_BASE_DELAY_MS:1000}
       reconnect-max-delay-ms: ${YACC_CONNECTOR_IRC_RECONNECT_MAX_DELAY_MS:60000}
+  queue:
+    retry:
+      # MIG-063 DB-backed retry policy (ADR-028). These are BASELINE PARITY
+      # VALUES, not tunables (message-queue.types.ts RETRY_CONFIG): the
+      # redelivery backoff ladder is 1m -> 5m -> 30m over MAX 3 attempts per
+      # retry cycle (the frozen BullMQ semantics), and the retried-marker
+      # consumer poll is hygiene cadence, not a contract value. Overrides
+      # exist so the environment/tests can bound the policy deterministically;
+      # production keeps the frozen defaults.
+      backoff-delays-ms: ${YACC_QUEUE_RETRY_BACKOFF_DELAYS_MS:60000,300000,1800000}
+      max-attempts: ${YACC_QUEUE_RETRY_MAX_ATTEMPTS:3}
+      marker-poll-interval-ms: ${YACC_QUEUE_RETRY_MARKER_POLL_INTERVAL_MS:30000}
   realtime:
     websocket:
       # MIG-050 raw WebSocket endpoint (ADR-026; SPEC-002 FR-06/TR-04).

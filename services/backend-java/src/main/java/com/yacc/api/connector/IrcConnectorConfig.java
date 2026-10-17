@@ -16,10 +16,12 @@ import org.springframework.context.annotation.Configuration;
  *       WS behavior lives in this module).</li>
  * </ul>
  *
- * <p>The {@link ConnectorErrorHook} seam default (MIG-063 replaces it with
- * DLQ enqueue + circuit breaker) is wired once by
- * {@link TelegramConnectorConfig} and shared platform-generically — the
- * typed error carries the platform id.</p>
+ * <p>The {@link ConnectorErrorHook} seam is implemented platform-generically
+ * by MIG-063's {@link ConnectorBreakerErrorHook} (circuit breaker, threshold
+ * 5), component-scanned once for both connectors — the typed error carries
+ * the platform id. DLQ entry creation needs message correlation (frozen
+ * {@code dead_letter_queue} FKs) and lands with MIG-062's exchange over
+ * {@code DlqService#enqueue}.</p>
  */
 @Configuration
 public class IrcConnectorConfig {

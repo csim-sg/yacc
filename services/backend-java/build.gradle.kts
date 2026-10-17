@@ -89,6 +89,17 @@ dependencies {
     // transitively — no separate JDBC starter declaration.
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 
+    // --- MIG-063 async processing (SPEC-002 FR-07/TR-06; ADR-028) ---
+    // Quartz scheduler for the DB-backed retry worker (backoff 1m/5m/30m,
+    // concurrency 5) + DB DLQ + circuit breaker. The JDBC job store persists
+    // jobs/triggers in PostgreSQL (Flyway V4 creates the job-store tables —
+    // spring.quartz.jdbc.initialize-schema stays `never`, Flyway is the only
+    // schema mechanism, ARCH-004 §7). In-process and deliberately NOT
+    // clustered (single-instance posture, ADR-024/029). This replaces the
+    // POC's BullMQ/Redis retry queue — NO Redis client or dependency exists
+    // anywhere in this service (AC-MIG-063-3).
+    implementation("org.springframework.boot:spring-boot-starter-quartz")
+
     // MIG-014 test infrastructure (SPEC-002 Testing Strategy; ARCH-004 §13 #10).
     // Versions are managed by the Spring Boot dependency-management BOM.
     testImplementation("org.springframework.boot:spring-boot-starter-test")

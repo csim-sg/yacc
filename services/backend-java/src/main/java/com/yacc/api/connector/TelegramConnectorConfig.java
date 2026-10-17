@@ -7,32 +7,28 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Connector module wiring (ARCH-004 §4 — connector-local {@code @Configuration}
- * stays in the module). Provides the temporary no-op defaults for the two
- * seams other migration tasks replace:
+ * stays in the module). Provides the temporary no-op default for the one
+ * seam another migration task still replaces:
  *
  * <ul>
- *   <li>{@link ConnectorErrorHook} — MIG-063 (#360) replaces this default
- *       with DLQ enqueue (through the DLQ persistence surface) + circuit
- *       breaker (AC-MIG-060-2 hook; ADR-028).</li>
  *   <li>{@link TelegramUpdateReceiver} — MIG-062 (#359) replaces this
- *       default with the connector→realtime bridge (ledger
+ *       default with the connector&rarr;realtime bridge (ledger
  *       WS-OP-CONN-001/002; no WS behavior lives in this module).</li>
  * </ul>
  *
- * <p>The default error hook logs at warn (the typed error carries no
- * credentials) so surfaced adapter failures stay observable until MIG-063.</p>
+ * <p>The {@link ConnectorErrorHook} seam is no longer a no-op: MIG-063's
+ * component-scanned {@link ConnectorBreakerErrorHook} (platform circuit
+ * breaker, threshold 5) is the single platform-generically-wired
+ * implementation this module and the IRC connector share — the typed error
+ * carries the platform id. DLQ entry creation requires message correlation
+ * (frozen {@code dead_letter_queue} FKs) and goes through
+ * {@code com.yacc.service.DlqService#enqueue} from the delivery path that
+ * owns the identity (MIG-062's exchange).</p>
  */
 @Configuration
 public class TelegramConnectorConfig {
 
     private static final Logger log = LoggerFactory.getLogger(TelegramConnectorConfig.class);
-
-    /** No-op default until MIG-063 implements DLQ routing + the breaker. */
-    @Bean
-    public ConnectorErrorHook connectorErrorHook() {
-        return error -> log.warn("Connector adapter error surfaced (hook default; MIG-063 owns DLQ/breaker): {}",
-                error);
-    }
 
     /** No-op default until MIG-062 implements the connector→realtime bridge. */
     @Bean

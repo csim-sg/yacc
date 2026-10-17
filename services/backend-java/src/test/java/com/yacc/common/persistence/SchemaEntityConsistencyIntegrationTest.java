@@ -22,7 +22,10 @@ import com.yacc.common.testsupport.AbstractPostgresIntegrationTest;
  *
  * <p>MIG-051 added the {@code websocket_backlog} entity (the V2 table was
  * deliberately deferred to it by the #346 arbitration ruling R1), so the
- * manifest now covers the 19 V1 baseline tables plus the V2 backlog table.</p>
+ * manifest now covers the 19 V1 baseline tables plus the V2 backlog table.
+ * MIG-063 added the Quartz JDBC job-store tables (Flyway V4, ADR-028):
+ * scheduler-internal persistence with deliberately NO JPA entity/repository,
+ * so the manifest lists them as a separate Quartz-managed set.</p>
  */
 class SchemaEntityConsistencyIntegrationTest extends AbstractPostgresIntegrationTest {
 
@@ -66,6 +69,25 @@ class SchemaEntityConsistencyIntegrationTest extends AbstractPostgresIntegration
             // tag
             "tags");
 
+    /**
+     * The 11 Quartz JDBC job-store tables (Flyway V4; MIG-063, ADR-028) —
+     * scheduler-internal persistence, deliberately NOT entity-mapped (no
+     * JPA entity/repository exists for them; the store is Quartz's own
+     * JDBC delegation, never queried through JPA).
+     */
+    private static final List<String> QUARTZ_MANAGED_TABLES = List.of(
+            "qrtz_blob_triggers",
+            "qrtz_calendars",
+            "qrtz_cron_triggers",
+            "qrtz_fired_triggers",
+            "qrtz_job_details",
+            "qrtz_locks",
+            "qrtz_paused_trigger_grps",
+            "qrtz_scheduler_state",
+            "qrtz_simple_triggers",
+            "qrtz_simprop_triggers",
+            "qrtz_triggers");
+
     private final JdbcTemplate jdbcTemplate;
 
     /**
@@ -84,6 +106,11 @@ class SchemaEntityConsistencyIntegrationTest extends AbstractPostgresIntegration
     }
 
     @Test
+    void quartzJobStoreIsExactlyTheElevenSchedulerManagedTables() {
+        assertThat(QUARTZ_MANAGED_TABLES).hasSize(11);
+    }
+
+    @Test
     void everyMappedTableExistsInTheSchema() {
         List<String> missing = new ArrayList<>();
         for (String table : MAPPED_TABLES) {
@@ -99,13 +126,14 @@ class SchemaEntityConsistencyIntegrationTest extends AbstractPostgresIntegration
     }
 
     @Test
-    void schemaContainsExactlyTheMappedTablesPlusFlywayHistory() {
+    void schemaContainsExactlyTheMappedAndQuartzManagedTablesPlusFlywayHistory() {
         List<String> tables = jdbcTemplate.queryForList(
                 "SELECT table_name FROM information_schema.tables"
                         + " WHERE table_schema = 'public' ORDER BY table_name",
                 String.class);
 
         List<String> expected = new ArrayList<>(MAPPED_TABLES);
+        expected.addAll(QUARTZ_MANAGED_TABLES);
         expected.add("flyway_schema_history");
         assertThat(tables).containsExactlyInAnyOrderElementsOf(expected);
     }

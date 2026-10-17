@@ -75,7 +75,9 @@ public class MessageService {
     /**
      * Manual retry — exactly once per message (ledger row REST-MSG-003):
      * only failed messages with an un-retried DLQ entry are eligible; the
-     * DLQ row is marked retried (Quartz delivery lands with MIG-063).
+     * DLQ row is marked retried and the MIG-063 Quartz retry worker
+     * consumes the marker for redelivery (ADR-028 — the P0 exactly-once
+     * rule preserved).
      */
     @Transactional
     public Message retry(UUID conversationId, UUID messageId, String userId) {

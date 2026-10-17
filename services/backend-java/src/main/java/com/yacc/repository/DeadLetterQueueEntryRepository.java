@@ -1,5 +1,6 @@
 package com.yacc.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,7 +19,12 @@ public interface DeadLetterQueueEntryRepository extends JpaRepository<DeadLetter
 
     Optional<DeadLetterQueueEntry> findByMessageId(UUID messageId);
 
+    List<DeadLetterQueueEntry> findByRetryAttemptTrue();
+
     List<DeadLetterQueueEntry> findByFailureReason(String failureReason);
 
     Page<DeadLetterQueueEntry> findByFailureReason(String failureReason, Pageable pageable);
+
+    /** The expired entries (retention sweep input), oldest expirations first. */
+    List<DeadLetterQueueEntry> findByExpiresAtBefore(LocalDateTime deadline, Pageable pageable);
 }
