@@ -41,14 +41,18 @@ import org.slf4j.LoggerFactory;
  * <p><b>Injection guard:</b> client-supplied protocol fields (password,
  * nick, channels, outbound recipients) are validated with
  * {@link #isSafeProtocolParam} before any write, and {@code sendLine}
- * re-checks the single-line rule at the write boundary — a CR or LF inside
- * a field would otherwise terminate the line early and let one call inject
- * additional IRC commands on the authenticated connection.</p>
+ * re-checks the single-line rule at the write boundary — a CR, LF or NUL
+ * inside a field would otherwise terminate, split or corrupt the protocol
+ * line and let one call inject additional IRC commands on the
+ * authenticated connection.</p>
  *
  * <p><b>Bounded inbound framing:</b> inbound lines are framed at
- * {@link #MAX_LINE_OCTETS} octets (RFC 1459 §2.3 line budget). A peer that
- * streams an oversized or unterminated line violates the framing — the
- * connection is dropped instead of being buffered without bound.</p>
+ * {@link #MAX_LINE_OCTETS} octets <i>including</i> the CRLF delimiter
+ * (RFC 1459 §2.3 line budget, so the largest legal payload is 510 octets
+ * plus CRLF). A peer that streams an over-budget or unterminated line —
+ * including a truncated fragment still buffered at EOF — violates the
+ * framing: the connection is dropped instead of buffering without bound
+ * or parsing a truncated command.</p>
  *
  * <p>Instances are per-connection (baseline {@code IRCClient} parity):
  * created by {@link IrcConnector} per attempt, never a Spring bean. The
@@ -69,9 +73,11 @@ public class IrcProtocolClient implements Closeable {
 
     /**
      * Bounded inbound framing budget (RFC 1459 §2.3: one IRC message is at
-     * most 512 octets including the CRLF terminator). An inbound line whose
-     * payload reaches this budget without a terminator — terminated or not —
-     * is a framing violation and fails the connection.
+     * most 512 octets <i>including</i> the CRLF terminator — the largest
+     * legal wire line is 510 payload octets plus CRLF). An inbound line
+     * that is not terminated once its octets reach this budget — terminated
+     * or not — is a framing violation and fails the connection, as is a
+     * truncated fragment still buffered at EOF.
      */
     static final int MAX_LINE_OCTETS = 512;
 
@@ -323,23 +329,30 @@ public class IrcProtocolClient implements Closeable {
 
     /**
      * Reads one inbound line with bounded framing: LF terminates (one
-     * optional preceding CR is stripped), the partial-line buffer survives
-     * {@link SocketTimeoutException} ticks, and a line that reaches the
-     * {@link #MAX_LINE_OCTETS} budget without a terminator — terminated or
-     * not — is a framing violation that fails the connection (P2: no
-     * unbounded allocation). At EOF the unterminated remainder within the
-     * budget is returned as the final line, then {@code null} afterwards.
+     * optional preceding CR is stripped) and the partial-line buffer
+     * survives {@link SocketTimeoutException} ticks. The octet budget is
+     * accounted over the whole wire line including the delimiter: the
+     * buffer holds every octet of the current line read so far (the
+     * terminator itself is never buffered), so once it holds
+     * {@link #MAX_LINE_OCTETS} - 1 octets a further byte cannot be part of
+     * any legal line — whatever follows, the line is already past the
+     * 512-octet budget (510 payload + CRLF at most) and is a framing
+     * violation that fails the connection (P2: no unbounded allocation).
+     * Unterminated data still buffered at EOF is a truncated line and also
+     * a framing violation; only a clean EOF between lines returns
+     * {@code null}.
      */
     private String readBoundedLine() throws IOException {
         while (true) {
             int b = input.read();
             if (b == -1) {
-                byte[] remainder = lineBuffer.toByteArray();
+                boolean truncated = lineBuffer.size() > 0;
                 lineBuffer.reset();
-                if (remainder.length == 0) {
-                    return null;
+                if (truncated) {
+                    throw new IOException(
+                            "IRC framing violation: connection ended mid-line");
                 }
-                return new String(remainder, StandardCharsets.UTF_8);
+                return null;
             }
             if (b == '\n') {
                 byte[] bytes = lineBuffer.toByteArray();
@@ -349,7 +362,7 @@ public class IrcProtocolClient implements Closeable {
                         : bytes.length;
                 return new String(bytes, 0, end, StandardCharsets.UTF_8);
             }
-            if (lineBuffer.size() >= MAX_LINE_OCTETS) {
+            if (lineBuffer.size() >= MAX_LINE_OCTETS - 1) {
                 lineBuffer.reset();
                 throw new IOException("IRC framing violation: line exceeds the "
                         + MAX_LINE_OCTETS + "-octet protocol limit");
@@ -361,16 +374,19 @@ public class IrcProtocolClient implements Closeable {
     /**
      * One serialized protocol write (reader PONGs and sends share it). The
      * single-line check is the last-resort injection boundary (P1): even a
-     * caller that bypassed field validation can never emit a CR or LF, so
-     * one call can never write more than one protocol line.
+     * caller that bypassed field validation can never emit a CR, LF or NUL,
+     * so one call can never write more than one protocol line and can never
+     * corrupt the byte stream mid-line (NUL is a protocol-level forbidden
+     * octet, not a delimiter — it is refused with nothing written).
      */
     private synchronized void sendLine(String line) throws IOException {
         if (closed || writer == null) {
             throw new IOException("IRC connection is not open");
         }
-        if (line.indexOf('\r') >= 0 || line.indexOf('\n') >= 0) {
+        if (line.indexOf('\r') >= 0 || line.indexOf('\n') >= 0
+                || line.indexOf('\0') >= 0) {
             throw new IOException(
-                    "IRC protocol violation: refusing to write a line containing CR/LF");
+                    "IRC protocol violation: refusing to write a line containing CR/LF/NUL");
         }
         writer.write(line);
         writer.write("\r\n");

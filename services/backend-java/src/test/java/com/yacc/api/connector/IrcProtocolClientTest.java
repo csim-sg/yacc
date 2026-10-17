@@ -19,8 +19,11 @@ import org.junit.jupiter.api.Test;
  * registration rejection (464/433), deadline expiry, server-side close,
  * the protocol-field injection guard (review-loop P1: CR/LF/NUL/space in
  * password/nick/channel/recipient never reaches the wire), and bounded
- * inbound framing (review-loop P2: oversized/unterminated lines drop the
- * connection without unbounded allocation).
+ * inbound framing (review-loop P2: the 512-octet budget counts the whole
+ * wire line including the CRLF delimiter — max legal 510 payload + CRLF;
+ * oversized/unterminated lines and truncated EOF partials drop the
+ * connection without unbounded allocation; loop 2 also pins the NUL
+ * rejection at the final write boundary).
  */
 class IrcProtocolClientTest {
 
@@ -333,6 +336,122 @@ class IrcProtocolClientTest {
         assertThat((Exception) registrationFailures.get(0))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("octet");
+    }
+
+    // --- P2 loop 2: exact 512-octet wire budget (CRLF counted), EOF
+    // partials, and the NUL write boundary ---
+
+    @Test
+    void maxLegalWireLineOf510PayloadPlusCrLfIsAccepted() throws Exception {
+        // RFC 1459 §2.3 budget is 512 octets INCLUDING the CRLF delimiter,
+        // so 510 payload + CRLF (exactly 512 on the wire) is the largest
+        // legal line and must be delivered.
+        server = new MockIrcServer();
+        server.autoRegister();
+        client = newClient();
+        client.register("yaccbot", null, 2_000);
+        client.startReader();
+
+        server.sendRaw("x".repeat(510) + "\r\n");
+
+        long deadline = System.currentTimeMillis() + WAIT.toMillis();
+        while (inbound.isEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        assertThat(inbound).hasSize(1);
+        assertThat(inbound.get(0).raw()).hasSize(510);
+        assertThat(lostConnections).isEmpty();
+
+        // The reader loop must still be healthy at the boundary.
+        server.sendLine("PING :after-max-legal");
+        assertThat(server.awaitLineContaining("PONG :after-max-legal", WAIT)).isTrue();
+    }
+
+    @Test
+    void lineOf511PayloadPlusCrLfExceedsTheWireBudgetAndDropsTheConnection()
+            throws Exception {
+        // 511 payload + CRLF = 513 octets — one octet past the budget. The
+        // delimiter counts, so this is a framing violation, never a line.
+        server = new MockIrcServer();
+        server.autoRegister();
+        client = newClient();
+        client.register("yaccbot", null, 2_000);
+        client.startReader();
+
+        server.sendRaw("x".repeat(511) + "\r\n");
+
+        long deadline = System.currentTimeMillis() + WAIT.toMillis();
+        while (lostConnections.isEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        assertThat(lostConnections).containsExactly(client);
+        assertThat(inbound).isEmpty();
+    }
+
+    @Test
+    void unterminatedPartialDataAtEofIsRejectedAndTheConnectionIsCleanedUp()
+            throws Exception {
+        // A truncated command within the octet budget followed by EOF is a
+        // framing violation: the fragment must be discarded and reported as
+        // a lost connection, never parsed or surfaced as a final line.
+        server = new MockIrcServer();
+        server.autoRegister();
+        client = newClient();
+        client.register("yaccbot", null, 2_000);
+        client.startReader();
+
+        server.sendRaw(":mock.server PRIV #truncated");
+        server.dropClient();
+
+        long deadline = System.currentTimeMillis() + WAIT.toMillis();
+        while (lostConnections.isEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        assertThat(lostConnections).containsExactly(client);
+        assertThat(inbound).isEmpty();
+    }
+
+    @Test
+    void unterminatedPartialDataAtEofDuringRegistrationFailsFastAsAFramingViolation()
+            throws Exception {
+        server = new MockIrcServer();
+        client = newClient();
+        Thread register = registerAsync();
+
+        assertThat(server.awaitLineContaining("NICK yaccbot", WAIT)).isTrue();
+        server.sendRaw(":mock.server 001 trunc");
+        server.dropClient();
+
+        register.join(5_000);
+        assertThat(registrationFailures).hasSize(1);
+        // Fails fast as a framing violation — not the clean-EOF message and
+        // not a deadline timeout.
+        assertThat((Exception) registrationFailures.get(0))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("mid-line");
+    }
+
+    @Test
+    void sendLineBoundaryRejectsNulAndWritesZeroBytesToTheSocket() throws Exception {
+        server = new MockIrcServer();
+        server.autoRegister();
+        client = newClient();
+        client.register("yaccbot", null, 2_000);
+        int linesBefore = server.receivedLines().size();
+
+        // The trailing message text is deliberately not field-validated
+        // (spaces are legal there), so the final write boundary must refuse
+        // NUL on its own — a NUL on the wire corrupts the protocol stream.
+        assertThatThrownBy(() -> client.privmsg("#test", "hello\0world"))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("NUL");
+
+        // Zero bytes of the refused write reached the socket: the next
+        // valid send arrives alone and byte-exact.
+        client.privmsg("#test", "ok");
+        assertThat(server.awaitLineContaining("PRIVMSG #test :ok", WAIT)).isTrue();
+        assertThat(server.receivedLines()).hasSize(linesBefore + 1);
+        assertThat(server.receivedLines().get(linesBefore)).isEqualTo("PRIVMSG #test :ok");
     }
 
     // --- harness ---
