@@ -1,7 +1,7 @@
 # 004 Java Backend Guardrails (Spring — replaces TS guardrails for the Java service)
 
-**Status:** Draft for MIG-004 (#337) — acceptance recorded in MIG-005 (#339)
-**Last Updated:** 2026-09-26
+**Status:** Draft for MIG-004 (#337) — acceptance recorded in MIG-005 (#339)  
+**Last Updated:** 2026-10-16 (§1, §13 row 1, §14 rule 1 amended in place by MIG-100 #410 — standalone API-module model; §2–§12 unchanged)
 **Spec:** SPEC-002 — Java/Spring Backend Migration (TR-01..TR-09; Architecture Notes)
 **ADRs:** ADR-023 (contract), ADR-024 (architecture), ADR-025 (auth), ADR-026 (raw WS), ADR-027 (data), ADR-028 (async), ADR-029 (envelope/observability)
 **Supersedes for the Java service:** the TypeScript guardrails in `AGENTS.md` (§ Backend Entrypoints & Architecture Guardrails) — those remain authoritative for the Node POC until decommission (MIG-080).
@@ -16,13 +16,15 @@ Founder-fixed decisions are **codified here, not reopened**: dual-role OIDC (emb
 
 ---
 
-## 1. Package layout — package-by-feature (TR-01, ADR-024)
+## 1. Package layout — standalone API modules + shared persistence planes (TR-01, ADR-024 as amended in #410)
 
-- Top level is **package-by-feature**: `auth`, `user`, `conversation`, `message`, `note`, `tag`, `routingrule`, `notification`, `audit`, `dlq`, `queue`, `integration`, `realtime`, `connector`, `config`, `common`.
-- Each feature package has **`controller` / `service` / `repository` / `model`** sub-layers. No deeper nesting.
-- **One bounded context per package.** A service may call another package's service only through its public service API; **cross-package service→repository leakage is prohibited** (a service never touches another feature's repository directly).
+- Top level (amended 2026-10-16, issue #410; supersedes the former per-feature `controller`/`service`/`repository`/`model` four-sub-layer rule): **API modules** `api.<feature>` — `auth`, `user`, `conversation`, `message`, `note`, `tag`, `routingrule`, `notification`, `audit`, `dlq`, `queue`, `integration`, `realtime` (`api.connector` when Phase 6 lands) — plus the shared planes **`entity`**, **`repository`**, **`service`**, and the unchanged **`config`**, **`common`**. `com.yacc.YaccApplication` stays at the root (package `com.yacc`).
+- An API module owns its feature's REST controller(s) **and its request/response wire DTOs**. A mapper/service is added inside an API module **only when real logic warrants it** — never by default; and no layer package exists without content (KISS — no `.gitkeep` skeleton packages).
+- **Entities** (JPA entities + their enums/converters), **repositories** (Spring Data), and **genuinely shared / persistence-oriented services** live in the flat `entity`, `repository`, and `service` planes. Feature-local `@ConfigurationProperties`/`@Configuration` and feature security infrastructure stay in their API module (§4 unchanged).
+- **One bounded context per API module.** Cross-feature access composes through the owning module's service API; a consumer outside the owning bounded context never touches a repository directly (the no-cross-package service→repository leakage rule, restated for the shared planes).
 - No hexagonal/clean-architecture layering, no `domain/`/`application/`/`infrastructure` rings, no shared generic "manager"/"helper" packages. `common` holds only true cross-cutting types/utilities.
 - Single Gradle module (ADR-024); no multi-module split unless a reviewed ADR-level finding justifies it.
+- **Transitional state:** code merged before this amendment still follows the superseded per-feature four-sub-layer layout; **MIG-101 (#411)** relocates it to this map (behavior-preserving). Until that PR lands, reviewers must not enforce the superseded four-layer rule — and new Java code must not be added to the superseded layout.
 
 ## 2. Dependency injection — constructor only (TR-02)
 
@@ -93,7 +95,7 @@ Every `AGENTS.md` backend guardrail, mapped to its Java equivalent or explicit n
 
 | # | AGENTS.md TS guardrail | Java/Spring equivalent | Notes |
 |---|---|---|---|
-| 1 | Flat `src/` folders (`controllers/`, `services/`, `config/`, `infrastructure/`, …); no nested `api/`/`domain/` layering | **Replaced** — package-by-feature with `controller`/`service`/`repository`/`model` sub-layers (§1, TR-01/ADR-024) | Flat folders → feature packages; the "no deep layering" spirit survives as "no hexagonal rings" |
+| 1 | Flat `src/` folders (`controllers/`, `services/`, `config/`, `infrastructure/`, …); no nested `api/`/`domain/` layering | **Replaced** — standalone API modules `api.<feature>` (controller + wire DTOs) plus shared `entity`/`repository`/`service` planes; `config`/`common` unchanged (§1, TR-01/ADR-024 as amended in MIG-100 #410) | Flat folders → feature modules; the "no deep layering" spirit survives as "no hexagonal rings, no forced layer skeletons" |
 | 2 | No `any` — proper interfaces, never cast | **Replaced** — no `Object`/raw types/`Map<String,Object>` in domain code; records for DTOs; `JsonNode` only at documented JSON boundaries (§3, TR-02) | |
 | 3 | One definition per file (class/interface/service), single responsibility | **Carried over** — one top-level type per file; single-responsibility services (KISS, TR-09) | Java convention + review finding |
 | 4 | Index files export consts only; no re-export barrels; no inline arrays in `src/index.ts` | **N/A** — no barrel/index-file concept; Spring component scanning + explicit `@Bean` wiring replaces central export registries (`controllers = [...]` → classpath scanning) | The POC wiring file (`src/index.ts`) has no equivalent; `useExpressServer`/`SocketControllers` bootstrap → Spring Boot auto-configuration |
@@ -108,7 +110,7 @@ Also superseded for the Java service (context, not numbered guardrails): the POC
 
 ## 14. Non-negotiables carried into review (summary)
 
-1. One bounded context per package; **no cross-package service→repository leakage**.
+1. One bounded context per API module; cross-feature data access only via the owning module's service API — no repository use outside its own bounded context (no cross-package service→repository leakage).
 2. Constructor injection only; no `Object`/raw casts; `@Valid` on all request bodies.
 3. `/api` at controller `@RequestMapping`; one `@ControllerAdvice` error contract.
 4. Raw `WebSocketHandler` + (userId, conversationId) registry; envelope verbatim.
