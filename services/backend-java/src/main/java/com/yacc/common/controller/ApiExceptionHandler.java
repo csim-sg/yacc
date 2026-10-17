@@ -11,8 +11,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import com.yacc.auth.service.EmailAlreadyRegisteredException;
-import com.yacc.auth.service.InvalidTokenException;
+import com.yacc.service.EmailAlreadyRegisteredException;
+import com.yacc.service.InvalidTokenException;
 import com.yacc.common.model.ErrorResponse;
 import com.yacc.common.model.IntegrationErrorResponse;
 

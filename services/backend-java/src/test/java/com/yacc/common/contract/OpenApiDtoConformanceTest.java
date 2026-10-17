@@ -32,44 +32,44 @@ import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SchemaValidatorsConfig;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
-import com.yacc.auth.model.AuthRefreshResponse;
-import com.yacc.auth.model.AuthSessionGetResponse;
-import com.yacc.auth.model.AuthSessionResponse;
-import com.yacc.auth.model.AuthSignOutResponse;
-import com.yacc.user.model.CreateUserRequest;
-import com.yacc.auth.model.ForgotPasswordRequest;
-import com.yacc.auth.model.MessageResponse;
-import com.yacc.auth.model.ResetPasswordRequest;
-import com.yacc.auth.model.SuccessMessageResponse;
-import com.yacc.user.model.UpdateUserRequest;
-import com.yacc.auth.model.UserResponse;
-import com.yacc.auth.model.UserRole;
-import com.yacc.auth.model.UserStatus;
-import com.yacc.auth.model.VerifyEmailRequest;
+import com.yacc.api.auth.AuthRefreshResponse;
+import com.yacc.api.auth.AuthSessionGetResponse;
+import com.yacc.api.auth.AuthSessionResponse;
+import com.yacc.api.auth.AuthSignOutResponse;
+import com.yacc.api.user.CreateUserRequest;
+import com.yacc.api.auth.ForgotPasswordRequest;
+import com.yacc.api.auth.MessageResponse;
+import com.yacc.api.auth.ResetPasswordRequest;
+import com.yacc.api.auth.SuccessMessageResponse;
+import com.yacc.api.user.UpdateUserRequest;
+import com.yacc.api.auth.UserResponse;
+import com.yacc.entity.UserRole;
+import com.yacc.entity.UserStatus;
+import com.yacc.api.auth.VerifyEmailRequest;
 import com.yacc.common.model.BaseListResponse;
 import com.yacc.common.model.ErrorResponse;
 import com.yacc.common.model.IntegrationErrorResponse;
-import com.yacc.conversation.model.AssignRequest;
-import com.yacc.conversation.model.AssignmentResponse;
-import com.yacc.conversation.model.BulkActionRequest;
-import com.yacc.conversation.model.BulkActionResponseData;
-import com.yacc.dlq.model.DlqEntryResponse;
-import com.yacc.integration.model.IrcConfigRequest;
-import com.yacc.integration.model.IrcConnectionStatus;
-import com.yacc.integration.model.Profile;
-import com.yacc.integration.model.ProfileResponse;
-import com.yacc.integration.model.ProfileWrite;
-import com.yacc.message.model.MessageListResponse;
-import com.yacc.message.model.SendMessageBody;
-import com.yacc.note.model.CreateNoteRequest;
-import com.yacc.note.model.NoteResponse;
-import com.yacc.notification.model.NotificationResponse;
-import com.yacc.routingrule.model.RoutingRuleResponse;
-import com.yacc.tag.model.CreateTagRequest;
-import com.yacc.tag.model.TagResponse;
-import com.yacc.user.model.CreateUserResponse;
-import com.yacc.user.model.DeleteUserResponse;
-import com.yacc.user.model.UpdateUserResponse;
+import com.yacc.api.conversation.AssignRequest;
+import com.yacc.api.conversation.AssignmentResponse;
+import com.yacc.api.conversation.BulkActionRequest;
+import com.yacc.api.conversation.BulkActionResponseData;
+import com.yacc.api.dlq.DlqEntryResponse;
+import com.yacc.api.integration.IrcConfigRequest;
+import com.yacc.api.integration.IrcConnectionStatus;
+import com.yacc.api.integration.Profile;
+import com.yacc.api.integration.ProfileResponse;
+import com.yacc.api.integration.ProfileWrite;
+import com.yacc.api.message.MessageListResponse;
+import com.yacc.api.message.SendMessageBody;
+import com.yacc.api.note.CreateNoteRequest;
+import com.yacc.api.note.NoteResponse;
+import com.yacc.api.notification.NotificationResponse;
+import com.yacc.api.routingrule.RoutingRuleResponse;
+import com.yacc.api.tag.CreateTagRequest;
+import com.yacc.api.tag.TagResponse;
+import com.yacc.api.user.CreateUserResponse;
+import com.yacc.api.user.DeleteUserResponse;
+import com.yacc.api.user.UpdateUserResponse;
 
 /**
  * MIG-041 payload-level contract conformance, Java DTO side (AC-MIG-041-1;
@@ -249,7 +249,7 @@ class OpenApiDtoConformanceTest {
                         UUID1.toString(), "conversation assigned", false, null,
                         LocalDateTime.parse("2026-10-16T08:00:00"))));
         responseCases.add(new ResponseCase("AuditLog", "AuditLogResponse",
-                () -> new com.yacc.audit.model.AuditLogResponse(UUID1, UUID1.toString(),
+                () -> new com.yacc.api.audit.AuditLogResponse(UUID1, UUID1.toString(),
                         "System Administrator", "conversation_status_change", "conversation",
                         UUID1.toString(), staticJson("{\"from\": \"open\"}"), "127.0.0.1",
                         LocalDateTime.parse("2026-10-16T08:00:00"))));
@@ -306,10 +306,10 @@ class OpenApiDtoConformanceTest {
     }
 
     /** Representative wire message reused by the Message + MessageListResponse cases. */
-    private com.yacc.message.model.MessageResponse sampleMessage() {
+    private com.yacc.api.message.MessageResponse sampleMessage() {
         // senderId and metadata are required-nullable members: present on the
         // wire, so the representative instance carries non-null values.
-        return new com.yacc.message.model.MessageResponse(UUID1, UUID1, UUID1.toString(),
+        return new com.yacc.api.message.MessageResponse(UUID1, UUID1, UUID1.toString(),
                 "irc-bot", "hello from IRC", "sent", "inbound", "ext-msg-1",
                 staticJson("{\"platformMessageId\": \"tg-1\"}"),
                 LocalDateTime.parse("2026-10-16T08:00:00"),

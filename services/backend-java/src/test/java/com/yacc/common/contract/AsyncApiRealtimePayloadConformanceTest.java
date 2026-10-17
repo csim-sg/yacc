@@ -25,11 +25,11 @@ import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SchemaValidatorsConfig;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
-import com.yacc.realtime.model.RealtimeEvents;
-import com.yacc.realtime.model.SystemErrorDetail;
-import com.yacc.realtime.model.SystemEventPayload;
-import com.yacc.realtime.model.WebSocketEnvelope;
-import com.yacc.realtime.model.WebSocketInboundFrame;
+import com.yacc.api.realtime.RealtimeEvents;
+import com.yacc.api.realtime.SystemErrorDetail;
+import com.yacc.api.realtime.SystemEventPayload;
+import com.yacc.api.realtime.WebSocketEnvelope;
+import com.yacc.api.realtime.WebSocketInboundFrame;
 
 /**
  * MIG-041 real-time contract conformance, Java model side (AC-MIG-041-1;
