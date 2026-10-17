@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
@@ -144,6 +145,39 @@ class TelegramConnectorTest {
         assertThat(surfaced.code()).isEqualTo(ConnectorErrorCode.INVALID_CREDENTIALS);
         assertThat(connector.status()).isEqualTo(ConnectorStatus.DISCONNECTED);
         server.verify();
+    }
+
+    @Test
+    void reconnectAfterCredentialLossFailsClosedAndNeverSendsWithTheStaleToken() {
+        expectConnect();
+        connector.connect();
+        assertThat(connector.status()).isEqualTo(ConnectorStatus.CONNECTED);
+
+        // The DB profile is removed/disabled (or decryption fails) before
+        // the next connect: the resolver returns empty and the reconnect
+        // must discard the previous connection state.
+        when(credentials.resolve()).thenReturn(Optional.empty());
+        assertThatThrownBy(connector::connect)
+                .isInstanceOf(ConnectorException.class)
+                .satisfies(failure -> assertThat(
+                        ((ConnectorException) failure).getError().code())
+                        .isEqualTo(ConnectorErrorCode.INVALID_CREDENTIALS));
+
+        assertThat(connector.status()).isNotEqualTo(ConnectorStatus.CONNECTED);
+        assertThat(connector.status()).isEqualTo(ConnectorStatus.DISCONNECTED);
+        assertThat(connector.health().healthy()).isFalse();
+
+        // The stale token must be unusable: sending fails closed without any
+        // Bot API call (no sendMessage expectation exists — an unexpected
+        // request would fail the mock server, so this asserts no API call).
+        ConnectorSendResult result = connector.sendMessage(new ConnectorOutboundMessage(
+                "00000000-0000-0000-0000-00000000c001", "telegram:12345", "hi", null));
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error().code()).isEqualTo(ConnectorErrorCode.NETWORK_ERROR);
+        assertThat(result.error().retryable()).isTrue();
+        server.verify();
+        verify(errorHook, times(2)).onAdapterError(any());
     }
 
     @Test

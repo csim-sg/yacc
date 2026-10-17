@@ -89,13 +89,23 @@ public class TelegramConnector {
     /**
      * Connects to Telegram: resolves the DB-first bot token, validates its
      * format (baseline {@code isValidTelegramToken} parity) and verifies it
-     * with a Bot API {@code getMe} call.
+     * with a Bot API {@code getMe} call. Any prior connection state is
+     * reset first — a reconnect that cannot produce usable credentials
+     * (profile removed/disabled, decryption failure, malformed token) or a
+     * Bot API rejection fails closed to a non-connected status with the
+     * stale in-memory token discarded, so {@code sendMessage} can never
+     * send with a revoked/removed credential.
      *
      * @throws ConnectorException with the typed adapter error (already
      *         surfaced to the {@link ConnectorErrorHook}) when credentials
      *         are absent/malformed or the Bot API rejects/ times out
      */
     public void connect() {
+        // Fail closed before resolving credentials: discard any previous
+        // connection state so a failed reconnect can never leave the old
+        // token usable or the connector reporting CONNECTED.
+        botToken = null;
+        status = ConnectorStatus.DISCONNECTED;
         Optional<TelegramCredentials> resolved = credentials.resolve();
         if (resolved.isEmpty()) {
             throw failure("connect", ConnectorErrorCode.INVALID_CREDENTIALS,
