@@ -9,8 +9,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -32,8 +33,10 @@ import com.yacc.entity.WebSocketBacklogEntry;
  * reconnect (user disconnected within the policy window), the durable
  * backlog restoration sequence (replay started → stored envelopes → clear →
  * completed), the fresh-session semantics (no marker, no replay without
- * rows), and the {@code system.reconnection.failed} + {@code system.error}
- * pair when restoration cannot be completed.
+ * rows), the {@code system.reconnection.failed} + {@code system.error} pair
+ * when restoration cannot be completed — including a repository read
+ * failure —, and delivery-tracked retention: only the delivered rows are
+ * cleared, an incomplete replay retains the undelivered remainder.
  */
 class WebSocketReconnectServiceTest {
 
@@ -47,6 +50,12 @@ class WebSocketReconnectServiceTest {
     private WebSocketReconnectService service;
     private final List<WebSocketEnvelope> emitted = new CopyOnWriteArrayList<>();
 
+    /**
+     * Per-send results consumed in order (a replay write failure is a
+     * {@code false} head); sends beyond the queue succeed.
+     */
+    private final Queue<Boolean> sendResults = new ConcurrentLinkedDeque<>();
+
     @BeforeEach
     void setUp() throws Exception {
         backlog = mock(WebSocketBacklogService.class);
@@ -56,8 +65,11 @@ class WebSocketReconnectServiceTest {
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .build();
         doAnswer(invocation -> {
-            emitted.add(invocation.getArgument(1));
-            return null;
+            boolean delivered = sendResults.isEmpty() ? true : sendResults.poll();
+            if (delivered) {
+                emitted.add(invocation.getArgument(1));
+            }
+            return delivered;
         }).when(publisher).publishToSession(any(WebSocketSession.class),
                 any(WebSocketEnvelope.class));
         service = new WebSocketReconnectService(backlog, publisher, mapper,
@@ -76,19 +88,22 @@ class WebSocketReconnectServiceTest {
         return names;
     }
 
-    private void givenBacklogRows(int count) {
+    private List<WebSocketBacklogEntry> givenBacklogRows(int count) {
         List<WebSocketBacklogEntry> rows = new java.util.ArrayList<>();
         for (int i = 0; i < count; i++) {
-            rows.add(new WebSocketBacklogEntry("user-1", "message.received", null,
-                    "{\"id\":\"m-" + i + "\"}", LocalDateTime.now(),
-                    LocalDateTime.now().plusHours(1)));
+            WebSocketBacklogEntry row = mock(WebSocketBacklogEntry.class);
+            when(row.getId()).thenReturn((long) (i + 1));
+            when(row.getEventName()).thenReturn("message.received");
+            when(row.getPayload()).thenReturn("{\"id\":\"m-" + i + "\"}");
+            rows.add(row);
         }
         when(backlog.replayRows("user-1")).thenReturn(rows);
+        return rows;
     }
 
     @Test
     void firstEstablishmentRestoresWithoutTheReconnectMarker() throws Exception {
-        givenBacklogRows(2);
+        List<WebSocketBacklogEntry> rows = givenBacklogRows(2);
 
         service.onSessionEstablished(session, IDENTITY);
 
@@ -97,7 +112,7 @@ class WebSocketReconnectServiceTest {
                 "message.received",
                 "message.received",
                 "system.backlog.replay.completed");
-        verify(backlog).clear("user-1");
+        verify(backlog).clear("user-1", rows);
     }
 
     @Test
@@ -143,15 +158,81 @@ class WebSocketReconnectServiceTest {
         service.onSessionEstablished(session, IDENTITY);
 
         assertThat(eventNames()).isEmpty();
-        verify(backlog, never()).clear(any());
+        verify(backlog, never()).clear(any(), any());
+    }
+
+    @Test
+    void replayReadFailureEmitsReconnectionFailedAndSystemErrorAndRetainsRows() {
+        when(backlog.replayRows("user-1")).thenThrow(new IllegalStateException("db down"));
+
+        service.onSessionEstablished(session, IDENTITY);
+
+        // The read is inside the failure path: failed + error, nothing else,
+        // and no clear touched the durable rows.
+        assertThat(eventNames()).containsExactly(
+                "system.reconnection.failed", "system.error");
+        verify(backlog, never()).clear(any(), any());
+    }
+
+    @Test
+    void undeliverableStartMarkerRetainsEveryRow() throws Exception {
+        givenBacklogRows(2);
+        sendResults.add(false); // the replay start marker cannot be written
+
+        service.onSessionEstablished(session, IDENTITY);
+
+        assertThat(eventNames()).containsExactly(
+                "system.reconnection.failed", "system.error");
+        verify(backlog, never()).clear(any(), any());
+    }
+
+    @Test
+    void undeliverableReplayRowRetainsTheUndeliveredRemainderOnly() throws Exception {
+        List<WebSocketBacklogEntry> rows = givenBacklogRows(3);
+        sendResults.add(true); // start marker
+        sendResults.add(true); // first row
+        sendResults.add(false); // second row fails
+
+        service.onSessionEstablished(session, IDENTITY);
+
+        assertThat(eventNames()).containsSubsequence(
+                "system.backlog.replay.started",
+                "message.received",
+                "system.reconnection.failed",
+                "system.error");
+        assertThat(eventNames()).doesNotContain("system.backlog.replay.completed");
+        // Only the delivered prefix is cleared; the failed row and its
+        // successors stay durable for the next replay.
+        verify(backlog).clear("user-1", List.of(rows.get(0)));
+        verify(backlog, org.mockito.Mockito.times(1)).clear(any(), any());
+    }
+
+    @Test
+    void undeliverableCompletedMarkerStillReportsTheIncompleteSequence() throws Exception {
+        List<WebSocketBacklogEntry> rows = givenBacklogRows(1);
+        sendResults.add(true); // start marker
+        sendResults.add(true); // the row
+        sendResults.add(false); // completed marker fails
+
+        service.onSessionEstablished(session, IDENTITY);
+
+        assertThat(eventNames()).containsSubsequence(
+                "system.backlog.replay.started",
+                "message.received",
+                "system.reconnection.failed",
+                "system.error");
+        assertThat(eventNames()).doesNotContain("system.backlog.replay.completed");
+        // Every row was delivered, so none is retained for re-delivery.
+        verify(backlog, org.mockito.Mockito.atLeastOnce())
+                .clear("user-1", rows);
     }
 
     @Test
     void failedRestorationEmitsReconnectionFailedAndSystemError() throws Exception {
         service.onSessionClosed(IDENTITY);
-        givenBacklogRows(1);
-        doThrow(new IllegalStateException("replay blew up"))
-                .when(backlog).clear("user-1");
+        List<WebSocketBacklogEntry> rows = givenBacklogRows(1);
+        doThrow(new IllegalStateException("clear blew up"))
+                .when(backlog).clear("user-1", rows);
 
         service.onSessionEstablished(session, IDENTITY);
 

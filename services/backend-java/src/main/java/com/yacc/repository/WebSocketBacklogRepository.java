@@ -1,8 +1,10 @@
 package com.yacc.repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 import com.yacc.entity.WebSocketBacklogEntry;
 
@@ -25,7 +27,17 @@ public interface WebSocketBacklogRepository extends JpaRepository<WebSocketBackl
     @Transactional
     long deleteByExpiresAtBefore(LocalDateTime now);
 
-    /** Post-replay clear of one user's backlog (prevents duplicate delivery). */
+    /**
+     * Deletes exactly the enumerated rows of one user — the rows delivered by
+     * a replay (the full read set on success, the delivered prefix on an
+     * incomplete delivery). Scoping the post-replay clear to the read set
+     * never drops rows stored for the user while a replay is in flight.
+     */
+    @Transactional
+    long deleteByUserIdAndIdIn(@Param("userId") String userId,
+            @Param("ids") Collection<Long> ids);
+
+    /** Deletes every row of one user (fixture cleanup / maintenance). */
     @Transactional
     long deleteByUserId(String userId);
 }

@@ -56,7 +56,7 @@ class WebSocketPresenceServiceTest {
         when(session.getId()).thenReturn("s1");
         doAnswer(invocation -> {
             emitted.add(invocation.getArgument(1));
-            return null;
+            return true;
         }).when(publisher).publishToSession(any(WebSocketSession.class),
                 any(WebSocketEnvelope.class));
         doAnswer(invocation -> {

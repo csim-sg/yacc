@@ -107,12 +107,24 @@ class WebSocketEventPublisherTest {
         WebSocketSession target = connectedSession("s1", "user-1");
         WebSocketSession bystander = connectedSession("s2", "user-2");
 
-        publisher.publishToSession(target, WebSocketEnvelope.of(
+        boolean delivered = publisher.publishToSession(target, WebSocketEnvelope.of(
                 "system.connection.established",
                 mapper.createObjectNode().put("type", "connection_established")));
 
+        assertThat(delivered).isTrue();
         verify(target, times(1)).sendMessage(any(TextMessage.class));
         verify(bystander, never()).sendMessage(any(TextMessage.class));
+    }
+
+    @Test
+    void sessionEmissionReportsUndeliveredFramesWithoutThrowing() throws Exception {
+        WebSocketSession broken = connectedSession("s1", "user-1");
+        doThrow(new IOException("gone")).when(broken).sendMessage(any(TextMessage.class));
+
+        boolean delivered = publisher.publishToSession(broken, WebSocketEnvelope.of(
+                "message.received", mapper.createObjectNode()));
+
+        assertThat(delivered).isFalse(); // observable to durability-critical callers
     }
 
     @Test
@@ -195,6 +207,43 @@ class WebSocketEventPublisherTest {
                 mapper.createObjectNode()));
 
         verify(backlog, never()).store(any(), any(), any());
+    }
+
+    // --- MIG-051 review loop (P2): one durable row per user, not per socket ---
+
+    @Test
+    void globalEmissionStoresOneBacklogRowPerUserAcrossTheirSessions() {
+        connectedSession("s1", "user-1");
+        connectedSession("s2", "user-1"); // second live socket of the same user
+        connectedSession("s3", "user-2");
+
+        publisher.publishToAll(WebSocketEnvelope.of("message.received",
+                mapper.createObjectNode().put("id", "m-1")));
+
+        verify(backlog, times(1)).store(org.mockito.ArgumentMatchers.eq("user-1"),
+                org.mockito.ArgumentMatchers.isNull(), any(WebSocketEnvelope.class));
+        verify(backlog, times(1)).store(org.mockito.ArgumentMatchers.eq("user-2"),
+                org.mockito.ArgumentMatchers.isNull(), any(WebSocketEnvelope.class));
+    }
+
+    @Test
+    void roomEmissionStoresOneBacklogRowPerUserAcrossTheirSessions()
+            throws Exception {
+        WebSocketSession first = connectedSession("s1", "user-1");
+        connectedSession("s2", "user-1"); // same user, second socket in the room
+        registry.joinRoom("s1", RealtimeRooms.conversation("conv-1"));
+        registry.joinRoom("s2", RealtimeRooms.conversation("conv-1"));
+
+        publisher.publishToRoom(RealtimeRooms.conversation("conv-1"),
+                WebSocketEnvelope.of("notification.received",
+                        mapper.createObjectNode().put("id", "n-1")));
+
+        verify(backlog, times(1)).store(org.mockito.ArgumentMatchers.eq("user-1"),
+                org.mockito.ArgumentMatchers.eq(RealtimeRooms.conversation("conv-1")),
+                any(WebSocketEnvelope.class));
+        verify(backlog, times(1)).store(any(), any(), any(WebSocketEnvelope.class));
+        // Live fan-out still reaches every session of the user.
+        verify(first, times(1)).sendMessage(any(TextMessage.class));
     }
 
     // --- MIG-051: baseline sender-exclusion fan-outs (WS-OP-PRES/TYPE) ---

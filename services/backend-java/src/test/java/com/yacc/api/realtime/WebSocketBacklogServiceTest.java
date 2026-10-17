@@ -130,11 +130,32 @@ class WebSocketBacklogServiceTest {
     }
 
     @Test
-    void clearAndSweepDelegateToTheRepository() {
-        service.clear("user-1");
+    void clearDeletesExactlyTheGivenRowsAndSweepDelegatesToTheRepository() {
+        service.clear("user-1", java.util.List.of(row(7L), row(9L)));
         service.purgeExpired();
 
-        verify(repository).deleteByUserId("user-1");
+        verify(repository).deleteByUserIdAndIdIn(org.mockito.ArgumentMatchers.eq("user-1"),
+                org.mockito.ArgumentMatchers.argThat(arg -> {
+                    @SuppressWarnings("unchecked")
+                    java.util.Collection<Long> deliveredIds = (java.util.Collection<Long>) arg;
+                    return deliveredIds.size() == 2 && deliveredIds.contains(7L)
+                            && deliveredIds.contains(9L);
+                }));
+        verify(repository, never()).deleteByUserId(any());
         verify(repository).deleteByExpiresAtBefore(any(LocalDateTime.class));
+    }
+
+    @Test
+    void clearWithoutDeliveredRowsTouchesNothing() {
+        service.clear("user-1", List.of());
+
+        verify(repository, never()).deleteByUserIdAndIdIn(any(), any());
+    }
+
+    /** Id-stubbed backlog row (the entity's id is JPA-assigned). */
+    private static WebSocketBacklogEntry row(long id) {
+        WebSocketBacklogEntry row = org.mockito.Mockito.mock(WebSocketBacklogEntry.class);
+        org.mockito.Mockito.when(row.getId()).thenReturn(id);
+        return row;
     }
 }

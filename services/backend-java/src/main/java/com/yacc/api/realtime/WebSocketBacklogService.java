@@ -2,6 +2,7 @@ package com.yacc.api.realtime;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -25,8 +26,10 @@ import com.yacc.repository.WebSocketBacklogRepository;
  * frozen {@code WebSocketEventMap} families the baseline gateway stored
  * (message, conversation, notification, queue) —, <em>replay</em> reads by
  * user ordered by emission filtering on {@code expires_at} (replay
- * correctness never depends on the sweep), and <em>clear</em> after a
- * successful replay prevents duplicate delivery. Storage is best-effort by
+ * correctness never depends on the sweep), and <em>clear</em> of the rows a
+ * replay actually delivered — the full read set on a complete delivery, the
+ * delivered prefix on an incomplete one, so the durable copy is never lost
+ * to a failed delivery. Storage is best-effort by
  * design (baseline parity): a failed store must never break the emitting
  * flow.</p>
  *
@@ -129,9 +132,22 @@ public class WebSocketBacklogService {
                 LocalDateTime.now());
     }
 
-    /** Clears one user's backlog after a successful replay (WS-BHV-009). */
-    public void clear(String userId) {
-        repository.deleteByUserId(userId);
+    /**
+     * Clears exactly the given delivered rows of one user after a replay
+     * (WS-BHV-009 clear step). The clear is scoped to the replay's read set —
+     * the full set on a complete delivery, the already-delivered prefix on an
+     * incomplete one — so undelivered rows survive for the next replay and
+     * rows stored for the user while the replay ran are never dropped.
+     *
+     * @param userId        the replayed user
+     * @param deliveredRows the replay rows that were written to the session
+     */
+    public void clear(String userId, Collection<WebSocketBacklogEntry> deliveredRows) {
+        if (deliveredRows.isEmpty()) {
+            return;
+        }
+        repository.deleteByUserIdAndIdIn(userId,
+                deliveredRows.stream().map(WebSocketBacklogEntry::getId).toList());
     }
 
     /**

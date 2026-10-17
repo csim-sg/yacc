@@ -22,7 +22,10 @@ import com.yacc.api.realtime.WebSocketEnvelope;
  *
  * <p>Send failures are swallowed by design: a dead channel is cleaned up by
  * the transport-error/close callbacks of the handler, and a failed emit must
- * never break the emitting business flow.</p>
+ * never break the emitting business flow. {@code publishToSession} reports
+ * the failure through its result so durability-critical callers — the
+ * backlog replay — can retain undelivered rows; room/global fan-outs remain
+ * fire-and-forget.</p>
  *
  * <p>MIG-051 (WS-BHV-009): room and global emits of backlog-eligible events
  * additionally store the event for every connected recipient via
@@ -116,13 +119,19 @@ public class WebSocketEventPublisher {
      *
      * @param session  the target channel
      * @param envelope the enveloped event
+     * @return whether the frame was written to the channel — the observable
+     *         form of a send failure; the failure is still never propagated
+     *         (durability-critical callers such as the backlog replay use it
+     *         to retain undelivered rows instead of throwing through the
+     *         emitting flow)
      */
-    public void publishToSession(WebSocketSession session, WebSocketEnvelope envelope) {
-        publish(java.util.List.of(session), envelope);
+    public boolean publishToSession(WebSocketSession session, WebSocketEnvelope envelope) {
+        return publish(java.util.List.of(session), envelope);
     }
 
-    private void publish(Collection<WebSocketSession> channels, WebSocketEnvelope envelope) {
+    private boolean publish(Collection<WebSocketSession> channels, WebSocketEnvelope envelope) {
         String wire = serialize(envelope);
+        boolean allDelivered = true;
         for (WebSocketSession channel : channels) {
             try {
                 synchronized (channel) {
@@ -131,22 +140,32 @@ public class WebSocketEventPublisher {
             } catch (IOException e) {
                 // The close/transport-error callbacks unregister the dead
                 // channel; never propagate into the emitting flow.
+                allDelivered = false;
                 log.debug("WS emit dropped for closed session {}: {}",
                         channel.getId(), e.getMessage());
             }
         }
+        return allDelivered;
     }
 
-    /** Backlog store side of the room/global emit paths (WS-BHV-009). */
+    /**
+     * Backlog store side of the room/global emit paths (WS-BHV-009). The
+     * frozen backlog is one rolling window <em>per user</em> (the baseline
+     * gateway enumerated unique connected user ids), so recipients are
+     * deduplicated by user id before storing — multiple live sockets of one
+     * user share the single durable copy that a replay restores.
+     */
     private void storeForRecipients(Collection<WebSocketSession> channels, String room,
             WebSocketEnvelope envelope) {
         if (!backlog.isEligible(envelope.event())) {
             return;
         }
-        for (WebSocketSession channel : channels) {
-            registry.identity(channel.getId())
-                    .ifPresent(identity -> backlog.store(identity.userId(), room, envelope));
-        }
+        channels.stream()
+                .map(channel -> registry.identity(channel.getId()))
+                .flatMap(java.util.Optional::stream)
+                .map(RealtimeSession::userId)
+                .distinct()
+                .forEach(userId -> backlog.store(userId, room, envelope));
     }
 
     private String serialize(WebSocketEnvelope envelope) {

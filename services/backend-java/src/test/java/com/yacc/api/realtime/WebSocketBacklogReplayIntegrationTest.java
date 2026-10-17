@@ -27,6 +27,7 @@ import com.yacc.api.auth.AuthUser;
 import com.yacc.entity.User;
 import com.yacc.entity.UserRole;
 import com.yacc.entity.UserStatus;
+import com.yacc.entity.WebSocketBacklogEntry;
 import com.yacc.repository.UserRepository;
 import com.yacc.repository.WebSocketBacklogRepository;
 import com.yacc.service.JwtTokenService;
@@ -38,9 +39,10 @@ import com.yacc.common.testsupport.AbstractPostgresIntegrationTest;
  * {@code system.reconnection.started} for a detected reconnect, then
  * {@code system.backlog.replay.started}, the stored envelopes,
  * {@code system.backlog.replay.completed} — the 1h window is the
- * {@code expires_at} filter (expired rows never replay), and the
- * post-replay clear prevents duplicate delivery (store/replay/clear
- * lifecycle).
+ * {@code expires_at} filter (expired rows never replay), the post-replay
+ * clear prevents duplicate delivery (store/replay/clear lifecycle), an
+ * incomplete replay retains the undelivered remainder in PostgreSQL, and
+ * the durable window holds one row per user even with several live sockets.
  *
  * <p>Deliberately NOT {@code @Transactional} (WS server threads authenticate
  * outside the test transaction); this class commits and therefore removes
@@ -73,6 +75,12 @@ class WebSocketBacklogReplayIntegrationTest extends AbstractPostgresIntegrationT
     @Autowired
     private WebSocketBacklogRepository backlogRows;
 
+    @Autowired
+    private WebSocketEventPublisher publisher;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
     private final ObjectMapper reader = new ObjectMapper();
 
     /** Sessions this test opened; closed after every test (isolation). */
@@ -88,6 +96,7 @@ class WebSocketBacklogReplayIntegrationTest extends AbstractPostgresIntegrationT
             }
         }
         opened.clear();
+        backlogRows.deleteByUserId(USER_ID);
     }
 
     @AfterAll
@@ -150,7 +159,7 @@ class WebSocketBacklogReplayIntegrationTest extends AbstractPostgresIntegrationT
         firstSession.close();
         awaitDisconnectRecorded();
 
-        backlogRows.save(new com.yacc.entity.WebSocketBacklogEntry(USER_ID,
+        backlogRows.save(new WebSocketBacklogEntry(USER_ID,
                 "message.received", null, "{\"text\":\"expired\"}",
                 LocalDateTime.now().minusHours(2), LocalDateTime.now().minusMinutes(5)));
         backlog.store(USER_ID, null,
@@ -167,6 +176,81 @@ class WebSocketBacklogReplayIntegrationTest extends AbstractPostgresIntegrationT
         assertThat(replayed.get("data").get("text").asText()).isEqualTo("fresh");
         assertThat(reconnect.nextFrame("message.received", 2)).isNull(); // expired row skipped
         session.close();
+    }
+
+    // --- MIG-051 review loop (P1): delivery-tracked retention on send failure ---
+
+    @Test
+    void replaySendFailureRetainsTheUndeliveredRowsInPostgreSQL() throws Exception {
+        // Explicit emission times pin the replay order regardless of write timing.
+        backlogRows.save(new WebSocketBacklogEntry(USER_ID,
+                "message.received", null, "{\"seq\":1}",
+                LocalDateTime.now().minusMinutes(2), LocalDateTime.now().plusHours(1)));
+        backlogRows.save(new WebSocketBacklogEntry(USER_ID,
+                "message.received", null, "{\"seq\":2}",
+                LocalDateTime.now().minusMinutes(1), LocalDateTime.now().plusHours(1)));
+
+        // Deterministic mid-replay socket death: the start marker and the
+        // first row are written, the second row is not. Stubbing the
+        // publisher (instead of racing a real close) keeps the failure point
+        // exact; the backlog side below is the real PostgreSQL path.
+        WebSocketEventPublisher dyingSocket = org.mockito.Mockito.mock(
+                WebSocketEventPublisher.class);
+        org.mockito.Mockito.when(dyingSocket.publishToSession(
+                org.mockito.ArgumentMatchers.any(WebSocketSession.class),
+                org.mockito.ArgumentMatchers.any(WebSocketEnvelope.class)))
+                .thenReturn(true, true, false);
+        WebSocketReconnectService restoreUnderTest = new WebSocketReconnectService(
+                backlog, dyingSocket, objectMapper,
+                new RealtimeProperties(null,
+                        new RealtimeProperties.Reconnect(1000, 5000, 5, 2)));
+
+        restoreUnderTest.onSessionEstablished(
+                org.mockito.Mockito.mock(WebSocketSession.class),
+                new RealtimeSession("restore-under-test", USER_ID,
+                        "restore@fixture.yacc.local", "user", "Restore fixture"));
+
+        // failed + error were reported to the session.
+        org.mockito.ArgumentCaptor<WebSocketEnvelope> captor =
+                org.mockito.ArgumentCaptor.forClass(WebSocketEnvelope.class);
+        org.mockito.Mockito.verify(dyingSocket, org.mockito.Mockito.atLeastOnce())
+                .publishToSession(org.mockito.ArgumentMatchers.any(), captor.capture());
+        assertThat(captor.getAllValues().stream().map(WebSocketEnvelope::event))
+                .contains("system.reconnection.failed", "system.error");
+
+        // The delivered first row is gone; the undelivered second row stays
+        // durable — the next replay restores exactly the remainder.
+        List<WebSocketBacklogEntry> remaining = backlog.replayRows(USER_ID);
+        assertThat(remaining).hasSize(1);
+        assertThat(objectMapper.readTree(remaining.get(0).getPayload()).get("seq").asText())
+                .isEqualTo("2");
+    }
+
+    // --- MIG-051 review loop (P2): one durable row per user across sockets ---
+
+    @Test
+    void oneBacklogRowPerUserEvenWithSeveralLiveSessions() throws Exception {
+        seedUser();
+        String token = accessToken();
+
+        CollectingHandler first = new CollectingHandler();
+        CollectingHandler second = new CollectingHandler();
+        connect(first, token);
+        connect(second, token);
+        first.nextFrame("system.connection.established");
+        second.nextFrame("system.connection.established");
+
+        publisher.publishToAll(envelope("message.received", text("stored-once")));
+
+        // Live fan-out still reaches every session of the user…
+        assertThat(first.nextFrame("message.received").get("data").get("text").asText())
+                .isEqualTo("stored-once");
+        assertThat(second.nextFrame("message.received").get("data").get("text").asText())
+                .isEqualTo("stored-once");
+        assertThat(first.nextFrame("message.received", 2)).isNull();
+        assertThat(second.nextFrame("message.received", 2)).isNull();
+        // …while the durable window holds exactly one row for the user.
+        assertThat(backlog.replayRows(USER_ID)).hasSize(1);
     }
 
     private User seedUser() {
