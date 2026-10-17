@@ -29,9 +29,11 @@ import com.yacc.repository.DeadLetterQueueEntryRepository;
  * REST-DLQ-001..004; ADR-028 — the POC's Redis/BullMQ queueing is removed;
  * POC {@code dlq.service} parity): paged listing with failure-reason filter,
  * reason statistics, entry creation (POC {@code moveToDLQ} parity), failed
- * redelivery-attempt recording, re-queue marking, and ops-review removal.
- * The retried markers are consumed by the MIG-063 Quartz redelivery worker
- * ({@code com.yacc.api.queue.QueueRetryService}).
+ * redelivery-attempt recording, re-queue marking, ops-review removal, and
+ * the enforced 7-day retention sweep. The retried markers are consumed by
+ * the MIG-063 Quartz redelivery worker
+ * ({@code com.yacc.api.queue.QueueRetryService}), which also drives the
+ * durable attempt-claim protocol below.
  */
 @Service
 public class DlqService {
@@ -39,18 +41,32 @@ public class DlqService {
     /**
      * Redelivery-cycle lifecycle state stored in the entry's jsonb metadata
      * (the V1 {@code dead_letter_queue} schema is frozen — no new column):
-     * {@code retryCycle.attempt} is the last attempted attempt number and
-     * {@code retryCycle.exhausted} marks the terminal
+     * {@code retryCycle.attempt} is the last <em>claimed</em> attempt number
+     * (persisted <b>before</b> the delivery runs — the crash-safety claim),
+     * {@code retryCycle.failed} marks that the claimed attempt's failure
+     * outcome was recorded (a claim without it is an interrupted execution),
+     * and {@code retryCycle.exhausted} marks the terminal
      * {@code max_retries_exceeded} state. The once-only {@code retry_attempt}
      * flag must stay {@code true} after a manual retry (REST-MSG-003 P0
-     * rule), so cycle state lives here instead.
+     * rule), so cycle state lives here instead. The key is worker-owned;
+     * callers of {@code enqueue} must never set it.
      */
     private static final String RETRY_CYCLE_METADATA_KEY = "retryCycle";
     private static final String RETRY_CYCLE_ATTEMPT_KEY = "attempt";
+    private static final String RETRY_CYCLE_FAILED_KEY = "failed";
     private static final String RETRY_CYCLE_EXHAUSTED_KEY = "exhausted";
 
     /** POC retention parity: DLQ entries expire 7 days after they move. */
     private static final int RETENTION_DAYS = 7;
+
+    /**
+     * Retention-sweep hygiene bounds (not contract values): at most
+     * {@value #RETENTION_BATCH_SIZE} rows per bounded, independently
+     * committed batch and at most {@value #RETENTION_SWEEP_MAX_ENTRIES}
+     * rows per sweep call.
+     */
+    private static final int RETENTION_BATCH_SIZE = 200;
+    private static final int RETENTION_SWEEP_MAX_ENTRIES = 10_000;
 
     private final DeadLetterQueueEntryRepository entries;
     private final ObjectMapper mapper;
@@ -88,21 +104,46 @@ public class DlqService {
     /**
      * Records one failed redelivery attempt (MIG-063 worker): refreshes
      * {@code last_error}/{@code total_attempts}/{@code updated_at} and
-     * persists the cycle state — the attempt counter and, when the retry
-     * cycle is exhausted, the terminal marker.
+     * persists the cycle state — the attempt counter, the recorded-outcome
+     * marker (a claim without it reads as an interrupted execution), and,
+     * when the retry cycle is exhausted, the terminal marker.
      */
     @Transactional
     public DeadLetterQueueEntry recordFailedAttempt(UUID id, String lastError,
-            int totalAttempts, int cycleAttempt, boolean cycleExhausted) {
+            int cycleAttempt, boolean cycleExhausted) {
         DeadLetterQueueEntry entry = entries.findById(id)
                 .orElseThrow(() -> new NotFoundException("DLQ entry not found"));
         entry.setLastError(lastError);
-        entry.setTotalAttempts(totalAttempts);
+        entry.setTotalAttempts(
+                (entry.getTotalAttempts() == null ? 0 : entry.getTotalAttempts()) + 1);
         ObjectNode cycle = metadataObject(entry.getMetadata(), RETRY_CYCLE_METADATA_KEY);
         cycle.put(RETRY_CYCLE_ATTEMPT_KEY, cycleAttempt);
+        cycle.put(RETRY_CYCLE_FAILED_KEY, true);
         if (cycleExhausted) {
             cycle.put(RETRY_CYCLE_EXHAUSTED_KEY, true);
         }
+        entry.setMetadata(mergeMetadata(entry.getMetadata(), RETRY_CYCLE_METADATA_KEY, cycle));
+        entry.setUpdatedAt(LocalDateTime.now());
+        return entries.save(entry);
+    }
+
+    /**
+     * Durably claims the next redelivery attempt <b>before</b> the delivery
+     * runs (MIG-063 crash-safety protocol). Because the frozen contract has
+     * no consumer acknowledgement, the claim — not the delivery result — is
+     * the durable attempt record: a crash after this point leaves a claim
+     * whose outcome is unknown, which the worker settles as an interrupted
+     * attempt instead of silently re-delivering forever or assuming
+     * success. Clears the previous outcome marker, so the freshly claimed
+     * attempt starts in flight.
+     */
+    @Transactional
+    public DeadLetterQueueEntry claimAttempt(UUID id, int cycleAttempt) {
+        DeadLetterQueueEntry entry = entries.findById(id)
+                .orElseThrow(() -> new NotFoundException("DLQ entry not found"));
+        ObjectNode cycle = metadataObject(entry.getMetadata(), RETRY_CYCLE_METADATA_KEY);
+        cycle.put(RETRY_CYCLE_ATTEMPT_KEY, cycleAttempt);
+        cycle.remove(RETRY_CYCLE_FAILED_KEY);
         entry.setMetadata(mergeMetadata(entry.getMetadata(), RETRY_CYCLE_METADATA_KEY, cycle));
         entry.setUpdatedAt(LocalDateTime.now());
         return entries.save(entry);
@@ -125,11 +166,23 @@ public class DlqService {
 
     /**
      * The persisted attempt counter of the entry's redelivery cycle
-     * (0 when no attempt has been recorded yet).
+     * (0 when no attempt has been claimed yet).
      */
     public int retryCycleAttempt(DeadLetterQueueEntry entry) {
         return metadataObject(entry.getMetadata(), RETRY_CYCLE_METADATA_KEY)
                 .path(RETRY_CYCLE_ATTEMPT_KEY).asInt(0);
+    }
+
+    /**
+     * True when the claimed attempt's failure outcome was recorded. A claim
+     * without a recorded outcome is an interrupted execution (the previous
+     * worker crashed between the claim and the outcome write) — the worker
+     * settles it as a counted, re-delivered attempt, never as a silent
+     * success.
+     */
+    public boolean isAttemptOutcomeRecorded(DeadLetterQueueEntry entry) {
+        return metadataObject(entry.getMetadata(), RETRY_CYCLE_METADATA_KEY)
+                .path(RETRY_CYCLE_FAILED_KEY).asBoolean(false);
     }
 
     /** DLQ page ({@code {entries,total,page,limit}} shape). */
@@ -232,6 +285,43 @@ public class DlqService {
     @Transactional(readOnly = true)
     public List<DeadLetterQueueEntry> byReason(String failureReason) {
         return entries.findByFailureReason(failureReason);
+    }
+
+    /**
+     * Enforces the 7-day retention the enqueue writes (MIG-063; POC
+     * {@code moveToDLQ} parity made real): removes expired entries in
+     * bounded batches — at most {@value #RETENTION_BATCH_SIZE} rows per
+     * batch, each batch a single atomic delete committed independently, at
+     * most {@value #RETENTION_SWEEP_MAX_ENTRIES} rows per call — so the
+     * sweep can never lock the table unboundedly. Returns the number of
+     * removed entries. Entries whose {@code expires_at} is still in the
+     * future are never touched.
+     */
+    public int removeExpiredEntries() {
+        int removed = 0;
+        while (removed < RETENTION_SWEEP_MAX_ENTRIES) {
+            int batch = removeExpiredBatch();
+            removed += batch;
+            if (batch < RETENTION_BATCH_SIZE) {
+                break;
+            }
+        }
+        return removed;
+    }
+
+    /**
+     * One bounded expired-entry batch (single atomic bulk delete committed
+     * on its own; the oldest expirations go first).
+     */
+    public int removeExpiredBatch() {
+        var expired = entries.findByExpiresAtBefore(LocalDateTime.now(),
+                PageRequest.of(0, RETENTION_BATCH_SIZE, Sort.by(Sort.Direction.ASC,
+                        "expiresAt")));
+        if (expired.isEmpty()) {
+            return 0;
+        }
+        entries.deleteAllInBatch(expired);
+        return expired.size();
     }
 
     /**

@@ -14,6 +14,16 @@ import java.util.UUID;
  * is the MIG-062 (#359) gateway exchange; until that lands
  * {@link QueueRetryConfig} wires a documented no-op default that reports
  * NOT delivered (fail-closed: a no-op must never mark anything delivered).</p>
+ *
+ * <p><b>Delivery guarantee — at-least-once:</b> the frozen contract has no
+ * consumer acknowledgement, so the worker cannot promise exactly-once
+ * delivery and does not claim to. A crash between a {@code deliver} call
+ * and the worker's durable outcome write is resolved by re-delivering the
+ * message under the next attempt number (the worker persists the durable
+ * attempt claim before calling this seam), so implementers must tolerate
+ * repeated calls for the same {@code messageId} — collapsing duplicates by
+ * messageId at the delivery target is the implementer's idempotence
+ * boundary. Loss is never traded for a duplicate.</p>
  */
 @FunctionalInterface
 public interface RetryDeliveryHandler {

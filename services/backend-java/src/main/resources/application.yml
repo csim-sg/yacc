@@ -62,6 +62,10 @@ spring:
       # WORKER_CONCURRENCY = 5) — one Quartz worker thread per concurrent
       # redelivery attempt.
       org.quartz.threadPool.threadCount: 5
+    # The DLQ 7-day retention sweep (MIG-063) is also Quartz-owned: a
+    # durable job (dlq-retention group) registered once at startup by
+    # DlqRetentionSchedule — hourly, first fire immediate. No config
+    # surface: hygiene cadence, not a contract value.
   jpa:
     hibernate:
       # MIG-021: every runtime context boot validates all JPA entity mappings
