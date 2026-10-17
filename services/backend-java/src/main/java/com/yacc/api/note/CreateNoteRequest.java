@@ -2,6 +2,7 @@ package com.yacc.api.note;
 
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -14,8 +15,10 @@ import jakarta.validation.constraints.Size;
  */
 public record CreateNoteRequest(
         @NotBlank @Size(max = 10000) String body,
-        UUID replyToMessageId,
-        Boolean isInternal) {
+        // Contract CreateNoteBody: replyToMessageId/isInternal are optional and
+        // non-nullable — omitted when absent, never null (MIG-102).
+        @JsonInclude(JsonInclude.Include.NON_NULL) UUID replyToMessageId,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Boolean isInternal) {
 
     /** Normalizes the optional flag to its frozen default. */
     public boolean internalOrDefault() {

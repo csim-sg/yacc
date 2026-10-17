@@ -3,6 +3,7 @@ package com.yacc.api.message;
 import java.util.List;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -14,5 +15,7 @@ import jakarta.validation.constraints.Size;
  */
 public record SendMessageBody(
         @NotBlank @Size(min = 1, max = 10000) String body,
-        List<UUID> attachmentIds) {
+        // Contract SendMessageBody.attachmentIds: optional, non-nullable —
+        // omitted when absent, never null (MIG-102).
+        @JsonInclude(JsonInclude.Include.NON_NULL) List<UUID> attachmentIds) {
 }

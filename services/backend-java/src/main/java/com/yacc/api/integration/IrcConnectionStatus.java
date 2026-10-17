@@ -3,6 +3,8 @@ package com.yacc.api.integration;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 /**
  * IRC connection status model (frozen contract component
  * {@code IrcConnectionStatus}; POC {@code IRCConnectionStatusModel} parity).
@@ -20,5 +22,8 @@ public record IrcConnectionStatus(
         int attemptCount,
         LocalDateTime lastConnectedAt,
         String lastError,
-        UUID reconnectIncidentId) {
+        // Contract IrcConnectionStatus.reconnectIncidentId: optional,
+        // non-nullable — omitted when absent, never null (MIG-102).
+        // lastConnectedAt/lastError are nullable-typed: explicit null stays.
+        @JsonInclude(JsonInclude.Include.NON_NULL) UUID reconnectIncidentId) {
 }

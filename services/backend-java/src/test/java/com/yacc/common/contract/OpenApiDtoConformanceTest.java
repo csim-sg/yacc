@@ -22,8 +22,6 @@ import org.junit.jupiter.api.TestInstance;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -81,8 +79,10 @@ import com.yacc.api.user.UpdateUserResponse;
  * <p>Two directions per case:</p>
  * <ul>
  *   <li><strong>response components</strong> — a representative DTO instance
- *       is serialized with the app's Jackson posture (JavaTimeModule, ISO
- *       strings) and the wire JSON is validated;</li>
+ *       is serialized with the production Jackson posture (the app-wide
+ *       {@code JacksonConfig} customizer: RFC 3339 UTC date-time, narrow
+ *       per-member {@code NON_NULL} omission — MIG-102) and the wire JSON is
+ *       validated, strictly and without exclusions;</li>
  *   <li><strong>request components</strong> — a wire fixture is first
  *       validated as contract-legal, then deserialized into the request DTO
  *       (wire → DTO), then the DTO is re-serialized and re-validated
@@ -117,47 +117,17 @@ class OpenApiDtoConformanceTest {
             UUID.fromString("00000000-0000-4000-8000-000000000001");
 
     /**
-     * Jackson posture for DTO wire conformance. ISO date strings like the
-     * Spring Boot app defaults; {@code NON_NULL} mirrors the frozen
-     * contract's optional-member semantics (absent allowed, null not
-     * declared — several DTO records currently emit explicit nulls on the
-     * live wire).
-     *
-     * <p><strong>Temporary, tracked exemption — not an accepted permanent
-     * deviation.</strong> This test-local mapper (including its
-     * {@code NON_NULL} inclusion) proves a test-only posture: the shipped
-     * production Jackson configuration has no such inclusion, so explicit
-     * {@code null} emission for optional non-nullable members is an open
-     * defect owned by follow-up <a href="https://github.com/csim-sg/yacc/issues/414">#414</a>
-     * (MIG-102), which re-binds this harness to the production mapper,
-     * applies the per-member correction, and removes this exemption.</p>
+     * MIG-102: the production Jackson wire posture — the same
+     * {@link com.yacc.config.JacksonConfig} customizer the Spring context
+     * applies to the auto-configured mapper (MVC converters + WebSocket
+     * publisher). Built via {@link ProductionJacksonPosture}; there is no
+     * test-only inclusion or format override anywhere. {@link LocalDateTime}
+     * members serialize as RFC 3339 UTC ({@code ...Z}); optional non-nullable
+     * members omit via narrow per-member {@code @JsonInclude(NON_NULL)}
+     * annotations on the affected records (MIG-102), while required+nullable
+     * members keep explicit {@code null}.
      */
-    private final ObjectMapper mapper = JsonMapper.builder()
-            .addModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .serializationInclusion(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-            .build();
-
-    /**
-     * Recorded contract deviation, tracked as temporary — <strong>not an
-     * accepted permanent deviation</strong> (MIG-041 finding; fix owned by
-     * follow-up <a href="https://github.com/csim-sg/yacc/issues/414">#414</a>
-     * / MIG-102, not implemented here): the service emits
-     * {@code LocalDateTime} as bare ISO-8601 local timestamps
-     * ({@code 2026-10-16T08:00:00}), while every contract {@code format:
-     * date-time} member is RFC 3339 (offset required) and the frozen
-     * baseline emitted UTC {@code ...Z} — a parity regression, not a
-     * contract choice. Structure, required members, enums, and all other
-     * formats are asserted strictly; only this message pattern is excluded,
-     * so any NEW date-time drift still surfaces. #414 closes this by
-     * pinning an explicit UTC time basis and removing this exclusion.
-     */
-    private static final String RECORDED_DATETIME_DEVIATION = "RFC 3339 date-time";
-
-    private static boolean isRecordedDatetimeDeviation(ValidationMessage message) {
-        return message.getMessage().contains(RECORDED_DATETIME_DEVIATION);
-    }
+    private final ObjectMapper mapper = ProductionJacksonPosture.productionMapper();
 
     private JsonNode components;
 
@@ -343,7 +313,7 @@ class OpenApiDtoConformanceTest {
         Map<String, Set<ValidationMessage>> failures = new LinkedHashMap<>();
         responseCases.forEach(entry -> {
             JsonNode wire = mapper.valueToTree(entry.instance().get());
-            Set<ValidationMessage> errors = unexpectedErrors(entry.component(), wire);
+            Set<ValidationMessage> errors = validate(entry.component(), wire);
             if (!errors.isEmpty()) {
                 failures.put(entry.component() + " ← " + entry.dto() + ": " + wire, errors);
             }
@@ -357,7 +327,7 @@ class OpenApiDtoConformanceTest {
         requestCases.forEach(entry -> {
             try {
                 JsonNode fixture = mapper.readTree(entry.fixtureJson());
-                Set<ValidationMessage> fixtureErrors = unexpectedErrors(
+                Set<ValidationMessage> fixtureErrors = validate(
                         entry.component(), fixture);
                 if (!fixtureErrors.isEmpty()) {
                     failures.put(
@@ -366,7 +336,7 @@ class OpenApiDtoConformanceTest {
                 }
                 Object dto = mapper.readValue(entry.fixtureJson(), entry.dtoType());
                 JsonNode reEmitted = mapper.valueToTree(dto);
-                Set<ValidationMessage> roundTripErrors = unexpectedErrors(
+                Set<ValidationMessage> roundTripErrors = validate(
                         entry.component(), reEmitted);
                 if (!roundTripErrors.isEmpty()) {
                     failures.put(entry.component() + " re-emitted ← " + reEmitted,
@@ -379,18 +349,6 @@ class OpenApiDtoConformanceTest {
             }
         });
         assertThat(failures).as("wire → DTO → wire conformance failures").isEmpty();
-    }
-
-    /**
-     * Validation errors minus the single recorded date-time emission
-     * deviation — a temporary, tracked exemption owned by
-     * <a href="https://github.com/csim-sg/yacc/issues/414">#414</a>
-     * (MIG-102), never a permanent pass. Everything else fails closed.
-     */
-    private Set<ValidationMessage> unexpectedErrors(String component, JsonNode instance) {
-        return validate(component, instance).stream()
-                .filter(message -> !isRecordedDatetimeDeviation(message))
-                .collect(Collectors.toSet());
     }
 
     @Test

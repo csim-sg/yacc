@@ -109,6 +109,14 @@ dependencies {
     testRuntimeOnly("org.postgresql:postgresql")
 }
 
+tasks.withType<Test>().configureEach {
+    // MIG-102 (AC-MIG-102-4): the tests assert the shipped UTC time basis, so
+    // every test JVM runs with the same pinned default zone as the runtime
+    // envelope (Dockerfile/helm `TZ=UTC`, UtcTimeBasisConfig boot anchoring) —
+    // the basis assertion reflects the posture, not the CI/dev machine zone.
+    jvmArgs("-Duser.timezone=UTC")
+}
+
 tasks.test {
     useJUnitPlatform {
         // MIG-041 final test/contract split: @Tag("contract") tests run once,
@@ -136,7 +144,9 @@ tasks.register<Test>("contractTest") {
         includeTags("contract")
     }
     filter {
-        isFailOnNoMatchingTests = false
+        // MIG-102: fail closed — a renamed/empty contract tag must fail the
+        // gate, never pass it vacuously.
+        isFailOnNoMatchingTests = true
     }
 }
 

@@ -3,6 +3,7 @@ package com.yacc.api.audit;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 
 /**
@@ -12,12 +13,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 public record AuditLogResponse(
         UUID id,
         String actorId,
-        String actorName,
+        // Contract AuditLog.actorName: optional, non-nullable — omitted when
+        // absent, never null (MIG-102). actorId stays required-nullable.
+        @JsonInclude(JsonInclude.Include.NON_NULL) String actorName,
         String action,
         String entityType,
         String entityId,
         JsonNode metadata,
-        String ipAddress,
+        // Contract AuditLog.ipAddress: optional, non-nullable — omitted when
+        // absent, never null (MIG-102).
+        @JsonInclude(JsonInclude.Include.NON_NULL) String ipAddress,
         LocalDateTime createdAt) {
 
     /** JSON-boundary edge: the entity stores metadata as a JSON string. */

@@ -27,6 +27,13 @@ spring:
         # exact PG enum labels as strings (ADR-027). Applies to the pooled
         # driver connection regardless of the DATABASE_URL host/port contract.
         stringtype: unspecified
+        # MIG-102 (AC-MIG-102-4): pin the JDBC/DB session time zone to UTC on
+        # every pooled connection. ADR-027 `timestamp` (without time zone)
+        # columns bound as LocalDateTime are never converted in transit (the
+        # value is the pinned UTC wall-clock, see UtcTimeBasisConfig); the
+        # session pin makes that basis explicit and guards future zone-aware
+        # reads. Asserted by the integration suite (current_setting TimeZone).
+        options: "-c timezone=UTC"
   flyway:
     # Flyway-only schema management (ARCH-004 §7). The single V1 full-reset
     # baseline lives in classpath:db/migration; later changes append V2+.
