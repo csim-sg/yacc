@@ -112,9 +112,19 @@ class WebSocketBacklogReplayIntegrationTest extends AbstractPostgresIntegrationT
         seedUser();
         String token = accessToken();
 
+        // Warmup: the first session's connect-time restore consumes this row,
+        // and awaiting the completed marker here proves the server-side
+        // establishment callback (including the restore) has fully drained
+        // before any rows meant for the reconnected session are stored —
+        // a late restore replaying them to the closing socket is the race
+        // this test otherwise intermits under (CI-proven).
+        backlog.store(USER_ID, null, envelope("message.received", text("warmup")));
         CollectingHandler first = new CollectingHandler();
         WebSocketSession firstSession = connect(first, token);
         first.nextFrame("system.connection.established");
+        first.nextFrame("system.backlog.replay.started");
+        first.nextFrame("message.received");
+        first.nextFrame("system.backlog.replay.completed");
 
         backlog.store(USER_ID, null,
                 envelope("message.received", text("while-you-were-away")));
@@ -152,10 +162,17 @@ class WebSocketBacklogReplayIntegrationTest extends AbstractPostgresIntegrationT
 
         // Own connect/close cycle so the reconnect marker is deterministic
         // regardless of test-method order (the close callback records the
-        // disconnect this method's reconnect is recognized by).
+        // disconnect this method's reconnect is recognized by). The warmup
+        // row drains this session's connect-time restore before the rows
+        // meant for the reconnected session are stored (see the race note in
+        // reconnectionRestoresTheDurableBacklogInOrderThenClearsIt).
+        backlog.store(USER_ID, null, envelope("message.received", text("warmup")));
         CollectingHandler first = new CollectingHandler();
         WebSocketSession firstSession = connect(first, token);
         first.nextFrame("system.connection.established");
+        first.nextFrame("system.backlog.replay.started");
+        first.nextFrame("message.received");
+        first.nextFrame("system.backlog.replay.completed");
         firstSession.close();
         awaitDisconnectRecorded();
 
@@ -233,12 +250,25 @@ class WebSocketBacklogReplayIntegrationTest extends AbstractPostgresIntegrationT
         seedUser();
         String token = accessToken();
 
+        // Drain each session's connect-time restore with its own warmup row
+        // (awaiting the completed marker) before the emitted event is stored
+        // — otherwise a late restore could consume it (race note in
+        // reconnectionRestoresTheDurableBacklogInOrderThenClearsIt).
         CollectingHandler first = new CollectingHandler();
         CollectingHandler second = new CollectingHandler();
+        backlog.store(USER_ID, null, envelope("message.received", text("warmup-1")));
         connect(first, token);
-        connect(second, token);
         first.nextFrame("system.connection.established");
+        first.nextFrame("system.backlog.replay.started");
+        first.nextFrame("message.received");
+        first.nextFrame("system.backlog.replay.completed");
+
+        backlog.store(USER_ID, null, envelope("message.received", text("warmup-2")));
+        connect(second, token);
         second.nextFrame("system.connection.established");
+        second.nextFrame("system.backlog.replay.started");
+        second.nextFrame("message.received");
+        second.nextFrame("system.backlog.replay.completed");
 
         publisher.publishToAll(envelope("message.received", text("stored-once")));
 
