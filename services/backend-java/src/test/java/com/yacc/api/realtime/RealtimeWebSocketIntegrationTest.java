@@ -64,14 +64,14 @@ class RealtimeWebSocketIntegrationTest extends AbstractPostgresIntegrationTest {
     private ObjectMapper mapper;
 
     /**
-     * ROUTING-HELD (MIG-101 #411, pending tech-lead approval): removes only the
-     * two smoke identities this class commits directly (see class javadoc —
-     * deliberately not {@code @Transactional}). Without this cleanup the shared
-     * test database permanently carries the rows, and the suite's greenness
-     * depends on JUnit's hash-based class order placing
-     * {@code DeterministicSeedIntegrationTest} (exact {@code hasSize(4)}) before
-     * this class — an ordering invariant the MIG-101 package relocation broke.
-     * Assertions, names, and intent unchanged; reruns stay idempotent.
+     * Removes exactly the two smoke identities this class commits directly
+     * (see class javadoc — deliberately not {@code @Transactional}), so the
+     * shared test database does not carry this class's rows after it runs.
+     * {@code DeterministicSeedIntegrationTest} asserts an exact
+     * {@code hasSize(4)} against the same shared container; the order
+     * coupling between the two classes pre-dated MIG-101 and was only
+     * surfaced by the package relocation's mandated renames. Reruns stay
+     * idempotent.
      */
     @org.junit.jupiter.api.AfterAll
     static void removeCommittedSmokeIdentities(
