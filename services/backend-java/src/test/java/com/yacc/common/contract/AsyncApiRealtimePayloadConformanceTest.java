@@ -112,6 +112,10 @@ class AsyncApiRealtimePayloadConformanceTest {
         assertThat(errors("envelope", wire)).isEmpty();
 
         // Verbatim member set + ISO-8601 timestamp at emit time (WS-BHV-001).
+        // The timestamp check here is deliberately shape-only: RFC 3339
+        // (offset-ful) date-time emission is an open defect owned by
+        // follow-up #414 (MIG-102), not an accepted deviation — do not
+        // widen this assertion to accept non-conforming formats.
         assertThat(wire.fieldNames()).toIterable().containsExactlyInAnyOrderElementsOf(
                 ENVELOPE_MEMBERS);
         assertThat(wire.path("event").asText()).isEqualTo("message.sent");

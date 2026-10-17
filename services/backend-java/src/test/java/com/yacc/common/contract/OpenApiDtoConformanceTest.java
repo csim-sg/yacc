@@ -121,8 +121,16 @@ class OpenApiDtoConformanceTest {
      * Spring Boot app defaults; {@code NON_NULL} mirrors the frozen
      * contract's optional-member semantics (absent allowed, null not
      * declared — several DTO records currently emit explicit nulls on the
-     * live wire; recorded as a MIG-041 finding for tech-lead, fix is a
-     * main-source change outside this task's test-only scope).
+     * live wire).
+     *
+     * <p><strong>Temporary, tracked exemption — not an accepted permanent
+     * deviation.</strong> This test-local mapper (including its
+     * {@code NON_NULL} inclusion) proves a test-only posture: the shipped
+     * production Jackson configuration has no such inclusion, so explicit
+     * {@code null} emission for optional non-nullable members is an open
+     * defect owned by follow-up <a href="https://github.com/csim-sg/yacc/issues/414">#414</a>
+     * (MIG-102), which re-binds this harness to the production mapper,
+     * applies the per-member correction, and removes this exemption.</p>
      */
     private final ObjectMapper mapper = JsonMapper.builder()
             .addModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
@@ -132,13 +140,18 @@ class OpenApiDtoConformanceTest {
             .build();
 
     /**
-     * Recorded contract deviation (MIG-041 finding, not fixed here — the fix
-     * is main-source serialization behavior): the service emits
+     * Recorded contract deviation, tracked as temporary — <strong>not an
+     * accepted permanent deviation</strong> (MIG-041 finding; fix owned by
+     * follow-up <a href="https://github.com/csim-sg/yacc/issues/414">#414</a>
+     * / MIG-102, not implemented here): the service emits
      * {@code LocalDateTime} as bare ISO-8601 local timestamps
      * ({@code 2026-10-16T08:00:00}), while every contract {@code format:
-     * date-time} member is RFC 3339 (offset required). Structure, required
-     * members, enums, and all other formats are asserted strictly; only this
-     * message pattern is excluded, so any NEW date-time drift still surfaces.
+     * date-time} member is RFC 3339 (offset required) and the frozen
+     * baseline emitted UTC {@code ...Z} — a parity regression, not a
+     * contract choice. Structure, required members, enums, and all other
+     * formats are asserted strictly; only this message pattern is excluded,
+     * so any NEW date-time drift still surfaces. #414 closes this by
+     * pinning an explicit UTC time basis and removing this exclusion.
      */
     private static final String RECORDED_DATETIME_DEVIATION = "RFC 3339 date-time";
 
@@ -368,7 +381,12 @@ class OpenApiDtoConformanceTest {
         assertThat(failures).as("wire → DTO → wire conformance failures").isEmpty();
     }
 
-    /** Validation errors minus the one recorded date-time emission deviation. */
+    /**
+     * Validation errors minus the single recorded date-time emission
+     * deviation — a temporary, tracked exemption owned by
+     * <a href="https://github.com/csim-sg/yacc/issues/414">#414</a>
+     * (MIG-102), never a permanent pass. Everything else fails closed.
+     */
     private Set<ValidationMessage> unexpectedErrors(String component, JsonNode instance) {
         return validate(component, instance).stream()
                 .filter(message -> !isRecordedDatetimeDeviation(message))
