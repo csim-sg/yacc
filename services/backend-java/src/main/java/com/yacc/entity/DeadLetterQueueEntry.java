@@ -199,6 +199,10 @@ public class DeadLetterQueueEntry {
         this.lastError = lastError;
     }
 
+    public void setTotalAttempts(Integer totalAttempts) {
+        this.totalAttempts = totalAttempts;
+    }
+
     public void setExpiresAt(LocalDateTime expiresAt) {
         this.expiresAt = expiresAt;
     }

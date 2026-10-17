@@ -27,20 +27,27 @@ import com.yacc.api.queue.RetryResult;
 
 /**
  * Queue observability re-expressed over the DB DLQ + message lifecycle
- * (ledger rows REST-QUEUE-001..008; ADR-028 — Redis/BullMQ removed; POC
- * {@code queue.controller} wire shapes preserved). The Quartz redelivery
- * worker and 1:1 Quartz job identity land with MIG-063; job lookup maps
- * the opaque {@code jobId} onto the DLQ entry (messageId, else entry id).
+ * (ledger rows REST-QUEUE-001..008; ADR-028 — the POC's Redis/BullMQ
+ * queueing is removed; POC {@code queue.controller} wire shapes preserved).
+ * The MIG-063 Quartz redelivery worker
+ * ({@code com.yacc.api.queue.QueueRetryService}) supplies the async
+ * behavior: the opaque {@code jobId} maps 1:1 onto the Quartz job key
+ * (messageId string; canonicalization §5 Note 5 — lookup resolves the DLQ
+ * entry by messageId, else entry id) and {@code state} preserves the
+ * baseline vocabulary through the MIG-063 Quartz mapping.
  */
 @Service
 public class QueueService {
 
     private final DlqService dlq;
     private final MessageQueryService messages;
+    private final QueueRetryService retries;
 
-    public QueueService(DlqService dlq, MessageQueryService messages) {
+    public QueueService(DlqService dlq, MessageQueryService messages,
+            QueueRetryService retries) {
         this.dlq = dlq;
         this.messages = messages;
+        this.retries = retries;
     }
 
     /** Queue statistics + timestamp (BullMQ vocabulary, DB-derived). */
@@ -98,7 +105,11 @@ public class QueueService {
                 0, null, 0), LocalDateTime.now());
     }
 
-    /** Job lookup by opaque id (messageId first, then DLQ entry id). */
+    /**
+     * Job lookup by opaque id (messageId first, then DLQ entry id). The
+     * state is the MIG-063 Quartz mapping of the live cycle over the
+     * baseline vocabulary.
+     */
     @Transactional(readOnly = true)
     public Optional<JobDetails> job(String jobId) {
         Optional<com.yacc.entity.DeadLetterQueueEntry> entry = Optional.empty();
@@ -114,7 +125,7 @@ public class QueueService {
                 return Optional.empty();
             }
         }
-        return entry.map(QueueService::toJob);
+        return entry.map(this::toJob);
     }
 
     /** Clears (removes) the DLQ entry for a message (super_admin mutation). */
@@ -138,9 +149,9 @@ public class QueueService {
                 entry.getLastError());
     }
 
-    private static JobDetails toJob(com.yacc.entity.DeadLetterQueueEntry entry) {
+    private JobDetails toJob(com.yacc.entity.DeadLetterQueueEntry entry) {
         return new JobDetails(entry.getMessageId().toString(), "outbound-message", entry.getPayload(),
-                "failed", 100, entry.getTotalAttempts(),
+                retries.jobState(entry.getMessageId()), 100, entry.getTotalAttempts(),
                 new JobOptions(entry.getTotalAttempts(), "fixed"),
                 entry.getLastError(), null, entry.getMovedAt(), entry.getMovedAt());
     }

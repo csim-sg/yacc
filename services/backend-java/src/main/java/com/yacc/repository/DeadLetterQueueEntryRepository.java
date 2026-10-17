@@ -18,6 +18,8 @@ public interface DeadLetterQueueEntryRepository extends JpaRepository<DeadLetter
 
     Optional<DeadLetterQueueEntry> findByMessageId(UUID messageId);
 
+    List<DeadLetterQueueEntry> findByRetryAttemptTrue();
+
     List<DeadLetterQueueEntry> findByFailureReason(String failureReason);
 
     Page<DeadLetterQueueEntry> findByFailureReason(String failureReason, Pageable pageable);

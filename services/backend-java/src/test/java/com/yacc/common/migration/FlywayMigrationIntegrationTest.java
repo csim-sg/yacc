@@ -27,6 +27,11 @@ import com.yacc.common.testsupport.AbstractPostgresIntegrationTest;
  * CHECK/partial-unique/FK shapes that the orphan POC migration
  * {@code 0005_add_dlq_traceability_fields} got wrong (uuid FK) — the applied
  * {@code 0006_add_dlq_tracing_fields} shape (integer FK) must win.</p>
+ *
+ * <p>MIG-063 added Flyway V4 (ADR-028: Quartz DB-backed job store): the
+ * monotonic sequence continues at 4 and the 11 {@code qrtz_*} store tables
+ * (the verbatim Quartz 2.5.2 PostgreSQL script) exist alongside the
+ * application schema.</p>
  */
 class FlywayMigrationIntegrationTest extends AbstractPostgresIntegrationTest {
 
@@ -52,20 +57,36 @@ class FlywayMigrationIntegrationTest extends AbstractPostgresIntegrationTest {
             "routing_rule_executions",
             "tags");
 
+    /** The 11 Quartz job-store tables (Flyway V4; MIG-063, ADR-028). */
+    private static final List<String> QUARTZ_STORE_TABLES = List.of(
+            "qrtz_blob_triggers",
+            "qrtz_calendars",
+            "qrtz_cron_triggers",
+            "qrtz_fired_triggers",
+            "qrtz_job_details",
+            "qrtz_locks",
+            "qrtz_paused_trigger_grps",
+            "qrtz_scheduler_state",
+            "qrtz_simple_triggers",
+            "qrtz_simprop_triggers",
+            "qrtz_triggers");
+
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void reExpressesExactlyTheNineteenBaselineTablesPlusBacklog() {
+    void reExpressesExactlyTheNineteenBaselineTablesPlusBacklogAndQuartzStore() {
         List<String> tables = jdbcTemplate.queryForList(
                 "SELECT table_name FROM information_schema.tables"
                         + " WHERE table_schema = 'public' ORDER BY table_name",
                 String.class);
 
         // Exactly the 19 re-expressed tables + websocket_backlog (ADR-028, V2)
-        // + Flyway's own history table. Nothing else — no unrelated schema.
+        // + the 11 Quartz job-store tables (ADR-028, V4) + Flyway's own
+        // history table. Nothing else — no unrelated schema.
         List<String> expected = new ArrayList<>(BASELINE_TABLES);
         expected.add("websocket_backlog");
+        expected.addAll(QUARTZ_STORE_TABLES);
         expected.add("flyway_schema_history");
         assertThat(tables).containsExactlyInAnyOrderElementsOf(expected);
     }
@@ -81,9 +102,32 @@ class FlywayMigrationIntegrationTest extends AbstractPostgresIntegrationTest {
 
         // AC-MIG-020-2: the duplicate 0005/0006 POC numbering collapses into
         // one clean sequence, all applied cleanly. V1 baseline + V2 backlog
-        // (ADR-028) + V3 forced-password-change flag (MIG-030, ADR-025).
-        assertThat(versions).containsExactly("1", "2", "3");
-        assertThat(successes).containsExactly(true, true, true);
+        // (ADR-028) + V3 forced-password-change flag (MIG-030, ADR-025) +
+        // V4 Quartz job store (MIG-063, ADR-028).
+        assertThat(versions).containsExactly("1", "2", "3", "4");
+        assertThat(successes).containsExactly(true, true, true, true);
+    }
+
+    @Test
+    void quartzJobStoreCarriesTheCanonicalPostgresShape() {
+        List<String> jobDetailColumns = jdbcTemplate.queryForList(
+                "SELECT column_name FROM information_schema.columns"
+                        + " WHERE table_schema = 'public' AND table_name = 'qrtz_job_details'"
+                        + " ORDER BY ordinal_position",
+                String.class);
+        Integer triggerForeignKeys = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pg_constraint WHERE conname ="
+                        + " 'qrtz_triggers_sched_name_job_name_job_group_fkey' AND contype = 'f'",
+                Integer.class);
+
+        // The verbatim Quartz 2.5.2 PostgreSQL script shape: the store owns
+        // its schema; Quartz's runtime SQL addresses it unquoted (lowercase
+        // folding).
+        assertThat(jobDetailColumns).containsExactly(
+                "sched_name", "job_name", "job_group", "description", "job_class_name",
+                "is_durable", "is_nonconcurrent", "is_update_data", "requests_recovery",
+                "job_data");
+        assertThat(triggerForeignKeys).isEqualTo(1);
     }
 
     @Test
