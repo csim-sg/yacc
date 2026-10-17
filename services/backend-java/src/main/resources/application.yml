@@ -202,6 +202,16 @@ yacc:
       # at rest, ADR-027) and never a property. The base URL override exists
       # for parity tooling/tests; production uses the Bot API origin.
       base-url: ${YACC_CONNECTOR_TELEGRAM_BASE_URL:https://api.telegram.org}
+    irc:
+      # MIG-061 IRC connector (SPEC FR-07): env-bound timing policy only —
+      # server/port/nick/password/channels resolve DB-first (profile
+      # preferred, AES-256-GCM at rest, ADR-027) and are never properties.
+      # The overrides exist for parity tooling/tests; production uses the
+      # EA-spec defaults (30s connect deadline; 1s→60s capped exponential
+      # reconnect backoff over max 5 attempts).
+      connect-timeout-ms: ${YACC_CONNECTOR_IRC_CONNECT_TIMEOUT_MS:30000}
+      reconnect-base-delay-ms: ${YACC_CONNECTOR_IRC_RECONNECT_BASE_DELAY_MS:1000}
+      reconnect-max-delay-ms: ${YACC_CONNECTOR_IRC_RECONNECT_MAX_DELAY_MS:60000}
   realtime:
     websocket:
       # MIG-050 raw WebSocket endpoint (ADR-026; SPEC-002 FR-06/TR-04).
