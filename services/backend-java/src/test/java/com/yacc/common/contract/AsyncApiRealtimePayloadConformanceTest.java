@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -23,6 +24,11 @@ import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SchemaValidatorsConfig;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
+import com.yacc.api.realtime.ConnectorRelayService;
+import com.yacc.api.realtime.MessageFailedPayload;
+import com.yacc.api.realtime.MessageReceivedPayload;
+import com.yacc.api.realtime.MessageSentPayload;
+import com.yacc.api.realtime.WebSocketEventPublisher;
 import com.yacc.api.realtime.OnlineUsersPayload;
 import com.yacc.api.realtime.PresenceUpdatedPayload;
 import com.yacc.api.realtime.RealtimeEvents;
@@ -248,6 +254,148 @@ class AsyncApiRealtimePayloadConformanceTest {
                 .as("inbound frames carry no timestamp (envelope is outbound-only)")
                 .isFalse();
         assertThat(errors("message-sent", wire.path("data"))).isEmpty();
+    }
+
+    // --- MIG-062 connector-bridge payload emitters (WS-EVT-003/004/005;
+    // the gateway exchange is the emitter, the models are wire truth) ---
+
+    @Test
+    void messageReceivedPayloadValidatesAgainstTheFrozenSchema() {
+        MessageReceivedPayload payload = new MessageReceivedPayload(
+                UUID.fromString("00000000-0000-4000-8000-0000000000a1"),
+                UUID.fromString("00000000-0000-4000-8000-0000000000a2"),
+                "telegram", "555", "Tg User", "hello",
+                java.time.LocalDateTime.of(2026, 10, 18, 10, 0, 0));
+
+        JsonNode wire = mapper.valueToTree(payload);
+        assertThat(errors("message-received", wire)).isEmpty();
+        // Frozen required member set exactly (attachments deliberately absent).
+        assertThat(wire.fieldNames()).toIterable().containsExactlyInAnyOrder(
+                "messageId", "conversationId", "platform", "senderId", "senderName",
+                "body", "timestamp");
+        // MIG-102 posture: LocalDateTime members emit RFC 3339 UTC.
+        assertThat(wire.path("timestamp").asText())
+                .matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z");
+
+        // Fail-closed shape: a blank senderName is a schema violation.
+        JsonNode blank = mapper.valueToTree(new MessageReceivedPayload(
+                UUID.fromString("00000000-0000-4000-8000-0000000000a1"),
+                UUID.fromString("00000000-0000-4000-8000-0000000000a2"),
+                "telegram", "555", "", "hello",
+                java.time.LocalDateTime.of(2026, 10, 18, 10, 0, 0)));
+        assertThat(errors("message-received", blank)).isNotEmpty();
+    }
+
+    @Test
+    void messageSentPayloadValidatesAgainstTheFrozenSchema() {
+        MessageSentPayload payload = new MessageSentPayload(
+                UUID.fromString("00000000-0000-4000-8000-0000000000b1"),
+                UUID.fromString("00000000-0000-4000-8000-0000000000b2"),
+                "sent", java.time.LocalDateTime.of(2026, 10, 18, 10, 0, 0));
+
+        JsonNode wire = mapper.valueToTree(payload);
+        assertThat(errors("message-sent", wire)).isEmpty();
+        assertThat(wire.fieldNames()).toIterable().containsExactlyInAnyOrder(
+                "messageId", "conversationId", "status", "sentAt");
+        assertThat(wire.path("status").asText()).isEqualTo("sent");
+
+        // The schema pins the `sent` constant — anything else is a violation.
+        JsonNode wrong = mapper.valueToTree(new MessageSentPayload(
+                UUID.fromString("00000000-0000-4000-8000-0000000000b1"),
+                UUID.fromString("00000000-0000-4000-8000-0000000000b2"),
+                "failed", java.time.LocalDateTime.of(2026, 10, 18, 10, 0, 0)));
+        assertThat(errors("message-sent", wrong)).isNotEmpty();
+    }
+
+    @Test
+    void messageFailedPayloadValidatesAgainstTheFrozenSchemaWithTheLadderBounds() {
+        MessageFailedPayload payload = new MessageFailedPayload(
+                UUID.fromString("00000000-0000-4000-8000-0000000000c1"),
+                UUID.fromString("00000000-0000-4000-8000-0000000000c2"),
+                "failed", "NETWORK_ERROR: transport down",
+                java.time.LocalDateTime.of(2026, 10, 18, 10, 1, 0), 1);
+
+        JsonNode wire = mapper.valueToTree(payload);
+        assertThat(errors("message-failed", wire)).isEmpty();
+        assertThat(wire.fieldNames()).toIterable().containsExactlyInAnyOrder(
+                "messageId", "conversationId", "status", "error", "retryAt", "attempt");
+        assertThat(wire.path("retryAt").asText())
+                .matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z");
+
+        // attempt is bounded 1..3 by the frozen schema (E3 posture: only
+        // attempts with a truthful retryAt are emitted at all).
+        assertThat(errors("message-failed", mapper.valueToTree(new MessageFailedPayload(
+                UUID.fromString("00000000-0000-4000-8000-0000000000c1"),
+                UUID.fromString("00000000-0000-4000-8000-0000000000c2"),
+                "failed", "err",
+                java.time.LocalDateTime.of(2026, 10, 18, 10, 1, 0), 3)))).isEmpty();
+        assertThat(errors("message-failed", mapper.valueToTree(new MessageFailedPayload(
+                UUID.fromString("00000000-0000-4000-8000-0000000000c1"),
+                UUID.fromString("00000000-0000-4000-8000-0000000000c2"),
+                "failed", "err",
+                java.time.LocalDateTime.of(2026, 10, 18, 10, 1, 0), 4)))).isNotEmpty();
+        assertThat(errors("message-failed", mapper.valueToTree(new MessageFailedPayload(
+                UUID.fromString("00000000-0000-4000-8000-0000000000c1"),
+                UUID.fromString("00000000-0000-4000-8000-0000000000c2"),
+                "failed", "err",
+                java.time.LocalDateTime.of(2026, 10, 18, 10, 1, 0), 0)))).isNotEmpty();
+    }
+
+    @Test
+    void connectorBridgeRawChannelShapesCarryTheirFrozenMembers() {
+        // WS-RAW-008/009/012/013: raw baseline emissions (no frozen schema
+        // files — AsyncAPI declares {type: object, additionalProperties: true})
+        // — the shapes the relay service actually emits, member-wise.
+        ObjectMapper mapper = new ObjectMapper();
+        WebSocketEventPublisher publisher = org.mockito.Mockito.mock(
+                WebSocketEventPublisher.class);
+        ConnectorRelayService relay = new ConnectorRelayService(publisher, mapper);
+
+        relay.relayStatusChanged(mapper.createObjectNode()
+                .put("platform", "telegram")
+                .put("status", "connected")
+                .put("timestamp", "2026-10-18T10:00:00Z"));
+        org.mockito.ArgumentCaptor<WebSocketEnvelope> captor =
+                org.mockito.ArgumentCaptor.forClass(WebSocketEnvelope.class);
+        org.mockito.Mockito.verify(publisher).publishToAll(captor.capture());
+        org.mockito.Mockito.verify(publisher).publishToRoom(
+                org.mockito.ArgumentMatchers.eq("connector:telegram"), captor.capture());
+        JsonNode broadcast = captor.getAllValues().get(0).data();
+        assertThat(broadcast.fieldNames()).toIterable().containsExactlyInAnyOrder(
+                "platform", "status", "timestamp");
+        JsonNode room = captor.getAllValues().get(1).data();
+        assertThat(room.fieldNames()).toIterable().containsExactly("status", "timestamp");
+
+        org.mockito.Mockito.reset(publisher);
+        relay.relayMessageError(mapper.createObjectNode()
+                .put("conversationId", UUID.fromString(
+                        "00000000-0000-4000-8000-0000000000d1").toString())
+                .put("messageId", "m-1")
+                .put("platform", "telegram")
+                .put("error", "send failed")
+                .put("willRetry", true)
+                .put("timestamp", "2026-10-18T10:00:00Z"));
+        org.mockito.Mockito.verify(publisher).publishToRoom(
+                org.mockito.ArgumentMatchers.eq("conversation:00000000-0000-4000-8000-0000000000d1"),
+                captor.capture());
+        JsonNode error = captor.getValue().data();
+        assertThat(error.fieldNames()).toIterable().containsExactlyInAnyOrder(
+                "messageId", "error", "willRetry", "timestamp");
+
+        org.mockito.Mockito.reset(publisher);
+        relay.relayMessageAck(mapper.createObjectNode()
+                .put("conversationId", UUID.fromString(
+                        "00000000-0000-4000-8000-0000000000d1").toString())
+                .put("messageId", "m-1")
+                .put("platform", "telegram")
+                .put("platformMessageId", "777")
+                .put("timestamp", "2026-10-18T10:00:00Z"));
+        org.mockito.Mockito.verify(publisher).publishToRoom(
+                org.mockito.ArgumentMatchers.eq("conversation:00000000-0000-4000-8000-0000000000d1"),
+                captor.capture());
+        JsonNode ack = captor.getValue().data();
+        assertThat(ack.fieldNames()).toIterable().containsExactlyInAnyOrder(
+                "messageId", "platformMessageId", "timestamp");
     }
 
     private Set<ValidationMessage> errors(String schemaName, JsonNode instance) {

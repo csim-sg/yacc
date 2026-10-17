@@ -83,6 +83,19 @@ public final class RealtimeEvents {
     public static final String TYPING_TIMEOUT = "typing.timeout";
     public static final String TYPING_HEARTBEAT = "typing.heartbeat";
 
+    // --- MIG-062 connector bridge channels (frozen AsyncAPI channels; ledger
+    // WS-OP-CONN-001..006, WS-RAW-008/009/012/013) — the four remaining
+    // inbound connector ops and their raw emissions, plus the server-side
+    // status-emission channels ---
+    public static final String CONNECTOR_MESSAGE_RECEIVED = "connector.message.received";
+    public static final String CONNECTOR_STATUS_CHANGED = "connector.status.changed";
+    public static final String CONNECTOR_MESSAGE_ERROR = "connector.message.error";
+    public static final String CONNECTOR_MESSAGE_ACK = "connector.message.ack";
+    public static final String CONNECTOR_STATUS = "connector.status";
+    public static final String STATUS_UPDATED = "status.updated";
+    public static final String MESSAGE_ERROR = "message.error";
+    public static final String MESSAGE_ACK = "message.ack";
+
     private RealtimeEvents() {
         // Constants only.
     }

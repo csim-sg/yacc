@@ -16,10 +16,10 @@ package com.yacc.api.connector;
  *       error stream (no breaker class exists today; MIG-063 scope).</li>
  * </ul>
  *
- * <p>Until MIG-063 lands, {@link TelegramConnectorConfig} wires a no-op
- * default. Implementations must never throw: an error surfaced here must
- * not mask the connector's own result/exception (fail-closed behavior of
- * the connector is defined independently of the hook outcome).</p>
+ * <p>MIG-063 implemented this seam as the component-scanned
+ * {@code ConnectorBreakerErrorHook} (platform circuit breaker, threshold
+ * 5); MIG-062's exchange added the message-correlated DLQ half on the
+ * {@code DlqService#enqueue} surface.</p>
  */
 @FunctionalInterface
 public interface ConnectorErrorHook {

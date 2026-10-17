@@ -63,6 +63,7 @@ class YaccWebSocketHandlerTest {
                 org.mockito.Mockito.mock(WebSocketPresenceService.class),
                 org.mockito.Mockito.mock(WebSocketTypingService.class),
                 org.mockito.Mockito.mock(WebSocketReconnectService.class),
+                org.mockito.Mockito.mock(ConnectorRelayService.class),
                 mapper);
 
         session = mock(WebSocketSession.class);

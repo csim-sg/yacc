@@ -6,11 +6,10 @@ package com.yacc.api.connector;
  * webhook route exists: the frozen OpenAPI has no Telegram path and GOV-038
  * locks the surface).
  *
- * <p>MIG-062 (#359) replaces the {@link TelegramConnectorConfig} no-op
- * default with the connector→realtime bridge (ledger WS-OP-CONN-001; the
- * WS ops and {@code connector:{platform}} rooms are MIG-062 scope). Until
- * then implementations must be cheap and must never throw into the
- * connector.</p>
+ * <p>MIG-062 (#359) replaced the former no-op default with the production
+ * {@link GatewayExchange} (ledger WS-OP-CONN-001; the WS ops and
+ * {@code connector:{platform}} rooms are MIG-062 scope). Implementations
+ * must be cheap and must never throw into the connector.</p>
  */
 @FunctionalInterface
 public interface TelegramUpdateReceiver {

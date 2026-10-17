@@ -36,6 +36,10 @@ import com.yacc.api.realtime.WebSocketInboundFrame;
  *       ({@code conversation.subscribed}/{@code ...unsubscribed} with
  *       {@code {conversationId}}; {@code connector.subscribed}/
  *       {@code ...unsubscribed} with {@code {platform,timestamp}});</li>
+ *   <li>the MIG-062 connector relay ops — {@code connector.message.received},
+ *       {@code connector.status.changed}, {@code connector.message.error},
+ *       {@code connector.message.ack} — routed to
+ *       {@link ConnectorRelayService} (ledger WS-OP-CONN-001/002/005/006);</li>
  *   <li>the {@code system.error} error path (WS-EVT-018) for malformed
  *       frames, unknown channels, and transport faults;</li>
  *   <li>registry cleanup on close (idempotent).</li>
@@ -70,17 +74,20 @@ public class YaccWebSocketHandler extends TextWebSocketHandler {
 
     private final WebSocketReconnectService reconnect;
 
+    private final ConnectorRelayService relay;
+
     private final ObjectMapper mapper;
 
     public YaccWebSocketHandler(WebSocketSessionRegistry registry,
             WebSocketEventPublisher publisher, WebSocketPresenceService presence,
             WebSocketTypingService typing, WebSocketReconnectService reconnect,
-            ObjectMapper mapper) {
+            ConnectorRelayService relay, ObjectMapper mapper) {
         this.registry = registry;
         this.publisher = publisher;
         this.presence = presence;
         this.typing = typing;
         this.reconnect = reconnect;
+        this.relay = relay;
         this.mapper = mapper;
     }
 
@@ -121,6 +128,14 @@ public class YaccWebSocketHandler extends TextWebSocketHandler {
                     connectorSubscribe(session, identity, frame.data());
             case RealtimeEvents.CONNECTOR_UNSUBSCRIBE ->
                     connectorUnsubscribe(session, identity, frame.data());
+            case RealtimeEvents.CONNECTOR_MESSAGE_RECEIVED ->
+                    relay(session, () -> relay.relayMessageReceived(frame.data()));
+            case RealtimeEvents.CONNECTOR_STATUS_CHANGED ->
+                    relay(session, () -> relay.relayStatusChanged(frame.data()));
+            case RealtimeEvents.CONNECTOR_MESSAGE_ERROR ->
+                    relay(session, () -> relay.relayMessageError(frame.data()));
+            case RealtimeEvents.CONNECTOR_MESSAGE_ACK ->
+                    relay(session, () -> relay.relayMessageAck(frame.data()));
             case RealtimeEvents.PRESENCE_UPDATED -> presence.onPresenceUpdated(session, frame.data());
             case RealtimeEvents.USER_ONLINE -> presence.onUserOnline(session, frame.data());
             case RealtimeEvents.USER_OFFLINE -> presence.onUserOffline(session, frame.data());
@@ -210,6 +225,19 @@ public class YaccWebSocketHandler extends TextWebSocketHandler {
         registry.leaveRoom(identity.sessionId(), RealtimeRooms.connector(platform));
         publisher.publishToSession(session, WebSocketEnvelope.of(
                 RealtimeEvents.CONNECTOR_UNSUBSCRIBED, connectorAck(platform)));
+    }
+
+    /**
+     * Routes one MIG-062 connector relay op; a malformed frozen bare payload
+     * surfaces as the existing {@code system.error} path — never a silent
+     * drop (guardrail G3).
+     */
+    private void relay(WebSocketSession session, Runnable action) {
+        try {
+            action.run();
+        } catch (IllegalArgumentException badFrame) {
+            emitError(session, ERROR_CODE_BAD_FRAME, badFrame.getMessage());
+        }
     }
 
     // --- Helpers ---

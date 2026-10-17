@@ -1,5 +1,6 @@
 package com.yacc.api.conversation;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -50,5 +51,28 @@ public class ConversationAccessService {
     @Transactional(readOnly = true)
     public boolean isAssignedTo(UUID conversationId, String userId) {
         return conversations.existsByIdAndAssignedUserId(conversationId, userId);
+    }
+
+    /**
+     * Outbound dispatch routing for one conversation (MIG-062; the gateway
+     * exchange composes through this owning-module read API — never a
+     * repository import, ARCH-004 §1/§14 rule 1).
+     *
+     * @param conversationId the conversation id
+     * @return the channel label ({@code telegram}|{@code irc}) and the
+     *         external thread id (the platform recipient), empty when the
+     *         conversation does not exist
+     */
+    @Transactional(readOnly = true)
+    public Optional<ConversationRouting> routingOf(UUID conversationId) {
+        return conversations.findById(conversationId)
+                .map(conversation -> new ConversationRouting(conversation.getId(),
+                        conversation.getChannel().getLabel(),
+                        conversation.getExternalThreadId()));
+    }
+
+    /** Outbound dispatch routing snapshot (see {@link #routingOf}). */
+    public record ConversationRouting(UUID conversationId, String channel,
+            String externalThreadId) {
     }
 }

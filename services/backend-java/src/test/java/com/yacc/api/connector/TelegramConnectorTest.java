@@ -65,6 +65,7 @@ class TelegramConnectorTest {
     private MockRestServiceServer server;
     private TelegramCredentialsResolver credentials;
     private ConnectorErrorHook errorHook;
+    private ConnectorStatusListener statusListener;
     private final List<TelegramInboundMessage> inbound = new ArrayList<>();
 
     private TelegramConnector connector;
@@ -75,8 +76,9 @@ class TelegramConnectorTest {
         server = MockRestServiceServer.bindTo(builder).build();
         credentials = mock(TelegramCredentialsResolver.class);
         errorHook = mock(ConnectorErrorHook.class);
+        statusListener = mock(ConnectorStatusListener.class);
         connector = new TelegramConnector(builder, new TelegramConnectorProperties(null),
-                credentials, errorHook, inbound::add, new ObjectMapper());
+                credentials, errorHook, inbound::add, statusListener, new ObjectMapper());
     }
 
     // --- connect (Bot API getMe) ---
@@ -95,6 +97,22 @@ class TelegramConnectorTest {
         assertThat(connector.health().healthy()).isTrue();
         server.verify();
         verify(errorHook, never()).onAdapterError(any());
+    }
+
+    /** MIG-062 server-side status surface: transitions fire the additive seam. */
+    @Test
+    void statusTransitionsFireTheStatusListenerSeam() {
+        when(credentials.resolve()).thenReturn(Optional.of(
+                new TelegramCredentials(VALID_TOKEN, "yacc_bot")));
+        server.expect(requestTo(BASE_URL + "/bot" + VALID_TOKEN + "/getMe"))
+                .andRespond(withSuccess(GET_ME_OK, MediaType.APPLICATION_JSON));
+        connector.connect();
+        verify(statusListener).onStatusChange(TelegramConnector.PLATFORM,
+                ConnectorStatus.CONNECTED);
+
+        connector.disconnect();
+        verify(statusListener).onStatusChange(TelegramConnector.PLATFORM,
+                ConnectorStatus.DISCONNECTED);
     }
 
     @Test

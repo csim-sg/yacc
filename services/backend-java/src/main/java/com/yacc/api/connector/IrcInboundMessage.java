@@ -5,8 +5,8 @@ import java.util.UUID;
 
 /**
  * Normalized IRC inbound message (POC {@code InboundMessageEvent} /
- * {@code ingestInboundMessage} payload parity) — the payload the intake
- * seam hands to {@link IrcMessageReceiver}.
+ * {@code ingestInboundMessage} payload parity) — the payload the intake seam
+ * hands to {@link IrcMessageReceiver}.
  *
  * @param platform             always {@code irc}
  * @param externalThreadId     IRC channel the message was sent to (PRIVMSG
@@ -20,6 +20,12 @@ import java.util.UUID;
  * @param correlationId        per-event tracing id
  * @param rawLine              original protocol line (parity
  *                             {@code rawPayload})
+ * @param profileId            resolved IRC profile id of the connection the
+ *                             message arrived on (MIG-062 guardrail G12 —
+ *                             the additive nullable component; the
+ *                             conversation find-or-create key carries it
+ *                             when present), null when resolved from the
+ *                             single-config store
  */
 public record IrcInboundMessage(
         String platform,
@@ -29,5 +35,6 @@ public record IrcInboundMessage(
         String body,
         LocalDateTime receivedAt,
         UUID correlationId,
-        String rawLine) {
+        String rawLine,
+        Integer profileId) {
 }

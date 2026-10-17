@@ -51,7 +51,7 @@ import jakarta.annotation.PreDestroy;
  * and is never logged or persisted in plaintext.</p>
  */
 @Service
-public class IrcConnector {
+public class IrcConnector implements PlatformConnector {
 
     private static final Logger log = LoggerFactory.getLogger(IrcConnector.class);
 
@@ -76,6 +76,7 @@ public class IrcConnector {
     private final IrcMessageReceiver receiver;
     private final IrcConnectorProperties properties;
     private final IrcConnectionState connectionState;
+    private final ConnectorStatusListener statusListener;
 
     private volatile ConnectorStatus status = ConnectorStatus.DISCONNECTED;
     private volatile IrcProtocolClient client;
@@ -92,12 +93,13 @@ public class IrcConnector {
 
     public IrcConnector(IrcConnectionConfigResolver configResolver, ConnectorErrorHook errorHook,
             IrcMessageReceiver receiver, IrcConnectorProperties properties,
-            IrcConnectionState connectionState) {
+            IrcConnectionState connectionState, ConnectorStatusListener statusListener) {
         this.configResolver = configResolver;
         this.errorHook = errorHook;
         this.receiver = receiver;
         this.properties = properties;
         this.connectionState = connectionState;
+        this.statusListener = statusListener;
     }
 
     /**
@@ -161,6 +163,7 @@ public class IrcConnector {
         status = ConnectorStatus.DISCONNECTED;
         reconnectAttempts = 0;
         connectionState.markDisconnected();
+        statusListener.onStatusChange(PLATFORM, ConnectorStatus.DISCONNECTED);
     }
 
     /**
@@ -273,6 +276,10 @@ public class IrcConnector {
             status = ConnectorStatus.CONNECTED;
         }
         connectionState.markConnected();
+        // MIG-062 server-side status surface: the connected transition emits
+        // the frozen raw status channels and resets the platform breaker
+        // (the G6 un-wedge path).
+        statusListener.onStatusChange(PLATFORM, ConnectorStatus.CONNECTED);
         created.startReader();
         log.info("Connected to IRC (server={}:{}, nick={}, channels={})",
                 attemptConfig.server(), attemptConfig.port(), attemptConfig.nick(),
@@ -324,6 +331,7 @@ public class IrcConnector {
             log.error("IRC reconnect gave up after {} attempts: {}", reconnectAttempts, reason);
             status = ConnectorStatus.ERROR;
             connectionState.markFailed(reconnectAttempts, reason);
+            statusListener.onStatusChange(PLATFORM, ConnectorStatus.ERROR);
             return;
         }
         if (reconnectAttempts == 0) {
@@ -333,6 +341,10 @@ public class IrcConnector {
         long delayMs = IrcConnectorProperties.backoffDelayMs(reconnectAttempts,
                 properties.reconnectBaseDelayMs(), properties.reconnectMaxDelayMs());
         connectionState.markRetrying(reconnectAttempts);
+        // MIG-062 server-side status surface: the reconnect-scheduled
+        // transition is the frozen vocabulary's `reconnecting` member (the
+        // only CONNECTING transition the connector surfaces).
+        statusListener.onStatusChange(PLATFORM, ConnectorStatus.CONNECTING);
         log.info("Scheduling IRC reconnect attempt {}/{} in {}ms (incident {})",
                 reconnectAttempts, MAX_RECONNECT_ATTEMPTS, delayMs, reconnectIncidentId);
         pendingReconnect = scheduler().schedule(this::attemptConnect, delayMs,
@@ -353,6 +365,7 @@ public class IrcConnector {
             status = ConnectorStatus.DISCONNECTED;
         }
         log.warn("IRC connection lost");
+        statusListener.onStatusChange(PLATFORM, ConnectorStatus.DISCONNECTED);
         scheduleReconnect(lastError != null ? lastError : "connection lost");
     }
 
@@ -374,7 +387,9 @@ public class IrcConnector {
      * Normalizes one PRIVMSG/NOTICE into {@link IrcInboundMessage} and hands
      * it to the receiver seam. Receiver failures are logged and dropped —
      * baseline ingestion-error parity: they must not break the protocol
-     * loop.
+     * loop. The resolved profile id rides on the payload (guardrail G12 —
+     * the conversation find-or-create key component); null when resolved
+     * from the single-config store.
      */
     private void dispatchInbound(IrcLine line) {
         String channel = line.firstParam();
@@ -386,9 +401,11 @@ public class IrcConnector {
                 ? "unknown"
                 : line.nick();
         lastMessageAt = LocalDateTime.now();
+        IrcConnectionConfig resolvedConfig = config;
         try {
             receiver.onInboundMessage(new IrcInboundMessage(PLATFORM, channel, sender, sender,
-                    body, LocalDateTime.now(), UUID.randomUUID(), line.raw()));
+                    body, LocalDateTime.now(), UUID.randomUUID(), line.raw(),
+                    resolvedConfig == null ? null : resolvedConfig.profileId()));
         } catch (RuntimeException receiverFailure) {
             log.warn("IRC inbound receiver failed (dropped, baseline ingestion-error parity): {}",
                     receiverFailure.getClass().getSimpleName());

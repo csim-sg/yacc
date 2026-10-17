@@ -11,9 +11,8 @@ import java.util.UUID;
  * the POC {@code gateway-exchange.handleOutbound} owned them; the worker
  * ({@link QueueRetryService}) owns only the schedule/backoff/exhaustion and
  * the DLQ row lifecycle around each attempt. The production implementation
- * is the MIG-062 (#359) gateway exchange; until that lands
- * {@link QueueRetryConfig} wires a documented no-op default that reports
- * NOT delivered (fail-closed: a no-op must never mark anything delivered).</p>
+ * is the MIG-062 (#359) gateway exchange
+ * ({@code com.yacc.api.connector.GatewayExchange}).</p>
  *
  * <p><b>Delivery guarantee — at-least-once, no exactly-once claim:</b> the
  * frozen contract has no consumer acknowledgement, so the worker cannot
