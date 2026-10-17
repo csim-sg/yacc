@@ -13,11 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.yacc.auth.model.User;
-import com.yacc.auth.model.UserRole;
-import com.yacc.auth.model.UserStatus;
-import com.yacc.auth.repository.UserRepository;
-import com.yacc.auth.service.AuthEmailSender;
+import com.yacc.entity.User;
+import com.yacc.entity.UserRole;
+import com.yacc.entity.UserStatus;
+import com.yacc.repository.UserRepository;
+import com.yacc.service.AuthEmailSender;
 
 /**
  * Shared base for MIG-040 REST-parity wire tests: real Spring Security

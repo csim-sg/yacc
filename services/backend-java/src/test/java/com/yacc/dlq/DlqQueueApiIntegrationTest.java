@@ -14,14 +14,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
-import com.yacc.auth.model.UserRole;
-import com.yacc.auth.model.UserStatus;
+import com.yacc.entity.UserRole;
+import com.yacc.entity.UserStatus;
 import com.yacc.common.testsupport.AbstractApiIntegrationTest;
-import com.yacc.dlq.model.DeadLetterQueueEntry;
-import com.yacc.dlq.repository.DeadLetterQueueEntryRepository;
-import com.yacc.message.model.Message;
-import com.yacc.message.model.MessageDirection;
-import com.yacc.message.repository.MessageRepository;
+import com.yacc.entity.DeadLetterQueueEntry;
+import com.yacc.repository.DeadLetterQueueEntryRepository;
+import com.yacc.entity.Message;
+import com.yacc.entity.MessageDirection;
+import com.yacc.repository.MessageRepository;
 
 /**
  * MIG-040 DLQ + queue wire tests (ledger rows REST-DLQ-001..004,
@@ -40,14 +40,14 @@ class DlqQueueApiIntegrationTest extends AbstractApiIntegrationTest {
     @Autowired
     private MessageRepository messages;
     @Autowired
-    private com.yacc.conversation.repository.ConversationRepository conversations;
+    private com.yacc.repository.ConversationRepository conversations;
 
     private DeadLetterQueueEntry seedEntry(String reason) {
-        var conversation = conversations.save(new com.yacc.conversation.model.Conversation(
-                UUID.randomUUID(), com.yacc.conversation.model.ChannelType.IRC, "#dlq"));
+        var conversation = conversations.save(new com.yacc.entity.Conversation(
+                UUID.randomUUID(), com.yacc.entity.ChannelType.IRC, "#dlq"));
         Message message = messages.save(new Message(UUID.randomUUID(), conversation.getId(),
                 null, "external-sender", "body", MessageDirection.INBOUND));
-        message.setStatus(com.yacc.message.model.MessageStatus.FAILED);
+        message.setStatus(com.yacc.entity.MessageStatus.FAILED);
         messages.save(message);
         return dlq.save(new DeadLetterQueueEntry(UUID.randomUUID(), message.getId(),
                 conversation.getId(), "{}", reason, 3, "boom",
