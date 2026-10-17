@@ -10,6 +10,12 @@ package com.yacc.api.realtime;
  * AsyncAPI document — never edit a literal here without a recorded
  * contract-change decision against {@code contract-canonicalization.md}.</p>
  *
+ * <p>MIG-051 appends the raw presence/typing channel names its ledger rows
+ * (WS-OP-PRES-004/005, WS-RAW-006/007, WS-BHV-015) preserve — frozen
+ * AsyncAPI channels outside the MIG-003 23-constant canonical set, kept in
+ * this one place so every emit/subscription site compiles against the frozen
+ * surface.</p>
+ *
  * <p>Constants are declared in one place so every emit/subscription site
  * compiles against the frozen surface; the ledger dispositions (which events
  * are wired by which milestone) are unchanged by this class.</p>
@@ -66,6 +72,16 @@ public final class RealtimeEvents {
     public static final String UNSUBSCRIBE_CONVERSATION = "unsubscribe.conversation";
     public static final String CONNECTOR_SUBSCRIBE = "connector.subscribe";
     public static final String CONNECTOR_UNSUBSCRIBE = "connector.unsubscribe";
+
+    // --- MIG-051 raw presence/typing channels (frozen AsyncAPI channels
+    // outside the MIG-003 23-constant canonical set; ledger WS-OP-PRES-004/005,
+    // WS-RAW-006/007, WS-BHV-015) ---
+    public static final String ONLINE_USERS = "online.users";
+    public static final String USER_STATUS_CHANGED = "user.status.changed";
+    public static final String USER_STATUS = "user.status";
+    public static final String REQUEST_ONLINE_USERS = "request.online.users";
+    public static final String TYPING_TIMEOUT = "typing.timeout";
+    public static final String TYPING_HEARTBEAT = "typing.heartbeat";
 
     private RealtimeEvents() {
         // Constants only.

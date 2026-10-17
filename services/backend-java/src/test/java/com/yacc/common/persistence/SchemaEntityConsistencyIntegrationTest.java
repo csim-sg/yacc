@@ -15,22 +15,23 @@ import com.yacc.common.testsupport.AbstractPostgresIntegrationTest;
  *
  * <p>Column-level fidelity is enforced continuously by Hibernate
  * {@code ddl-auto=validate} (application-test.yml): every context boot in the
- * test profile validates all 19 entity mappings against the MIG-020
+ * test profile validates all entity mappings against the MIG-020
  * Flyway-built schema. This test adds the table-level 1:1 manifest check —
  * every mapped table exists and no table lacks an entity (the only
  * entity-less table is Flyway's own history).</p>
+ *
+ * <p>MIG-051 added the {@code websocket_backlog} entity (the V2 table was
+ * deliberately deferred to it by the #346 arbitration ruling R1), so the
+ * manifest now covers the 19 V1 baseline tables plus the V2 backlog table.</p>
  */
 class SchemaEntityConsistencyIntegrationTest extends AbstractPostgresIntegrationTest {
 
     /**
-     * The 19 entities of the MIG-021 data layer, mapped 1:1 to the V1
-     * baseline tables (tech-lead ruling R4 on #346: exactly 19, no more, no
-     * fewer), in package-by-feature order (ADR-030).
-     *
-     * <p>The V2 {@code websocket_backlog} table is deliberately
-     * <strong>not</strong> entity-mapped here: it is owned by MIG-051
-     * (backlog replay behavior, ADR-028) per the #346 arbitration ruling R1
-     * — MIG-021 maps the 19-table V1 baseline only.</p>
+     * The 20 entity-mapped tables: the 19 entities of the MIG-021 data layer
+     * mapped 1:1 to the V1 baseline tables (tech-lead ruling R4 on #346:
+     * exactly 19, no more, no fewer) plus the V2 {@code websocket_backlog}
+     * table whose entity MIG-051 owns (the #346 ruling R1 deferral is
+     * discharged), in package-by-feature order (ADR-030).
      */
     private static final List<String> MAPPED_TABLES = List.of(
             // auth
@@ -57,14 +58,13 @@ class SchemaEntityConsistencyIntegrationTest extends AbstractPostgresIntegration
             "notes",
             // notification
             "notifications",
+            // realtime (MIG-051; Flyway V2)
+            "websocket_backlog",
             // routingrule
             "routing_rule_executions",
             "routing_rules",
             // tag
             "tags");
-
-    /** The V2 table intentionally left entity-less until MIG-051. */
-    private static final String UNMAPPED_V2_TABLE = "websocket_backlog";
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -79,8 +79,8 @@ class SchemaEntityConsistencyIntegrationTest extends AbstractPostgresIntegration
     }
 
     @Test
-    void mapsExactlyNineteenBaselineTables() {
-        assertThat(MAPPED_TABLES).hasSize(19);
+    void mapsExactlyTwentyTables() {
+        assertThat(MAPPED_TABLES).hasSize(20);
     }
 
     @Test
@@ -99,14 +99,13 @@ class SchemaEntityConsistencyIntegrationTest extends AbstractPostgresIntegration
     }
 
     @Test
-    void schemaContainsExactlyTheMappedTablesPlusV2AndFlywayHistory() {
+    void schemaContainsExactlyTheMappedTablesPlusFlywayHistory() {
         List<String> tables = jdbcTemplate.queryForList(
                 "SELECT table_name FROM information_schema.tables"
                         + " WHERE table_schema = 'public' ORDER BY table_name",
                 String.class);
 
         List<String> expected = new ArrayList<>(MAPPED_TABLES);
-        expected.add(UNMAPPED_V2_TABLE);
         expected.add("flyway_schema_history");
         assertThat(tables).containsExactlyInAnyOrderElementsOf(expected);
     }

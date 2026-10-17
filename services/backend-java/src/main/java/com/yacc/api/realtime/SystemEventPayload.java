@@ -27,6 +27,9 @@ public record SystemEventPayload(
 
     /** Frozen {@code type} member values (system-payload.schema.json). */
     public static final String TYPE_CONNECTION_ESTABLISHED = "connection_established";
+    public static final String TYPE_HEARTBEAT = "heartbeat";
+    public static final String TYPE_RECONNECTION = "reconnection";
+    public static final String TYPE_BACKLOG_REPLAY = "backlog_replay";
     public static final String TYPE_ERROR = "error";
 
     /** System event without error detail (heartbeat/established/…). */
