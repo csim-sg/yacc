@@ -68,6 +68,9 @@ class WebSocketBacklogReplayIntegrationTest extends AbstractPostgresIntegrationT
     private WebSocketBacklogService backlog;
 
     @Autowired
+    private WebSocketReconnectService reconnects;
+
+    @Autowired
     private WebSocketBacklogRepository backlogRows;
 
     private final ObjectMapper reader = new ObjectMapper();
@@ -110,6 +113,7 @@ class WebSocketBacklogReplayIntegrationTest extends AbstractPostgresIntegrationT
                 envelope("message.received", text("conversation-scope")));
 
         firstSession.close();
+        awaitDisconnectRecorded();
 
         CollectingHandler reconnect = new CollectingHandler();
         WebSocketSession secondSession = connect(reconnect, token);
@@ -137,6 +141,15 @@ class WebSocketBacklogReplayIntegrationTest extends AbstractPostgresIntegrationT
         seedUser();
         String token = accessToken();
 
+        // Own connect/close cycle so the reconnect marker is deterministic
+        // regardless of test-method order (the close callback records the
+        // disconnect this method's reconnect is recognized by).
+        CollectingHandler first = new CollectingHandler();
+        WebSocketSession firstSession = connect(first, token);
+        first.nextFrame("system.connection.established");
+        firstSession.close();
+        awaitDisconnectRecorded();
+
         backlogRows.save(new com.yacc.entity.WebSocketBacklogEntry(USER_ID,
                 "message.received", null, "{\"text\":\"expired\"}",
                 LocalDateTime.now().minusHours(2), LocalDateTime.now().minusMinutes(5)));
@@ -160,6 +173,20 @@ class WebSocketBacklogReplayIntegrationTest extends AbstractPostgresIntegrationT
         return users.save(new User(USER_ID, "ws-backlog-" + USER_ID + "@fixture.yacc.local",
                 "WS Backlog Fixture", "backlog-has-no-login", UserRole.USER,
                 UserStatus.ACTIVE, false));
+    }
+
+    /**
+     * Waits until the server-side close callback has recorded the disconnect
+     * (the reconnect marker depends on it) — deterministic under any close
+     * handshake vs new-upgrade timing.
+     */
+    private void awaitDisconnectRecorded() throws Exception {
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < deadline && !reconnects.isReconnect(USER_ID)) {
+            Thread.sleep(50);
+        }
+        assertThat(reconnects.isReconnect(USER_ID))
+                .as("server-observed disconnect recorded within the timeout").isTrue();
     }
 
     private String accessToken() {

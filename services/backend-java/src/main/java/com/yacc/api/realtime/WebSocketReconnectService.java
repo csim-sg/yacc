@@ -112,7 +112,13 @@ public class WebSocketReconnectService {
         }
     }
 
-    private boolean isReconnect(String userId) {
+    /**
+     * Server-observed reconnect decision for the user: a recorded disconnect
+     * within the policy window. Package-visible so the reconnect behavior
+     * tests can wait for the close callback to record the disconnect before
+     * re-establishing a session (no test polls on transport internals).
+     */
+    boolean isReconnect(String userId) {
         Long lastDisconnectedAt = lastDisconnectedAtByUserId.get(userId);
         return lastDisconnectedAt != null && System.currentTimeMillis() - lastDisconnectedAt
                 <= properties.reconnect().maxDelayMs();
