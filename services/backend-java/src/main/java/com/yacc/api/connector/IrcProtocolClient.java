@@ -1,10 +1,11 @@
 package com.yacc.api.connector;
 
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -37,6 +38,18 @@ import org.slf4j.LoggerFactory;
  *       silence (baseline {@code ping_interval: 60} parity).</li>
  * </ul>
  *
+ * <p><b>Injection guard:</b> client-supplied protocol fields (password,
+ * nick, channels, outbound recipients) are validated with
+ * {@link #isSafeProtocolParam} before any write, and {@code sendLine}
+ * re-checks the single-line rule at the write boundary — a CR or LF inside
+ * a field would otherwise terminate the line early and let one call inject
+ * additional IRC commands on the authenticated connection.</p>
+ *
+ * <p><b>Bounded inbound framing:</b> inbound lines are framed at
+ * {@link #MAX_LINE_OCTETS} octets (RFC 1459 §2.3 line budget). A peer that
+ * streams an oversized or unterminated line violates the framing — the
+ * connection is dropped instead of being buffered without bound.</p>
+ *
  * <p>Instances are per-connection (baseline {@code IRCClient} parity):
  * created by {@link IrcConnector} per attempt, never a Spring bean. The
  * reader runs on one daemon thread; writes are serialized. TLS/SASL/IRCv3
@@ -54,6 +67,14 @@ public class IrcProtocolClient implements Closeable {
     /** Client PING after ~60s of silence (baseline ping_interval parity). */
     private static final int PING_AFTER_IDLE_TICKS = 60;
 
+    /**
+     * Bounded inbound framing budget (RFC 1459 §2.3: one IRC message is at
+     * most 512 octets including the CRLF terminator). An inbound line whose
+     * payload reaches this budget without a terminator — terminated or not —
+     * is a framing violation and fails the connection.
+     */
+    static final int MAX_LINE_OCTETS = 512;
+
     private final String host;
     private final int port;
     private final int connectTimeoutMs;
@@ -61,10 +82,38 @@ public class IrcProtocolClient implements Closeable {
     private final Consumer<IrcProtocolClient> connectionLost;
 
     private Socket socket;
-    private BufferedReader reader;
+    private InputStream input;
     private BufferedWriter writer;
+    /** Partially read inbound line (allocation bounded by the octet budget). */
+    private final ByteArrayOutputStream lineBuffer = new ByteArrayOutputStream();
     private volatile boolean closed;
     private Thread readerThread;
+
+    /**
+     * {@code true} when the value is safe to write as one IRC protocol
+     * parameter: non-empty and free of CR, LF, NUL and spaces — any of
+     * which would terminate or split the protocol line and allow command
+     * injection (review-loop P1). The connector validates stored config
+     * fields with this same rule before connecting; {@code sendLine}
+     * enforces the single-line rule again at the write boundary.
+     *
+     * @param value candidate protocol field value (password, nick, channel,
+     *              outbound recipient)
+     * @return {@code false} when null/empty or when it contains
+     *         {@code \r}, {@code \n}, {@code \0} or a space
+     */
+    public static boolean isSafeProtocolParam(String value) {
+        if (value == null || value.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '\r' || c == '\n' || c == '\0' || c == ' ') {
+                return false;
+            }
+        }
+        return true;
+    }
 
     /**
      * Creates an unconnected client.
@@ -100,12 +149,16 @@ public class IrcProtocolClient implements Closeable {
      *         registration (carries the IRC numeric, e.g. {@code 464}
      *         password mismatch, {@code 433} nick in use)
      * @throws IOException on transport failure, server-side close during
-     *         registration, or deadline expiry
+     *         registration, deadline expiry, or a protocol field that fails
+     *         the {@link #isSafeProtocolParam} injection guard (nothing is
+     *         written in that case)
      */
     public void register(String nick, String password, int registrationTimeoutMs)
             throws IOException {
+        requireSafeParam(nick, "nick");
         connectSocket();
         if (password != null && !password.isBlank()) {
+            requireSafeParam(password, "password");
             sendLine("PASS " + password);
         }
         sendLine("NICK " + nick);
@@ -113,15 +166,28 @@ public class IrcProtocolClient implements Closeable {
         awaitRegistered(nick, registrationTimeoutMs);
     }
 
-    /** Joins the given channels (baseline: after registration only). */
+    /**
+     * Joins the given channels (baseline: after registration only).
+     *
+     * @throws IOException when a channel fails the
+     *         {@link #isSafeProtocolParam} injection guard (nothing is
+     *         written for it) or the transport fails
+     */
     public void join(Collection<String> channels) throws IOException {
         for (String channel : channels) {
+            requireSafeParam(channel, "channel");
             sendLine("JOIN " + channel);
         }
     }
 
-    /** Sends one sanitized chat message (baseline {@code say} parity). */
+    /**
+     * Sends one sanitized chat message (baseline {@code say} parity). The
+     * target must pass the {@link #isSafeProtocolParam} injection guard;
+     * the message text is a trailing parameter (spaces allowed) whose
+     * single-line property is enforced by the {@code sendLine} boundary.
+     */
     public void privmsg(String target, String text) throws IOException {
+        requireSafeParam(target, "recipient");
         sendLine("PRIVMSG " + target + " :" + text);
     }
 
@@ -133,7 +199,9 @@ public class IrcProtocolClient implements Closeable {
     /**
      * Starts the daemon reader loop (after successful registration): parses
      * every line, answers {@code PING}, surfaces everything else to the
-     * consumer, and reports the lost connection exactly once.
+     * consumer, and reports the lost connection exactly once. A framing
+     * violation (oversized/unterminated inbound line) reports the
+     * connection as lost like any other transport failure.
      */
     public synchronized void startReader() {
         if (closed || readerThread != null) {
@@ -162,8 +230,7 @@ public class IrcProtocolClient implements Closeable {
         created.connect(new InetSocketAddress(host, port), connectTimeoutMs);
         created.setTcpNoDelay(true);
         this.socket = created;
-        this.reader = new BufferedReader(
-                new InputStreamReader(created.getInputStream(), StandardCharsets.UTF_8));
+        this.input = new BufferedInputStream(created.getInputStream());
         this.writer = new BufferedWriter(
                 new OutputStreamWriter(created.getOutputStream(), StandardCharsets.UTF_8));
     }
@@ -177,7 +244,12 @@ public class IrcProtocolClient implements Closeable {
                         "Connection timeout: did not receive registered event");
             }
             socket.setSoTimeout((int) Math.min(remainingMs, Integer.MAX_VALUE));
-            String raw = readLine();
+            String raw;
+            try {
+                raw = readBoundedLine();
+            } catch (SocketTimeoutException tick) {
+                continue; // deadline re-checked at the top of the loop
+            }
             if (raw == null) {
                 throw new IOException("Connection closed by server");
             }
@@ -207,7 +279,7 @@ public class IrcProtocolClient implements Closeable {
             while (!closed) {
                 String raw;
                 try {
-                    raw = reader.readLine();
+                    raw = readBoundedLine();
                 } catch (SocketTimeoutException tick) {
                     idleTicks++;
                     if (idleTicks >= PING_AFTER_IDLE_TICKS) {
@@ -249,20 +321,71 @@ public class IrcProtocolClient implements Closeable {
         }
     }
 
-    /** One serialized protocol write (reader PONGs and sends share it). */
+    /**
+     * Reads one inbound line with bounded framing: LF terminates (one
+     * optional preceding CR is stripped), the partial-line buffer survives
+     * {@link SocketTimeoutException} ticks, and a line that reaches the
+     * {@link #MAX_LINE_OCTETS} budget without a terminator — terminated or
+     * not — is a framing violation that fails the connection (P2: no
+     * unbounded allocation). At EOF the unterminated remainder within the
+     * budget is returned as the final line, then {@code null} afterwards.
+     */
+    private String readBoundedLine() throws IOException {
+        while (true) {
+            int b = input.read();
+            if (b == -1) {
+                byte[] remainder = lineBuffer.toByteArray();
+                lineBuffer.reset();
+                if (remainder.length == 0) {
+                    return null;
+                }
+                return new String(remainder, StandardCharsets.UTF_8);
+            }
+            if (b == '\n') {
+                byte[] bytes = lineBuffer.toByteArray();
+                lineBuffer.reset();
+                int end = bytes.length > 0 && bytes[bytes.length - 1] == '\r'
+                        ? bytes.length - 1
+                        : bytes.length;
+                return new String(bytes, 0, end, StandardCharsets.UTF_8);
+            }
+            if (lineBuffer.size() >= MAX_LINE_OCTETS) {
+                lineBuffer.reset();
+                throw new IOException("IRC framing violation: line exceeds the "
+                        + MAX_LINE_OCTETS + "-octet protocol limit");
+            }
+            lineBuffer.write(b);
+        }
+    }
+
+    /**
+     * One serialized protocol write (reader PONGs and sends share it). The
+     * single-line check is the last-resort injection boundary (P1): even a
+     * caller that bypassed field validation can never emit a CR or LF, so
+     * one call can never write more than one protocol line.
+     */
     private synchronized void sendLine(String line) throws IOException {
         if (closed || writer == null) {
             throw new IOException("IRC connection is not open");
         }
-        writer.write(line + "\r\n");
+        if (line.indexOf('\r') >= 0 || line.indexOf('\n') >= 0) {
+            throw new IOException(
+                    "IRC protocol violation: refusing to write a line containing CR/LF");
+        }
+        writer.write(line);
+        writer.write("\r\n");
         writer.flush();
     }
 
-    private String readLine() throws IOException {
-        try {
-            return reader.readLine();
-        } catch (SocketTimeoutException timeout) {
-            return ""; // deadline tick — the caller re-checks the budget
+    /**
+     * Validates one protocol field before it is ever written. The offending
+     * value is deliberately never echoed: protocol fields can carry
+     * credential material, and multi-line payloads must not reach the log.
+     */
+    private static void requireSafeParam(String value, String field) throws IOException {
+        if (!isSafeProtocolParam(value)) {
+            throw new IOException("IRC " + field
+                    + " contains characters that are not allowed in a protocol parameter");
         }
     }
 

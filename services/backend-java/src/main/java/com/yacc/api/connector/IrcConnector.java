@@ -182,8 +182,10 @@ public class IrcConnector {
         }
         String channel = extractChannel(request.recipientId());
         if (channel == null) {
+            // The echoed recipient is sanitized: raw CR/LF must not reach
+            // the surfaced error (log forging).
             return failureResult("sendMessage", ConnectorErrorCode.UNKNOWN_ERROR,
-                    "Invalid IRC channel format: " + request.recipientId());
+                    "Invalid IRC channel format: " + sanitizeMessage(request.recipientId()));
         }
         try {
             client.privmsg(channel, sanitizeMessage(request.body()));
@@ -433,8 +435,15 @@ public class IrcConnector {
     // --- baseline parity helpers ---
 
     /**
-     * Baseline {@code validatePlatformConfig} parity: server/nick required,
-     * port 1..65535 required, at least one {@code #}-prefixed channel.
+     * Baseline {@code validatePlatformConfig} parity (server/nick required,
+     * port 1..65535 required, at least one {@code #}-prefixed channel) plus
+     * the protocol-parameter injection guard (review-loop P1): every field
+     * that reaches a protocol line — server, nick, password, channels —
+     * must pass {@link IrcProtocolClient#isSafeProtocolParam} (no CR, LF,
+     * NUL or spaces), so a stored credential or channel can never inject
+     * additional IRC commands during registration/join. The client
+     * re-checks the same rule and the single-line property at the write
+     * boundary (defense in depth).
      *
      * @return the first validation error message, or null when valid
      */
@@ -442,8 +451,14 @@ public class IrcConnector {
         if (config.server() == null || config.server().isBlank()) {
             return "Server is required";
         }
+        if (!IrcProtocolClient.isSafeProtocolParam(config.server())) {
+            return "Server contains characters that are not allowed in a protocol field";
+        }
         if (config.nick() == null || config.nick().isBlank()) {
             return "Nick is required";
+        }
+        if (!IrcProtocolClient.isSafeProtocolParam(config.nick())) {
+            return "Nick contains characters that are not allowed in a protocol parameter";
         }
         if (config.port() < 1 || config.port() > 65535) {
             return "Port must be a number between 1 and 65535";
@@ -452,15 +467,29 @@ public class IrcConnector {
             return "At least one channel is required";
         }
         for (String channel : config.channels()) {
-            if (channel == null || !channel.startsWith("#")) {
+            // Safety first, so the baseline format message below never
+            // echoes a multi-line value into the surfaced error.
+            if (!IrcProtocolClient.isSafeProtocolParam(channel)) {
+                return "Channel contains characters that are not allowed in a protocol parameter";
+            }
+            if (!channel.startsWith("#")) {
                 return "Invalid channel format: " + channel + ". Channels must start with #";
             }
+        }
+        if (config.password() != null && !config.password().isBlank()
+                && !IrcProtocolClient.isSafeProtocolParam(config.password())) {
+            // Never echo the offending value: it can carry credential
+            // material or an injected command payload.
+            return "Password contains characters that are not allowed in a protocol parameter";
         }
         return null;
     }
 
     /**
-     * Baseline recipient parity: {@code irc:#channel} or {@code #channel}.
+     * Baseline recipient parity: {@code irc:#channel} or {@code #channel},
+     * additionally guarded by {@link IrcProtocolClient#isSafeProtocolParam}
+     * so a recipient containing CR/LF/NUL/space is rejected before any
+     * {@code PRIVMSG} is composed (command-injection guard).
      *
      * @return the channel, or null when the recipient format is invalid
      */
@@ -470,9 +499,13 @@ public class IrcConnector {
         }
         if (recipientId.startsWith("irc:")) {
             String channel = recipientId.substring("irc:".length());
-            return channel.startsWith("#") ? channel : null;
+            return channel.startsWith("#") && IrcProtocolClient.isSafeProtocolParam(channel)
+                    ? channel
+                    : null;
         }
-        return recipientId.startsWith("#") ? recipientId : null;
+        return recipientId.startsWith("#") && IrcProtocolClient.isSafeProtocolParam(recipientId)
+                ? recipientId
+                : null;
     }
 
     /**

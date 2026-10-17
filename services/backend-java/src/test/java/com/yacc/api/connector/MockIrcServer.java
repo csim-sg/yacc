@@ -84,6 +84,21 @@ final class MockIrcServer implements Closeable {
         }
     }
 
+    /**
+     * Writes raw bytes with no line terminator (bounded-framing tests:
+     * oversized/unterminated inbound lines).
+     */
+    void sendRaw(String raw) throws IOException {
+        BufferedWriter writer = out;
+        if (writer == null) {
+            throw new IOException("mock IRC server has no connected client");
+        }
+        synchronized (writer) {
+            writer.write(raw);
+            writer.flush();
+        }
+    }
+
     /** Drops the current client connection (connection-loss simulation). */
     void dropClient() {
         Socket current = connection;

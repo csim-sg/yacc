@@ -301,6 +301,70 @@ class IrcConnectorTest {
         assertThat(surfaced.message()).contains("not connected");
     }
 
+    // --- protocol-field injection guard (review-loop P1) ---
+
+    @Test
+    void connectWithInjectedPasswordFailsValidationWithoutReachingTheServer() throws Exception {
+        server = new MockIrcServer();
+        when(resolver.resolve()).thenReturn(Optional.of(new IrcConnectionConfig(
+                "127.0.0.1", server.port(), "yaccbot", "s3cret\r\nPRIVMSG #evil :pwned",
+                List.of("#test"), 7)));
+
+        assertThatThrownBy(connector::connect)
+                .isInstanceOf(ConnectorException.class)
+                .satisfies(failure -> assertThat(
+                        ((ConnectorException) failure).getError().code())
+                        .isEqualTo(ConnectorErrorCode.UNKNOWN_ERROR));
+
+        // Nothing may reach the wire — not the injected command, and not
+        // even the registration burst that would follow the bad PASS.
+        assertThat(server.receivedLines()).isEmpty();
+        assertThat(server.receivedAnyContaining("PRIVMSG #evil")).isFalse();
+        ConnectorAdapterError surfaced = singleSurfacedError();
+        assertThat(surfaced.message()).contains("IRC validation error");
+        // The credential/injected payload must never be echoed.
+        assertThat(surfaced.message()).doesNotContain("s3cret").doesNotContain("PRIVMSG");
+    }
+
+    @Test
+    void connectWithInjectedChannelFailsValidationWithoutReachingTheServer() throws Exception {
+        server = new MockIrcServer();
+        resolveTo(server, null, List.of("#test\r\nPRIVMSG #evil :x"));
+
+        assertThatThrownBy(connector::connect)
+                .isInstanceOf(ConnectorException.class)
+                .satisfies(failure -> assertThat(
+                        ((ConnectorException) failure).getError().code())
+                        .isEqualTo(ConnectorErrorCode.UNKNOWN_ERROR));
+
+        assertThat(server.receivedLines()).isEmpty();
+        assertThat(server.receivedAnyContaining("PRIVMSG #evil")).isFalse();
+        ConnectorAdapterError surfaced = singleSurfacedError();
+        assertThat(surfaced.message()).contains("IRC validation error");
+        assertThat(surfaced.message()).doesNotContain("\r").doesNotContain("\n");
+    }
+
+    @Test
+    void sendMessageWithInjectedRecipientFailsTypedWithoutReachingTheServer() throws Exception {
+        server = new MockIrcServer();
+        server.autoRegister();
+        resolveTo(server, null, List.of("#test"));
+        connector.connect();
+        int linesBefore = server.receivedLines().size();
+
+        ConnectorSendResult result = connector.sendMessage(new ConnectorOutboundMessage(
+                "conv-1", "irc:#test\r\nPRIVMSG #evil :x", "hi", null));
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.error().code()).isEqualTo(ConnectorErrorCode.UNKNOWN_ERROR);
+        assertThat(result.error().message()).contains("Invalid IRC channel format");
+        // The surfaced error must not carry the raw multi-line recipient.
+        assertThat(result.error().message()).doesNotContain("\r").doesNotContain("\n");
+        assertThat(server.receivedLines()).hasSize(linesBefore);
+        assertThat(server.receivedAnyContaining("PRIVMSG #evil")).isFalse();
+        verify(errorHook, times(1)).onAdapterError(any());
+    }
+
     // --- inbound seam (baseline message/join/part/quit parity) ---
 
     @Test
