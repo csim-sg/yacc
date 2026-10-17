@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yacc/ws/notification.schema.json",
+  "title": "notification payload",
+  "description": "SPEC-002 MIG-002 capture @98db628. Baseline: NotificationPayload in packages/common/src/websocket/types/NotificationPayload.type.ts (contract type for notification.received/read/deleted).",
+  "type": "object",
+  "required": ["id", "userId", "type", "conversationId", "actorId", "actorName", "message", "isRead", "createdAt"],
+  "properties": {
+    "id": {"type": "string", "format": "uuid"},
+    "userId": {"type": "string", "format": "uuid"},
+    "type": {"type": "string", "enum": ["assignment", "mention", "system"]},
+    "conversationId": {"type": "string", "format": "uuid"},
+    "actorId": {"type": "string"},
+    "actorName": {"type": "string"},
+    "message": {"type": "string"},
+    "isRead": {"type": "boolean"},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "metadata": {"type": "object", "additionalProperties": true}
+  }
+}

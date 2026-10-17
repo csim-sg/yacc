@@ -1,120 +1,79 @@
 /**
- * Zod Schemas for API Responses
+ * Frontend runtime contract layer (MIG-041; SPEC-002 AC-02/AC-07; ADR-023).
  *
- * Type-safe runtime validation for all API responses
- * Provides both validation AND TypeScript type inference
+ * Zod validators for API responses, each BOUND to the generated contract
+ * types in `../api/contract/rest-api.gen.ts` (generated from the frozen
+ * `.docs/migration/openapi.yaml`). The generated types are the single
+ * contract source — this module adds runtime validation only and re-derives
+ * no shape of its own, so wire-shape drift fails `pnpm type-check`.
  *
- * Key Benefits:
- * - Runtime validation (ensures API returns expected shape)
- * - Type inference via z.infer<> (eliminates manual type defs)
- * - Clear error messages if validation fails
- * - Single source of truth for API types
- *
- * Usage:
- * ```typescript
- * // Type inference
- * type Conversation = z.infer<typeof ConversationSchema>;
- *
- * // Validation
- * const conversation = ConversationSchema.parse(apiResponse);
- * ```
+ * ADR-023 supersedes ADR-020: `@yacc/common` Zod is never imported here and
+ * no hand-declared interface backs these schemas.
  */
 
 import { z } from 'zod';
 import { logger } from '../lib/logger';
+import type { components } from './contract/rest-api.gen';
+
+type Schemas = components['schemas'];
 
 /**
- * User Schema
- * Represents authenticated user information
+ * User Schema — contract component `UserResponse`
+ * (uuid id, lowercase role/status, ISO date-time strings).
  */
-export const UserSchema = z.object({
+export const UserSchema: z.ZodType<Schemas['UserResponse']> = z.object({
   id: z.string().uuid('Invalid user ID format'),
   email: z.string().email('Invalid email format'),
   name: z.string(),
   role: z.enum(['super_admin', 'admin', 'manager', 'user']),
   status: z.enum(['active', 'inactive', 'suspended']),
-  emailVerified: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  deletedAt: z.string().nullable().optional(),
+});
+
+export type User = Schemas['UserResponse'];
+
+/**
+ * Message Schema — contract component `Message`
+ * (`senderId`/`senderName`, nullable metadata, no client-side `sender`
+ * object and no attachments member — the frozen contract is the shape).
+ */
+export const MessageSchema: z.ZodType<Schemas['Message']> = z.object({
+  id: z.string().uuid(),
+  conversationId: z.string().uuid(),
+  senderId: z.string().nullable(),
+  senderName: z.string(),
+  body: z.string(),
+  status: z.enum(['pending', 'sent', 'failed']),
+  direction: z.enum(['inbound', 'outbound']),
+  externalMessageId: z.string().optional(),
+  metadata: z.record(z.unknown()).nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 
-export type User = z.infer<typeof UserSchema>;
+export type Message = Schemas['Message'];
 
 /**
- * Sender Schema (subset of User for messages)
- * Lightweight version used in message objects
+ * Conversation Schema — contract component `Conversation`
+ * (four canonical members, `additionalProperties: true` on the wire, so the
+ * validator passes unknown members through instead of stripping them).
  */
-export const SenderSchema = z.object({
-  id: z.string().uuid(),
-  email: z.string().email(),
-  name: z.string().nullable().optional(),
-});
+export const ConversationSchema: z.ZodType<Schemas['Conversation']> = z
+  .object({
+    id: z.string().uuid().optional(),
+    status: z.enum(['open', 'pending', 'resolved']).optional(),
+    priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
+    assignedUserId: z.string().nullable().optional(),
+  })
+  .passthrough();
 
-export type Sender = z.infer<typeof SenderSchema>;
-
-/**
- * Attachment Schema
- * File attachment on a message
- */
-export const AttachmentSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string(),
-  type: z.string(), // MIME type
-  size: z.number().int().positive(),
-  url: z.string().url('Invalid attachment URL'),
-  storageKey: z.string().optional(), // R2 storage key
-  uploadedAt: z.string().datetime().transform((date) => new Date(date)),
-});
-
-export type Attachment = z.infer<typeof AttachmentSchema>;
+export type Conversation = Schemas['Conversation'];
 
 /**
- * Message Schema
- * Individual message in a conversation
- */
-export const MessageSchema = z.object({
-  id: z.string().uuid(),
-  conversationId: z.string().uuid(),
-  sender: SenderSchema,
-  senderId: z.string().uuid(),
-  body: z.string().min(1, 'Message body cannot be empty'),
-  status: z.enum(['pending', 'sent', 'failed']),
-  direction: z.enum(['inbound', 'outbound']),
-  attachments: z.array(AttachmentSchema).optional().default([]),
-  createdAt: z.string().datetime().transform((date) => new Date(date)),
-  updatedAt: z.string().datetime().transform((date) => new Date(date)),
-});
-
-export type Message = z.infer<typeof MessageSchema>;
-
-/**
- * Conversation Schema
- * Main conversation (group/channel/DM)
- */
-export const ConversationSchema = z.object({
-  id: z.string().uuid(),
-  channel: z.enum(['telegram', 'irc', 'whatsapp', 'wechat', 'meta', 'x']),
-  externalThreadId: z.string(), // ID from external platform
-  status: z.enum(['open', 'pending', 'resolved']),
-  priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
-  title: z.string().optional(), // Group/channel name
-  assignedUserId: z.string().uuid().nullable().optional(),
-  assignedUser: UserSchema.nullable().optional(),
-  tags: z.array(z.string()).optional().default([]),
-  unreadCount: z.number().int().nonnegative().optional().default(0),
-  lastMessage: MessageSchema.nullable().optional(),
-  lastMessageAt: z.string().datetime().transform((date) => new Date(date)).nullable().optional(),
-  createdAt: z.string().datetime().transform((date) => new Date(date)),
-  updatedAt: z.string().datetime().transform((date) => new Date(date)),
-  closedAt: z.string().datetime().transform((date) => new Date(date)).nullable().optional(),
-  reopenedAt: z.string().datetime().transform((date) => new Date(date)).nullable().optional(),
-});
-
-export type Conversation = z.infer<typeof ConversationSchema>;
-
-/**
- * Paginated Response Schema
- * Generic schema for paginated API responses
+ * Paginated Response Schema — the frozen `BaseListResponse` envelope
+ * `{data, page, limit, total}` (1-indexed page; REST-XSRV-001).
  *
  * Usage:
  * ```typescript
@@ -124,84 +83,70 @@ export type Conversation = z.infer<typeof ConversationSchema>;
 export function PaginatedSchema<T extends z.ZodTypeAny>(itemSchema: T) {
   return z.object({
     data: z.array(itemSchema),
-    pagination: z.object({
-      page: z.number().int().positive(),
-      limit: z.number().int().positive(),
-      total: z.number().int().nonnegative(),
-      totalPages: z.number().int().nonnegative(),
-      hasMore: z.boolean(),
-    }),
+    page: z.number().int(),
+    limit: z.number().int(),
+    total: z.number().int(),
   });
 }
 
 /**
  * Conversations List Response
- * GET /api/conversations (with pagination)
+ * GET /api/conversations (BaseListResponse of Conversation)
  */
 export const ConversationsListSchema = PaginatedSchema(ConversationSchema);
 export type ConversationsList = z.infer<typeof ConversationsListSchema>;
 
 /**
  * Messages List Response
- * GET /api/conversations/:id/messages (with pagination)
+ * GET /api/conversations/:id/messages — contract component
+ * `MessageListResponse` (custom shape, deliberately NOT BaseListResponse).
  */
-export const MessagesListSchema = PaginatedSchema(MessageSchema);
-export type MessagesList = z.infer<typeof MessagesListSchema>;
-
-/**
- * API Response Envelope
- * Wraps successful API responses
- */
-export const ApiResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
+export const MessagesListSchema: z.ZodType<Schemas['MessageListResponse']> =
   z.object({
-    data: dataSchema,
-    meta: z.object({
-      requestId: z.string().optional(),
-      timestamp: z.string().datetime().optional(),
-    }).optional(),
+    messages: z.array(MessageSchema),
+    total: z.number().int(),
+    page: z.number().int(),
+    limit: z.number().int(),
   });
 
+export type MessagesList = Schemas['MessageListResponse'];
+
 /**
- * Mutation Response Schemas
+ * Mutation Response Schemas — each mirrors its frozen operation's 2xx
+ * envelope (`{data: …}`).
  */
 
 /**
  * Send Message Response
- * POST /api/conversations/:id/messages
+ * POST /api/conversations/:id/messages → 201 `{data: Message}`
  */
 export const SendMessageResponseSchema = z.object({
-  id: z.string().uuid(),
-  conversationId: z.string().uuid(),
-  status: z.enum(['pending', 'sent', 'failed']),
-  createdAt: z.string().datetime().transform((date) => new Date(date)),
+  data: MessageSchema,
 });
 
 export type SendMessageResponse = z.infer<typeof SendMessageResponseSchema>;
 
 /**
  * Update Conversation Status Response
- * PATCH /api/conversations/:id/status
+ * PATCH /api/conversations/:id/status → 200 `{data: Conversation}`
  */
 export const UpdateStatusResponseSchema = z.object({
-  id: z.string().uuid(),
-  status: z.enum(['open', 'pending', 'resolved']),
-  updatedAt: z.string().datetime().transform((date) => new Date(date)),
+  data: ConversationSchema,
 });
 
 export type UpdateStatusResponse = z.infer<typeof UpdateStatusResponseSchema>;
 
 /**
  * Assign Conversation Response
- * PATCH /api/conversations/:id/assign
+ * PATCH /api/conversations/:id/assign → 200 `{data: Conversation}`
  */
 export const AssignConversationResponseSchema = z.object({
-  id: z.string().uuid(),
-  assignedUserId: z.string().uuid().nullable(),
-  assignedUser: UserSchema.nullable().optional(),
-  updatedAt: z.string().datetime().transform((date) => new Date(date)),
+  data: ConversationSchema,
 });
 
-export type AssignConversationResponse = z.infer<typeof AssignConversationResponseSchema>;
+export type AssignConversationResponse = z.infer<
+  typeof AssignConversationResponseSchema
+>;
 
 /**
  * Safe Parse Helpers

@@ -11,12 +11,12 @@
  * - Self-modification prevention
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { UsersTable } from '../UsersTable';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useRoles } from '../../../hooks/useUsers';
 import type { UserDTO, ListUsersResponse, ListRolesResponse } from '../../../types/user.types';
+import { UsersTable } from '../UsersTable';
 
 // Mock the hooks
 vi.mock('../../../hooks/useUsers');
@@ -36,7 +36,7 @@ const mockedUseUpdateUser = vi.mocked(useUpdateUser);
 const mockedUseDeleteUser = vi.mocked(useDeleteUser);
 const mockedUseRoles = vi.mocked(useRoles);
 
-// Sample data
+// Sample data (frozen contract `UserResponse` shapes: ISO date-time strings)
 const mockUsers: UserDTO[] = [
   {
     id: 'user-1',
@@ -44,8 +44,8 @@ const mockUsers: UserDTO[] = [
     name: 'Admin User',
     role: 'super_admin',
     status: 'active',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
   },
   {
     id: 'user-2',
@@ -53,8 +53,8 @@ const mockUsers: UserDTO[] = [
     name: 'Manager User',
     role: 'manager',
     status: 'active',
-    createdAt: new Date('2024-01-02'),
-    updatedAt: new Date('2024-01-02'),
+    createdAt: '2024-01-02T00:00:00.000Z',
+    updatedAt: '2024-01-02T00:00:00.000Z',
   },
   {
     id: 'user-3',
@@ -62,8 +62,8 @@ const mockUsers: UserDTO[] = [
     name: 'Regular User',
     role: 'user',
     status: 'inactive',
-    createdAt: new Date('2024-01-03'),
-    updatedAt: new Date('2024-01-03'),
+    createdAt: '2024-01-03T00:00:00.000Z',
+    updatedAt: '2024-01-03T00:00:00.000Z',
   },
 ];
 
@@ -97,9 +97,11 @@ describe('UsersTable', () => {
     // Default mock implementations
     mockedUseUsers.mockReturnValue({
       data: {
-        users: mockUsers,
-        pagination: { total: 3, page: 1, limit: 20, totalPages: 1 },
-      } as ListUsersResponse,
+        data: mockUsers,
+        page: 1,
+        limit: 20,
+        total: 3,
+      } satisfies ListUsersResponse,
       isLoading: false,
       error: null,
       refetch: vi.fn(),
@@ -203,8 +205,10 @@ describe('UsersTable', () => {
     it('should show empty state when no users', () => {
       mockedUseUsers.mockReturnValue({
         data: {
-          users: [],
-          pagination: { total: 0, page: 1, limit: 20, totalPages: 0 },
+          data: [],
+          page: 1,
+          limit: 20,
+          total: 0,
         },
         isLoading: false,
         error: null,

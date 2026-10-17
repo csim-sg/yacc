@@ -15,8 +15,8 @@
  */
 
 import type { FC } from 'react';
-import { MessageStatus } from '../MessageStatus';
 import type { Message } from '../../api/schemas';
+import { MessageStatus } from '../MessageStatus';
 
 interface TimelineMessageProps {
   message: Message;
@@ -36,7 +36,7 @@ export const TimelineMessage: FC<TimelineMessageProps> = ({
   className = '',
   onRetryMessage,
 }) => {
-  const senderName = message.sender?.name || 'Unknown User';
+  const senderName = message.senderName || 'Unknown User';
   const senderInitial = senderName?.charAt(0).toUpperCase() || '?';
 
   return (
@@ -65,15 +65,10 @@ export const TimelineMessage: FC<TimelineMessageProps> = ({
               {senderName}
             </span>
             <span className="text-xs text-base-content/50">
-              {message.createdAt instanceof Date
-                ? message.createdAt.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : new Date(message.createdAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+              {new Date(message.createdAt).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
             </span>
           </div>
         )}

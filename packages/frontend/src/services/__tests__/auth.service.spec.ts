@@ -15,7 +15,6 @@ const SESSION_RESPONSE = {
     name: 'System Administrator',
     role: 'super_admin',
     status: 'active',
-    emailVerified: true,
     createdAt: '2026-09-27T08:00:00',
     updatedAt: '2026-09-27T08:00:00',
   },
