@@ -15,15 +15,20 @@ import java.util.UUID;
  * {@link QueueRetryConfig} wires a documented no-op default that reports
  * NOT delivered (fail-closed: a no-op must never mark anything delivered).</p>
  *
- * <p><b>Delivery guarantee — at-least-once:</b> the frozen contract has no
- * consumer acknowledgement, so the worker cannot promise exactly-once
- * delivery and does not claim to. A crash between a {@code deliver} call
- * and the worker's durable outcome write is resolved by re-delivering the
- * message under the next attempt number (the worker persists the durable
- * attempt claim before calling this seam), so implementers must tolerate
- * repeated calls for the same {@code messageId} — collapsing duplicates by
- * messageId at the delivery target is the implementer's idempotence
- * boundary. Loss is never traded for a duplicate.</p>
+ * <p><b>Delivery guarantee — at-least-once, no exactly-once claim:</b> the
+ * frozen contract has no consumer acknowledgement, so the worker cannot
+ * promise exactly-once delivery and does not claim to. Duplicates arise
+ * from a <em>started</em> attempt whose outcome was never recorded: the
+ * invocation-start marker is the last durable write before the
+ * {@code deliver} call, so recovery consumes that attempt conservatively
+ * and re-delivers under the next attempt number. An unstarted claim (a
+ * crash before the invocation began) is never consumed — it is released
+ * and re-delivered under the SAME attempt number, so a delivery can never
+ * be silently skipped on the last ladder step either. Implementers must
+ * therefore tolerate repeated {@code deliver} calls for the same
+ * {@code messageId} — collapsing duplicates by messageId at the delivery
+ * target is the implementer's idempotence boundary. Loss is never traded
+ * for a duplicate.</p>
  */
 @FunctionalInterface
 public interface RetryDeliveryHandler {

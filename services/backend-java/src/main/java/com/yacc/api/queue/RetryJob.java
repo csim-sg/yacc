@@ -18,9 +18,12 @@ import org.quartz.JobExecutionContext;
  * {@code SpringBeanJobFactory}, whose {@code createBean} resolves the single
  * constructor from the context — constructor DI preserved (ARCH-004 §2).</p>
  *
- * <p>{@link DisallowConcurrentExecution @DisallowConcurrentExecution} keeps
- * one cycle from racing itself (re-entrancy guard); the cross-job worker
- * concurrency is the Quartz thread pool (5, baseline parity).</p>
+ * <p>{@link DisallowConcurrentExecution @DisallowConcurrentExecution} is
+ * load-bearing for the claim/invocation protocol: it keeps the intermediate
+ * claim-without-start state from being observed by the marker poll while a
+ * firing is in flight (the poll additionally no-ops while the fired
+ * trigger is still present); the cross-job worker concurrency is the
+ * Quartz thread pool (5, baseline parity).</p>
  */
 @DisallowConcurrentExecution
 public class RetryJob implements Job {

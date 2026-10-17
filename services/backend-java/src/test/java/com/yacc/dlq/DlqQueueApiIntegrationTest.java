@@ -164,4 +164,27 @@ class DlqQueueApiIntegrationTest extends AbstractApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
+
+    @Test
+    void reQueueOfATerminalEntryClearsTheTerminalCycleState() throws Exception {
+        // REST-DLQ-003 over a terminal (exhausted) MIG-063 retry cycle: the
+        // re-queue answers success AND clears the terminal cycle state (a
+        // fresh 3-attempt budget — the worker redelivers), while the P0
+        // once-only flag and the row-lifetime accounting stay untouched.
+        seedActors();
+        DeadLetterQueueEntry entry = seedEntry("delivery_timeout");
+        entry.setMetadata("{\"retryCycle\":{\"attempt\":3,\"failed\":true,\"exhausted\":true}}");
+        entry = dlq.save(entry);
+
+        mockMvc.perform(post("/api/dlq/" + entry.getId() + "/re-queue")
+                        .header("Authorization", bearer(SUPER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Entry marked for manual retry"))
+                .andExpect(jsonPath("$.entry.retryAttempt").value(true));
+
+        DeadLetterQueueEntry reloaded = dlq.findById(entry.getId()).orElseThrow();
+        assertThat(reloaded.getRetryAttempt()).isTrue();
+        assertThat(reloaded.getMetadata()).doesNotContain("retryCycle");
+        assertThat(reloaded.getTotalAttempts()).isEqualTo(3);
+    }
 }

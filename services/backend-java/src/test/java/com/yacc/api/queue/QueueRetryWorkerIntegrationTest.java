@@ -1,6 +1,7 @@
 package com.yacc.api.queue;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -39,15 +40,20 @@ import com.yacc.service.DlqService;
  * layer (AC-MIG-063-1/2): retried-marker consumption, the 1:1 Quartz job
  * identity (REST-QUEUE-006), the schedule &rarr; fire &rarr; backoff
  * &rarr; DLQ-move cycle, exhaustion, success clearing, the frozen worker
- * concurrency, and — for the PR #420 review findings — the crash-safety
- * and self-healing behaviors: stranded durable jobs without triggers are
- * re-armed from the persisted cycle state, persistence/reschedule failures
- * are healed by the marker poll, interrupted attempt claims are consumed
- * and re-delivered (never silently assumed delivered), and orphaned jobs
- * are swept. The policy is overridden to fast, deterministic values — no
- * long sleeps; every wait is a bounded condition poll; faults are injected
- * with spies or by driving the worker seam directly (the frozen 1m/5m/30m
- * ladder itself is pinned by {@link QueueRetryPropertiesTest}).
+ * concurrency, and — for the PR #420 review findings — the claim/invocation
+ * crash-safety protocol (I1 no-loss / I2 termination / I3 honest
+ * accounting): stranded durable jobs without triggers are re-armed from
+ * the persisted cycle state, persistence/reschedule/invocation-start
+ * failures are healed by the marker poll, an unstarted claim is RELEASED
+ * (never consumed — the same attempt number is re-armed and delivered, so
+ * a crash before a delivery cannot drop the message), a started
+ * invocation without an outcome is CONSUMED (counted once, terminal at
+ * the limit), a manual re-queue of a terminal entry restores a fresh
+ * 3-attempt budget while the P0 once-only flag stays frozen, and orphaned
+ * jobs are swept. The policy is overridden to fast, deterministic values —
+ * no long sleeps; every wait is a bounded condition poll; faults are
+ * injected with spies or by driving the worker seam directly (the frozen
+ * 1m/5m/30m ladder itself is pinned by {@link QueueRetryPropertiesTest}).
  *
  * <p>Non-transactional by design: the Quartz firing threads must observe
  * committed DLQ rows. Committed writers clean up after themselves
@@ -81,6 +87,10 @@ class QueueRetryWorkerIntegrationTest extends AbstractPostgresIntegrationTest {
     private RetryDeliveryHandler handler;
     @MockitoSpyBean
     private Scheduler schedulerSpy;
+    @Autowired
+    private QueueService queueService;
+    @Autowired
+    private com.yacc.api.message.MessageService messageService;
 
     @AfterEach
     void cleanCommittedState() throws SchedulerException {
@@ -271,8 +281,10 @@ class QueueRetryWorkerIntegrationTest extends AbstractPostgresIntegrationTest {
         Mockito.<RetryDeliveryHandler.RetryOutcome>when(handler.deliver(any()))
                 .thenReturn(RetryDeliveryHandler.RetryOutcome.failure("smtp still down"));
         // Fault: the outcome write after the failed attempt dies once — the
-        // execution dies between the durable claim and the outcome record,
-        // the one-shot trigger is gone, and the claim is left in flight.
+        // execution dies between the invocation start (claim + started,
+        // written before the delivery) and the outcome record; the one-shot
+        // trigger is gone and the started-without-outcome invocation is
+        // left in flight.
         doThrow(new RuntimeException("injected persistence failure"))
                 .doCallRealMethod()
                 .when(dlq).recordFailedAttempt(any(UUID.class), anyString(), anyInt(),
@@ -283,8 +295,9 @@ class QueueRetryWorkerIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(dlq.findByMessageId(messageId)
                 .map(entry -> dlq.isAttemptOutcomeRecorded(entry)).orElse(true)).isFalse();
 
-        // Self-healing: the poll settles the interrupted attempt (counted),
-        // re-arms the cycle, and the ladder completes to the terminal state.
+        // Self-healing: the poll consumes the started invocation (counted —
+        // its delivery happened but the outcome is unknowable), re-arms the
+        // cycle, and the ladder completes to the terminal state.
         queueRetry.consumeRetriedMarkers();
         await(CYCLE_TIMEOUT, () -> cycleExhausted(messageId) && jobGone(messageId));
         DeadLetterQueueEntry entry = dlq.findByMessageId(messageId).orElseThrow();
@@ -295,24 +308,27 @@ class QueueRetryWorkerIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void interruptedClaimFromACrashedExecutionIsCountedAndRedelivered() {
+    void interruptedStartedInvocationBelowTheLimitIsConsumedAndRedelivered() {
         UUID messageId = UUID.randomUUID();
         var entry = seedRetriedMarker(messageId);
-        // Crash simulation: attempt 1 was durably claimed, its delivery
-        // never happened, and the execution died before any outcome.
+        // Crash simulation: attempt 1 was claimed AND its invocation
+        // durably started; the outcome was never recorded (unknowable
+        // without a consumer ACK).
         dlq.claimAttempt(entry.getId(), 1);
+        dlq.markInvocationStarted(entry.getId());
         Mockito.<RetryDeliveryHandler.RetryOutcome>when(handler.deliver(any()))
                 .thenReturn(RetryDeliveryHandler.RetryOutcome.failure("smtp still down"));
 
-        // Recovered firing: the interrupted claim is consumed (counted,
-        // honestly recorded), and the message is re-delivered under the
-        // next attempt number — attempt 1 itself is not re-delivered.
+        // Recovered firing: the started invocation is CONSUMED — counted
+        // exactly once, honestly recorded — and the message is re-delivered
+        // under the next attempt number in the same firing (attempt 1 is
+        // never invoked again under its own number, I2).
         queueRetry.executeRetryAttempt(messageId.toString());
 
         DeadLetterQueueEntry reloaded = dlq.findByMessageId(messageId).orElseThrow();
         assertThat(dlq.retryCycleAttempt(reloaded)).isEqualTo(2);
         assertThat(dlq.isAttemptOutcomeRecorded(reloaded)).isTrue();
-        assertThat(reloaded.getTotalAttempts()).isEqualTo(3); // seed + interrupted + attempt 2
+        assertThat(reloaded.getTotalAttempts()).isEqualTo(3); // seed + consumed + attempt 2
         assertThat(reloaded.getLastError()).isEqualTo("smtp still down");
         verify(handler, times(1)).deliver(messageId);
 
@@ -326,41 +342,271 @@ class QueueRetryWorkerIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void interruptedClaimAtTheLadderLimitExhaustsWithoutAnotherDelivery() {
+    void interruptedStartedInvocationAtTheLadderLimitIsConsumedAndTerminal() {
         UUID messageId = UUID.randomUUID();
         var entry = seedRetriedMarker(messageId);
-        // Crash simulation on the LAST allowed attempt: the claim is in
-        // flight with an unknown outcome when the recovery happens.
+        // Crash simulation on the LAST allowed attempt: attempt 3 was
+        // claimed and durably started, its outcome never recorded.
         dlq.claimAttempt(entry.getId(), 3);
+        dlq.markInvocationStarted(entry.getId());
 
         queueRetry.executeRetryAttempt(messageId.toString());
 
+        // CONSUME at the limit: terminal, counted exactly once (honest
+        // unknown-outcome accounting), no delivery in the recovery firing
+        // (I2 — a started attempt is never invoked again under its own
+        // number).
         DeadLetterQueueEntry reloaded = dlq.findByMessageId(messageId).orElseThrow();
         assertThat(dlq.isRetryCycleExhausted(reloaded)).isTrue();
         assertThat(dlq.retryCycleAttempt(reloaded)).isEqualTo(3);
-        assertThat(reloaded.getTotalAttempts()).isEqualTo(2); // seed + the interrupted attempt
+        assertThat(reloaded.getTotalAttempts()).isEqualTo(2); // seed + the started invocation
         verify(handler, never()).deliver(any());
         assertThat(queueRetry.jobState(messageId)).isEqualTo("failed");
+    }
+
+    @Test
+    void claimedButNotStartedAtTheLadderLimitIsReleasedAndDelivered() throws SchedulerException {
+        UUID messageId = UUID.randomUUID();
+        var entry = seedRetriedMarker(messageId);
+        queueRetry.scheduleCycle(messageId);
+        // The fired one-shot trigger is gone while the durable job remains —
+        // the production state of a firing whose process died mid-flight.
+        scheduler.unscheduleJob(scheduler.getTriggersOfJob(
+                QueueRetryService.jobKey(messageId)).getFirst().getKey());
+        Mockito.<RetryDeliveryHandler.RetryOutcome>when(handler.deliver(any()))
+                .thenReturn(RetryDeliveryHandler.RetryOutcome.failure("smtp still down"));
+        // Crash simulation on the LAST allowed attempt: attempts 1 and 2
+        // genuinely ran and failed; attempt 3 was durably claimed and the
+        // process died BEFORE its invocation started.
+        dlq.recordFailedAttempt(entry.getId(), "err", 1, false);
+        dlq.recordFailedAttempt(entry.getId(), "err", 2, false);
+        dlq.claimAttempt(entry.getId(), 3);
+        int totalBeforeRelease = dlq.findByMessageId(messageId).orElseThrow()
+                .getTotalAttempts();
+
+        queueRetry.executeRetryAttempt(messageId.toString());
+
+        // RELEASE: the unstarted claim never consumed the budget — no
+        // delivery, no exhaustion, counters untouched, the cycle stays live
+        // (the disputed zero-delivery loss at the ladder limit is gone).
+        verify(handler, never()).deliver(any());
+        DeadLetterQueueEntry released = dlq.findByMessageId(messageId).orElseThrow();
+        assertThat(dlq.isRetryCycleExhausted(released)).isFalse();
+        assertThat(released.getTotalAttempts()).isEqualTo(totalBeforeRelease);
+        assertThat(queueRetry.jobState(messageId)).isEqualTo("retrying");
+
+        // The marker poll re-arms the SAME attempt number (3).
+        queueRetry.consumeRetriedMarkers();
+        assertThat(scheduler.getTriggersOfJob(QueueRetryService.jobKey(messageId)))
+                .hasSize(1);
+
+        // The re-armed firing delivers under attempt 3; the failed delivery
+        // then exhausts the cycle honestly at the limit
+        // (total = 1 seed + the three recorded attempts 1/2/3).
+        await(CYCLE_TIMEOUT, () -> cycleExhausted(messageId) && jobGone(messageId));
+        DeadLetterQueueEntry terminal = dlq.findByMessageId(messageId).orElseThrow();
+        assertThat(dlq.retryCycleAttempt(terminal)).isEqualTo(3);
+        assertThat(terminal.getTotalAttempts()).isEqualTo(totalBeforeRelease + 1);
+        verify(handler, times(1)).deliver(messageId);
+    }
+
+    @Test
+    void crashBeforeTheInvocationNeverConsumesTheBudget() {
+        UUID messageId = UUID.randomUUID();
+        var entry = seedRetriedMarker(messageId);
+        // Three consecutive claim-without-start crashes: every recovery
+        // RELEASES the unstarted claim — the ladder position never advances
+        // (nothing was delivered and nothing was consumed; I3).
+        for (int recovery = 1; recovery <= 3; recovery++) {
+            dlq.claimAttempt(entry.getId(), 1);
+            queueRetry.executeRetryAttempt(messageId.toString());
+            DeadLetterQueueEntry released = dlq.findByMessageId(messageId).orElseThrow();
+            assertThat(dlq.isRetryCycleExhausted(released))
+                    .as("recovery %d must never exhaust", recovery).isFalse();
+            assertThat(released.getTotalAttempts()).isEqualTo(1); // the seed only
+            verify(handler, never()).deliver(any());
+        }
+
+        // I1 + I2 in one run: a following normal cycle delivers exactly
+        // three times and only then exhausts.
+        Mockito.<RetryDeliveryHandler.RetryOutcome>when(handler.deliver(any()))
+                .thenReturn(RetryDeliveryHandler.RetryOutcome.failure("smtp still down"));
+        queueRetry.executeRetryAttempt(messageId.toString()); // attempt 1
+        queueRetry.executeRetryAttempt(messageId.toString()); // attempt 2
+        queueRetry.executeRetryAttempt(messageId.toString()); // attempt 3
+        DeadLetterQueueEntry terminal = dlq.findByMessageId(messageId).orElseThrow();
+        assertThat(dlq.isRetryCycleExhausted(terminal)).isTrue();
+        assertThat(dlq.retryCycleAttempt(terminal)).isEqualTo(3);
+        assertThat(terminal.getTotalAttempts()).isEqualTo(4); // seed + 3 real invocations
+        verify(handler, times(3)).deliver(messageId);
+    }
+
+    @Test
+    void strandedClaimWithoutAStartIsReleasedByTheMarkerPoll() throws SchedulerException {
+        UUID messageId = UUID.randomUUID();
+        var entry = seedRetriedMarker(messageId);
+        queueRetry.scheduleCycle(messageId);
+        // Crash: the one-shot trigger is gone while attempt 1 sits claimed
+        // without a start — the durable job is stranded with an in-flight
+        // claim.
+        scheduler.unscheduleJob(scheduler.getTriggersOfJob(
+                QueueRetryService.jobKey(messageId)).getFirst().getKey());
+        dlq.claimAttempt(entry.getId(), 1);
+        int totalBefore = dlq.findByMessageId(messageId).orElseThrow().getTotalAttempts();
+
+        // The poll RELEASES the unstarted claim (counters untouched) and
+        // re-arms the SAME attempt number — no trigger existed, so no
+        // in-execution key collision is possible here.
+        queueRetry.consumeRetriedMarkers();
+
+        DeadLetterQueueEntry releasedEntry = dlq.findByMessageId(messageId).orElseThrow();
+        assertThat(dlq.retryCycleAttempt(releasedEntry)).isZero();
+        assertThat(releasedEntry.getTotalAttempts()).isEqualTo(totalBefore);
+        var triggers = scheduler.getTriggersOfJob(QueueRetryService.jobKey(messageId));
+        assertThat(triggers).hasSize(1);
+        assertThat(triggers.getFirst().getKey().getName())
+                .isEqualTo(messageId.toString() + "-1");
+
+        // The re-armed cycle actually delivers.
+        Mockito.<RetryDeliveryHandler.RetryOutcome>when(handler.deliver(any()))
+                .thenReturn(RetryDeliveryHandler.RetryOutcome.success());
+        await(CYCLE_TIMEOUT, () -> dlq.findByMessageId(messageId).isEmpty()
+                && jobGone(messageId));
+        verify(handler, times(1)).deliver(messageId);
+    }
+
+    @Test
+    void invocationStartPersistFailureLeavesTheAttemptReleaseable() {
+        UUID messageId = UUID.randomUUID();
+        seedRetriedMarker(messageId);
+        Mockito.<RetryDeliveryHandler.RetryOutcome>when(handler.deliver(any()))
+                .thenReturn(RetryDeliveryHandler.RetryOutcome.success());
+        // Fault: persisting the invocation start dies once — the claim is
+        // left without a start, nothing is delivered, counters untouched.
+        doThrow(new RuntimeException("injected invocation-start failure"))
+                .doCallRealMethod()
+                .when(dlq).markInvocationStarted(any(UUID.class));
+        queueRetry.scheduleCycle(messageId);
+
+        await(CYCLE_TIMEOUT, () -> claimInFlight(messageId, 1) && stranded(messageId));
+        verify(handler, never()).deliver(any());
+        assertThat(dlq.findByMessageId(messageId).orElseThrow().getTotalAttempts())
+                .isEqualTo(1);
+
+        // Loss-free healing: the poll releases the unstarted claim, re-arms
+        // the same attempt, and the next invocation starts for real and
+        // delivers.
+        queueRetry.consumeRetriedMarkers();
+        await(CYCLE_TIMEOUT, () -> dlq.findByMessageId(messageId).isEmpty()
+                && jobGone(messageId));
+        verify(handler, times(1)).deliver(messageId);
     }
 
     @Test
     void aDeliveryLostToACrashWindowIsRedeliveredNotAssumedDelivered() {
         UUID messageId = UUID.randomUUID();
         var entry = seedRetriedMarker(messageId);
-        // Crash simulation: attempt 1 claimed, the delivery MAY have
-        // happened, the outcome write never did — unknowable without a
-        // consumer ACK.
+        // Crash simulation: attempt 1 was claimed AND its invocation
+        // started; the outcome write never happened — whether the delivery
+        // happened is unknowable without a consumer ACK (the duplicate
+        // window lives at this START boundary, never before it).
         dlq.claimAttempt(entry.getId(), 1);
+        dlq.markInvocationStarted(entry.getId());
         Mockito.<RetryDeliveryHandler.RetryOutcome>when(handler.deliver(any()))
                 .thenReturn(RetryDeliveryHandler.RetryOutcome.success());
 
-        // Loss-prevention: the message is re-delivered (the documented
-        // at-least-once duplicate window), never silently assumed delivered.
+        // Loss-prevention: the started invocation is consumed and the
+        // message is re-delivered (the documented at-least-once duplicate
+        // window), never silently assumed delivered.
         queueRetry.executeRetryAttempt(messageId.toString());
 
         verify(handler, times(1)).deliver(messageId);
         assertThat(dlq.findByMessageId(messageId)).isEmpty();
         assertThat(queueRetry.jobState(messageId)).isEqualTo("completed");
+    }
+
+    @Test
+    void requeueOfATerminalEntryStartsAFreshCycle() throws SchedulerException {
+        UUID messageId = UUID.randomUUID();
+        seedRetriedMarker(messageId);
+        Mockito.<RetryDeliveryHandler.RetryOutcome>when(handler.deliver(any()))
+                .thenReturn(RetryDeliveryHandler.RetryOutcome.failure("smtp still down"));
+        queueRetry.consumeRetriedMarkers();
+        await(CYCLE_TIMEOUT, () -> cycleExhausted(messageId) && jobGone(messageId));
+        DeadLetterQueueEntry terminal = dlq.findByMessageId(messageId).orElseThrow();
+        int totalAfterFirstCycle = terminal.getTotalAttempts();
+        assertThat(dlq.isRetryCycleExhausted(terminal)).isTrue();
+
+        // REST-QUEUE-003 path: the manual re-queue of a terminal entry
+        // answers success AND restores a FRESH 3-attempt cycle (baseline
+        // parity) — it must not silently redeliver nothing.
+        var result = queueService.retry(messageId, ACTOR);
+        assertThat(result.success()).isTrue();
+        DeadLetterQueueEntry requeued = dlq.findByMessageId(messageId).orElseThrow();
+        assertThat(requeued.getRetryAttempt()).isTrue();            // P0 flag untouched
+        assertThat(dlq.isRetryCycleExhausted(requeued)).isFalse();  // terminal state cleared
+        assertThat(dlq.retryCycleAttempt(requeued)).isZero();       // fresh cycle
+        assertThat(requeued.getTotalAttempts()).isEqualTo(totalAfterFirstCycle);
+
+        // The fresh cycle runs: 3 new invocations, terminal again, the
+        // row-lifetime counter accumulates (1 seed + 3 + 3).
+        queueRetry.consumeRetriedMarkers();
+        await(CYCLE_TIMEOUT, () -> cycleExhausted(messageId) && jobGone(messageId));
+        DeadLetterQueueEntry terminalAgain = dlq.findByMessageId(messageId).orElseThrow();
+        assertThat(dlq.retryCycleAttempt(terminalAgain)).isEqualTo(3);
+        assertThat(terminalAgain.getTotalAttempts()).isEqualTo(totalAfterFirstCycle + 3);
+        verify(handler, times(6)).deliver(messageId); // 3 + 3 real invocations
+    }
+
+    @Test
+    void requeueOfALiveCycleDoesNotResetIt() {
+        UUID messageId = UUID.randomUUID();
+        var entry = seedRetriedMarker(messageId);
+        // A live (non-terminal) cycle: attempt 1 ran and failed; the cycle
+        // is mid-flight on the ladder.
+        dlq.recordFailedAttempt(entry.getId(), "err", 1, false);
+
+        queueService.retry(messageId, ACTOR);
+
+        // A live cycle is left exactly as it was (idempotent with the
+        // previous markRetried behavior) — only terminal cycles are reset.
+        DeadLetterQueueEntry requeued = dlq.findByMessageId(messageId).orElseThrow();
+        assertThat(requeued.getRetryAttempt()).isTrue();
+        assertThat(dlq.retryCycleAttempt(requeued)).isEqualTo(1);
+        assertThat(dlq.isAttemptOutcomeRecorded(requeued)).isTrue();
+        assertThat(dlq.isRetryCycleExhausted(requeued)).isFalse();
+        assertThat(requeued.getTotalAttempts()).isEqualTo(2);
+    }
+
+    @Test
+    void theP0OnceOnlyFlagIsUnchanged() {
+        UUID messageId = UUID.randomUUID();
+        var conversation = conversations.save(new com.yacc.entity.Conversation(
+                UUID.randomUUID(), com.yacc.entity.ChannelType.IRC, "#retry-p0"));
+        var message = messages.save(new com.yacc.entity.Message(messageId,
+                conversation.getId(), null, "yacc", "body",
+                com.yacc.entity.MessageDirection.OUTBOUND));
+        message.setStatus(com.yacc.entity.MessageStatus.FAILED);
+        messages.save(message);
+        DeadLetterQueueEntry entry = dlq.enqueue(messageId, conversation.getId(),
+                "{\"origin\":\"mig-063-test\"}", "platform_error", 1, "initial failure",
+                null, null);
+        dlq.markRetried(entry.getId(), ACTOR);
+        Mockito.<RetryDeliveryHandler.RetryOutcome>when(handler.deliver(any()))
+                .thenReturn(RetryDeliveryHandler.RetryOutcome.failure("smtp still down"));
+        queueRetry.consumeRetriedMarkers();
+        await(CYCLE_TIMEOUT, () -> cycleExhausted(messageId) && jobGone(messageId));
+
+        // The terminal-cycle clear on a manual re-queue does NOT relax the
+        // frozen P0 once-only rule: the marker stays true and the
+        // REST-MSG-003 path (MessageService.retry) still rejects.
+        queueService.retry(messageId, ACTOR);
+        DeadLetterQueueEntry requeued = dlq.findByMessageId(messageId).orElseThrow();
+        assertThat(requeued.getRetryAttempt()).isTrue();
+        assertThatThrownBy(() -> messageService.retry(conversation.getId(), messageId,
+                ACTOR.toString()))
+                .isInstanceOf(com.yacc.common.controller.BadRequestException.class)
+                .hasMessageContaining("already been retried");
     }
 
     private DeadLetterQueueEntry seedRetriedMarker(UUID messageId) {
