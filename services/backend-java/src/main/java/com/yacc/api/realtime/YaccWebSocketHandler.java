@@ -41,9 +41,12 @@ import com.yacc.api.realtime.WebSocketInboundFrame;
  *   <li>registry cleanup on close (idempotent).</li>
  * </ul>
  *
- * <p>Heartbeat, presence/typing, backlog replay, and reconnect semantics are
- * application-owned behaviors that arrive with MIG-051 — this handler is the
- * transport they build on (ADR-026).</p>
+ * <p>MIG-051 extends the demux with the frozen presence/typing channels
+ * (WS-OP-PRES-001..005, WS-OP-TYPE-001..004), hooking the connect/close
+ * lifecycle to the reconnection behavior (reconnect marker + durable backlog
+ * restoration, {@link WebSocketReconnectService}) and the last-socket-off
+ * presence broadcast ({@link WebSocketPresenceService}) — this handler is
+ * the transport those behaviors build on (ADR-026).</p>
  */
 @Component
 public class YaccWebSocketHandler extends TextWebSocketHandler {
@@ -61,12 +64,23 @@ public class YaccWebSocketHandler extends TextWebSocketHandler {
 
     private final WebSocketEventPublisher publisher;
 
+    private final WebSocketPresenceService presence;
+
+    private final WebSocketTypingService typing;
+
+    private final WebSocketReconnectService reconnect;
+
     private final ObjectMapper mapper;
 
     public YaccWebSocketHandler(WebSocketSessionRegistry registry,
-            WebSocketEventPublisher publisher, ObjectMapper mapper) {
+            WebSocketEventPublisher publisher, WebSocketPresenceService presence,
+            WebSocketTypingService typing, WebSocketReconnectService reconnect,
+            ObjectMapper mapper) {
         this.registry = registry;
         this.publisher = publisher;
+        this.presence = presence;
+        this.typing = typing;
+        this.reconnect = reconnect;
         this.mapper = mapper;
     }
 
@@ -83,6 +97,8 @@ public class YaccWebSocketHandler extends TextWebSocketHandler {
                 RealtimeEvents.SYSTEM_CONNECTION_ESTABLISHED,
                 mapper.valueToTree(SystemEventPayload.of(
                         SystemEventPayload.TYPE_CONNECTION_ESTABLISHED))));
+        // Reconnect marker + durable backlog restoration (MIG-051).
+        reconnect.onSessionEstablished(session, identity);
     }
 
     @Override
@@ -105,6 +121,15 @@ public class YaccWebSocketHandler extends TextWebSocketHandler {
                     connectorSubscribe(session, identity, frame.data());
             case RealtimeEvents.CONNECTOR_UNSUBSCRIBE ->
                     connectorUnsubscribe(session, identity, frame.data());
+            case RealtimeEvents.PRESENCE_UPDATED -> presence.onPresenceUpdated(session, frame.data());
+            case RealtimeEvents.USER_ONLINE -> presence.onUserOnline(session, frame.data());
+            case RealtimeEvents.USER_OFFLINE -> presence.onUserOffline(session, frame.data());
+            case RealtimeEvents.USER_STATUS -> presence.onUserStatus(session, frame.data());
+            case RealtimeEvents.REQUEST_ONLINE_USERS -> presence.onRequestOnlineUsers(session);
+            case RealtimeEvents.TYPING_STARTED -> typing.onTypingStarted(session, frame.data());
+            case RealtimeEvents.TYPING_STOPPED -> typing.onTypingStopped(session, frame.data());
+            case RealtimeEvents.TYPING_TIMEOUT -> typing.onTypingTimeout(session, frame.data());
+            case RealtimeEvents.TYPING_HEARTBEAT -> typing.onTypingHeartbeat(frame.data());
             default -> emitError(session, ERROR_CODE_UNKNOWN_EVENT,
                     "Unknown event: " + frame.event());
         }
@@ -122,7 +147,13 @@ public class YaccWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        registry.unregister(session.getId());
+        registry.identity(session.getId()).ifPresent(identity -> {
+            registry.unregister(session.getId());
+            // Presence-offline broadcast for the user's last socket (WS-BHV-014)
+            // + reconnect memory for a timely re-establishment (MIG-051).
+            presence.broadcastOfflineIfLastSocket(identity);
+            reconnect.onSessionClosed(identity);
+        });
     }
 
     // --- Frozen inbound channels (bare payloads; acks per AsyncAPI) ---

@@ -58,7 +58,12 @@ class YaccWebSocketHandlerTest {
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .build();
         handler = new YaccWebSocketHandler(registry,
-                new WebSocketEventPublisher(registry, mapper), mapper);
+                new WebSocketEventPublisher(registry,
+                        org.mockito.Mockito.mock(WebSocketBacklogService.class), mapper),
+                org.mockito.Mockito.mock(WebSocketPresenceService.class),
+                org.mockito.Mockito.mock(WebSocketTypingService.class),
+                org.mockito.Mockito.mock(WebSocketReconnectService.class),
+                mapper);
 
         session = mock(WebSocketSession.class);
         when(session.getId()).thenReturn("s1");

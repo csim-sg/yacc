@@ -93,6 +93,16 @@ class RealtimeTransportContractAlignmentTest {
             "subscribe.conversation", "unsubscribe.conversation",
             "connector.subscribe", "connector.unsubscribe");
 
+    /**
+     * MIG-051 raw presence/typing channel names (ledger WS-OP-PRES-004/005,
+     * WS-RAW-006/007, WS-BHV-015) — frozen {@code asyncapi.yaml} channels
+     * outside the MIG-003 23-constant canonical set.
+     */
+    private static final List<String> MIG_051_CHANNELS = List.of(
+            "online.users", "user.status.changed",
+            "user.status", "request.online.users",
+            "typing.timeout", "typing.heartbeat");
+
     /** MIG-050-owned ledger row IDs (scope ceiling: the transport core). */
     private static final List<String> MIG_050_LEDGER_ROWS = List.of(
             "WS-BHV-001", "WS-OP-CONV-004", "WS-OP-CONV-005",
@@ -144,7 +154,7 @@ class RealtimeTransportContractAlignmentTest {
         List<String> declared = declaredConstants();
 
         assertThat(declared).containsExactlyInAnyOrderElementsOf(concat(
-                FROZEN_23, ACK_CHANNELS, INBOUND_CHANNELS));
+                FROZEN_23, ACK_CHANNELS, INBOUND_CHANNELS, MIG_051_CHANNELS));
 
         assertThat(channelsOf(asyncapi).keySet()).containsAll(declared);
     }
@@ -193,7 +203,12 @@ class RealtimeTransportContractAlignmentTest {
             throws Exception {
         WebSocketSessionRegistry registry = new WebSocketSessionRegistry();
         YaccWebSocketHandler handler = new YaccWebSocketHandler(registry,
-                new WebSocketEventPublisher(registry, mapper), mapper);
+                new WebSocketEventPublisher(registry,
+                        org.mockito.Mockito.mock(WebSocketBacklogService.class), mapper),
+                org.mockito.Mockito.mock(WebSocketPresenceService.class),
+                org.mockito.Mockito.mock(WebSocketTypingService.class),
+                org.mockito.Mockito.mock(WebSocketReconnectService.class),
+                mapper);
 
         Map<String, Object> attributes = new HashMap<>();
         attributes.put(WebSocketHandshakeAuthInterceptor.IDENTITY_ATTRIBUTE,

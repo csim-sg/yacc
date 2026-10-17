@@ -23,9 +23,14 @@ import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SchemaValidatorsConfig;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
+import com.yacc.api.realtime.OnlineUsersPayload;
+import com.yacc.api.realtime.PresenceUpdatedPayload;
 import com.yacc.api.realtime.RealtimeEvents;
 import com.yacc.api.realtime.SystemErrorDetail;
 import com.yacc.api.realtime.SystemEventPayload;
+import com.yacc.api.realtime.TypingStartedPayload;
+import com.yacc.api.realtime.TypingStoppedPayload;
+import com.yacc.api.realtime.UserStatusChangedPayload;
 import com.yacc.api.realtime.WebSocketEnvelope;
 import com.yacc.api.realtime.WebSocketInboundFrame;
 
@@ -50,10 +55,17 @@ import com.yacc.api.realtime.WebSocketInboundFrame;
  *       declares the 2020-12 dialect and an object root).</li>
  * </ul>
  *
- * <p>Per-event payload <em>emitters</em> (conversation.updated, presence,
- * typing, …) land with MIG-051 and extend this test then; transport-frame
- * conventions stay in {@code RealtimeTransportContractAlignmentTest}
- * (MIG-050).</p>
+ * <p>MIG-051 extension: the per-event payload emitters it owns —
+ * {@code presence.updated} (presence-updated.schema.json, WS-EVT-009,
+ * canonicalization §4.5), {@code typing.started}/{@code typing.stopped}
+ * (typing-*.schema.json, WS-EVT-010/011) and the new system-family
+ * emitters (heartbeat/reconnection/backlog_replay types, WS-EVT-015..020) —
+ * validate against the same frozen schemas; the raw
+ * {@code online.users}/{@code user.status.changed} reply/broadcast shapes
+ * (WS-RAW-006/007) have no frozen schema file and are asserted member-wise.</p>
+ *
+ * <p>Transport-frame conventions stay in
+ * {@code RealtimeTransportContractAlignmentTest} (MIG-050).</p>
  */
 @Tag("contract")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -132,12 +144,91 @@ class AsyncApiRealtimePayloadConformanceTest {
                 SystemEventPayload.of(SystemEventPayload.TYPE_CONNECTION_ESTABLISHED));
         assertThat(errors("system-payload", connectionEstablished)).isEmpty();
 
+        // MIG-051 emitters of the remaining frozen system types (WS-EVT-015..020).
+        JsonNode heartbeat = mapper.valueToTree(SystemEventPayload.of(
+                SystemEventPayload.TYPE_HEARTBEAT));
+        assertThat(errors("system-payload", heartbeat)).isEmpty();
+        JsonNode reconnection = mapper.valueToTree(SystemEventPayload.of(
+                SystemEventPayload.TYPE_RECONNECTION));
+        assertThat(errors("system-payload", reconnection)).isEmpty();
+        JsonNode backlogReplay = mapper.valueToTree(SystemEventPayload.of(
+                SystemEventPayload.TYPE_BACKLOG_REPLAY));
+        assertThat(errors("system-payload", backlogReplay)).isEmpty();
+
         JsonNode error = mapper.valueToTree(SystemEventPayload.error(
                 "internal_error", "handler failed"));
         assertThat(errors("system-payload", error)).isEmpty();
         assertThat(error.path("error").path("code").asText()).isEqualTo("internal_error");
         assertThat(new SystemErrorDetail("internal_error", "handler failed").code())
                 .isEqualTo("internal_error");
+    }
+
+    @Test
+    void presenceUpdatedPayloadValidatesAgainstTheFrozenCanonicalSchema() {
+        // WS-EVT-009 / canonicalization §4.5: one canonical shape for ALL
+        // outbound presence emissions.
+        PresenceUpdatedPayload payload = new PresenceUpdatedPayload(
+                "00000000-0000-4000-8000-000000000001",
+                PresenceUpdatedPayload.STATUS_ONLINE,
+                java.time.Instant.now());
+
+        JsonNode wire = mapper.valueToTree(payload);
+        assertThat(errors("presence-updated", wire)).isEmpty();
+
+        // Canonical member set; lastSeen is RFC 3339 UTC through the
+        // production posture (the frozen schema declares
+        // format: date-time with format assertions on).
+        assertThat(wire.fieldNames()).toIterable()
+                .containsExactlyInAnyOrder("userId", "status", "lastSeen");
+        assertThat(wire.path("lastSeen").asText())
+                .matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z");
+
+        // The retired baseline value is refused by the frozen enum.
+        JsonNode away = mapper.createObjectNode()
+                .put("userId", "00000000-0000-4000-8000-000000000001")
+                .put("status", "away")
+                .put("lastSeen", wire.path("lastSeen").asText());
+        assertThat(errors("presence-updated", away)).isNotEmpty();
+    }
+
+    @Test
+    void typingPayloadsValidateAgainstTheFrozenChannelSchemas() {
+        JsonNode started = mapper.valueToTree(new TypingStartedPayload(
+                "00000000-0000-4000-8000-000000000002",
+                "00000000-0000-4000-8000-000000000001",
+                "Alice"));
+        assertThat(errors("typing-started", started)).isEmpty();
+        assertThat(started.fieldNames()).toIterable()
+                .containsExactlyInAnyOrder("conversationId", "userId", "name");
+
+        JsonNode stopped = mapper.valueToTree(new TypingStoppedPayload(
+                "00000000-0000-4000-8000-000000000002",
+                "00000000-0000-4000-8000-000000000001"));
+        assertThat(errors("typing-stopped", stopped)).isEmpty();
+        assertThat(stopped.fieldNames()).toIterable()
+                .containsExactly("conversationId", "userId");
+    }
+
+    @Test
+    void rawPresenceReplyAndStatusShapesCarryTheirFrozenMembers() {
+        // WS-RAW-006/007: raw baseline reply/broadcast payloads (no frozen
+        // schema file) — member-wise shape pins.
+        JsonNode onlineUsers = mapper.valueToTree(new OnlineUsersPayload(
+                List.of("00000000-0000-4000-8000-000000000001"),
+                java.time.Instant.now()));
+        assertThat(onlineUsers.fieldNames()).toIterable()
+                .containsExactlyInAnyOrder("users", "timestamp");
+        assertThat(onlineUsers.path("timestamp").asText())
+                .matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z");
+
+        JsonNode statusChanged = mapper.valueToTree(new UserStatusChangedPayload(
+                "00000000-0000-4000-8000-000000000001",
+                UserStatusChangedPayload.STATUS_AWAY,
+                java.time.Instant.now()));
+        assertThat(statusChanged.fieldNames()).toIterable()
+                .containsExactlyInAnyOrder("userId", "status", "timestamp");
+        assertThat(statusChanged.path("timestamp").asText())
+                .matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z");
     }
 
     @Test
