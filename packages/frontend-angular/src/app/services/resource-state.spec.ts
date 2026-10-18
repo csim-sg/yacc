@@ -162,6 +162,95 @@ describe('ResourceState', () => {
     expect(state.snapshot(cacheKeys.tags.all())).toBeUndefined();
   });
 
+  it('invalidation during the first load does not commit the pre-mutation response as fresh', async () => {
+    let release!: (data: { value: number }) => void;
+    let call = 0;
+    const fetcher = vi.fn((): Promise<{ value: number }> => {
+      call += 1;
+      // First call: a request that is still pending when invalidate() runs.
+      return call === 1
+        ? new Promise<{ value: number }>((resolve) => {
+            release = resolve;
+          })
+        : Promise.resolve({ value: 2 });
+    });
+
+    const pending = state.load(key(), fetcher);
+    expect(state.snapshot(key())?.loading).toBe(true);
+
+    // A mutation invalidates the key while the pre-mutation GET is running…
+    state.invalidate(key());
+    // …and the stale response only lands afterwards.
+    release({ value: 1 });
+    await pending;
+
+    // The invalidated load was superseded, so the follow-up refetch runs.
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(state.snapshot(key())?.data).toEqual({ value: 2 }));
+
+    // The committed value is fresh — a load inside the window needs no HTTP
+    // (the stale value never became the fresh cache entry).
+    await state.load(key(), countingFetcher);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(state.snapshot(key())?.data).toEqual({ value: 2 });
+  });
+
+  it('invalidation during a background refresh discards the stale response and refetches', async () => {
+    await state.load(key(), countingFetcher); // value 1, fresh
+    vi.setSystemTime(Date.now() + 31_000); // now stale
+
+    let release!: (data: { value: number }) => void;
+    let call = 0;
+    const fetcher = vi.fn((): Promise<{ value: number }> => {
+      call += 1;
+      return call === 1
+        ? new Promise<{ value: number }>((resolve) => {
+            release = resolve;
+          })
+        : Promise.resolve({ value: 3 });
+    });
+
+    const refresh = state.load(key(), fetcher);
+    expect(state.snapshot(key())?.refetching).toBe(true);
+
+    state.invalidate(key()); // mutation mid-refresh
+    release({ value: 2 }); // pre-mutation response lands late
+    await refresh;
+
+    // Previous data was kept while revalidating, but the superseded
+    // response never replaced it — the follow-up refetch commits instead.
+    await vi.waitFor(() => expect(state.snapshot(key())?.data).toEqual({ value: 3 }));
+    expect(state.snapshot(key())?.refetching).toBe(false);
+    expect(state.snapshot(key())?.error).toBeNull();
+  });
+
+  it('a patched value survives an in-flight response that resolves afterwards', async () => {
+    let release!: (data: { value: number }) => void;
+    const pending = state.load(
+      key(),
+      () =>
+        new Promise<{ value: number }>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    state.update(key(), (previous) => ({ value: (previous?.value ?? 0) + 100 }));
+    expect(state.snapshot(key())?.data).toEqual({ value: 100 });
+
+    release({ value: 1 }); // the load's response lands after the patch
+    await pending;
+
+    // No stale result overwrites new data.
+    expect(state.snapshot(key())?.data).toEqual({ value: 100 });
+    expect(state.snapshot(key())?.loading).toBe(false);
+    expect(state.snapshot(key())?.error).toBeNull();
+
+    // The patch is what made the entry fresh — no refetch in the window.
+    vi.setSystemTime(Date.now() + 10_000);
+    await state.load(key(), countingFetcher);
+    expect(fetches).toBe(0);
+  });
+
   it('update() patches synchronously and marks the data fresh', async () => {
     await state.load(key(), countingFetcher);
 

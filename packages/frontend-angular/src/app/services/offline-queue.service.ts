@@ -1,8 +1,9 @@
 import { Injectable, signal, inject } from '@angular/core';
 
-import { generateTempId } from '../lib/tempId';
 import { logger } from '../lib/logger';
+import { generateTempId } from '../lib/tempId';
 import type { OfflineMessage } from '../types/offline-message';
+import { MessagesService } from './messages.service';
 import { WebSocketStateService } from './websocket-state.service';
 
 /** Max queue size (React `MAX_QUEUE_SIZE`). */
@@ -30,6 +31,20 @@ function isOfflineMessage(value: unknown): value is OfflineMessage {
   );
 }
 
+/** Best-effort message extraction (Angular rejects with `HttpErrorResponse`, which is not an `Error`). */
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.length > 0) {
+      return message;
+    }
+  }
+  return 'Unknown error';
+}
+
 /**
  * Offline-queue signal store (T2 §3.2 `offline-queue.store` row): a
  * persisted FIFO (max 50) of messages composed while offline, with
@@ -39,16 +54,23 @@ function isOfflineMessage(value: unknown): value is OfflineMessage {
  * there is no `OfflineIndicator`/queue UI — building one is ANG-015's
  * recorded disposition, not silent scope.
  *
- * Sync mechanism parity note: the React `syncOfflineQueue` carries a
- * TODO for a batch-sync endpoint (`POST /api/conversations/messages/batch`)
- * that does not exist on the frozen contract — it is NOT invented here.
- * The ported mechanism is exactly the live one: mark syncing, drain
- * pending/failed rows on reconnect, stamp `lastSyncTime`, or record a
- * sync error and keep the rows queued as `failed`.
+ * Delivery semantics (review loop 1, PR #427): the React `syncOfflineQueue`
+ * simulated a batch-sync endpoint (`POST /api/conversations/messages/batch`)
+ * that does not exist on the frozen contract — it removed every row and
+ * reported success WITHOUT sending anything (permanent data loss). That
+ * behavior is intentionally NOT ported. Rows are delivered one-by-one
+ * through the one supported, server-confirmed send seam
+ * (`MessagesService.send` → `POST /api/conversations/:id/messages`), in
+ * strict FIFO order, and a row is removed only after its own send actually
+ * succeeds. A failed send keeps the row (status `failed`, per-message
+ * error), stops the drain so ordering is preserved for the retry, and the
+ * run reports an explicit non-success (`syncError`; `lastSyncTime` is
+ * stamped only after every row was delivered).
  */
 @Injectable({ providedIn: 'root' })
 export class OfflineQueueService {
   private readonly websocketState = inject(WebSocketStateService);
+  private readonly messagesApi = inject(MessagesService);
 
   private readonly messagesSignal = signal<OfflineMessage[]>(loadPersisted());
   /** Queued messages, FIFO order (max 50). */
@@ -142,8 +164,21 @@ export class OfflineQueueService {
     }
   }
 
-  /** Drain the queue: sync every pending/failed row (FIFO order). */
+  /**
+   * Drain the queue: deliver every pending/failed row FIFO through the
+   * supported send endpoint. A row leaves the queue only after its own
+   * send is confirmed by the server; a failed send keeps the row with a
+   * per-message error, records `syncError` and stops the drain (strict
+   * FIFO — later rows stay queued ahead of the retry so chat ordering is
+   * preserved).
+   */
   async sync(): Promise<void> {
+    if (this.syncingSignal()) {
+      // One drain at a time — a reconnect burst (browser `online` +
+      // socket-reconnect entry point) must not double-deliver rows.
+      logger.debug('[OfflineQueue] Sync already in progress');
+      return;
+    }
     const queued = this.messagesSignal();
     if (!queued.length) {
       logger.debug('[OfflineQueue] No messages to sync');
@@ -151,27 +186,42 @@ export class OfflineQueueService {
     }
     logger.info('[OfflineQueue] Starting sync', { messageCount: queued.length });
     this.setSyncing(true);
-    const pending = queued.filter((row) => row.status === 'pending' || row.status === 'failed');
+    // No sync can be running here (guard above), so any `syncing` rows are
+    // orphans from an interrupted run (crash/refresh mid-delivery) —
+    // reclaim and retry them together with pending/failed rows.
+    const pending = queued.filter(
+      (row) => row.status === 'pending' || row.status === 'failed' || row.status === 'syncing',
+    );
     if (!pending.length) {
       this.setSyncing(false);
       return;
     }
     try {
-      // Batch-sync endpoint is the recorded React TODO — not invented on
-      // the frozen contract. The live mechanism drains the drained rows.
       for (const row of pending) {
+        this.updateMessageStatus(row.tempId, 'syncing');
+        try {
+          await this.messagesApi.send(row.conversationId, { body: row.body });
+        } catch (error: unknown) {
+          const message = errorMessage(error);
+          logger.error('[OfflineQueue] Delivery failed', { tempId: row.tempId, error: message });
+          this.updateMessageStatus(row.tempId, 'failed', message);
+          throw error;
+        }
+        // Confirmed by the server — only now may the row leave the queue.
         this.removeMessage(row.tempId);
       }
       this.setLastSyncTime(Date.now());
       this.setSyncing(false);
-      logger.info('[OfflineQueue] Sync completed successfully', { syncedCount: pending.length });
+      logger.info('[OfflineQueue] Sync completed successfully', {
+        syncedCount: pending.length,
+      });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = errorMessage(error);
       logger.error('[OfflineQueue] Sync failed', { error: message });
+      // Explicit non-success: rows stay queued (failed row + everything
+      // after it), no `lastSyncTime` stamp — the next reconnect/manual
+      // retry redelivers them.
       this.setSyncError(message);
-      for (const row of pending) {
-        this.updateMessageStatus(row.tempId, 'failed', message);
-      }
     }
   }
 

@@ -30,6 +30,14 @@ interface Entry<T> {
   accessedAt: number;
   /** Last fetcher seen for this key — replays invalidate-triggered refetches. */
   fetcher: (() => Promise<T>) | null;
+  /**
+   * Bumped by every `invalidate()`/`update()` on this entry. An in-flight
+   * load captures the value at start and may only commit while it is
+   * unchanged — a response that was already in flight when the entry was
+   * invalidated/patched (potentially pre-mutation data) must never land
+   * as fresh or overwrite the newer value.
+   */
+  generation: number;
 }
 
 /**
@@ -53,9 +61,12 @@ interface Entry<T> {
  *   (gcTime parity without a sweep timer).
  * - `invalidate()` — mark stale + refetch now (entries that were loaded;
  *   keys never loaded are left uncreated — same observable behavior as
- *   marking-inactive-queries-stale-only).
+ *   marking-inactive-queries-stale-only). An invalidation of a key with a
+ *   load in flight supersedes that request: its response never lands as
+ *   fresh, and the refetch runs once the in-flight slot frees up.
  * - `update()` — synchronous patch (React `setQueryData` parity: the
- *   patched data becomes fresh).
+ *   patched data becomes fresh; an in-flight response resolving later
+ *   cannot overwrite it).
  */
 export class ResourceState<T> {
   private readonly entries = new Map<string, Entry<T>>();
@@ -116,22 +127,35 @@ export class ResourceState<T> {
       error: null,
     });
     entry.fetcher = fetcher;
+    const generation = entry.generation;
 
     const request = fetcher().then(
       (data) => {
-        entry.state.set({ data, loading: false, refetching: false, error: null });
-        entry.fetchedAt = Date.now();
-        entry.accessedAt = entry.fetchedAt;
+        if (entry.generation === generation) {
+          entry.state.set({ data, loading: false, refetching: false, error: null });
+          entry.fetchedAt = Date.now();
+          entry.accessedAt = entry.fetchedAt;
+        } else {
+          // Superseded mid-flight (invalidated or patched while running):
+          // keep the current committed value and just clear the in-flight
+          // markers — the follow-up refetch below revalidates instead.
+          entry.state.set({ ...entry.state(), loading: false, refetching: false });
+        }
         return data;
       },
       (error: unknown) => {
-        // Keep previous data on failure (keep-previous parity).
-        entry.state.set({
-          data: entry.state().data,
-          loading: false,
-          refetching: false,
-          error,
-        });
+        if (entry.generation === generation) {
+          // Keep previous data on failure (keep-previous parity).
+          entry.state.set({
+            data: entry.state().data,
+            loading: false,
+            refetching: false,
+            error,
+          });
+        } else {
+          // Superseded: don't publish the stale attempt's error either.
+          entry.state.set({ ...entry.state(), loading: false, refetching: false });
+        }
         throw error;
       },
     );
@@ -144,6 +168,12 @@ export class ResourceState<T> {
         if (this.inFlight.get(serialized) === request) {
           this.inFlight.delete(serialized);
         }
+        // The request was superseded by an invalidation mid-flight and so
+        // could not mark the entry fresh — run the invalidation's
+        // follow-up refetch now that the dedup slot has freed up.
+        if (entry.generation !== generation && entry.fetchedAt === 0 && entry.fetcher) {
+          void this.load(entry.key, entry.fetcher);
+        }
       });
     return request;
   }
@@ -152,18 +182,28 @@ export class ResourceState<T> {
    * Mark entries matching `prefix` stale and refetch the loaded ones now
    * (background, keep-previous). Without a prefix every loaded entry of
    * this instance is invalidated — the per-store invalidation unit.
+   *
+   * Entries with a request in flight are NOT skipped: the invalidation is
+   * recorded on the entry (generation bump + stale mark) so the in-flight
+   * response cannot land as fresh, and its completion handler runs the
+   * follow-up refetch once the per-key dedup slot frees up.
    */
   invalidate(prefix?: CacheKey): void {
     for (const [serialized, entry] of this.entries) {
       if (prefix && !ResourceState.startsWith(entry.key, prefix)) {
         continue;
       }
+      // Supersede any in-flight load BEFORE touching freshness so a
+      // pre-mutation response can never commit over the invalidation.
+      entry.generation += 1;
+      // Mark stale so the (follow-up) refetch bypasses the freshness gate
+      // (React invalidateQueries parity).
+      entry.fetchedAt = 0;
       if (!entry.fetcher || this.inFlight.has(serialized)) {
+        // No fetcher to replay (update-only entry), or a request is
+        // already running — the completion handler schedules the refetch.
         continue;
       }
-      // Mark stale first so the refetch bypasses the freshness gate
-      // (React invalidateQueries parity), then refetch in the background.
-      entry.fetchedAt = 0;
       void this.load(entry.key, entry.fetcher);
     }
   }
@@ -179,6 +219,9 @@ export class ResourceState<T> {
     if (next === undefined) {
       return;
     }
+    // The patch is the new truth — supersede in-flight loads so their
+    // responses cannot overwrite it (no stale result overwrites new data).
+    entry.generation += 1;
     entry.state.set({
       data: next,
       loading: false,
@@ -204,6 +247,7 @@ export class ResourceState<T> {
         fetchedAt: 0,
         accessedAt: Date.now(),
         fetcher: null,
+        generation: 0,
       };
       this.entries.set(serialized, entry);
     }
