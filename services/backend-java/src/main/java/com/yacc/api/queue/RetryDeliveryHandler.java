@@ -11,9 +11,8 @@ import java.util.UUID;
  * the POC {@code gateway-exchange.handleOutbound} owned them; the worker
  * ({@link QueueRetryService}) owns only the schedule/backoff/exhaustion and
  * the DLQ row lifecycle around each attempt. The production implementation
- * is the MIG-062 (#359) gateway exchange; until that lands
- * {@link QueueRetryConfig} wires a documented no-op default that reports
- * NOT delivered (fail-closed: a no-op must never mark anything delivered).</p>
+ * is the MIG-062 (#359) gateway exchange
+ * ({@code com.yacc.api.connector.GatewayExchange}).</p>
  *
  * <p><b>Delivery guarantee — at-least-once, no exactly-once claim:</b> the
  * frozen contract has no consumer acknowledgement, so the worker cannot
@@ -44,6 +43,37 @@ public interface RetryDeliveryHandler {
      *         recorded on the DLQ row ({@code last_error})
      */
     RetryOutcome deliver(UUID messageId);
+
+    /**
+     * The terminal-cycle notification (founder Option A, guardrails
+     * G15/G16): called <b>once</b> by the worker
+     * ({@link QueueRetryService}) after the durable terminal state has
+     * committed — on both terminal paths, the delivery-path exhaustion and
+     * the interrupted-claim settlement — so the terminal
+     * {@code queue.message.dlq} signal can never publish an undurable
+     * fact. Best-effort and at-most-once per terminal transition: the
+     * committed {@code retryCycle.exhausted} marker short-circuits every
+     * later worker entry point, so a firing/poll/settlement never notifies
+     * twice (a manual re-queue clears the marker — a later exhaustion is a
+     * <em>new</em> transition and notifies again). Exactly-once is not
+     * claimed and no outbox exists: a notification can be lost only in the
+     * crash window between the terminal commit and the in-memory fan-out —
+     * the durable DLQ row, the {@code failed} message status and the
+     * {@code failed} job state are the authoritative record.
+     *
+     * <p>Implementations must never throw (the notification must not break
+     * the state machine, the scheduler thread or the job removal) and must
+     * not run inside a DB transaction (durable first, then publish — the
+     * notification happens after the terminal write commits). The
+     * default is a documented no-op (G11 additive-seam pattern), so every
+     * existing lambda/mock keeps compiling.</p>
+     *
+     * @param messageId the exhausted message identity
+     */
+    default void onCycleExhausted(UUID messageId) {
+        // no-op default (G11): the production implementation is the
+        // MIG-062 (#359) gateway exchange via GatewayRedeliveryHandler.
+    }
 
     /**
      * One redelivery attempt result.

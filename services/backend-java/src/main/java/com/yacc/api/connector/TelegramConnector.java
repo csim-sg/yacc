@@ -52,7 +52,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * never logged or persisted in plaintext.</p>
  */
 @Service
-public class TelegramConnector {
+public class TelegramConnector implements PlatformConnector {
 
     private static final Logger log = LoggerFactory.getLogger(TelegramConnector.class);
 
@@ -69,6 +69,7 @@ public class TelegramConnector {
     private final TelegramCredentialsResolver credentials;
     private final ConnectorErrorHook errorHook;
     private final TelegramUpdateReceiver receiver;
+    private final ConnectorStatusListener statusListener;
     private final ObjectMapper mapper;
 
     private volatile ConnectorStatus status = ConnectorStatus.DISCONNECTED;
@@ -77,12 +78,14 @@ public class TelegramConnector {
 
     public TelegramConnector(RestClient.Builder restClientBuilder,
             TelegramConnectorProperties properties, TelegramCredentialsResolver credentials,
-            ConnectorErrorHook errorHook, TelegramUpdateReceiver receiver, ObjectMapper mapper) {
+            ConnectorErrorHook errorHook, TelegramUpdateReceiver receiver,
+            ConnectorStatusListener statusListener, ObjectMapper mapper) {
         this.restClient = restClientBuilder.build();
         this.properties = properties;
         this.credentials = credentials;
         this.errorHook = errorHook;
         this.receiver = receiver;
+        this.statusListener = statusListener;
         this.mapper = mapper;
     }
 
@@ -120,11 +123,16 @@ public class TelegramConnector {
         TelegramApiEnvelope response = callBotApi(resolvedCredentials.botToken(), "getMe", Map.of());
         if (!response.ok()) {
             status = ConnectorStatus.ERROR;
+            statusListener.onStatusChange(PLATFORM, ConnectorStatus.ERROR);
             throw failure("connect", response.failureCode(),
                     responseDescription(response, "Telegram API error"));
         }
         this.botToken = resolvedCredentials.botToken();
         status = ConnectorStatus.CONNECTED;
+        // MIG-062 server-side status surface: the connected transition emits
+        // the frozen raw status channels and resets the platform breaker
+        // (the G6 un-wedge path).
+        statusListener.onStatusChange(PLATFORM, ConnectorStatus.CONNECTED);
         log.info("Connected to Telegram{} (getMe ok)",
                 resolvedCredentials.botName() == null ? "" : " as " + resolvedCredentials.botName());
     }
@@ -134,6 +142,7 @@ public class TelegramConnector {
         log.info("Disconnecting from Telegram");
         status = ConnectorStatus.DISCONNECTED;
         botToken = null;
+        statusListener.onStatusChange(PLATFORM, ConnectorStatus.DISCONNECTED);
     }
 
     /**

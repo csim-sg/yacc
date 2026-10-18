@@ -43,6 +43,7 @@ class IrcConnectorTest {
     private ConnectorErrorHook errorHook;
     private final List<IrcInboundMessage> inbound = new CopyOnWriteArrayList<>();
     private IrcConnectionState state;
+    private ConnectorStatusListener statusListener = mock(ConnectorStatusListener.class);
     private IrcConnector connector;
 
     @BeforeEach
@@ -51,7 +52,7 @@ class IrcConnectorTest {
         errorHook = mock(ConnectorErrorHook.class);
         state = new IrcConnectionState();
         connector = new IrcConnector(resolver, errorHook, inbound::add,
-                new IrcConnectorProperties(2_000, 20L, 60L), state);
+                new IrcConnectorProperties(2_000, 20L, 60L), state, statusListener);
     }
 
     @AfterEach
@@ -87,7 +88,29 @@ class IrcConnectorTest {
         assertThat(snapshot.status()).isEqualTo("connected");
         assertThat(snapshot.attemptCount()).isZero();
         assertThat(snapshot.lastConnectedAt()).isNotNull();
-        assertThat(snapshot.reconnectIncidentId()).isNull();
+        // MIG-062 server-side status surface: the connected transition fires
+        // the additive seam.
+        verify(statusListener).onStatusChange(IrcConnector.PLATFORM,
+                ConnectorStatus.CONNECTED);
+    }
+
+    /** MIG-062 G12: the resolved profile id rides on the inbound payload. */
+    @Test
+    void inboundPrivmsgCarriesTheResolvedProfileId() throws Exception {
+        server = new MockIrcServer();
+        server.autoRegister();
+        resolveTo(server, null, List.of("#test"));
+
+        connector.connect();
+        server.sendLine(":nick!~nick@irc PRIVMSG #test :profile check");
+        long deadline = System.currentTimeMillis() + WAIT.toMillis();
+        while (inbound.isEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(20);
+        }
+
+        assertThat(inbound).hasSize(1);
+        assertThat(inbound.get(0).profileId()).isEqualTo(7);
+        assertThat(state.snapshot().reconnectIncidentId()).isNull();
         verify(errorHook, never()).onAdapterError(any());
     }
 
@@ -208,7 +231,7 @@ class IrcConnectorTest {
         // A long base delay makes the cancelled attempt unambiguous: no
         // second registration may ever arrive.
         connector = new IrcConnector(resolver, errorHook, inbound::add,
-                new IrcConnectorProperties(2_000, 5_000L, 6_000L), state);
+                new IrcConnectorProperties(2_000, 5_000L, 6_000L), state, statusListener);
         resolveTo(server, null, List.of("#test"));
         assertThatThrownBy(connector::connect)
                 .isInstanceOf(ConnectorException.class);

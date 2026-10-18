@@ -73,6 +73,25 @@ public interface ConversationRepository
         return (root, query, cb) -> cb.equal(root.get("channel"), channel);
     }
 
+    /**
+     * Specification matching the exact external thread id (MIG-062 inbound
+     * find-or-create; POC {@code gateway-exchange.upsertConversation}
+     * parity). Persistence traversal stays inside the owning repository
+     * (ARCH-004 §7).
+     */
+    static Specification<Conversation> hasExternalThreadId(String externalThreadId) {
+        return (root, query, cb) -> cb.equal(root.get("externalThreadId"), externalThreadId);
+    }
+
+    /**
+     * Specification matching the exact IRC profile id (MIG-062 inbound
+     * find-or-create; guardrail G12 — applied only when the inbound event
+     * carries a resolved profile).
+     */
+    static Specification<Conversation> hasIrcProfileId(Integer ircProfileId) {
+        return (root, query, cb) -> cb.equal(root.get("ircProfileId"), ircProfileId);
+    }
+
     /** Specification filtering by status. */
     static Specification<Conversation> hasStatus(ConversationStatus status) {
         return (root, query, cb) -> cb.equal(root.get("status"), status);

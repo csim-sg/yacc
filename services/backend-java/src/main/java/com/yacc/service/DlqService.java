@@ -74,6 +74,17 @@ public class DlqService {
     private static final String RETRY_CYCLE_FAILED_KEY = "failed";
     private static final String RETRY_CYCLE_EXHAUSTED_KEY = "exhausted";
 
+    /**
+     * The documented + POC terminal failure vocabulary
+     * ({@code .docs/02-api-and-data-model.md} &sect;message.failed /
+     * {@code dead_letter_queue.failure_reason}; POC
+     * {@code messageStatusTracker.moveToDLQ(…, 'max_retries_exceeded', …)}),
+     * written onto the row in the same transaction as the terminal cycle
+     * marker (guardrail G15) — the value the terminal
+     * {@code queue.message.dlq} payload reports verbatim.
+     */
+    public static final String MAX_RETRIES_EXCEEDED_REASON = "max_retries_exceeded";
+
     /** POC retention parity: DLQ entries expire 7 days after they move. */
     private static final int RETENTION_DAYS = 7;
 
@@ -123,9 +134,12 @@ public class DlqService {
      * Records one failed redelivery attempt (MIG-063 worker): refreshes
      * {@code last_error}/{@code total_attempts}/{@code updated_at} and
      * persists the cycle state — the attempt counter and the recorded-outcome
-     * marker, plus, when the retry cycle is exhausted, the terminal marker.
-     * The outcome state is canonical: {@code started} is dropped (the
-     * recorded outcome supersedes it).
+     * marker, plus, when the retry cycle is exhausted, the terminal marker
+     * <b>and</b> the documented terminal {@code failure_reason}
+     * ({@link #MAX_RETRIES_EXCEEDED_REASON}) in the same transaction (G15 —
+     * the durable terminal row and the terminal notification can never
+     * disagree). The outcome state is canonical: {@code started} is dropped
+     * (the recorded outcome supersedes it).
      */
     @Transactional
     public DeadLetterQueueEntry recordFailedAttempt(UUID id, String lastError,
@@ -141,6 +155,7 @@ public class DlqService {
         cycle.remove(RETRY_CYCLE_STARTED_KEY);
         if (cycleExhausted) {
             cycle.put(RETRY_CYCLE_EXHAUSTED_KEY, true);
+            entry.setFailureReason(MAX_RETRIES_EXCEEDED_REASON);
         }
         entry.setMetadata(mergeMetadata(entry.getMetadata(), RETRY_CYCLE_METADATA_KEY, cycle));
         entry.setUpdatedAt(LocalDateTime.now());

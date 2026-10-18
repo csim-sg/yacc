@@ -103,6 +103,17 @@ class RealtimeTransportContractAlignmentTest {
             "user.status", "request.online.users",
             "typing.timeout", "typing.heartbeat");
 
+    /**
+     * MIG-062 connector bridge channels (frozen AsyncAPI channels; ledger
+     * WS-OP-CONN-001/002/005/006, WS-RAW-008/009/012/013) — the four
+     * remaining inbound connector ops, their raw emissions and the
+     * server-side status channels.
+     */
+    private static final List<String> MIG_062_CHANNELS = List.of(
+            "connector.message.received", "connector.status.changed",
+            "connector.message.error", "connector.message.ack",
+            "connector.status", "status.updated", "message.error", "message.ack");
+
     /** MIG-050-owned ledger row IDs (scope ceiling: the transport core). */
     private static final List<String> MIG_050_LEDGER_ROWS = List.of(
             "WS-BHV-001", "WS-OP-CONV-004", "WS-OP-CONV-005",
@@ -154,7 +165,8 @@ class RealtimeTransportContractAlignmentTest {
         List<String> declared = declaredConstants();
 
         assertThat(declared).containsExactlyInAnyOrderElementsOf(concat(
-                FROZEN_23, ACK_CHANNELS, INBOUND_CHANNELS, MIG_051_CHANNELS));
+                FROZEN_23, ACK_CHANNELS, INBOUND_CHANNELS, MIG_051_CHANNELS,
+                MIG_062_CHANNELS));
 
         assertThat(channelsOf(asyncapi).keySet()).containsAll(declared);
     }
@@ -208,6 +220,7 @@ class RealtimeTransportContractAlignmentTest {
                 org.mockito.Mockito.mock(WebSocketPresenceService.class),
                 org.mockito.Mockito.mock(WebSocketTypingService.class),
                 org.mockito.Mockito.mock(WebSocketReconnectService.class),
+                org.mockito.Mockito.mock(ConnectorRelayService.class),
                 mapper);
 
         Map<String, Object> attributes = new HashMap<>();
