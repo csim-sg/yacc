@@ -1,263 +1,220 @@
 import { z } from 'zod';
 
 /**
- * Socket.io server→client event contracts (T3 §5.1/§5.2 — verified wire).
+ * Raw WebSocket wire contracts (R1 target — FROZEN contract, ADR-023).
  *
- * Per-event schemas encoding each event's ACTUAL wire format — there is
- * deliberately NO single envelope assumption:
- * - `conversation.updated` / `message.received` — RAW FLAT payloads,
- *   room-scoped (`conversation:{id}`) via `WebSocketServer.emitToConversation`.
- * - `message.sent` / `message.failed` — `{ event, data, timestamp }`
- *   ENVELOPE, global broadcast, emitted only by the legacy
- *   `wsGateway.emitGlobally` path (T3-G5, decision U3: the frontend
- *   encodes this wire truth; backend unification is a post-gate founder
- *   decision — NOT fixed frontend-side).
- * - `notification.received` / `conversation.reopened` — DECLARED, no
- *   backend emitter exists (T3-G2/G3); schemas encode the declared
- *   frontend shape so an emitter appearing becomes a visible change.
- * - `presence.updated` — raw `{ userId, isOnline, timestamp }` global
- *   broadcast (wire truth; the richer React listener type is NOT
- *   replicated — T3-G4, parity = same absence).
- * - `message.retry.scheduled` / `queue.message.dlq` — legacy-gateway
- *   envelopes, not listened to by the frontend (LIVE, unconsumed).
- * - No `eventId` field is ever sent by the backend (T3-G10) — declared
- *   `eventId` fields are optional and never depended on.
- * - There are NO client→server event contracts: the real-time surface is
- *   inbound-only (T2 B14/G10; ARCH-005 boundary 2).
+ * Encoded 1:1 from the frozen `.docs/migration/asyncapi.yaml` +
+ * `.docs/migration/schemas/*.json` (GOV-038 — the frozen files are
+ * read-only; this local contract layer mirrors them, never redefines):
+ *
+ * - EVERY server→client frame carries the frozen `{event, data,
+ *   timestamp}` envelope (`schemas/envelope.schema.json`; ADR-026). The
+ *   Node-baseline flat/enveloped duality (T3-G5 / U3) is SUPERSEDED as
+ *   wire truth by SPEC-003 §Java Baseline Approval R1 — there is one
+ *   frame shape, and the per-channel `data` payload is what the frozen
+ *   per-event schemas describe.
+ * - The canonical subscribe-side listener set = the 9 channels the
+ *   verified React frontend consumed (T3 §5.1 / `socketListeners.ts`) +
+ *   the 7 `system.*` channels the frozen target wires (ADR-026
+ *   application-level resilience; `contract-canonicalization.md` §4.3).
+ * - Frozen dispositions mirrored, never resolved here:
+ *   `notification.deleted` / `notification.read` /
+ *   `notification.dismissed` are `retained-no-emitter`
+ *   (parity-of-absence — no listener is registered and no coverage is
+ *   claimed; wiring them is a founder decision, U1). `conversation.
+ *   reopened` (U2) is a declared frozen channel with no pinned payload
+ *   shape — its known members are encoded optional. The queue channels
+ *   (`message.retry.scheduled`, `queue.message.dlq`) stay unconsumed
+ *   (verified React baseline consumed neither).
+ * - No `eventId` field exists on the wire (T3-G10) and none is depended
+ *   on. There are NO client→server contracts here: the real-time surface
+ *   is inbound-only (T2 B14 / T3-G10; ARCH-005 boundary 2) — the client
+ *   sends nothing.
+ * - `presence.updated` data is the MIG-003 canonical shape
+ *   `{userId, status: online|offline, lastSeen}` — the retired
+ *   `{userId, isOnline, timestamp}` disconnect variant and the richer
+ *   React listener type (T3-G4) are NOT encoded.
  */
 
 // ---------------------------------------------------------------------------
-// Shared envelope
+// Frozen envelope (schemas/envelope.schema.json)
 // ---------------------------------------------------------------------------
 
-/** Legacy-gateway envelope: `{ event, data, timestamp }` (T3-G5). */
-function wsEnvelopeSchema<E extends string, T extends z.ZodTypeAny>(eventName: E, data: T) {
-  return z.object({
-    event: z.literal(eventName),
-    data,
-    timestamp: z.string(),
-  });
-}
+/** The ONE server→client frame shape: `{event, data, timestamp}`. */
+export const WsEnvelopeSchema = z.object({
+  event: z.string(),
+  data: z.unknown(),
+  timestamp: z.string(),
+});
+
+export type WsEnvelope = z.infer<typeof WsEnvelopeSchema>;
 
 // ---------------------------------------------------------------------------
-// conversation.updated — flat payload, conversation room
+// Per-channel `data` payloads (frozen schemas/*.json, verbatim members)
 // ---------------------------------------------------------------------------
 
-export const ConversationUpdatedEventSchema = z.object({
+/** `conversation.updated` data (schemas/conversation-updated.schema.json). */
+export const ConversationUpdatedPayloadSchema = z.object({
   conversationId: z.string().uuid(),
   updatedFields: z.record(z.string(), z.unknown()),
   changedBy: z.string(),
   changedAt: z.string(),
 });
+export type ConversationUpdatedPayload = z.infer<typeof ConversationUpdatedPayloadSchema>;
 
-export type ConversationUpdatedEvent = z.infer<typeof ConversationUpdatedEventSchema>;
+/**
+ * `conversation.reopened` data (frozen payload: `additionalProperties:
+ * true`, no required members — the shape is NOT pinned; U2 emitter
+ * decision is open). The declared members are encoded optional so the
+ * frozen "no required fields" truth holds while known members stay
+ * visible; the handler consumes `conversationId` only when present.
+ */
+export const ConversationReopenedPayloadSchema = z
+  .object({
+    conversationId: z.string().uuid(),
+    reason: z.string(),
+  })
+  .partial()
+  .passthrough();
+export type ConversationReopenedPayload = z.infer<typeof ConversationReopenedPayloadSchema>;
 
-// ---------------------------------------------------------------------------
-// message.received — flat payload, conversation room (IRC/connector ingestion)
-// ---------------------------------------------------------------------------
-
-export const MessageReceivedEventSchema = z.object({
-  messageId: z.string(),
+/** `message.received` data (schemas/message-received.schema.json). */
+export const MessageReceivedPayloadSchema = z.object({
+  messageId: z.string().uuid(),
   conversationId: z.string().uuid(),
   platform: z.enum(['telegram', 'irc']),
-  senderId: z.string(),
-  body: z.string(),
-  senderName: z.string(),
+  senderId: z.string().min(1),
+  senderName: z.string().min(1),
+  body: z.string().min(1),
   timestamp: z.string(),
-  /** Declared by the React listener type; not sent by any verified producer. */
   attachments: z
     .array(z.object({ url: z.string(), type: z.string(), name: z.string() }))
     .optional(),
 });
+export type MessageReceivedPayload = z.infer<typeof MessageReceivedPayloadSchema>;
 
-export type MessageReceivedEvent = z.infer<typeof MessageReceivedEventSchema>;
-
-// ---------------------------------------------------------------------------
-// message.sent / message.failed — ENVELOPE, global broadcast (T3-G5)
-// ---------------------------------------------------------------------------
-
+/** `message.sent` data (schemas/message-sent.schema.json). */
 export const MessageSentPayloadSchema = z.object({
-  messageId: z.string(),
-  conversationId: z.string(),
+  messageId: z.string().uuid(),
+  conversationId: z.string().uuid(),
   status: z.literal('sent'),
-  platformMessageId: z.string(),
-  timestamp: z.string(),
+  sentAt: z.string(),
 });
+export type MessageSentPayload = z.infer<typeof MessageSentPayloadSchema>;
 
-export const MessageSentEventSchema = wsEnvelopeSchema('message.sent', MessageSentPayloadSchema);
-
-export type MessageSentEvent = z.infer<typeof MessageSentEventSchema>;
-
+/** `message.failed` data (schemas/message-failed.schema.json). */
 export const MessageFailedPayloadSchema = z.object({
-  messageId: z.string(),
-  conversationId: z.string(),
-  status: z.enum(['failed', 'pending']),
-  attempt: z.number().int(),
-  maxAttempts: z.number().int(),
+  messageId: z.string().uuid(),
+  conversationId: z.string().uuid(),
+  status: z.literal('failed'),
   error: z.string(),
-  nextRetryTime: z.string().optional(),
-  isFinal: z.boolean(),
+  retryAt: z.string(),
+  attempt: z.number().int().min(1).max(3),
 });
+export type MessageFailedPayload = z.infer<typeof MessageFailedPayloadSchema>;
 
-export const MessageFailedEventSchema = wsEnvelopeSchema(
-  'message.failed',
-  MessageFailedPayloadSchema
-);
-
-export type MessageFailedEvent = z.infer<typeof MessageFailedEventSchema>;
-
-// ---------------------------------------------------------------------------
-// connection.established — raw, on connect (unconsumed by the frontend)
-// ---------------------------------------------------------------------------
-
-export const ConnectionEstablishedEventSchema = z.object({
-  socketId: z.string(),
-  timestamp: z.string(),
+/**
+ * `presence.updated` data (schemas/presence-updated.schema.json — the
+ * MIG-003 canonical shape, incl. the disconnect path).
+ */
+export const PresenceUpdatedPayloadSchema = z.object({
+  userId: z.string().uuid(),
+  status: z.enum(['online', 'offline']),
+  lastSeen: z.string(),
 });
+export type PresenceUpdatedPayload = z.infer<typeof PresenceUpdatedPayloadSchema>;
 
-export type ConnectionEstablishedEvent = z.infer<typeof ConnectionEstablishedEventSchema>;
-
-// ---------------------------------------------------------------------------
-// presence.updated — raw `{ userId, isOnline, timestamp }`, global (T3-G4)
-// ---------------------------------------------------------------------------
-
-export const PresenceUpdatedEventSchema = z.object({
-  userId: z.string(),
-  isOnline: z.boolean(),
-  timestamp: z.string(),
-});
-
-export type PresenceUpdatedEvent = z.infer<typeof PresenceUpdatedEventSchema>;
-
-// ---------------------------------------------------------------------------
-// notification.received — DECLARED, no backend emitter (T3-G2)
-// ---------------------------------------------------------------------------
-
-export const NotificationReceivedEventSchema = z.object({
-  notification: z.object({
-    id: z.string(),
-    userId: z.string(),
-    type: z.enum(['assignment', 'mention', 'unread']),
-    conversationId: z.string(),
-    actorId: z.string().optional(),
-    actorName: z.string().optional(),
-    message: z.string(),
-    isRead: z.boolean(),
-    createdAt: z.string(),
-  }),
-  timestamp: z.string(),
-  /** Never sent by the backend (T3-G10). */
-  eventId: z.string().optional(),
-});
-
-export type NotificationReceivedEvent = z.infer<typeof NotificationReceivedEventSchema>;
-
-// ---------------------------------------------------------------------------
-// conversation.reopened — DECLARED, no backend emitter (T3-G3)
-// ---------------------------------------------------------------------------
-
-export const ConversationReopenedEventSchema = z.object({
+/** `typing.started` data (schemas/typing-started.schema.json — `name`). */
+export const TypingStartedPayloadSchema = z.object({
   conversationId: z.string().uuid(),
-  reason: z.string(),
-  timestamp: z.string(),
-  /** Never sent by the backend (T3-G10). */
-  eventId: z.string().optional(),
+  userId: z.string().uuid(),
+  name: z.string().min(1),
 });
+export type TypingStartedPayload = z.infer<typeof TypingStartedPayloadSchema>;
 
-export type ConversationReopenedEvent = z.infer<typeof ConversationReopenedEventSchema>;
-
-// ---------------------------------------------------------------------------
-// Queue / delivery pipeline — legacy-gateway envelopes, unconsumed (§5.1)
-// ---------------------------------------------------------------------------
-
-export const MessageRetryScheduledEventSchema = wsEnvelopeSchema(
-  'message.retry.scheduled',
-  z.object({
-    messageId: z.string(),
-    conversationId: z.string(),
-    attempt: z.number().int(),
-    nextRetryTime: z.string().optional(),
-    timestamp: z.string(),
-  })
-);
-
-export type MessageRetryScheduledEvent = z.infer<typeof MessageRetryScheduledEventSchema>;
-
-export const QueueMessageDlqEventSchema = wsEnvelopeSchema(
-  'queue.message.dlq',
-  z.object({
-    messageId: z.string(),
-    conversationId: z.string(),
-    failureReason: z.string(),
-    totalAttempts: z.number().int(),
-    lastError: z.string(),
-    correlationId: z.string().optional(),
-    requiresReview: z.boolean(),
-    timestamp: z.string(),
-  })
-);
-
-export type QueueMessageDlqEvent = z.infer<typeof QueueMessageDlqEventSchema>;
-
-// ---------------------------------------------------------------------------
-// typing.started / typing.stopped — UNWIRED producer (§5.1); declared shapes
-// ---------------------------------------------------------------------------
-
-export const TypingStartedEventSchema = z.object({
+/** `typing.stopped` data (schemas/typing-stopped.schema.json). */
+export const TypingStoppedPayloadSchema = z.object({
   conversationId: z.string().uuid(),
-  userId: z.string(),
-  userName: z.string(),
-  timestamp: z.string(),
-  /** Never sent by the backend (T3-G10). */
-  eventId: z.string().optional(),
+  userId: z.string().uuid(),
 });
+export type TypingStoppedPayload = z.infer<typeof TypingStoppedPayloadSchema>;
 
-export type TypingStartedEvent = z.infer<typeof TypingStartedEventSchema>;
-
-export const TypingStoppedEventSchema = z.object({
+/**
+ * `notification.received` data (schemas/notification.schema.json — wire
+ * enum `assignment|mention|system`). The sibling channels
+ * `notification.deleted` / `notification.read` /
+ * `notification.dismissed` are `retained-no-emitter` (frozen
+ * `x-disposition`): no schema is encoded here because no listener exists
+ * (parity-of-absence, U1).
+ */
+export const NotificationPayloadSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid(),
+  type: z.enum(['assignment', 'mention', 'system']),
   conversationId: z.string().uuid(),
-  userId: z.string(),
-  timestamp: z.string(),
-  /** Never sent by the backend (T3-G10). */
-  eventId: z.string().optional(),
+  actorId: z.string(),
+  actorName: z.string(),
+  message: z.string(),
+  isRead: z.boolean(),
+  createdAt: z.string(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
+export type NotificationPayload = z.infer<typeof NotificationPayloadSchema>;
 
-export type TypingStoppedEvent = z.infer<typeof TypingStoppedEventSchema>;
+/**
+ * `system.*` data (schemas/system-payload.schema.json) — shared by the
+ * seven wired system channels.
+ */
+export const SystemPayloadSchema = z.object({
+  type: z.enum(['heartbeat', 'connection_established', 'reconnection', 'error', 'backlog_replay']),
+  timestamp: z.string(),
+  data: z.record(z.string(), z.unknown()).optional(),
+  error: z.object({ code: z.string(), message: z.string() }).optional(),
+});
+export type SystemPayload = z.infer<typeof SystemPayloadSchema>;
 
 // ---------------------------------------------------------------------------
-// Event-name registry + typed payload map (the single socket surface)
+// Listener registry (the fixed inbound surface) + typed fan-out map
 // ---------------------------------------------------------------------------
 
-/** Every server→client event name on the verified baseline (T3 §5.1). */
+/** Every channel the raw-WS event router recognizes (the fixed set). */
 export const WS_SERVER_EVENTS = {
   conversationUpdated: 'conversation.updated',
+  conversationReopened: 'conversation.reopened',
   messageReceived: 'message.received',
   messageSent: 'message.sent',
   messageFailed: 'message.failed',
-  connectionEstablished: 'connection.established',
-  presenceUpdated: 'presence.updated',
-  notificationReceived: 'notification.received',
-  conversationReopened: 'conversation.reopened',
-  messageRetryScheduled: 'message.retry.scheduled',
-  queueMessageDlq: 'queue.message.dlq',
   typingStarted: 'typing.started',
   typingStopped: 'typing.stopped',
+  presenceUpdated: 'presence.updated',
+  notificationReceived: 'notification.received',
+  systemConnectionEstablished: 'system.connection.established',
+  systemReconnectionStarted: 'system.reconnection.started',
+  systemReconnectionFailed: 'system.reconnection.failed',
+  systemHeartbeat: 'system.heartbeat',
+  systemError: 'system.error',
+  systemBacklogReplayStarted: 'system.backlog.replay.started',
+  systemBacklogReplayCompleted: 'system.backlog.replay.completed',
 } as const;
 
 export type WsServerEventName = (typeof WS_SERVER_EVENTS)[keyof typeof WS_SERVER_EVENTS];
 
-/** Event name → wire payload type (flat or envelope per the schemas above). */
+/** Channel name → envelope `data` payload type (frozen per-channel shape). */
 export interface WsEventPayloadMap {
-  'conversation.updated': ConversationUpdatedEvent;
-  'message.received': MessageReceivedEvent;
-  'message.sent': MessageSentEvent;
-  'message.failed': MessageFailedEvent;
-  'connection.established': ConnectionEstablishedEvent;
-  'presence.updated': PresenceUpdatedEvent;
-  'notification.received': NotificationReceivedEvent;
-  'conversation.reopened': ConversationReopenedEvent;
-  'message.retry.scheduled': MessageRetryScheduledEvent;
-  'queue.message.dlq': QueueMessageDlqEvent;
-  'typing.started': TypingStartedEvent;
-  'typing.stopped': TypingStoppedEvent;
+  'conversation.updated': ConversationUpdatedPayload;
+  'conversation.reopened': ConversationReopenedPayload;
+  'message.received': MessageReceivedPayload;
+  'message.sent': MessageSentPayload;
+  'message.failed': MessageFailedPayload;
+  'typing.started': TypingStartedPayload;
+  'typing.stopped': TypingStoppedPayload;
+  'presence.updated': PresenceUpdatedPayload;
+  'notification.received': NotificationPayload;
+  'system.connection.established': SystemPayload;
+  'system.reconnection.started': SystemPayload;
+  'system.reconnection.failed': SystemPayload;
+  'system.heartbeat': SystemPayload;
+  'system.error': SystemPayload;
+  'system.backlog.replay.started': SystemPayload;
+  'system.backlog.replay.completed': SystemPayload;
 }

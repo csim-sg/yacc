@@ -68,6 +68,16 @@ export class ConversationsStore {
     this.details.invalidate(cacheKeys.conversations.detail(conversationId));
   }
 
+  /**
+   * Invalidate every conversations list entry (all filter variants) —
+   * the B4 mapping used by the ANG-006 real-time handlers and the
+   * socket `connect$` refetch, mirroring the React
+   * `invalidateQueries({ queryKey: ['conversations'] })` unit.
+   */
+  invalidateLists(): void {
+    this.lists.invalidate(cacheKeys.conversations.all());
+  }
+
   /** PATCH /api/conversations/:id/status → invalidate detail + lists. */
   async updateStatus(
     conversationId: string,
@@ -100,9 +110,5 @@ export class ConversationsStore {
     await this.service.assign(conversationId, { assignedUserId });
     this.invalidateDetail(conversationId);
     this.invalidateLists();
-  }
-
-  private invalidateLists(): void {
-    this.lists.invalidate(cacheKeys.conversations.all());
   }
 }
