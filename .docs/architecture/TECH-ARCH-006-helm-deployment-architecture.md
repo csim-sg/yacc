@@ -19,7 +19,9 @@ This document details the **technical architecture** for deploying YACC backend 
 - GitOps workflow integration
 - Namespace and RBAC strategy
 
-**Scope**: Backend deployment only (PostgreSQL, Redis, Node.js API). Frontend deployment remains AWS S3 + CloudFront (out of Kubernetes).
+**Scope**: Backend deployment only (PostgreSQL + Java/Spring API). Frontend deployment remains AWS S3 + CloudFront (out of Kubernetes).
+
+> **Java migration note (SPEC-002 / ADR-029, MIG-012)**: the chart deploys the Java 21 service built from `services/backend-java/Dockerfile` (Temurin 21 JRE, non-root uid 1000, read-only root filesystem). **Redis was removed** (ADR-028: Quartz + PostgreSQL DLQ/WS-backlog replace it) — the Redis StatefulSet/PVC/`REDIS_URL` below are historical Node-era artifacts corrected in place; the pod envelope is ≥1Gi request / 2Gi limit (ADR-029) and probes use the actuator wire paths `/health/live` + `/health/ready`.
 
 **Target Audience**: Backend developers, DevOps engineers, infrastructure architects
 
@@ -120,8 +122,8 @@ Same Helm chart, different configurations
 - **Type**: Deployment (manages ReplicaSet, rolling updates)
 - **Replicas**: 1 (MVP), scale to 2-3+ for high availability
 - **Strategy**: RollingUpdate (0 downtime during updates)
-- **Liveness Probe**: HTTP GET `/health` (every 30s, fail after 3 tries = 90s)
-- **Readiness Probe**: HTTP GET `/ready` (every 10s, fail after 3 tries = 30s)
+- **Liveness Probe**: HTTP GET `/health/live` (actuator liveness group, ADR-029; every 30s, fail after 3 tries = 90s)
+- **Readiness Probe**: HTTP GET `/health/ready` (actuator readiness group; every 10s, fail after 3 tries = 30s)
 
 **Manifest Template** (pseudocode):
 
@@ -157,9 +159,9 @@ spec:
           containerPort: 8080
           protocol: TCP
         env:
-        - name: NODE_ENV
-          value: "{{ .Values.nodeEnv }}"
-        - name: PORT
+        - name: SPRING_PROFILES_ACTIVE
+          value: "{{ .Values.config.SPRING_PROFILES_ACTIVE }}"
+        - name: SERVER_PORT
           value: "8080"
         envFrom:
         - configMapRef:
@@ -169,23 +171,23 @@ spec:
         resources:
           requests:
             cpu: 500m
-            memory: 512Mi
+            memory: 1Gi
           limits:
             cpu: 1000m
-            memory: 1Gi
+            memory: 2Gi
         livenessProbe:
           httpGet:
-            path: /health
+            path: /health/live
             port: http
-          initialDelaySeconds: 15
+          initialDelaySeconds: 30
           periodSeconds: 30
           timeoutSeconds: 5
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /ready
+            path: /health/ready
             port: http
-          initialDelaySeconds: 5
+          initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 3
           failureThreshold: 3
@@ -287,15 +289,15 @@ POSTGRES_SVC_PORT_5432_TCP_PORT=5432
 **Short Names** (within same namespace):
 ```bash
 postgres-svc              # Resolves to: 10.43.100.200
-redis-svc                 # Resolves to: 10.43.200.100
 ```
 
 **Fully Qualified Names** (across namespaces):
 ```bash
 postgres-svc.yacc-staging.svc.cluster.local
-redis-svc.yacc-staging.svc.cluster.local
 kube-dns.kube-system.svc.cluster.local
 ```
+
+> Redis service examples were removed: there is no Redis service in the cluster (ADR-028).
 
 ### Network Policies (Post-MVP)
 
@@ -333,13 +335,6 @@ spec:
     ports:
     - protocol: TCP
       port: 5432
-  - to:
-    - podSelector:
-        matchLabels:
-          app: redis
-    ports:
-    - protocol: TCP
-      port: 6379
   # Allow DNS (CoreDNS)
   - to:
     - namespaceSelector: {}
@@ -359,16 +354,16 @@ spec:
 resources:
   requests:
     cpu: 500m              # Minimum guaranteed
-    memory: 512Mi          # Minimum guaranteed
+    memory: 1Gi            # Minimum guaranteed (ADR-029 JVM envelope)
   limits:
     cpu: 1000m             # Maximum allowed
-    memory: 1Gi            # Maximum allowed
+    memory: 2Gi            # Maximum allowed (JVM heap sizes from the limit)
 ```
 
 **Rationale**:
 - **Requests**: Scheduler uses to place pod; cluster needs at least this much free
-- **Limits**: Kubernetes kills pod if exceeds (prevent runaway processes)
-- **Headroom**: 2x requests = limit (safety margin)
+- **Limits**: Kubernetes kills pod if exceeds (prevent runaway processes); the JVM sizes heap via `MaxRAMPercentage=75`
+- **Envelope floor**: ADR-029 requires ≥1Gi request / 2Gi limit (the Node-era 512Mi/1Gi was too small for the JVM)
 
 ### Resource Calculations (MVP Single Node)
 
@@ -378,13 +373,14 @@ Node Capacity:
   Memory: 4 GB (3 GB usable after OS)
 
 Pod Allocations:
-  Backend:     500m / 512 MB request
+  Backend:     500m / 1 Gi request (ADR-029 envelope)
   PostgreSQL:  500m / 1 GB request
-  Redis:       250m / 256 MB request
   K3s system:  750m / 1 GB (kubelet, apiserver, etcd, etc.)
   ──────────────────────────
-  Total:       2000m / 2.7 GB (75% utilized at startup)
-  Buffer:      0m / 0.3 GB (25% headroom for spikes)
+  Total:       1750m / 3 GB (~90% of usable memory at request level)
+  Buffer:      250m / 1 GB — size the node accordingly (4 GB is the floor; prefer more headroom)
+
+(No Redis allocation — Redis was removed, ADR-028.)
 ```
 
 ### Horizontal Pod Autoscaling (Post-MVP)
@@ -438,7 +434,7 @@ spec:
 ### Backend: Deployment (Stateless)
 
 **Why Deployment**:
-- Backend is stateless (all state in PostgreSQL + Redis)
+- Backend is stateless (all state in PostgreSQL; async durability via the Quartz job store, DLQ and WS-backlog tables — ADR-028)
 - Any pod replica is interchangeable
 - Rolling updates work cleanly (no data consistency issues)
 
@@ -467,21 +463,15 @@ spec:
   # ...
 ```
 
-### Redis: StatefulSet (Stateful)
+### Async Durability: PostgreSQL (no Redis StatefulSet)
 
-**Why StatefulSet**:
-- Redis maintains in-memory state (cache, message queue)
-- RDB snapshots persisted to disk
-- Stable identity for monitoring/debugging
+**Why no queue StatefulSet**:
+- ADR-028 replaced Redis/BullMQ with Quartz backed by the PostgreSQL JDBC job store, plus the `dead_letter_queue` and `websocket_backlog` tables
+- There is no Redis pod, service, PVC, or `REDIS_URL` in the current chart (MIG-012 removed them)
 
 ```yaml
-kind: StatefulSet
-metadata:
-  name: redis
-spec:
-  serviceName: redis
-  replicas: 1  # MVP: single instance (sentinel/cluster post-MVP)
-  # ...
+# Historical Node-era example removed — nothing to deploy.
+# Retry/queue state lives in PostgreSQL (Flyway-managed tables).
 ```
 
 ---
@@ -498,13 +488,12 @@ kind: ConfigMap
 metadata:
   name: {{ include "yacc-backend.fullname" . }}-config
 data:
-  NODE_ENV: "{{ .Values.nodeEnv }}"
-  PORT: "8080"
-  LOG_LEVEL: "{{ .Values.logLevel }}"
-  DATABASE_POOL_SIZE: "{{ .Values.database.poolSize }}"
-  REDIS_RETRY_STRATEGY: "{{ .Values.redis.retryStrategy }}"
-  ATTACHMENT_MAX_SIZE: "{{ .Values.attachments.maxSize }}"
-  WEBHOOK_TIMEOUT: "{{ .Values.webhook.timeoutMs }}"
+  SPRING_PROFILES_ACTIVE: "{{ .Values.config.SPRING_PROFILES_ACTIVE }}"
+  SERVER_PORT: "8080"
+  LOGGING_LEVEL_ROOT: "{{ .Values.config.LOGGING_LEVEL_ROOT }}"
+  TZ: "UTC"
+  MESSAGE_RETRY_ATTEMPTS: "{{ .Values.config.MESSAGE_RETRY_ATTEMPTS }}"
+  ATTACHMENT_MAX_SIZE_MB: "{{ .Values.config.ATTACHMENT_MAX_SIZE_MB }}"
 ```
 
 **Environment Injection** (deployment.yaml):
@@ -527,32 +516,25 @@ image:
   tag: "v1.0.0"
   pullPolicy: IfNotPresent
 
-nodeEnv: development
-logLevel: debug
+config:
+  SPRING_PROFILES_ACTIVE: production
+  LOGGING_LEVEL_ROOT: info
 
 database:
   poolSize: 10
 
-redis:
-  retryStrategy: exponential
-
 attachments:
   maxSize: 5242880  # 5 MB
-
-webhook:
-  timeoutMs: 30000
 ```
 
 **values-staging.yaml** (overrides):
 ```yaml
-nodeEnv: staging
-logLevel: info
+config:
+  SPRING_PROFILES_ACTIVE: production
+  LOGGING_LEVEL_ROOT: info
 
 database:
   poolSize: 15
-
-redis:
-  retryStrategy: exponential
 
 # Inherits other values from values.yaml
 ```
@@ -574,10 +556,8 @@ kubectl create secret generic yacc-backend-secrets \
 
 **Secret Types** (K8s Secrets):
 - `DATABASE_URL` - PostgreSQL connection string
-- `REDIS_URL` - Redis connection string
+- Bootstrap Super Admin + founder recovery keys (ADR-025: `yacc-auth-secrets`; the POC's `JWT_SECRET`/`BETTER_AUTH_SECRET`/`SESSION_SECRET` are decommissioned)
 - `TELEGRAM_BOT_TOKEN` - Telegram API credential
-- `SESSION_SECRET` - Express session secret
-- `JWT_SECRET` - JWT signing key
 
 ### Secret Rotation (Post-MVP)
 
@@ -630,20 +610,7 @@ spec:
       storage: 5Gi
 ```
 
-**Redis PV**:
-```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: redis-pvc
-spec:
-  storageClassName: local-path
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 500Mi
-```
+> The Redis PV example was removed — there is no Redis PVC (ADR-028).
 
 ### Storage Class Definition
 
@@ -704,31 +671,19 @@ Client Browser
 - Return 5xx = remove from load balancer
 
 **Implementation** (backend code):
-```javascript
-// GET /health
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-// GET /ready (checks all dependencies)
-app.get('/ready', async (req, res) => {
-  try {
-    await db.query('SELECT 1');  // DB check
-    const pong = await redis.ping();  // Redis check
-    res.json({ ready: true });
-  } catch (err) {
-    res.status(503).json({ ready: false, reason: err.message });
-  }
-});
+```java
+// Spring Boot actuator (management base path "/"):
+// GET /health/live   -> liveness group (livenessState only)
+// GET /health/ready  -> readiness group (readinessState only)
+// No external dependencies in the probe verdict (ADR-029).
 ```
 
-### Metrics Exposure (Post-MVP)
+### Metrics Exposure
 
-**Prometheus Metrics** (future):
+**Prometheus metrics** (ADR-029, live):
 ```yaml
-# Backend pod exposes metrics at /metrics (Prometheus format)
-# Prometheus scrapes every 30 seconds
-# Metrics includes: request latency, error rates, database pool size, etc.
+# Backend pod exposes Micrometer metrics at /actuator/prometheus
+# (ADR-029 frozen scrape path; management endpoints include health + prometheus)
 ```
 
 ### Logging Strategy
@@ -774,7 +729,7 @@ on:
   push:
     branches: [dev]
     paths:
-      - 'packages/backend/**'
+      - 'services/backend-java/**'
       - 'deploy/helm/yacc-backend/**'
 
 jobs:
@@ -802,7 +757,9 @@ jobs:
 | **Chart Structure** | Flat (no subcharts) | Simplicity for MVP; add subcharts if >5 components |
 | **Replica Count** | 1 (MVP) | Single node cluster; scale post-MVP for HA |
 | **Rolling Update** | Zero downtime | No customer impact during deployments |
-| **Probes** | HTTP GET endpoints | Standard, requires no extra tools |
+| **Probes** | Actuator `/health/live` + `/health/ready` | Standard, requires no extra tools (ADR-029) |
+| **Pod Envelope** | 500m/1Gi request, 1 CPU/2Gi limit | ADR-029 JVM envelope (amends ADR-019) |
+| **Async durability** | Quartz + PostgreSQL job store/DLQ | ADR-028; no Redis in the cluster |
 | **Storage** | local-path (MVP) | Sufficient for MVP; migrate to managed storage (EBS/EFS) post-MVP |
 | **Secrets** | K8s Secrets (MVP) | Simple; upgrade to sealed-secrets post-MVP if multi-cluster |
 | **Network** | No policies (MVP) | Simpler; add network policies post-MVP for security |
@@ -812,9 +769,9 @@ jobs:
 
 ## Related Documentation
 
-- **ADR-019**: K3s + Helm deployment decision
+- **ADR-019**: K3s + Helm deployment decision (pod spec amended by ADR-029)
 - **K3s Cluster Requirements**: Infrastructure specs, networking, troubleshooting
-- **Helm Rollback Runbook**: Manual rollback procedures
+- **Incident Runbook**: `.docs/runbooks/helm-rollback.md` (roll-forward incident procedure)
 - **Implementation Guide**: Backend architecture + component overview
 - **Helm Official Docs**: https://helm.sh/docs/
 

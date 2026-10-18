@@ -53,25 +53,32 @@ k3d version
 
 ### Required Secrets (All Environments)
 
-Before deploying, create a K8s Secret named `yacc-backend-secrets`:
+Before deploying, create K8s Secrets for the Java/Spring backend (ADR-025/ADR-029; see `deploy/helm/yacc-backend/values.yaml` for the authoritative key names):
 
 ```bash
-# Generate secret values
-SESSION_SECRET=$(openssl rand -base64 32)
-JWT_SECRET=$(openssl rand -base64 32)
+# Auth bootstrap + recovery secrets (yacc-auth-secrets, ADR-025)
+BOOTSTRAP_PASSWORD=$(openssl rand -base64 24)
+RECOVERY_KEY=$(openssl rand -base64 32)
 
-# Create secret (staging example)
+# Create secrets (staging example)
 kubectl create secret generic yacc-backend-secrets \
   --from-literal=DATABASE_URL="postgresql://postgres:password@postgresql:5432/yacc" \
-  --from-literal=REDIS_URL="redis://:password@redis:6379/0" \
-  --from-literal=JWT_SECRET="$JWT_SECRET" \
-  --from-literal=BETTER_AUTH_SECRET="$SESSION_SECRET" \
   --from-literal=TELEGRAM_BOT_TOKEN="123456:ABCDEFGHIJKLMNOP" \
+  -n yacc-staging
+
+kubectl create secret generic yacc-auth-secrets \
+  --from-literal=bootstrap-super-admin-email="admin@example.org" \
+  --from-literal=bootstrap-super-admin-password="$BOOTSTRAP_PASSWORD" \
+  --from-literal=recovery-mode="once" \
+  --from-literal=recovery-key="$RECOVERY_KEY" \
   -n yacc-staging
 
 # Verify
 kubectl get secret yacc-backend-secrets -n yacc-staging
+kubectl get secret yacc-auth-secrets -n yacc-staging
 ```
+
+> The Node-POC secrets (`REDIS_URL`, `JWT_SECRET`, `BETTER_AUTH_SECRET`/`SESSION_SECRET`) are decommissioned with the transitional Node backend — the Java service uses Spring Security auth (ADR-025) and has no Redis dependency (ADR-028).
 
 **Secure Storage**:
 - Keep secret values in `.env.local` (git-ignored)
@@ -117,8 +124,15 @@ kubectl get namespace
 # Copy secrets from Step 1 (Prerequisites section)
 kubectl create secret generic yacc-backend-secrets \
   --from-literal=DATABASE_URL="postgresql://postgres:password@postgresql:5432/yacc" \
-  --from-literal=REDIS_URL="redis://:password@redis:6379/0" \
-  --from-literal=JWT_SECRET="..." \
+  --from-literal=TELEGRAM_BOT_TOKEN="..." \
+  -n yacc-staging
+
+# Plus the auth bootstrap/recovery secrets (see Prerequisites)
+kubectl create secret generic yacc-auth-secrets \
+  --from-literal=bootstrap-super-admin-email="..." \
+  --from-literal=bootstrap-super-admin-password="..." \
+  --from-literal=recovery-mode="once" \
+  --from-literal=recovery-key="..." \
   -n yacc-staging
 
 # Verify
@@ -152,10 +166,9 @@ kubectl logs -n yacc-staging -l app.kubernetes.io/name=yacc-backend -f
 # Port forward
 kubectl port-forward -n yacc-staging svc/yacc-backend 8080:8080 &
 
-# Health check
+# Health check (actuator wire paths, ADR-029)
 curl http://localhost:8080/health/live
 curl http://localhost:8080/health/ready
-curl http://localhost:8080/health | jq '.'
 ```
 
 ### Step 6: Clean Up (After Testing)
@@ -219,9 +232,15 @@ kubectl create namespace yacc-staging
 # Create secrets (same as local, with real values)
 kubectl create secret generic yacc-backend-secrets \
   --from-literal=DATABASE_URL="postgresql://postgres:password@postgresql:5432/yacc" \
-  --from-literal=REDIS_URL="redis://:password@redis:6379/0" \
-  --from-literal=JWT_SECRET="..." \
   --from-literal=TELEGRAM_BOT_TOKEN="..." \
+  -n yacc-staging
+
+# Plus the auth bootstrap/recovery secrets (see Prerequisites; ADR-025)
+kubectl create secret generic yacc-auth-secrets \
+  --from-literal=bootstrap-super-admin-email="..." \
+  --from-literal=bootstrap-super-admin-password="..." \
+  --from-literal=recovery-mode="once" \
+  --from-literal=recovery-key="..." \
   -n yacc-staging
 ```
 
@@ -249,7 +268,7 @@ kubectl logs -n yacc-staging -l app.kubernetes.io/name=yacc-backend
 kubectl port-forward -n yacc-staging svc/yacc-backend 8080:8080
 
 # Health check
-curl http://localhost:8080/health
+curl http://localhost:8080/health/ready
 ```
 
 ### Step 5: Setup Ingress (Optional)
@@ -337,10 +356,10 @@ gh run cancel <run-id>
 
 ### Workflow Stages
 
-1. **Build** (5 min): Docker image build + push to ghcr.io
+1. **Build** (5 min): Java Docker image build + push to ghcr.io (Temurin 21 JRE, ADR-029)
 2. **Deploy** (2 min): Helm deployment to staging
-3. **Smoke Tests** (2 min): Health checks + pod verification
-4. **Verify Rollback** (1 min): Confirm rollback capability
+3. **Smoke Tests** (2 min): Health checks (`/health/live`, `/health/ready`) + pod verification
+4. **Forward Verification** (1 min): Confirm the new revision is healthy after rollout
 5. **Notify** (1 min): Summary printed
 
 **Total time**: ~10-15 minutes end-to-end
@@ -386,12 +405,12 @@ kubectl describe pod -n yacc-staging <pod-name>
 #### Health endpoint returning 503
 
 ```bash
-# Readiness probe failing (dependencies not ready)
-# Check dependencies:
+# Readiness probe failing
+# Check pod status:
 kubectl get pods -n yacc-staging  # All pods should be Running
 
 # Check logs for database errors:
-kubectl logs -n yacc-staging -l app.kubernetes.io/name=yacc-backend | grep -i "database\|redis"
+kubectl logs -n yacc-staging -l app.kubernetes.io/name=yacc-backend | grep -i "database\|migration"
 ```
 
 #### Deployment not rolling out
@@ -409,41 +428,44 @@ kubectl describe pod -n yacc-staging <pod-name>
 
 ---
 
-## Rollback Procedures
+## Incident Procedures (Roll-Forward Posture)
 
-### Quick Rollback (Emergency)
+> **The migration operational posture is roll-forward only** (ARCH-004 §1; ADR-030 Decision 6): remediate incidents by deploying a forward fix. `helm rollback` is **not** the primary recovery path (schema-affecting changes are Flyway-managed and not designed for reversal). The rehearsal-evidenced incident procedure — including formal trigger conditions and stop authority — lands with MIG-070 (#361).
+
+### Forward Fix (Primary Path)
 
 ```bash
-# View history
+# 1. Confirm the failing revision (audit trail)
 helm history yacc-backend -n yacc-staging
 
-# Rollback to previous release
-helm rollback yacc-backend -n yacc-staging
+# 2. Fix forward: merge the fix, build the new image, redeploy
+helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \
+  -n yacc-staging --set image.tag=<fixed-tag>
 
-# Monitor rollback
+# 3. Monitor the forward deployment
 kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
 ```
 
-### Rollback to Specific Revision
+### Release Reinstall (Last Resort, Empty State Only)
+
+Only if the release is entirely broken and the state is disposable: uninstall and reinstall the same (fixed) version — this is not a data rollback.
 
 ```bash
-# Identify good revision
-helm history yacc-backend -n yacc-staging
-
-# Rollback to revision (e.g., 5)
-helm rollback yacc-backend 5 -n yacc-staging
-
-# Verify
-kubectl get pods -n yacc-staging
+helm uninstall yacc-backend -n yacc-staging
+helm install yacc-backend ./deploy/helm/yacc-backend \
+  -n yacc-staging \
+  -f deploy/helm/yacc-backend/values-staging.yaml
 ```
 
-### Detailed Rollback Procedure
+### Detailed Procedure
 
-See `.docs/runbooks/helm-rollback.md` for comprehensive procedures including:
-- Pre-rollback verification
-- Root cause analysis
-- Post-rollback testing
-- Prevention strategies
+See `.docs/runbooks/helm-rollback.md` — despite its historical filename, it documents the roll-forward incident runbook (trigger conditions, forward-verification, stop authority, escalation, audit trail).
+
+### Post-Incident
+
+- Root cause documented in a GitHub issue within 24 hours
+- Prevention items merged as forward fixes
+- Stop authority: escalate per the runbook's escalation matrix (rehearsal-owned by MIG-070)
 
 ---
 
@@ -452,13 +474,12 @@ See `.docs/runbooks/helm-rollback.md` for comprehensive procedures including:
 After deployment:
 
 - [ ] Pod running (kubectl get pods)
-- [ ] Health check passing (curl /health/live, /health/ready)
+- [ ] Health checks passing (curl /health/live, /health/ready)
 - [ ] Logs clean (no ERROR/FATAL)
-- [ ] Database connected (logs show "Database connected")
-- [ ] Redis connected (logs show "Redis connected")
+- [ ] Database connected (logs show successful Flyway migration + Hikari pool start)
 - [ ] Helm release healthy (helm status)
-- [ ] Resource allocation verified (kubectl top pods)
-- [ ] Rollback capability confirmed (helm history)
+- [ ] Resource allocation verified (kubectl top pods; ADR-029 envelope 1Gi/2Gi)
+- [ ] Forward-fix path confirmed (image tag deployed, helm history recorded)
 
 ---
 
@@ -479,9 +500,9 @@ helm get manifest yacc-backend -n yacc-staging
 helm template yacc-backend ./deploy/helm/yacc-backend -f values-staging.yaml
 helm lint ./deploy/helm/yacc-backend
 
-# Rollback
+# Audit trail / forward fix
 helm history yacc-backend -n yacc-staging
-helm rollback yacc-backend 1 -n yacc-staging
+helm upgrade --install yacc-backend ./deploy/helm/yacc-backend -n yacc-staging --set image.tag=<fixed-tag>
 ```
 
 ### kubectl
@@ -527,15 +548,15 @@ gh run cancel <run-id>
 
 ## Related Documentation
 
-- **ADR-019**: K3s + Helm architecture decision
+- **ADR-019**: K3s + Helm architecture decision (pod envelope amended by ADR-029)
 - **K3s Requirements**: `.docs/infrastructure/k3s-cluster-requirements.md`
 - **Helm Architecture**: `.docs/architecture/TECH-ARCH-006-helm-deployment-architecture.md`
-- **Rollback Runbook**: `.docs/runbooks/helm-rollback.md`
+- **Incident Runbook**: `.docs/runbooks/helm-rollback.md` (roll-forward incident procedure)
 - **Secrets Management**: `.docs/infrastructure/secrets-management-and-environment-configuration.md`
-- **Implementation Guide**: `.docs/03-implementation-guide.md` (Section 7: Helm Deployment)
+- **Implementation Guide**: `.docs/03-implementation-guide.md` (Helm Deployment section)
 
 ---
 
-**Last Updated**: 2026-02-26  
-**Status**: MVP Ready (All tests passed)  
+**Last Updated**: 2026-10-18 (Java/Spring backend — MIG-090 docs sweep)  
+**Status**: Java service is the deployed backend (Node POC transitional until MIG-080)  
 **Next Steps**: Production deployment (post-MVP) with multi-region HA

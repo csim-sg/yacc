@@ -28,6 +28,8 @@
 
 ## 1. API Conventions
 
+> **Contract source of truth (ADR-023)**: the frozen `.docs/migration/openapi.yaml` (OpenAPI 3.1), `.docs/migration/asyncapi.yaml` and `.docs/migration/schemas/*` are the authoritative API contract; the merged Java service (`services/backend-java`) validates against them. This document is descriptive prose. Where this document and the frozen artifacts disagree, the frozen artifacts win; the Node-era `@yacc/common` Zod layer is transitional (decommission: MIG-080) and is not the contract.
+
 ### Request/Response Format
 - **Auth**: JWT-only via BetterAuth bearer plugin
   - **Access TTL**: 48h (`ACCESS_TOKEN_TTL_SECONDS`)
@@ -357,7 +359,7 @@ bulk_action_applied
     "correlationId": "optional-trace-id",
     "lastError": "Platform error"
   },
-  "failureReason": "max_retries_exceeded" | "validation_error" | "platform_error" | "network_error" | "unknown",
+  "failureReason": "max_retries_exceeded" | "SEND_FAILED" | "validation_error" | "platform_error" | "network_error" | "unknown",
   "totalAttempts": 3,
   "lastError": "Error details",
   "correlationId": "optional-trace-id",
@@ -380,6 +382,8 @@ bulk_action_applied
 ```
 
 **Purpose**: Stores messages that failed after 3 retry attempts for ops investigation and manual retry
+
+**`failureReason` lifecycle (MIG-062/MIG-063 reconciliation)**: the durable row is created at the **first** dispatch failure with the Java-specific value `SEND_FAILED` (it is the retry-cycle carrier for the Quartz worker), and the same row is **rewritten to `max_retries_exceeded` in the terminal exhaustion transaction** — that terminal value is also what the `queue.message.dlq` wire payload reports. Readers of `GET /api/dlq` should interpret `SEND_FAILED` as "retry cycle in progress or exhausted (see `totalAttempts`/`retryAttempt`)" and `max_retries_exceeded` as "cycle terminally exhausted". The frozen OpenAPI types `failureReason` as a free string (no enum), so both values are contract-legal.
 
 **Retention**: 7 days (auto-cleanup via scheduled job)
 
@@ -751,7 +755,7 @@ CREATE TABLE dead_letter_queue (
   payload JSONB NOT NULL,
 
   -- Failure tracking
-  failure_reason VARCHAR(255) NOT NULL,  -- max_retries_exceeded, validation_error, platform_error, network_error, unknown
+  failure_reason TEXT NOT NULL,  -- lifecycle: 'SEND_FAILED' at first-failure row creation (retry-cycle carrier), rewritten to 'max_retries_exceeded' in the terminal exhaustion transaction; other free-string values possible (no DB enum/CHECK)
   total_attempts INTEGER NOT NULL DEFAULT 3,
   last_error TEXT NOT NULL,
 
@@ -2174,19 +2178,22 @@ Export filtered audit logs as CSV or JSON file.
 
 ## 6. WebSocket Events
 
+> **Transport (ADR-026)**: real-time is a **raw Spring WebSocket** endpoint at `/ws` — no Socket.io/STOMP/SockJS/broker. Every server emission is envelope-framed `{ "event", "data", "timestamp" }` (frozen `schemas/envelope.schema.json`; the payloads below describe the envelope's `data` member). The authoritative event/channels surface is the frozen `.docs/migration/asyncapi.yaml` + `schemas/*`.
+
 ### Connection & Authentication
 ```
-Client connects with auth token in handshake:
-  socket.io-client({ auth: { token: 'jwt-token' } })
+Client opens: wss://<host>/ws?token=<access JWT>
+The server's handshake interceptor verifies the JWT (and identity status) before the
+upgrade completes; invalid/expired tokens or inactive identities are denied.
 ```
 
 ### Heartbeat
 - **Interval**: 60 seconds
-- **Client**: Listens for `ping` event, responds with `pong`
+- **Server**: emits the enveloped `system.heartbeat` event; clients use it to detect stale connections
 - **Purpose**: Detect stale connections
 
 ### Events
-**Format**: Socket.io events emit raw payloads (no envelope wrapper). Example: `socket.on('message.sent', payload => {...})`
+**Format**: every event arrives enveloped — `socket.on('message', frame => frame.event, frame.data)`. Example: `frame.event === 'message.sent'`, `frame.data` matches the payload below.
 
 #### `conversation.updated`
 **Fired when**: Conversation status, priority, or assignment changes
@@ -2340,10 +2347,10 @@ Client connects with auth token in handshake:
 
 **Overview**: When WebSocket disconnects, client shows reconnect indicator and performs REST refresh on successful reconnection.
 
-**Client Reconnect Flow**:
+**Client Reconnect Flow** (backend contract; the frontend client implementation is owned by MIG-052 / SPEC-003 — ANG side reconciles separately):
 1. **Disconnection**: WS connection drops (network loss, server restart, etc.)
 2. **Visual Indicator**: "Reconnecting..." banner/spinner shown to user
-3. **Auto-Reconnect**: Socket.io attempts reconnection (exponential backoff)
+3. **Auto-Reconnect**: client reconnects to `/ws` with bounded exponential backoff (server-observed reconnects restore the durable 1-hour backlog; `system.reconnection.started`/`completed` events)
 4. **Success**: On successful reconnect, client immediately:
    - **REST Refresh**: Fetch latest conversation list + currently open conversation
    - **Cache Invalidate**: Replace in-memory cache with fresh data

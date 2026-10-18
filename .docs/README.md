@@ -60,6 +60,8 @@
 ### 🔹 02-api-and-data-model.md
 **Complete API contract, database schema, WebSocket events**
 
+> **Contract source of truth**: the frozen `.docs/migration/openapi.yaml` (OpenAPI 3.1) + `asyncapi.yaml` + `schemas/*` (ADR-023). This document is descriptive prose; where they disagree, the frozen artifacts win.
+
 - API conventions (request/response format, pagination, error handling)
 - Enums & constants (roles, statuses, priorities, etc.)
 - 12 data models with JSON examples
@@ -77,12 +79,12 @@
 **System architecture, components, data flows, and technical decisions**
 
 - High-level system architecture (inbound, outbound, real-time, search, rules)
-- 6 core components deep dive:
-  - Message Retry Queue (Redis + BullMQ)
+- Core components deep dive:
+  - Message Retry Queue & DLQ (Quartz + PostgreSQL, ADR-028)
   - Full-Text Search (PostgreSQL FTS)
   - Notification Engine
   - Attachment Handling (Cloudflare R2)
-  - WebSocket Real-Time Updates
+  - WebSocket Real-Time Updates (raw Spring WebSocket, ADR-026)
   - Routing Rules Engine
 - Architecture diagrams (deployment, auth flow, data flows)
 - 4 implementation phases with timelines
@@ -147,16 +149,7 @@ Official architecture review documents and guidance.
 
 Official ADRs numbered sequentially. Each ADR documents a significant architectural decision.
 
-**Current ADRs:**
-- **ADR-001**: Core table UUIDs
-- **ADR-002**: Non-core integer IDs
-- **ADR-003**: Phase 1 scope (Telegram + IRC)
-- **ADR-004**: Logging strategy
-- **ADR-005**: Infrastructure & config pattern
-- **ADR-006**: Auth client implementation
-- **ADR-007**: Jest to Vitest migration
-- **ADR-011**: File naming convention standardization
-- **ADR-012**: Index aggregator allowance (controllers/schemas lists)
+**Current ADRs:** ADR-001 through ADR-031 (check `adr/__README.md`; numbering is not a queue). The Java migration decisions are **ADR-023** (frozen contract source), **ADR-024** (Java/Spring replacement architecture), **ADR-025** (auth), **ADR-026** (raw WebSocket), **ADR-027** (Flyway + JPA), **ADR-028** (Quartz + DB DLQ, Redis dropped), **ADR-029** (JVM envelope + observability), **ADR-030** (Java package layout, amended by MIG-100), **ADR-031** (Angular frontend target) — all Accepted and implemented through SPEC-002 Phase 6.
 
 **When to use:** Understanding architectural rationale  
 **Audience:** Architects, tech leads, developers making design decisions
@@ -236,26 +229,27 @@ Development planning documents, task tracking, and sprint planning.
 
 | Aspect | Decision | Rationale |
 |--------|----------|-----------|
-| **Database** | PostgreSQL | ACID, FTS, JSON support, mature |
+| **Contract source** | Frozen OpenAPI 3.1 + AsyncAPI/JSON Schema (`.docs/migration/`) | Single cross-language source of truth (ADR-023; supersedes Zod-as-contract, ADR-020) |
+| **Database** | PostgreSQL 15 (Flyway + JPA) | ACID, FTS, JSON support, mature; Flyway-only schema management (ADR-027) |
 | **Storage** | Cloudflare R2 | Cheaper than S3, CDN-backed, S3-compatible |
-| **Queue** | Redis + BullMQ | Simple, fast, built-in retry scheduling |
-| **Real-Time** | Socket.io | WebSocket with reconnection & backlog |
+| **Async / Queue** | Quartz + PostgreSQL DB DLQ | DB-backed retry scheduling + durable DLQ (ADR-028; Redis dropped) |
+| **Real-Time** | Raw Spring WebSocket (`/ws`, envelope-framed) | No Socket.io/STOMP/broker; resilience app-owned (ADR-026) |
 | **Search** | PostgreSQL FTS (MVP) | Sufficient for MVP, Elasticsearch post-MVP |
 | **Architecture** | Single-tenant (MVP) | Default tenant context; tenant-scoped schema readiness for future multi-tenant migration |
-| **Frontend** | React 18 + TanStack Start | Modern, SSR-capable, great DX |
-| **Backend** | Node.js + Express | Simple, fast, familiar ecosystem |
-| **Retry** | Exponential backoff | Standard, reduces server load |
+| **Frontend** | React 18 + TanStack Start | Modern, SSR-capable, great DX — **production frontend until the SPEC-003 Angular cutover** (ANG-016) |
+| **Backend** | Java 21 + Spring Boot (`services/backend-java`) | Founder-directed replacement; Node POC stays transitional until MIG-080 |
+| **Retry** | Exponential backoff (1m/5m/30m ladder) | Standard, reduces server load; Quartz-scheduled (ADR-028) |
 | **Rules** | First match wins | Simple, predictable, avoids conflicts |
 
 ---
 
-## ✅ Updated: 2026-02-14
+## ✅ Updated: 2026-10-18
 
-**Status:** ✅ MVP stage (Phase 1 + Phase 2 complete)  
+**Status:** ✅ SPEC-002 Phases 0–6 merged — Java/Spring backend (`services/backend-java`) is the backend of record; Node packages transitional until MIG-080  
 **Total Files:** 53 (down from 93)  
 **Total Size:** 1.1MB (down from 1.7MB)  
-**Organization:** Core docs + ADR + Governance + Plans  
-**Latest:** MVP documentation cleanup + post-MVP doc lifecycle ADR
+**Organization:** Core docs + ADR + Governance + Plans + migration contracts  
+**Latest:** Java migration documentation sweep (MIG-090, #365)
 
 ---
 

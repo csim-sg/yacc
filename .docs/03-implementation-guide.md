@@ -36,22 +36,23 @@
               │ REST + WebSocket
               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ API Server (Node.js + Express)                                   │
+│ API Server (Java 21 + Spring Boot, services/backend-java)        │
 ├─────────────────────────────────────────────────────────────────┤
 │ • REST Endpoints (auth, inbox, messages, rules, etc.)          │
-│ • WebSocket Gateway (real-time events, notifications)          │
+│ • Raw WebSocket (/ws — enveloped realtime events)               │
 │ • Rules Engine (evaluate conditions, apply actions)            │
 │ • Search Service (full-text search on PostgreSQL)              │
 │ • Notification Engine (creation, delivery via WS)              │
 │ • Audit Logger (log all actions)                               │
-│ • Connector Manager (Telegram, IRC dispatchers)                │
+│ • Connector Registry (Telegram, IRC dispatchers)               │
+│ • Quartz Retry Worker + DB DLQ (ADR-028)                       │
 └─────────────┬──────────┬──────────┬──────────────┬──────────────┘
               │          │          │              │
               ▼          ▼          ▼              ▼
      ┌──────────────┐ ┌─────┐ ┌─────────┐  ┌─────────────┐
-     │ PostgreSQL   │ │ R2  │ │Redis +  │  │ Connectors  │
-     │ (data)       │ │(CDN)│ │BullMQ   │  │ (Telegram,  │
-     │              │ │     │ │(queues) │  │  IRC)       │
+     │ PostgreSQL   │ │ R2  │ │ Quartz  │  │ Connectors  │
+     │ (data,       │ │(CDN)│ │ + DB DLQ│  │ (Telegram,  │
+     │  Flyway/JPA) │ │     │ │(in PG)  │  │  IRC)       │
      └──────────────┘ └─────┘ └─────────┘  └─────────────┘
 ```
 
@@ -81,7 +82,7 @@ User submits reply in UI
   → Save message to Postgres (status: pending)
   → Dispatch to connector
   → Success: update status to sent
-  → Failure: enqueue retry (Redis + BullMQ)
+  → Failure: schedule retry (Quartz + PostgreSQL job store, ADR-028)
   → Emit WebSocket event (message.sent or message.failed)
 ```
 
@@ -99,32 +100,45 @@ After message stored:
 
 ## 2. Technology Stack
 
+> **Java migration note (SPEC-002)**: the backend of record is the Java/Spring service (`services/backend-java`); Node/TypeScript backend rows below are **transitional until MIG-080 (#364)**. The frozen `.docs/migration/{openapi.yaml,asyncapi.yaml,schemas/*}` is the contract source of truth (ADR-023).
+
 | Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Frontend** | TanStack Start (React) | SPA for inbox UI, real-time updates |
-| **Frontend Auth** | BetterAuth | Session management, JWT |
+| ----- | ----------- | --------- |
+| **Frontend** | TanStack Start (React) | SPA for inbox UI, real-time updates (production until the SPEC-003 Angular cutover) |
+| **Frontend Auth** | Spring Security session/JWT via REST | Session management, JWT (BetterAuth decommissioned with the Node POC; ADR-025) |
 | **Frontend State** | Zustand + TanStack Query | Client-side state & data fetching |
 | **Frontend Styling** | Tailwind CSS | Utility-first CSS |
-| **Backend** | Node.js 18+ | Runtime |
-| **Backend Framework** | Express + routing-controllers | MVC, REST API |
-| **Backend Auth** | BetterAuth | Email/password, session/JWT |
-| **Database** | PostgreSQL 14+ | Primary data store |
-| **Database ORM** | Drizzle | Type-safe SQL |
-| **Real-Time** | Socket.io | WebSocket for inbox updates, notifications |
+| **Backend** | Java 21 (Temurin) | Runtime (`services/backend-java`) |
+| **Backend Framework** | Spring Boot 3 (Spring MVC) | REST API per the frozen OpenAPI contract |
+| **Backend Auth** | Spring Security + dual-role OIDC | Email/password, JWT, bootstrap + recovery (ADR-025) |
+| **Database** | PostgreSQL 15 | Primary data store |
+| **Database Access** | Flyway + JPA/Hibernate (Spring Data) | Migrations + type-safe persistence (ADR-027) |
+| **Real-Time** | Raw Spring WebSocket (`/ws`) | Envelope-framed WebSocket for inbox updates, notifications (ADR-026) |
 | **Search** | PostgreSQL FTS | Full-text search (future: Elasticsearch) |
-| **Message Queue** | Redis + BullMQ | Outbound message retry queue |
+| **Async / Queue** | Quartz + PostgreSQL DB DLQ | Outbound message retry queue (ADR-028; Redis dropped) |
 | **File Storage** | Cloudflare R2 | Raw payloads, attachments, re-hosted files |
-| **Email** | Nodemailer / SendGrid | Password reset emails |
-| **Hosting** | K3s + Helm (single-tenant MVP) | Backend runs on K3s; deploy via Helm; dependencies via Helm |
+| **Email** | Spring mail / SendGrid | Password reset emails |
+| **Hosting** | K3s + Helm (single-tenant MVP) | Backend runs on K3s; deploy via Helm; ADR-029 JVM envelope |
 | **Testing** | Playwright | E2E testing |
-| **Testing** | Vitest | Unit & integration tests (native ESM, 18.8% faster) |
-| **Package Manager** | pnpm | Monorepo management with workspaces (Bun migration tracked separately) |
+| **Backend Testing** | JUnit 5 + Testcontainers | Unit, integration and contract tests (JaCoCo ≥85% gate) |
+| **Frontend Testing** | Vitest | Unit tests |
+| **Package Manager** | pnpm | Node-workspace management (frontend + transitional packages; Bun migration tracked separately) |
 
 ---
 
-## 2.1 Package Manager: pnpm
+## 2.1 Package Manager: pnpm (Node workspaces — frontend + transitional packages)
 
-YACC uses **pnpm** for efficient monorepo management with workspaces.
+YACC uses **pnpm** for efficient Node-workspace management. The Java backend does not use pnpm — build and test it with the Gradle wrapper (`services/backend-java/gradlew`; `./gradlew --no-daemon build`, `test`, `contractTest`, `check`). The pnpm sections below cover the frontend and the transitional Node packages (until MIG-080).
+
+### Java backend commands (backend of record)
+
+| Command | Purpose |
+| ----- | --------- |
+| `./gradlew --no-daemon bootRun` | Run the service locally (port 8080) |
+| `./gradlew --no-daemon build` | Build + unit/integration tests + JaCoCo gate |
+| `./gradlew --no-daemon test` | Unit + integration tests (Testcontainers PostgreSQL) |
+| `./gradlew --no-daemon contractTest` | Frozen OpenAPI/AsyncAPI conformance tests |
+| `./gradlew --no-daemon check` | Full verification gate (JaCoCo ≥85%) |
 
 ### Why pnpm?
 
@@ -214,46 +228,37 @@ Each workspace:
 
 ## 3. Core Components Guide
 
-### 3.1 Message Retry Queue & DLQ (Redis + BullMQ)
+### 3.1 Message Retry Queue & DLQ (Quartz + PostgreSQL DB DLQ, ADR-028)
 
 **When to use**: Outbound message fails to deliver to platform
 
 **Flow**:
 ```
 Message send fails
-  → Enqueue job: { messageId, conversationId, providerId }
-  → Job schedule: wait 1 minute (attempt 1)
-  → Worker picks up job, attempts delivery
-  → Success: mark message status = sent
-  → Failure: retry with backoff (5 min, 30 min)
-  → After 3 failures: move to DLQ for ops review
+  → DLQ row created at first failure (retry-cycle carrier, failureReason=SEND_FAILED)
+  → Quartz job scheduled: wait 1 minute (attempt 1)
+  → Worker picks up job, attempts delivery via the gateway exchange
+  → Success: mark message status = sent, clear DLQ row
+  → Failure: retry with backoff (5 min, 30 min; durable attempt claims)
+  → After 3 delivery attempts: terminal exhaustion — row rewritten to
+    max_retries_exceeded, queue.message.dlq emitted, job state = failed
   → Ops retry or delete via DLQ API
 ```
 
-**Configuration**:
+**Configuration** (`MESSAGE_RETRY_*` env keys, wired via `QueueRetryProperties`):
 ```env
-REDIS_HOST=localhost
-REDIS_PORT=6379
 MESSAGE_RETRY_ATTEMPTS=3
 MESSAGE_RETRY_BASE_DELAY_MS=60000  # 1 minute
 MESSAGE_RETRY_BACKOFF_MULTIPLIER=5  # 1m, 5m, 30m
 ```
 
-**Key Code**:
-```typescript
-// Enqueue retry on failure
-await messageRetryQueue.add(
-  { messageId, conversationId, providerId },
-  { attempts: 3, backoff: { type: 'exponential', delay: 60000 } }
-);
-
-// Process retry
-messageRetryQueue.process(async (job) => {
-  const { messageId, providerId } = job.data;
-  const message = await db.message.findUnique({ where: { id: messageId } });
-  const connector = getConnector(providerId);
-  await connector.sendMessage(...);
-});
+**Key Code** (Java, `com.yacc.api.queue`):
+```java
+// Quartz JDBC job store: one job per pending message id (1:1 identity),
+// single-fire triggers per attempt on the 1m/5m/30m ladder.
+// QueueRetryService claims the attempt durably (retryCycle jsonb on the DLQ row),
+// delivers through the GatewayRedeliveryHandler seam, and settles the outcome:
+// delivered → row cleared; failed → next ladder step; exhausted → terminal.
 ```
 
 ### 3.1.1 DLQ (Dead Letter Queue) Contract
@@ -264,21 +269,17 @@ messageRetryQueue.process(async (job) => {
 - Enforced by dlqService.moveToDLQ() validation
 
 **Example** (moving failed Telegram message to DLQ):
-```typescript
+```java
 // ✅ CORRECT: UUID messageId, external ID in metadata
-await dlqService.moveToDLQ(
-  'a1b2c3d4-e5f6-47a8-9b10-c1d2e3f4a5b6',  // UUID FK
-  conversationId,
-  payload,
-  'api_error',
-  'Failed to send to Telegram',
-  {
-    metadata: {
-      jobId: 'msg-payload-abc123',           // BullMQ job ID
-      externalMessageId: 'tg-msg-9876543'    // Telegram message ID
-    }
-  }
-);
+// (com.yacc.service.DlqService.enqueue — real message/conversation identities are
+// required by the V1 FK constraints; the row is the retry-cycle carrier)
+dlqService.enqueue(messageId, conversationId, payload,
+    "SEND_FAILED",              // first-failure value; rewritten to max_retries_exceeded at exhaustion
+    "Failed to send to Telegram",
+    Map.of(
+        "jobId", "msg-payload-abc123",          // Quartz job key (opaque string)
+        "externalMessageId", "tg-msg-9876543"   // Telegram message ID
+    ));
 ```
 
 **Traceability Fields** (for ops investigation):
@@ -494,109 +495,62 @@ export async function downloadAndRehost(
 
 ---
 
-### 3.5 WebSocket Real-Time Updates (socket-controllers)
+### 3.5 WebSocket Real-Time Updates (raw Spring WebSocket, ADR-026)
 
 **When to use**: Notify UI of inbox changes, message delivery, presence, notifications
 
-**Architecture Decision**: Adopted **socket-controllers** for declarative, type-safe WebSocket event handling (ADR-012)
+**Architecture Decision**: Raw Spring WebSocket at `/ws` — no Socket.io/STOMP/SockJS/broker (ADR-026, supersedes ADR-012 socket-controllers). Resilience is app-owned: durable backlog, server heartbeat, reconnect policy.
 
-**Configuration**:
+**Configuration** (`YACC_WS_*` env keys / `yacc.realtime` properties):
 ```
-Heartbeat: 60 seconds (ping/pong)
-Backlog: 1 hour of missed events (stored in DB)
-Reconnect: Exponential backoff (1s → 60s max, 5 attempts)
-Auth: BetterAuth JWT validation via webSocketAuthMiddleware
-```
-
-**Controller Pattern** (socket-controllers):
-```typescript
-import { SocketController, OnConnect, OnDisconnect, OnMessage } from 'socket-controllers';
-import type { Socket } from 'socket.io';
-import type { AuthenticatedSocket } from '../websockets/auth.middleware';
-
-@SocketController()
-export class ConversationController {
-  @OnConnect()
-  onConnect(socket: Socket): void {
-    const authSocket = socket as AuthenticatedSocket;
-    const userId = authSocket.userId;
-    // Join user's personal room
-    if (userId) {
-      socket.join(`user:${userId}`);
-    }
-  }
-
-  @OnMessage('subscribe.conversation')
-  async onSubscribeToConversation(socket: Socket, conversationId: string): Promise<void> {
-    socket.join(`conversation:${conversationId}`);
-    socket.emit('conversation.subscribed', { conversationId });
-  }
-
-  @OnMessage('conversation.updated')
-  async onConversationUpdated(socket: Socket, payload: ConversationUpdatedPayload): Promise<void> {
-    const room = `conversation:${payload.conversationId}`;
-    // Broadcast to all subscribers
-    socket.to(room).emit('conversation.updated', payload);
-  }
-
-  @OnDisconnect()
-  onDisconnect(socket: Socket): void {
-    const authSocket = socket as AuthenticatedSocket;
-    // Broadcast offline status
-    if (authSocket.userId) {
-      socket.broadcast.emit('presence.updated', {
-        userId: authSocket.userId,
-        status: 'offline',
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }
-}
+Path: /ws (JWT via ?token= query parameter, verified by the handshake interceptor)
+Heartbeat: server-emitted system.heartbeat every 60 seconds
+Backlog: 1 hour of missed events (websocket_backlog table in PostgreSQL)
+Reconnect: client bounded backoff; server-observed reconnects replay the durable backlog
+Envelope: every emission is {event, data, timestamp} (frozen schemas/envelope.schema.json)
 ```
 
-**Benefits Over Manual Listeners**:
-- ✅ **Type Safety**: Full TypeScript with `AuthenticatedSocket` interface
-- ✅ **Consistency**: Same decorator pattern as REST API (routing-controllers)
-- ✅ **Auto-Discovery**: Controllers registered via `socket-controllers/index.ts`
-- ✅ **Testability**: Controllers are unit-testable classes
-- ✅ **Middleware Integration**: Auth middleware applies uniformly
+**Handler Pattern** (Java, `com.yacc.api.realtime`):
+```java
+// YaccWebSocketHandler demuxes inbound frames {event, data} and rooms:
+//   user:{userId} personal room, conversation:{id}, connector:{platform}
+// WebSocketEventPublisher serializes the envelope with the single production
+// Jackson ObjectMapper (RFC 3339 UTC timestamps, MIG-102 posture) and fans out
+// to sessions/rooms; ConnectorRelayService bridges connector events.
+// Emissions reuse the frozen RealtimeEvents constants — no new event names.
+```
+
+**Benefits Over the Node POC**:
+- ✅ **No broker dependency**: transport is the servlet container itself
+- ✅ **Durable replay**: backlog rows live in PostgreSQL (survive restarts; replayed on reconnect)
+- ✅ **Single serialization posture**: same Jackson config as REST (contract-safe timestamps/nulls)
+- ✅ **Testability**: handler/services are plain beans; integration tests drive real sockets
 
 **Implementation Details**:
-- **Controllers**: `src/socket-controllers/` (6 controllers: conversation, message, typing, presence, reaction, connector)
-- **Types**: `AuthenticatedSocket` interface from `websockets/auth.middleware.ts`
-- **Auth**: `webSocketAuthMiddleware` validates JWT before `@OnConnect`
-- **Events**: Named via `@OnMessage('event.name')` matching API contract in `.docs/02-api-and-data-model.md`
+- **Realtime module**: `services/backend-java/src/main/java/com/yacc/api/realtime/` (handler, session registry, publisher, presence/typing/heartbeat/backlog/reconnect services)
+- **Auth**: `WebSocketHandshakeAuthInterceptor` verifies the JWT before the upgrade completes
+- **Events**: named via the frozen AsyncAPI vocabulary in `.docs/migration/asyncapi.yaml` + `schemas/*`
 
-**For Detailed Patterns**: See `GOV-014: Socket-Controllers Implementation Guide` for:
-- 5 common event handler patterns
-- Type safety guidelines
-- Error handling & logging standards
-- Testing patterns
-- Common gotchas & solutions
-
-**Client Integration**:
+**Client Integration** (target wire contract; the frontend client implementation is owned by MIG-052 / SPEC-003):
 ```typescript
-// TanStack Start frontend
-const socket = io(WS_URL, { auth: { token: jwt } });
+// Raw WebSocket — every server frame is enveloped {event, data, timestamp}
+const ws = new WebSocket(`${WS_URL}?token=${jwt}`);
 
-// Subscribe to conversation
-socket.emit('subscribe.conversation', 'conv-123');
+// Inbound ops are JSON frames; subscribe to a conversation room:
+ws.send(JSON.stringify({ event: 'subscribe.conversation', data: { conversationId: 'conv-123' } }));
 
-// Listen for updates
-socket.on('conversation.updated', (payload) => {
-  // Update store
-  updateInboxStore(payload.conversation);
-});
-
-socket.on('presence.updated', (payload) => {
-  // Update presence indicator
-  updatePresenceStore(payload);
-});
+ws.onmessage = (msg) => {
+  const frame = JSON.parse(msg.data);
+  if (frame.event === 'conversation.updated') updateInboxStore(frame.data.conversation);
+  if (frame.event === 'presence.updated') updatePresenceStore(frame.data);
+};
 ```
 
 #### 3.5.1 WebSocket Observability
 
-All WebSocket metrics are emitted via the `MetricsSink` interface. By default, metrics are logged to console as JSON.
+> **Posture note (ADR-029)**: the backend instruments via **Micrometer** (frozen scrape path `/actuator/prometheus`); the `MetricsSink` interface below is the **Node-POC client-side metrics design** (transitional until MIG-080, client implementation now SPEC-003/MIG-052 scope). The SLO targets are unchanged.
+
+All WebSocket metrics were emitted via the `MetricsSink` interface in the Node POC. By default, metrics are logged to console as JSON.
 
 **SLO Targets** (from GOV-030):
 - Connection Success Rate: ≥99.5%
@@ -726,30 +680,23 @@ export async function evaluateRules(
 
 ---
 
-### 3.7 IRC Profile Management (DB-First with Env Fallback)
+### 3.7 IRC Profile Management (DB-First, Fail-Closed)
 
-**INT-010: Support for multi-profile IRC connections with DB-first gating**
+**MIG-061: multi-profile IRC connections with DB-first gating** (the Node-era env fallback is decommissioned — the Java resolver never falls back to environment variables)
 
-**When to use**: Initialize IRC connector with credentials from database profiles or environment fallback
+**When to use**: Initialize IRC connector with credentials from database profiles or the single stored config
 
-**Architecture**:
-- **DB-first gating**: If ANY DB profiles exist for tenant + integration='irc', use DB only (ignore env)
-- **Env fallback**: Only if zero DB profiles exist AND all required env vars are set
-- **Error on DB failure**: If DB access errors occur, return 500 `irc_profile_resolution_failed` (fail closed; no silent env fallback)
-- **Encryption**: Credentials stored encrypted at rest using `INTEGRATION_CREDENTIALS_ENCRYPTION_KEY` (AES-256-GCM)
-- **Hard cap**: Maximum 10 profiles per tenant (enforce in service layer)
+**Architecture** (`IrcConnectionConfigResolver`, `com.yacc.api.connector`):
+- **DB-first gating**: If ANY DB profiles exist, use DB only (active profile wins → single implicit profile → multiple without an active selection fails closed)
+- **Zero profiles**: falls back to the existing `IrcConfigService.storedConfig()` (the single stored IRC config); if none → typed `irc_not_configured` (fail closed; **no env fallback**)
+- **Error on DB failure**: resolution/decryption failures fail closed (no silent fallback)
+- **Encryption**: Credentials stored encrypted at rest, decrypted via the shared `EncryptionService` (AES-256-GCM, ADR-027)
+- **Hard cap**: Maximum 10 profiles (enforced in the profile service)
 
 **Configuration**:
 ```env
-# Encryption key for credential storage (required if using DB profiles)
+# Encryption master key for credential storage (required)
 INTEGRATION_CREDENTIALS_ENCRYPTION_KEY=<32-byte base64-encoded key>
-
-# Fallback env vars (only used if zero DB profiles exist)
-IRC_SERVER=irc.example.com
-IRC_PORT=6667
-IRC_USERNAME=mybot
-IRC_PASSWORD=secret  # optional
-IRC_CHANNELS=#channel1,#channel2
 ```
 
 **Profile Lifecycle**:
@@ -759,42 +706,28 @@ CREATE → TEST → ACTIVATE → (optional) DISABLE → DELETE
  new   enabled  active   inactive            deleted
 ```
 
-**Gating Logic** (in `ircProfileResolution.service.ts`):
+**Gating Logic** (`IrcConnectionConfigResolver`):
 ```
-1. Try query DB for ANY profiles (enabled OR disabled)
-   - If DB error → throw 500 irc_profile_resolution_failed (FAIL CLOSED)
+1. Query DB for ANY profiles (enabled OR disabled)
+   - DB/decryption error → fail closed (no fallback)
 2. If >0 profiles found:
    - Active profile → use it
    - 0 active, 1 total → use implicitly (enabled or disabled)
-   - 0 active, >1 total → throw 409 irc_profile_not_selected
+   - 0 active, >1 total → fail closed (profile not selected)
 3. If 0 profiles found:
-   - Try env vars (IRC_SERVER, IRC_PORT, IRC_USERNAME, IRC_CHANNELS)
-   - If incomplete → throw 409 irc_not_configured
-   - If valid → use env (source: 'env')
+   - Use IrcConfigService.storedConfig() (single stored config)
+   - If absent → typed irc_not_configured (409)
 ```
 
-**Key Code**:
-```typescript
-// Resolve IRC config for connector startup
-import { resolveIrcConfig } from './services/ircProfileResolution.service';
+**Key Code** (Java):
+```java
+// Resolve IRC config for connector startup (com.yacc.api.connector)
+IrcConnectionConfig config = resolver.resolve();   // DB-first, fail-closed
+ircConnector.connect(config);
 
-// In IRC connector initialization:
-const ircConfig = await resolveIrcConfig(tenantId);
-// Returns: { server, port, nick, password?, channels[], source: 'db' | 'env', profileId? }
-
-// Handle errors:
-try {
-  const config = await resolveIrcConfig(tenantId);
-  await ircConnector.connect(config);
-} catch (error) {
-  if (error instanceof IrcProfileResolutionError) {
-    // 500 irc_profile_resolution_failed → DB access failure
-    // 409 irc_profile_not_selected → Multiple DB profiles, none active
-    // 409 irc_not_configured → No DB profiles, env incomplete
-    logger.error({ code: error.code, statusCode: error.statusCode }, error.message);
-  }
-  throw error;
-}
+// Failure codes surfaced as typed IntegrationApiException:
+//   409 irc_not_configured   → no profiles and no stored config
+//   409 profile-not-selected → multiple DB profiles, none active
 ```
 
 **RBAC** (who can manage IRC profiles):
@@ -820,17 +753,32 @@ User:        (no access)
 
 ```
 yacc-client/
- ├── packages/
- │   ├── common/
- │   │   ├── src/
- │   │   │   ├── types/
- │   │   │   ├── schemas/
- │   │   │   ├── constants/
- │   │   │   └── utils/
- │   │   ├── package.json
- │   │   └── tsconfig.json
- │   │
- │   ├── backend/
+ ├── services/
+ │   └── backend-java/              ← THE BACKEND OF RECORD (Java 21 + Spring Boot, SPEC-002)
+ │       ├── src/main/java/com/yacc/
+ │       │   ├── api/                ← standalone API modules: auth, user, conversation, message,
+ │       │   │                          note, tag, routingrule, notification, audit, dlq, queue,
+ │       │   │                          integration, realtime, connector (controller + wire DTOs each;
+ │       │   │                          amended ADR-030 / ARCH-004 §1)
+ │       │   ├── entity/             ← JPA entities (+ enums/converters)
+ │       │   ├── repository/         ← Spring Data repositories
+ │       │   ├── service/            ← genuinely shared/persistence services (auth identity,
+ │       │   │                          audit persistence, DLQ, encryption)
+ │       │   ├── config/             ← Spring @Configuration (incl. Jackson posture)
+ │       │   ├── common/             ← shared controllers/utilities
+ │       │   └── YaccApplication.java
+ │       ├── src/main/resources/
+ │       │   ├── application.yml
+ │       │   ├── logback-spring.xml  ← structured JSON logging (ADR-029)
+ │       │   └── db/migration/       ← Flyway V1..V4 (ADR-027; incl. Quartz job store)
+ │       ├── src/test/java/          ← JUnit 5 + Testcontainers (+ contractTest suite)
+ │       ├── Dockerfile              ← Temurin 21 JRE, non-root, read-only-root-safe (ADR-029)
+ │       └── build.gradle.kts
+ │
+ ├── packages/                       ← Node workspaces (frontend + transitional packages)
+ │   ├── common/                     ← @yacc/common — TRANSITIONAL until MIG-080 (Zod layer is not
+ │   │                                  the contract source; ADR-023)
+ │   ├── backend/                    ← @yacc/backend — TRANSITIONAL Node POC until MIG-080
  │   │   ├── src/
  │   │   │   ├── index.ts
  │   │   │   ├── controllers/         ← API controllers (from api/controllers/)
@@ -864,13 +812,15 @@ yacc-client/
  │       ├── vite.config.ts
  │       └── playwright.config.ts
  │
+ ├── .docs/                          ← incl. frozen .docs/migration contracts (ADR-023)
  ├── .github/workflows/
+ │   ├── backend-java-ci.yml         ← Java backend CI (build, tests, JaCoCo, contract tests)
+ │   ├── deploy-staging.yaml         ← Helm deploy to staging (Java image)
  │   ├── lint.yml
  │   ├── tests.yml
- │   ├── backend-deploy.yml
+ │   ├── backend-deploy.yml          ← transitional Node-era workflow (until MIG-080)
  │   └── frontend-deploy.yml
- │
- ├── .docs/
+ ├── deploy/helm/yacc-backend/       ← chart (Java image, ADR-029 envelope, no Redis)
  ├── docker compose.yml
  ├── turbo.json
  ├── pnpm-workspace.yaml
@@ -880,11 +830,11 @@ yacc-client/
 ### Backend Deployment Flow
 
 ```
-Push to main
+Push to dev
   ↓
-GitHub Actions: backend-deploy.yml
-  ├── Build Docker image (multi-stage)
-  ├── Push to Docker registry
+GitHub Actions: deploy-staging.yaml
+  ├── Build Java Docker image (services/backend-java/Dockerfile, Temurin 21)
+  ├── Push to container registry
   ├── Helm upgrade --install (to K3s)
   ├── Rollout status check
   ↓
@@ -914,13 +864,13 @@ User Visits App
 
 Login Form
   → POST /api/auth/login
-  → Backend validates (BetterAuth)
-  → Return JWT token
-  → Frontend stores in localStorage + Zustand
+  → Backend validates (Spring Security, ADR-025)
+  → Return JWT access token
+  → Frontend stores token + session state
 
 Every API Request
   → Attach JWT: Authorization: Bearer <JWT>
-  → Backend middleware: Verify & extract userId, role
+  → Backend filter: Verify & extract userId, role
   → Proceed to route handler
 ```
 
@@ -928,21 +878,20 @@ Every API Request
 
 ```
 Client (Frontend)
-  → Socket.io connection
-  → Automatic reconnection (exponential backoff)
-  → Attach to user (via JWT)
+  → Raw WebSocket connection to /ws?token=<JWT>
+  → Client-side bounded-backoff reconnection
+  → Handshake interceptor verifies JWT before upgrade
 
-Backend (Express + Socket.io)
-  → WebSocket Gateway
-  → Authentication middleware
-  → Event handlers (8 event types)
-  → Store in database (reconnect backlog)
-  → Broadcast to relevant users
-  → Clean up old events (1-hour backlog)
+Backend (Spring WebSocket, ADR-026)
+  → YaccWebSocketHandler (session registry, rooms)
+  → Event handlers (frozen AsyncAPI event vocabulary)
+  → Store missed events in PostgreSQL (websocket_backlog, 1-hour retention)
+  → Broadcast enveloped {event, data, timestamp} frames to relevant users
+  → Reconnect replays the durable backlog (system.reconnection.* events)
 
 Client Receives Event
-  → Update Zustand store
-  → Invalidate TanStack Query cache
+  → Update store
+  → Invalidate query cache
   → UI re-renders automatically
 ```
 
@@ -956,18 +905,18 @@ Client Receives Event
 **Goal**: Auth + data model + inbox + messaging + Telegram/IRC integrations
 
 **Tasks**:
-- [ ] Setup PostgreSQL schema (users, conversations, messages, etc.)
-- [ ] Implement BetterAuth (login, logout, forgot password)
-- [ ] API: GET /conversations, GET /conversations/:id
-- [ ] API: POST /auth/* endpoints
-- [ ] Data: User roles + RBAC middleware
-- [ ] WebSocket: connection, authentication, events
-- [ ] Setup: Redis + BullMQ for message retry
-- [ ] API: POST /conversations/:id/messages (send reply)
-- [ ] Connectors: Telegram webhook ingestion
-- [ ] Connectors: IRC polling/connection setup
-- [ ] Frontend: Login page + inbox list UI
-- [ ] Frontend: Conversation view + reply composer
+- [x] Setup PostgreSQL schema (users, conversations, messages, etc.)
+- [x] Implement auth (Spring Security: login, logout, forgot password — ADR-025)
+- [x] API: GET /conversations, GET /conversations/:id
+- [x] API: POST /auth/* endpoints
+- [x] Data: User roles + RBAC (method security)
+- [x] WebSocket: connection, authentication, events
+- [x] Setup: Quartz + DB DLQ for message retry (ADR-028)
+- [x] API: POST /conversations/:id/messages (send reply)
+- [x] Connectors: Telegram ingestion (connector intake; no HTTP webhook route in the frozen contract)
+- [x] Connectors: IRC socket connection
+- [x] Frontend: Login page + inbox list UI
+- [x] Frontend: Conversation view + reply composer
 
 **Deliverable**: Users can send/receive Telegram + IRC messages with live updates
 
@@ -1020,37 +969,35 @@ Client Receives Event
 
 ## 6. Configuration & Environment
 
-### Backend (.env)
+### Backend — Java service (`services/backend-java`; env keys bound via Spring relaxed binding, see `deploy/helm/yacc-backend/values.yaml` for the authoritative list)
 
 ```env
 # Database
-DATABASE_URL=postgresql://user:password@localhost:5432/omni_inbox
+DATABASE_URL=postgresql://user:password@localhost:5432/yacc_inbox
 
-# Auth
-BETTER_AUTH_SECRET=generate-random-string
-JWT_SECRET=generate-random-string
-RESET_PASSWORD_TOKEN_TTL_MINUTES=60
+# Auth (ADR-025: Spring Security; bootstrap Super Admin + founder recovery secrets)
+BOOTSTRAP_SUPER_ADMIN_EMAIL=admin@example.org
+BOOTSTRAP_SUPER_ADMIN_PASSWORD=change-me
+RECOVERY_MODE=once
+RECOVERY_KEY=founder-held-secret
 
 # Storage
 CLOUDFLARE_R2_ENDPOINT=https://r2.example.com
 CLOUDFLARE_R2_ACCESS_KEY=...
 CLOUDFLARE_R2_SECRET_KEY=...
-CLOUDFLARE_R2_BUCKET=omni-inbox
+CLOUDFLARE_R2_BUCKET=yacc-attachments
 CLOUDFLARE_CDN_URL=https://cdn.example.com
 
-# Redis & Queues
-REDIS_HOST=localhost
-REDIS_PORT=6379
+# Encryption (credential storage, ADR-027)
+INTEGRATION_CREDENTIALS_ENCRYPTION_KEY=<32-byte base64-encoded key>
+
+# Async / retry (ADR-028 — Quartz + PostgreSQL job store; no Redis)
 MESSAGE_RETRY_ATTEMPTS=3
 MESSAGE_RETRY_BASE_DELAY_MS=60000
+MESSAGE_RETRY_BACKOFF_MULTIPLIER=5
 
 # Integrations
 TELEGRAM_BOT_TOKEN=your-bot-token
-IRC_SERVER=irc.example.com
-IRC_PORT=6667
-IRC_USERNAME=botname
-IRC_PASSWORD=bot-password
-IRC_CHANNELS=#support,#general
 
 # Retention
 RAW_PAYLOAD_RETENTION_DAYS=7
@@ -1067,14 +1014,19 @@ SMTP_FROM_EMAIL=noreply@example.com
 FRONTEND_URL=https://app.example.com
 
 # WebSocket
-WS_HEARTBEAT_INTERVAL_SEC=60
-WS_BACKLOG_RETENTION_HOURS=1
+YACC_WS_HEARTBEAT_INTERVAL_SEC=60
+YACC_WS_BACKLOG_RETENTION_HOURS=1
 
- # Logging
- LOG_LEVEL=info
- ```
+# Service time basis (MIG-102: RFC 3339 UTC emission)
+TZ=UTC
 
-**Note**: For detailed guidance on configuration and infrastructure patterns, see **ADR-005: Simple Infrastructure and Config Pattern** (`docs/adr/ADR-005-infrastructure-config-pattern.md`). The config folder should contain simple objects with environment variables, while the infrastructure folder contains singleton classes for client initialization.
+# Logging
+LOGGING_LEVEL_ROOT=info
+```
+
+> The Node-POC env block (`BETTER_AUTH_SECRET`, `JWT_SECRET`, `REDIS_HOST/PORT`, `IRC_*` env fallback) is decommissioned with the transitional Node backend (MIG-080). `docker-compose.yml` still runs a Redis container for the transitional Node POC tests only — the Java service has no Redis dependency.
+
+**Note**: For the Node POC's configuration/infrastructure pattern, see **ADR-005** (transitional). The Java service uses Spring `@ConfigurationProperties`/relaxed binding in `com.yacc.config`.
 
 ### Frontend (.env.local)
 
@@ -1088,27 +1040,40 @@ REACT_APP_WS_URL=https://api.example.com
 ## 7. Key Technical Decisions
 
 | Decision | Choice | Rationale |
-|----------|--------|-----------|
-| **Database** | PostgreSQL | Mature, reliable, FTS support, ACID transactions |
+| ----- | -------- | ----------- |
+| **Contract source** | Frozen OpenAPI 3.1 + AsyncAPI/JSON Schema (`.docs/migration/`) | Cross-language single source of truth (ADR-023; supersedes Zod-as-contract ADR-020) |
+| **Database** | PostgreSQL 15 | Mature, reliable, FTS support, ACID transactions |
 | **File Storage** | Cloudflare R2 | Cheaper than S3, fast CDN, easy S3-compatible API |
-| **Message Queue** | Redis + BullMQ | Simple, fast, built-in retry scheduling |
+| **Async / Queue** | Quartz + PostgreSQL DB DLQ | DB-backed retry scheduling + durable DLQ, no extra infrastructure (ADR-028) |
 | **Search** | PostgreSQL FTS (MVP) → Elasticsearch (post-MVP) | FTS sufficient for MVP, easy to migrate |
-| **Auth** | BetterAuth | Flexible, supports email/password + OAuth, JWT + session |
-| **Real-Time** | Socket.io | Mature, handles reconnection, fallbacks (polling) |
-| **Retry Strategy** | Exponential backoff (1m, 5m, 30m) | Standard practice, reduces server load on failures |
+| **Auth** | Spring Security + dual-role OIDC (RP + embedded AS) | Email/password + OIDC, deterministic bootstrap + founder recovery (ADR-025) |
+| **Real-Time** | Raw Spring WebSocket (`/ws`, envelope-framed) | No broker/transport lock-in; resilience app-owned (ADR-026) |
+| **Retry Strategy** | Exponential backoff (1m, 5m, 30m ladder, 3 delivery attempts) | Standard practice, reduces server load on failures |
 | **Notifications** | In-app only (email Phase 2) | Simplifies MVP, WebSocket delivery is instant |
 | **Bulk Action** | Best-effort (partial OK) | More pragmatic than all-or-nothing, better UX |
  | **Single/Multi-Tenant** | Single-tenant (MVP) | Simpler architecture, env vars for credentials, easier deployment |
  | **Conversation Threading** | One per group/channel | Clear mapping, avoids confusion with multiple threads |
  | **Rules Evaluation** | First match wins | Simple, predictable, avoids conflicting actions |
  | **Attachment Re-Hosting** | Download + R2 | Preserves files if platform deletes, faster delivery via CDN |
- | **Infrastructure/Config Pattern** | Simple two-folder (config = data, infrastructure = clients) | Simple and clean approach, easy to test, clear separation (see ADR-005) |
+ | **Package Layout** | `api.<feature>` modules + shared entity/repository/service planes | Founder-corrected standalone-module model (ADR-030 as amended; ARCH-004 §1) |
 
 ---
 
 ## 8. Code Architecture Constraints (STRICT - Non-Negotiable)
 
-### Backend Code Standards
+> **Two codebases, two rule sets.** The Java backend of record follows ARCH-004 (`.docs/architecture/004-java-backend-guardrails.md`) + ADR-030; the Node POC rules below remain in force for the transitional Node packages until MIG-080.
+
+### Backend Code Standards (Java service — ARCH-004)
+
+1. **No `any` / raw types** — proper types everywhere; records for wire DTOs; no `Object` casts or `JsonNode` escape hatches (ARCH-004 §3).
+2. **Package layout** (amended ADR-030 / ARCH-004 §1): standalone `com.yacc.api.<feature>` modules (controller + wire DTOs; mapper/service only when genuinely warranted) plus the shared `entity`/`repository`/`service` planes; `config`/`common` support packages; `YaccApplication` at the root. No mandatory layer skeleton.
+3. **Spring idioms**: constructor injection only; middleware/filters via Spring configuration (no arbitrary `app.use()`-style global mutation); `/api` prefix at controller level (no global prefix).
+4. **One definition per file**, single responsibility.
+5. **Config vs infrastructure**: `config/` holds Spring configuration/properties; clients (DB, encryption) are Spring-managed beans — no bespoke singletons.
+6. **Database**: Drizzle-era raw-SQL ban carries over — Flyway migrations + JPA/Jackson only, no raw SQL in code (ADR-027); validation/contract via the frozen schemas (ADR-023).
+7. **No global `/api` prefix** — routes declare `/api` at the controller level where the frozen contract requires it.
+
+### Node POC Standards (transitional until MIG-080)
 
 1. **No `any` Types Allowed**
    - Use proper TypeScript interfaces extending `Request` from `express` module
@@ -1125,43 +1090,24 @@ REACT_APP_WS_URL=https://api.example.com
      - `connectors/`, `websockets/`, `workers/`, `types/`, `utils/`
    - ❌ WRONG: `api/`, `domain/`, `infrastructure/` nested folders
 
-3. **Routing-Controllers Best Practices**
+3. **Routing-Controllers Best Practices** (Node POC only)
    - Use `middlewares` option in `useExpressServer()` to register middleware
    - ❌ NO: Use `app.use()` for general middleware registration
    - ✅ YES: Pass middlewares via routing-controllers config
-   - ✅ Exception: request body parsing may use `app.use()` at the entrypoint boundary for BetterAuth compatibility (see ADR-014)
-
-4. **One Definition Per File**
-   - One class per file
-   - One interface per file (unless closely related)
-   - One service per file
-   - Clear single responsibility principle
-
-5. **Config vs Infrastructure Pattern** (ADR-005 Approved)
-   - **Config folder**: Simple `const` objects with env var references
-     - Example: `{ port: process.env.PORT, dbUrl: process.env.DATABASE_URL }`
-     - NO class definitions, NO initialization logic
-   - **Infrastructure folder**: Singleton client classes
-     - Example: `class DatabaseClient { constructor() { ... } }`
-     - Handles initialization, connection pooling, singleton pattern
-   - Rationale: "I don't want clean architecture. I want to keep it simple and clean."
-
-6. **No Global `/api` Prefix**
-   - ❌ NO: Global `@Controller('/api/users')`
-   - ✅ YES: Individual routes like `@Controller('/users')` with `@Post('/login')` → `/users/login`
-   - Add `/api` prefix only when needed for routing clarity
+   - ✅ Exception: request body parsing may use `app.use()` at the entrypoint boundary (see ADR-014)
 
 ### Testing & Quality Standards
 
 1. **Code Coverage Target**: ≥ 85% for all new code
-   - Exception: Infrastructure/config code can be lower if simple
-   - Use **Vitest** for unit/integration tests (native ESM, 18.8% faster than Jest)
+   - Java backend: JaCoCo aggregated gate enforced by `./gradlew check` and CI (aggregated over unit/integration + contract suites)
+   - Node POC (transitional): Vitest; infrastructure/config code can be lower if simple
    - Use Playwright for E2E tests
-   - **Reference**: ADR-006 (Jest → Vitest Migration, approved 2026-01-25)
+   - **Reference**: ADR-006 (Jest → Vitest Migration, approved 2026-01-25; Node-era)
 
 2. **Test Organization**:
-   - Unit tests co-located near source files or in `__tests__/` folder
-   - E2E tests in `packages/frontend/e2e/` (Playwright)
+   - Java: JUnit 5 suites under `src/test/java` (unit + Testcontainers integration) and the `contractTest` tag for frozen-contract conformance
+   - Node POC: unit tests co-located near source files or in `__tests__/` folder
+   - E2E tests in `packages/frontend/` (Playwright)
    - Mock external services (Telegram, IRC) in tests
 
 3. **Error Handling**:
@@ -1256,12 +1202,12 @@ class BaseListResponse<T> {
 }
 ```
 
-#### Backend PaginationRequest Helper
+#### Backend Pagination (Java service)
 
-Backend controllers use `PaginationRequest` which extends `BaseListRequest` with Drizzle ORM helpers:
+The Java backend implements the same envelope with Spring Data JPA: controllers bind `page`/`limit`/`searchText` request params, repositories return `Page<T>`/sliced results, and services map them to the `BaseListResponse<T>` wire shape (`data`, 1-indexed `page`, `limit`, `total`). The Node-POC `PaginationRequest`/Drizzle helper below is transitional (until MIG-080) and shows the same contract:
 
 ```typescript
-// packages/backend/src/utilities/pagination.ts
+// packages/backend/src/utilities/pagination.ts — TRANSITIONAL (Node POC, MIG-080)
 class PaginationRequest extends BaseListRequest {
   /**
    * Apply pagination to Drizzle query.
@@ -1280,9 +1226,9 @@ class PaginationRequest extends BaseListRequest {
 }
 ```
 
-**Feature-specific query classes override `applyToQuery()` to add BOTH filtering AND pagination:**
+**Feature-specific query classes override `applyToQuery()` to add BOTH filtering AND pagination** (Node POC pattern — transitional; the Java service expresses the same filtering via Spring Data `Specification` combinators in the owning repository):
 ```typescript
-// packages/backend/src/types/conversations.types.ts
+// packages/backend/src/types/conversations.types.ts — TRANSITIONAL (Node POC, MIG-080)
 class ListConversationsQuery extends PaginationRequest {
   channel?: 'telegram' | 'irc';
   status?: 'open' | 'pending' | 'resolved';
@@ -1391,7 +1337,7 @@ const { data } = useConversations({ page: 0, limit: 20, status: 'open' });
 
 ### Overview
 
-YACC backend is deployed to Kubernetes via Helm (ADR-019 approved). The Helm chart manages backend application lifecycle while PostgreSQL and Redis are managed as Kubernetes StatefulSets.
+YACC backend is deployed to Kubernetes via Helm (ADR-019 approved; pod envelope amended by ADR-029). The Helm chart deploys the **Java/Spring backend** built from `services/backend-java/Dockerfile` (Temurin 21 JRE, non-root uid 1000, read-only root filesystem). PostgreSQL is managed as a Kubernetes StatefulSet; there is **no Redis** in the cluster (ADR-028).
 
 **Scope**: Backend deployment only. Frontend remains AWS S3 + CloudFront (separate pipeline).
 
@@ -1420,23 +1366,23 @@ deploy/helm/yacc-backend/
 - **Type**: Deployment (stateless, rolling updates)
 - **Replicas**: 1 (MVP), scale to 2-3 for HA
 - **Strategy**: RollingUpdate with zero downtime
-- **Liveness Probe**: HTTP GET `/health` (detects crashed pods)
-- **Readiness Probe**: HTTP GET `/ready` (checks database/redis connectivity)
+- **Liveness Probe**: HTTP GET `/health/live` (actuator liveness group, ADR-029)
+- **Readiness Probe**: HTTP GET `/health/ready` (actuator readiness group; no external dependencies in the probe verdict)
 
-**Pod Resource Allocation**:
+**Pod Resource Allocation** (ADR-029 JVM envelope):
 ```yaml
 resources:
   requests:
     cpu: 500m          # Guaranteed minimum
-    memory: 512Mi
+    memory: 1Gi
   limits:
     cpu: 1000m         # Hard limit (pod killed if exceeded)
-    memory: 1Gi
+    memory: 2Gi        # JVM heap sizes from the limit (MaxRAMPercentage=75)
 ```
 
 **Environment Variables**:
-- Injected from ConfigMap (`NODE_ENV`, `PORT`, `LOG_LEVEL`, etc.)
-- Injected from K8s Secret (`DATABASE_URL`, `REDIS_URL`, credentials)
+- Injected from ConfigMap (`SPRING_PROFILES_ACTIVE`, `SERVER_PORT`, `TZ=UTC`, retry/WS tuning, etc.)
+- Injected from K8s Secret (`DATABASE_URL`, bootstrap/recovery + integration credentials per ADR-025/values.yaml)
 - Service discovery auto-populated (`POSTGRES_SVC_SERVICE_HOST`, etc.)
 
 ### Service Discovery
@@ -1445,7 +1391,6 @@ resources:
 ```
 Backend pod resolves:
   - postgres-svc.yacc-staging.svc.cluster.local:5432 → PostgreSQL
-  - redis-svc.yacc-staging.svc.cluster.local:6379 → Redis
 
 Backend service exposed as:
   - yacc-backend.yacc-staging.svc.cluster.local:8080 (internal)
@@ -1469,20 +1414,22 @@ ports:
 
 **ConfigMap** (non-sensitive settings):
 ```yaml
-NODE_ENV: staging
-LOG_LEVEL: info
-DATABASE_POOL_SIZE: 15
+SPRING_PROFILES_ACTIVE: production
+LOGGING_LEVEL_ROOT: info
+TZ: UTC
 ```
 
 **K8s Secrets** (sensitive credentials):
 ```bash
 kubectl create secret generic yacc-backend-secrets \
   --from-literal=DATABASE_URL="postgresql://user:pass@postgres-svc:5432/yacc" \
-  --from-literal=REDIS_URL="redis://:pass@redis-svc:6379/0" \
   --from-literal=TELEGRAM_BOT_TOKEN="xxxxx:xxxxx" \
-  --from-literal=SESSION_SECRET="xxxxx" \
-  --from-literal=JWT_SECRET="xxxxx" \
   -n yacc-staging
+
+# Auth bootstrap + recovery secrets (ADR-025) and R2/email credentials —
+# see deploy/helm/yacc-backend/values.yaml for the exact key names
+# (yacc-auth-secrets / yacc-cloudflare-secrets / yacc-email-secrets).
+# No Redis/JWT/BetterAuth secrets: decommissioned with the Node POC.
 ```
 
 **MVP Approach**: K8s Secrets (simple, sufficient). Post-MVP: sealed-secrets or Vault for multi-cluster.
@@ -1522,37 +1469,22 @@ Client (external) → VPS:80/443 → Traefik Pod → Backend Service → Backend
 
 ### Health Probes
 
-**Backend Implementation**:
-
-```typescript
-// GET /health - Pod liveness indicator
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-// GET /ready - Service readiness check
-app.get('/ready', async (req, res) => {
-  try {
-    await db.query('SELECT 1');       // Database check
-    await redis.ping();               // Redis check
-    res.json({ ready: true });
-  } catch (err) {
-    res.status(503).json({ 
-      ready: false, 
-      reason: err.message 
-    });
-  }
-});
+**Backend Implementation** (Spring Boot actuator, ADR-029):
+```java
+// Management base path is "/" — the frozen wire paths are:
+// GET /health/live   → liveness group (livenessState only; pod restart verdict)
+// GET /health/ready  → readiness group (readinessState only; traffic verdict)
+// No external dependencies in the probe verdict.
 ```
 
 **Probe Configuration**:
-- **Liveness**: Every 30 seconds, fail after 3 tries (pod restart)
-- **Readiness**: Every 10 seconds, fail after 3 tries (remove from load balancer)
-- **Initial Delay**: 15s for liveness, 5s for readiness
+- **Liveness**: `/health/live` — every 30 seconds, fail after 3 tries (pod restart)
+- **Readiness**: `/health/ready` — every 10 seconds, fail after 3 tries (remove from load balancer)
+- **Initial Delay**: 30s for liveness, 10s for readiness
 
 ### Storage Strategy
 
-**PostgreSQL & Redis**: StatefulSet with PersistentVolumes
+**PostgreSQL**: StatefulSet with a PersistentVolume (schema via Flyway V1..V4; includes the Quartz job-store, `dead_letter_queue` and `websocket_backlog` tables — ADR-027/ADR-028).
 
 ```yaml
 kind: StatefulSet
@@ -1568,7 +1500,7 @@ spec:
           storage: 5Gi               # PostgreSQL
 ```
 
-**Backend Pod**: No persistent storage (stateless)
+**Backend Pod**: No persistent storage (stateless; writable emptyDir paths only: `/tmp`, heap dumps, logs — read-only root filesystem, ADR-029)
 
 **Attachment Storage**: External (Cloudflare R2, not in Kubernetes)
 
@@ -1596,26 +1528,23 @@ helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \
   --set image.tag=v1.2.3
 ```
 
-### Rollback Procedure
+### Incident Response (Roll-Forward Posture)
 
-**View Release History**:
+The migration operational posture is **roll-forward only** (ARCH-004 §1; ADR-030 Decision 6): incidents are remediated by deploying a forward fix, not by `helm rollback` to a previous revision. `helm history` remains useful for audit (identifying what changed and when).
+
 ```bash
+# Identify the running revision + image (audit trail)
 helm history yacc-backend -n yacc-staging
 
-# REVISION  UPDATED                     STATUS      CHART
-# 1         Thu Feb 26 10:00:00 2026    superseded  yacc-backend-1.0.0
-# 2         Thu Feb 26 10:05:00 2026    deployed    yacc-backend-1.0.0
-```
+# Recover by rolling FORWARD: fix, build, redeploy the new image tag
+helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \
+  -n yacc-staging --set image.tag=<fixed-tag>
 
-**Rollback to Previous Revision**:
-```bash
-helm rollback yacc-backend 1 -n yacc-staging
-
-# Monitor rollback
+# Monitor the forward deployment
 kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
 ```
 
-**Details**: See `.docs/runbooks/helm-rollback.md` for complete procedures and troubleshooting.
+**Details**: See `.docs/runbooks/helm-rollback.md` — despite its historical name, it now documents the roll-forward incident procedure (trigger conditions, forward-verification, stop authority). The rehearsal-evidenced incident/rollback decision procedure lands with MIG-070 (#361).
 
 ### Related Documentation
 
@@ -1626,6 +1555,6 @@ kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
 
 ---
 
-**Version**: 2.2  
-**Last Updated**: February 26, 2026  
-**Status**: Phase 1 Development + Infrastructure (DEV-013-015 in progress)
+**Version**: 2.3  
+**Last Updated**: 2026-10-18 (Java/Spring backend — MIG-090 docs sweep)  
+**Status**: SPEC-002 Phases 0–6 merged; Java service is the backend of record (Node POC transitional until MIG-080)
