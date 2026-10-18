@@ -84,7 +84,10 @@ const WS_BASE_URL =
 const FIXTURES = {
   user: { email: 'user@yacc.local', password: 'admin123' },
   manager: { email: 'manager@yacc.local', password: 'admin123' },
-  conversationId: '00000000-0000-0000-0000-000000001001',
+  /** Telegram fixture conversation (avoided for sends: its message list
+   *  accumulates queue retry-cycle rows, pushing probe rows past the
+   *  list's first page). */
+  conversationId: '00000000-0000-0000-0000-000000001002',
 } as const;
 
 /** One frozen `{event, data, timestamp}` wire frame. */
