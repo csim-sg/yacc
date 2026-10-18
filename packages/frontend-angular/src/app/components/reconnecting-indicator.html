@@ -1,0 +1,67 @@
+@if (isReconnecting()) {
+  <div
+    class="alert alert-warning shadow-lg mb-4"
+    role="alert"
+    aria-live="polite"
+    aria-label="Reconnecting. Attempt {{ attemptNumber() + 1 }} of {{ maxAttempts }}.{{
+      countdownSeconds() !== null ? ' Retrying in ' + countdownSeconds() + ' seconds.' : ''
+    }}"
+  >
+    <div class="flex items-center justify-between w-full">
+      <div class="flex items-center gap-3">
+        <div class="loading loading-spinner loading-sm"></div>
+        <div>
+          <h3 class="font-semibold">Reconnecting...</h3>
+          <p class="text-sm opacity-80">
+            Attempt {{ attemptNumber() + 1 }} of {{ maxAttempts }}
+            @if (countdownSeconds() !== null) {
+              • Next retry in {{ countdownSeconds() }}s
+            }
+          </p>
+        </div>
+      </div>
+      <progress
+        class="progress progress-warning"
+        value="{{ ((attemptNumber() + 1) / maxAttempts) * 100 }}"
+        max="100"
+        aria-label="Reconnection progress"
+        style="width: 80px"
+      ></progress>
+    </div>
+  </div>
+} @else if (isExhausted()) {
+  <div
+    class="alert alert-error shadow-lg mb-4"
+    role="alert"
+    aria-label="Connection lost. Manual reconnection required."
+  >
+    <div class="flex items-center justify-between w-full">
+      <div class="flex items-center gap-3">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-6 w-6 flex-shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 9v2m0 4v2m0 5v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+        <div>
+          <h3 class="font-semibold">Connection Lost</h3>
+          <p class="text-sm opacity-80">
+            Unable to reconnect after {{ maxAttempts }} attempts. Please check your connection and
+            try again.
+          </p>
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline" aria-label="Retry connection" (click)="retry()">
+        Retry
+      </button>
+    </div>
+  </div>
+}

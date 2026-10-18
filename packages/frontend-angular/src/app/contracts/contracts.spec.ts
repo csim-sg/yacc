@@ -12,8 +12,8 @@ import { CreateNoteRequestSchema } from './http/notes.schema';
 import { CreateRoutingRuleRequestSchema, RoutingRuleActionSchema, RoutingRuleConditionSchema } from './http/routing-rules.schema';
 import { AttachTagRequestSchema, CreateTagRequestSchema } from './http/tags.schema';
 import { CreateUserRequestSchema } from './http/users.schema';
-import { WS_CONNECTION_TIMEOUT_MS, WS_CORRELATION_HEADER, WS_MAX_RECONNECTION_ATTEMPTS, WS_PING_INTERVAL_MS, WS_RECONNECTION_DELAYS_MS, WS_TRANSPORTS } from './ws/connection';
-import { ConversationUpdatedEventSchema, MessageFailedEventSchema, MessageSentEventSchema } from './ws/events.schema';
+import { WS_CONNECTION_TIMEOUT_MS, WS_ENDPOINT_PATH, WS_MAX_RECONNECT_ATTEMPTS, WS_PING_INTERVAL_MS, WS_RECONNECT_DELAYS_MS, WS_TYPING_CLEAR_MS } from './ws/connection';
+import { ConversationUpdatedPayloadSchema, MessageFailedPayloadSchema, MessageSentPayloadSchema, WsEnvelopeSchema } from './ws/events.schema';
 
 /**
  * Contract-layer smoke spec (ANG-004 PB-3 support).
@@ -216,59 +216,52 @@ describe('contract layer (frozen wire shapes)', () => {
     });
   });
 
-  describe('socket connection constants (T2 §3.5 pins)', () => {
-    it('carries the React client reconnection/transport/correlation pins', () => {
-      expect(WS_RECONNECTION_DELAYS_MS).toEqual([1000, 2000, 4000, 8000, 30000]);
-      expect(WS_MAX_RECONNECTION_ATTEMPTS).toBe(10);
+  describe('socket connection constants (frozen raw-WS pins)', () => {
+    it('carries the canonical application-owned reconnect/transport pins', () => {
+      expect(WS_ENDPOINT_PATH).toBe('/ws');
+      expect(WS_RECONNECT_DELAYS_MS).toEqual([1000, 2000, 4000, 8000, 30000]);
+      expect(WS_MAX_RECONNECT_ATTEMPTS).toBe(10);
       expect(WS_CONNECTION_TIMEOUT_MS).toBe(10000);
       expect(WS_PING_INTERVAL_MS).toBe(60000);
-      expect(WS_TRANSPORTS).toEqual(['websocket', 'polling']);
-      expect(WS_CORRELATION_HEADER).toBe('X-Request-ID');
+      expect(WS_TYPING_CLEAR_MS).toBe(5000);
     });
 
-    it('encodes the legacy-gateway `{event, data, timestamp}` envelope (T3-G5)', () => {
-      const sent = MessageSentEventSchema.parse({
-        event: 'message.sent',
-        data: {
-          messageId: 'm1',
-          conversationId: 'c1',
-          status: 'sent',
-          platformMessageId: 'tg-1',
-          timestamp: '2026-10-18T00:00:00',
-        },
-        timestamp: '2026-10-18T00:00:00',
+    it('parses every inbound frame as the frozen `{event, data, timestamp}` envelope', () => {
+      // `message.sent` data — frozen message-sent.schema.json (`sentAt`).
+      const sent = MessageSentPayloadSchema.parse({
+        messageId: '00000000-0000-0000-0000-000000000002',
+        conversationId: '00000000-0000-0000-0000-00000000000c',
+        status: 'sent',
+        sentAt: '2026-10-18T00:00:00',
       });
-      expect(sent.data.status).toBe('sent');
+      expect(sent.status).toBe('sent');
 
+      // `message.failed` data — frozen message-failed.schema.json
+      // (`retryAt`/`attempt`; the Node-era maxAttempts/isFinal are gone).
+      const failed = MessageFailedPayloadSchema.parse({
+        messageId: '00000000-0000-0000-0000-000000000002',
+        conversationId: '00000000-0000-0000-0000-00000000000c',
+        status: 'failed',
+        error: 'delivery timeout',
+        retryAt: '2026-10-18T00:01:00',
+        attempt: 3,
+      });
+      expect(failed.attempt).toBe(3);
       expect(
-        MessageFailedEventSchema.parse({
-          event: 'message.failed',
-          data: {
-            messageId: 'm1',
-            conversationId: 'c1',
-            status: 'failed',
-            attempt: 3,
-            maxAttempts: 3,
-            error: 'delivery timeout',
-            isFinal: true,
-          },
-          timestamp: '2026-10-18T00:00:00',
-        }).data.isFinal
-      ).toBe(true);
+        MessageFailedPayloadSchema.safeParse({ ...failed, attempt: 4 }).success
+      ).toBe(false);
 
-      expect(
-        ConversationUpdatedEventSchema.parse({
-          conversationId: '00000000-0000-0000-0000-00000000000c',
-          updatedFields: { status: 'open' },
-          changedBy: 'user-1',
-          changedAt: '2026-10-18T00:00:00',
-        }).updatedFields
-      ).toEqual({ status: 'open' });
+      // `conversation.updated` data — frozen conversation-updated.schema.json.
+      const updated = ConversationUpdatedPayloadSchema.parse({
+        conversationId: '00000000-0000-0000-0000-00000000000c',
+        updatedFields: { status: 'open' },
+        changedBy: '00000000-0000-0000-0000-000000000004',
+        changedAt: '2026-10-18T00:00:00',
+      });
+      expect(updated.updatedFields).toEqual({ status: 'open' });
 
-      // A wrong event literal does not parse (envelope duality guard).
-      expect(MessageSentEventSchema.safeParse({ event: 'message.failed', data: {}, timestamp: 't' }).success).toBe(
-        false
-      );
+      // Envelope conformance: a frame missing `timestamp` is not wire truth.
+      expect(WsEnvelopeSchema.safeParse({ event: 'message.sent', data: {} }).success).toBe(false);
     });
   });
 });

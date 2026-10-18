@@ -5,12 +5,15 @@ import { Injectable, computed, signal } from '@angular/core';
  * `notification.received` payload (`contracts/ws/events.schema.ts`), which
  * is what the ANG-006 handler feeds into this store. The React store's
  * extra `title`/`action` fields were never wire-backed and are dropped
- * (single canonical state location, B6 fix).
+ * (single canonical state location, B6 fix). `type` carries the frozen
+ * wire enum (`schemas/notification.schema.json`: assignment|mention|
+ * system) — the Node-era declared `unread` value was never sent and is
+ * not part of the frozen contract.
  */
 export interface Notification {
   id: string;
   userId: string;
-  type: 'assignment' | 'mention' | 'unread';
+  type: 'assignment' | 'mention' | 'system';
   conversationId: string;
   actorId?: string;
   actorName?: string;

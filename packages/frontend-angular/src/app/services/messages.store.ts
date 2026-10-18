@@ -82,6 +82,64 @@ export class MessagesStore {
   }
 
   // ---------------------------------------------------------------------------
+  // Real-time write surface (ANG-006 handlers; React event-handler parity)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Append an inbound `message.received` row to a loaded conversation's
+   * list (React `handleMessageReceived` parity): dedup by message id
+   * (backlog replay re-delivers rows), append at the list tail — the
+   * store's single ordering convention, matching the confirmed-send
+   * append. No-op when the conversation's list is not loaded (parity:
+   * React only patched an existing cache entry).
+   */
+  receiveInbound(message: Message): boolean {
+    if (this.listSnapshot(message.conversationId)?.data === undefined) {
+      return false; // List not loaded — no cache patch (parity).
+    }
+    if (this.exists(message.conversationId, message.id)) {
+      return false; // Duplicate (e.g. backlog replay re-delivery).
+    }
+    this.lists.update(cacheKeys.conversations.messages(message.conversationId), (previous) => {
+      if (!previous) {
+        return undefined;
+      }
+      return {
+        ...previous,
+        messages: [...previous.messages, message],
+        total: previous.total + 1,
+      };
+    });
+    return true;
+  }
+
+  /**
+   * Patch one message's delivery `status` in a loaded list
+   * (`message.sent` / `message.failed` handler parity). No-op when the
+   * list is not loaded or the row is absent.
+   */
+  updateMessageStatus(
+    conversationId: string,
+    messageId: string,
+    status: 'sent' | 'failed',
+  ): void {
+    this.lists.update(cacheKeys.conversations.messages(conversationId), (previous) => {
+      if (!previous) {
+        return undefined;
+      }
+      const messages = previous.messages.map((message) =>
+        message.id === messageId ? { ...message, status } : message,
+      );
+      return { ...previous, messages };
+    });
+  }
+
+  /** Invalidate every loaded conversation message list (the whole family). */
+  invalidate(): void {
+    this.lists.invalidate();
+  }
+
+  // ---------------------------------------------------------------------------
   // Optimistic mechanism (U5 — tested-but-inactive; activation is ANG-008)
   // ---------------------------------------------------------------------------
 
