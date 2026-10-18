@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yacc/ws/envelope.schema.json",
+  "title": "WebSocket event envelope",
+  "description": "SPEC-002 MIG-002 capture @98db628. Envelope applied ONLY by wsGateway emit paths (websockets/gateway.ts:73,107,145,178): {event, data, timestamp}. Socket-controller emits bypass it (bare payloads). Preserved verbatim per ADR-026.",
+  "type": "object",
+  "required": ["event", "data", "timestamp"],
+  "properties": {
+    "event": {
+      "type": "string",
+      "description": "Event name (dot notation), e.g. message.sent, notification.received",
+      "examples": ["message.sent", "notification.received", "message.retry.scheduled"]
+    },
+    "data": {
+      "description": "Event payload; conforms to the event-specific schema"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp set at emit time (new Date().toISOString())"
+    }
+  }
+}

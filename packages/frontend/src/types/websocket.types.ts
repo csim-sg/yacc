@@ -3,7 +3,19 @@
  *
  * Type definitions for all WebSocket events between client and server
  * Organized by event direction (server → client, client → server)
+ *
+ * MIG-041: payload types whose members are IDENTICAL to the frozen
+ * AsyncAPI/JSON Schema payloads are aliased from the generated contract
+ * (`../api/contract/realtime.gen.ts`). Types still carrying pre-canonical
+ * baseline members (userName/eventId/`away`, backlog sync) are explicitly
+ * NOT rewritten here — reconciling the WS stack to the canonical payloads
+ * is MIG-052 (ledger rows WS-BHV-012, WS-EVT-009; founder decision B keeps
+ * that work in the post-cutover frontend).
  */
+
+import type { components } from '../api/contract/realtime.gen';
+
+type RealtimeSchemas = components['schemas'];
 
 // ============================================================================
 // Connection State Types
@@ -22,51 +34,29 @@ export type ConnectionState =
 // ============================================================================
 
 /**
- * Conversation was updated (status/priority/assignment changes)
+ * Conversation was updated (status/priority/assignment changes).
+ * Contract payload: `schemas/conversation-updated.schema.json`.
  */
-export interface ConversationUpdatedEvent {
-  conversationId: string;
-  updatedFields: Record<string, unknown>; // Map of changed fields and values
-  changedBy: string; // UUID of user who made the change
-  changedAt: string; // ISO8601 timestamp
-}
+export type ConversationUpdatedEvent = RealtimeSchemas['conversation-updated'];
 
 /**
- * Message was sent successfully
+ * Message was sent successfully.
+ * Contract payload: `schemas/message-sent.schema.json`.
  */
-export interface MessageSentEvent {
-  conversationId: string;
-  messageId: string;
-  status: 'sent';
-  sentAt: string; // ISO8601 - actual backend field name
-}
+export type MessageSentEvent = RealtimeSchemas['message-sent'];
 
 /**
- * Message failed to send
+ * Message failed to send.
+ * Contract payload: `schemas/message-failed.schema.json`.
  */
-export interface MessageFailedEvent {
-  conversationId: string;
-  messageId: string;
-  status: 'failed';
-  error: string;
-  retryAt: string; // ISO8601 - when next retry will occur
-  attempt: number; // Retry attempt number (1-3)
-}
+export type MessageFailedEvent = RealtimeSchemas['message-failed'];
 
 /**
  * Inbound message received from external platform (Telegram, IRC)
- * Emitted by backend connector when platforms send new messages
+ * Emitted by backend connector when platforms send new messages.
+ * Contract payload: `schemas/message-received.schema.json`.
  */
-export interface MessageReceivedEvent {
-  conversationId: string;
-  messageId: string;
-  platform: 'telegram' | 'irc';
-  senderId: string;
-  senderName: string;
-  body: string;
-  timestamp: string; // ISO8601
-  attachments?: Array<{ url: string; type: string; name: string }>;
-}
+export type MessageReceivedEvent = RealtimeSchemas['message-received'];
 
 /**
  * User started typing

@@ -20,10 +20,23 @@ spring:
       # all JPA mappings against the Flyway-built schema. Hibernate never
       # creates or alters schema (ARCH-004 §7 — Flyway-only).
       ddl-auto: validate
+  quartz:
+    # MIG-063: cached test contexts never start Quartz threads. The shared
+    # PostgreSQL container would otherwise see several live non-clustered
+    # schedulers (one per cached context) racing over the same qrtz_* tables.
+    # The dedicated MIG-063 scheduler tests opt back in with an explicit
+    # spring.quartz.auto-startup=true context property.
+    auto-startup: false
 
 yacc:
   name: yacc-backend
   environment: test
+  queue:
+    retry:
+      # MIG-063: no background retried-marker polls in tests — the scheduler
+      # tests drive QueueRetryService.consumeRetriedMarkers() synchronously
+      # for determinism (no wall-clock dependence).
+      marker-poll-interval-ms: 3600000
   auth:
     token:
       # Deterministic test-only RS256 signing key (2048-bit RSA, PKCS#8,

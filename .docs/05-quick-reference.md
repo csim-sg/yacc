@@ -16,13 +16,29 @@ See [01-product-specification.md](./01-product-specification.md) for full scope 
 ## Deployment & CI/CD
 
 - Target runtime: K3s (Kubernetes)
-- Installer: Helm (app charts + dependencies like PostgreSQL/Redis)
-- Architecture decision: `.docs/adr/ADR-019-k3s-helm-cicd-deployment.md`
-- **Node.js v20+** required for CI/CD (linting, testing, building) due to `eslint-plugin-unicorn` dependency
+- Installer: Helm (backend chart `deploy/helm/yacc-backend`; PostgreSQL pre-installed in the cluster — **no Redis**, ADR-028)
+- Backend image: Java 21 / Spring Boot (`services/backend-java/Dockerfile`; ADR-029 envelope)
+- Architecture decision: `.docs/adr/ADR-019-k3s-helm-cicd-deployment.md` (envelope amended by ADR-029)
+- **Node.js v20+** required for Node-workspace CI/CD (linting, testing, building) due to `eslint-plugin-unicorn` dependency; the Java backend uses Temurin 21 (`backend-java-ci.yml`)
 
 ---
 
-## Package Manager: pnpm
+## Backend of Record: Java 21 + Spring Boot (`services/backend-java`)
+
+```bash
+cd services/backend-java
+./gradlew --no-daemon bootRun        # run locally (port 8080)
+./gradlew --no-daemon build          # build + tests + JaCoCo ≥85% gate
+./gradlew --no-daemon test           # unit + integration (Testcontainers)
+./gradlew --no-daemon contractTest   # frozen OpenAPI/AsyncAPI conformance
+./gradlew --no-daemon check          # full verification gate
+```
+
+Contract source of truth: frozen `.docs/migration/{openapi.yaml,asyncapi.yaml,schemas/*}` (ADR-023). Health wires: `/health/live`, `/health/ready` (actuator); metrics: `/actuator/prometheus` (ADR-029).
+
+---
+
+## Package Manager: pnpm (Node workspaces — frontend + transitional packages)
 
 YACC uses **pnpm** for monorepo management. 
 
@@ -63,6 +79,7 @@ pnpm --filter @yacc/common lint       # Common package linter
 
 **Status**: ✅ Complete + E2E tested  
 **Scope**: Auth, account recovery, core workflow, real-time, notifications (assignment-only)  
+**Stack note**: delivered on the transitional Node/TypeScript stack; the Java backend now provides auth via Spring Security (ADR-025 — BetterAuth decommissioned) and real-time via raw WebSocket (ADR-026). Frontend target reconciliation is SPEC-003 scope.
 
 | Feature | Status | Implementation | Test |
 |---------|--------|-----------------|------|
@@ -177,17 +194,20 @@ kubectl logs -n yacc-staging -l app=yacc-backend -f
 
 # Check pod health
 kubectl get pods -n yacc-staging
-kubectl exec -it <pod-name> -n yacc-staging -- curl http://localhost:8080/health
+kubectl exec -it <pod-name> -n yacc-staging -- curl http://localhost:8080/health/live
 ```
 
-### Rollback & Uninstall
+### Incident Response (Roll-Forward)
+
+The operational posture is **roll-forward only** (ARCH-004 §1): remediate by deploying a forward fix — `helm rollback` is not the primary path. See `.docs/runbooks/helm-rollback.md` (roll-forward incident runbook; rehearsal lands with MIG-070 #361).
 
 ```bash
-# Rollback to previous revision
-helm rollback yacc-backend -n yacc-staging
+# Deploy a forward fix
+helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \
+  -n yacc-staging --set image.tag=<fixed-tag>
 
-# Rollback to specific revision
-helm rollback yacc-backend 2 -n yacc-staging
+# Audit trail (what is/was running)
+helm history yacc-backend -n yacc-staging
 
 # Completely remove release
 helm uninstall yacc-backend -n yacc-staging
@@ -224,7 +244,7 @@ kubectl get events -n yacc-staging --sort-by='.lastTimestamp'
 - [ ] Review 03-implementation-guide.md (architecture, phases)
 - [ ] Check 04-qa-and-testing.md (ACs, regression suite)
 - [ ] Keep 05-quick-reference.md pinned for quick lookup
-- [ ] Setup PostgreSQL + Redis locally
+- [ ] Setup PostgreSQL locally (Java service: `services/backend-java`, Testcontainers provisions its own test DB)
 - [ ] Setup Cloudflare R2 bucket (or MinIO locally)
 
 ---
@@ -249,8 +269,8 @@ kubectl get events -n yacc-staging --sort-by='.lastTimestamp'
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: 2026-02-11  
-**Status**: Active (MVP in progress)  
+**Version**: 1.1  
+**Last Updated**: 2026-10-18 (Java/Spring backend — MIG-090 docs sweep)  
+**Status**: Active (SPEC-002 Phases 0–6 merged; Node packages transitional until MIG-080)  
 
 Print this page. Pin it on your wall. Reference frequently.

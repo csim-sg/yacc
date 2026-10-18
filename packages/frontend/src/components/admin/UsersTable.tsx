@@ -118,10 +118,13 @@ export function UsersTable({ className = '' }: UsersTableProps): JSX.Element {
   }, [sortField, sortDirection]);
 
   // Handle filter change
-  const handleFilterChange = useCallback((key: keyof UserFilters, value: string | undefined) => {
-    setFilters((prev) => ({ ...prev, [key]: value || undefined }));
-    setPage(1); // Reset to first page on filter change
-  }, []);
+  const handleFilterChange = useCallback(
+    (key: 'role' | 'status', value: string | undefined) => {
+      setFilters((prev) => ({ ...prev, [key]: value || undefined }));
+      setPage(1); // Reset to first page on filter change
+    },
+    []
+  );
 
   // Clear all filters
   const clearFilters = useCallback(() => {
@@ -155,8 +158,8 @@ export function UsersTable({ className = '' }: UsersTableProps): JSX.Element {
 
   // Sort users client-side (backend doesn't support sort yet)
   const sortedUsers = useMemo(() => {
-    if (!data?.users) return [];
-    return [...data.users].sort((a, b) => {
+    if (!data?.data) return [];
+    return [...data.data].sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
         case 'email':
@@ -174,7 +177,7 @@ export function UsersTable({ className = '' }: UsersTableProps): JSX.Element {
       }
       return sortDirection === 'asc' ? comparison : -comparison;
     });
-  }, [data?.users, sortField, sortDirection]);
+  }, [data?.data, sortField, sortDirection]);
 
   // Check if any filters are active
   const hasActiveFilters = Object.values(filters).some((v) => v) || debouncedSearch;
@@ -392,7 +395,7 @@ export function UsersTable({ className = '' }: UsersTableProps): JSX.Element {
           {/* Pagination */}
           <div className="flex justify-between items-center mt-6">
             <div className="text-sm text-base-content/70">
-              Showing {((page - 1) * pageSize) + 1}-{Math.min(page * pageSize, data?.pagination.total || 0)} of {data?.pagination.total || 0} users
+              Showing {((page - 1) * pageSize) + 1}-{Math.min(page * pageSize, data?.total || 0)} of {data?.total || 0} users
             </div>
             <div className="flex gap-2 items-center">
               <select
@@ -420,7 +423,7 @@ export function UsersTable({ className = '' }: UsersTableProps): JSX.Element {
                 <button className="btn btn-sm">Page {page}</button>
                 <button
                   className="btn btn-sm"
-                  disabled={page >= (data?.pagination.totalPages || 1)}
+                  disabled={page >= Math.max(1, Math.ceil((data?.total || 0) / pageSize))}
                   onClick={() => setPage(page + 1)}
                   data-testid="next-page-btn"
                 >

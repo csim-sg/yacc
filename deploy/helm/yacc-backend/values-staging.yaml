@@ -26,6 +26,8 @@ resources:
 config:
   SPRING_PROFILES_ACTIVE: production
   SERVER_PORT: "8080"
+  # MIG-102 (AC-MIG-102-4): pinned UTC service time basis (see values.yaml).
+  TZ: "UTC"
   JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -XX:HeapDumpPath=/app/heap-dumps -Djava.io.tmpdir=/tmp"
   LOGGING_LEVEL_ROOT: info
   WS_HEARTBEAT_INTERVAL_SEC: "60"

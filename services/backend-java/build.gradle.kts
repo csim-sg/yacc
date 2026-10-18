@@ -89,6 +89,17 @@ dependencies {
     // transitively — no separate JDBC starter declaration.
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 
+    // --- MIG-063 async processing (SPEC-002 FR-07/TR-06; ADR-028) ---
+    // Quartz scheduler for the DB-backed retry worker (backoff 1m/5m/30m,
+    // concurrency 5) + DB DLQ + circuit breaker. The JDBC job store persists
+    // jobs/triggers in PostgreSQL (Flyway V4 creates the job-store tables —
+    // spring.quartz.jdbc.initialize-schema stays `never`, Flyway is the only
+    // schema mechanism, ARCH-004 §7). In-process and deliberately NOT
+    // clustered (single-instance posture, ADR-024/029). This replaces the
+    // POC's BullMQ/Redis retry queue — NO Redis client or dependency exists
+    // anywhere in this service (AC-MIG-063-3).
+    implementation("org.springframework.boot:spring-boot-starter-quartz")
+
     // MIG-014 test infrastructure (SPEC-002 Testing Strategy; ARCH-004 §13 #10).
     // Versions are managed by the Spring Boot dependency-management BOM.
     testImplementation("org.springframework.boot:spring-boot-starter-test")
@@ -98,19 +109,68 @@ dependencies {
     // .docs/migration/openapi.yaml (copied to the test classpath) with
     // Jackson's YAML dataformat (ADR-023 contract-first verification).
     testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
+    // MIG-041 payload-level contract conformance (AC-MIG-041-1; ADR-023):
+    // JSON Schema 2020-12 validator used to validate Java DTO wire JSON
+    // against the frozen OpenAPI components and the AsyncAPI JSON Schemas.
+    // Test-scope only — no runtime dependency (ARCH-004 §12).
+    testImplementation("com.networknt:json-schema-validator:1.5.6")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testRuntimeOnly("org.postgresql:postgresql")
 }
 
+tasks.withType<Test>().configureEach {
+    // MIG-102 (AC-MIG-102-4): the tests assert the shipped UTC time basis, so
+    // every test JVM runs with the same pinned default zone as the runtime
+    // envelope (Dockerfile/helm `TZ=UTC`, UtcTimeBasisConfig boot anchoring) —
+    // the basis assertion reflects the posture, not the CI/dev machine zone.
+    jvmArgs("-Duser.timezone=UTC")
+}
+
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        // MIG-041 final test/contract split: @Tag("contract") tests run once,
+        // via the dedicated contractTest task below (which is part of
+        // `check`), not again inside the default suite.
+        excludeTags("contract")
+    }
     // Every test run also produces the JaCoCo report used as coverage evidence.
     finalizedBy(tasks.jacocoTestReport)
 }
 
+// MIG-013 contract-test gate (AC-MIG-013-2; SPEC-002 Testing Strategy):
+// contract tests carry @Tag("contract") and run via this dedicated task so
+// OpenAPI/AsyncAPI conformance (ADR-023) is a named CI gate alongside the
+// coverage gate below. MIG-041 landed the first contract tests and the final
+// test/contract split: the default `test` task excludes the tag, `check`
+// runs both suites, and coverage aggregates both execution-data files.
+tasks.register<Test>("contractTest") {
+    group = "verification"
+    description =
+        "Runs contract tests (JUnit @Tag(\"contract\")) — OpenAPI/AsyncAPI conformance (ADR-023)."
+    testClassesDirs = sourceSets.getByName("test").output.classesDirs
+    classpath = sourceSets.getByName("test").runtimeClasspath
+    useJUnitPlatform {
+        includeTags("contract")
+    }
+    filter {
+        // MIG-102: fail closed — a renamed/empty contract tag must fail the
+        // gate, never pass it vacuously.
+        isFailOnNoMatchingTests = true
+    }
+}
+
+tasks.named<Test>("contractTest") {
+    // Deterministic ordering when `check` runs both suites.
+    shouldRunAfter(tasks.test)
+}
+
 tasks.jacocoTestReport {
+    // MIG-041 JaCoCo execution-data wiring: coverage aggregates BOTH test
+    // suites (default + contract) so the split does not hide executed code.
+    executionData(fileTree(layout.buildDirectory).include("jacoco/*.exec"))
+    dependsOn(tasks.test, tasks.named("contractTest"))
     reports {
         xml.required = true // machine-readable evidence linked from the issue/PR
         html.required = true // human-readable report under build/reports/jacoco
@@ -130,6 +190,9 @@ tasks.jacocoTestReport {
 // context from inside the test JVM; every other class in the module counts
 // toward the gate.
 tasks.jacocoTestCoverageVerification {
+    // Same aggregated execution data as the report (test + contractTest).
+    executionData(fileTree(layout.buildDirectory).include("jacoco/*.exec"))
+    dependsOn(tasks.test, tasks.named("contractTest"))
     classDirectories.setFrom(
         sourceSets.main.get().output.asFileTree.matching {
             exclude("com/yacc/YaccApplication*")
@@ -148,23 +211,4 @@ tasks.jacocoTestCoverageVerification {
 
 tasks.named("check") {
     dependsOn(tasks.jacocoTestCoverageVerification)
-}
-
-// MIG-013 contract-test gate (AC-MIG-013-2; SPEC-002 Testing Strategy):
-// contract tests carry @Tag("contract") and run via this dedicated task so
-// OpenAPI/AsyncAPI conformance (ADR-023) is a named CI gate alongside the
-// coverage gate above. The first contract tests land with MIG-041, which also
-// owns the final test/contract split and JaCoCo execution-data wiring; until
-// then the task tolerates zero matching tests so CI stays green.
-tasks.register<Test>("contractTest") {
-    group = "verification"
-    description = "Runs contract tests (JUnit @Tag(\"contract\")) — tests land with MIG-041."
-    testClassesDirs = sourceSets.getByName("test").output.classesDirs
-    classpath = sourceSets.getByName("test").runtimeClasspath
-    useJUnitPlatform {
-        includeTags("contract")
-    }
-    filter {
-        isFailOnNoMatchingTests = false
-    }
 }

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yacc/ws/reaction-removed.schema.json",
+  "title": "reaction.removed payload",
+  "description": "SPEC-002 MIG-002 capture @98db628. Baseline: ReactionRemovedPayloadSchema in packages/backend/src/types/websocket.types.ts:112.",
+  "type": "object",
+  "required": ["messageId", "conversationId", "emoji", "userId"],
+  "properties": {
+    "messageId": {"type": "string", "format": "uuid"},
+    "conversationId": {"type": "string", "format": "uuid"},
+    "emoji": {"type": "string"},
+    "userId": {"type": "string", "format": "uuid"}
+  }
+}

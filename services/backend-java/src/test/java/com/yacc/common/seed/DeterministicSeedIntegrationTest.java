@@ -6,29 +6,29 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
-import com.yacc.auth.model.UserRole;
-import com.yacc.auth.repository.AccountRepository;
-import com.yacc.auth.repository.PasswordResetTokenRepository;
-import com.yacc.auth.repository.SessionRepository;
-import com.yacc.auth.repository.UserRepository;
-import com.yacc.auth.repository.VerificationRepository;
-import com.yacc.audit.repository.AuditLogRepository;
+import com.yacc.entity.UserRole;
+import com.yacc.repository.AccountRepository;
+import com.yacc.repository.PasswordResetTokenRepository;
+import com.yacc.repository.SessionRepository;
+import com.yacc.repository.UserRepository;
+import com.yacc.repository.VerificationRepository;
+import com.yacc.repository.AuditLogRepository;
 import com.yacc.common.testsupport.AbstractPostgresIntegrationTest;
-import com.yacc.conversation.repository.ConversationRepository;
-import com.yacc.conversation.repository.ConversationTagRepository;
-import com.yacc.dlq.repository.DeadLetterQueueEntryRepository;
-import com.yacc.integration.model.IntegrationConnectionProfile;
-import com.yacc.integration.repository.IntegrationConfigRepository;
-import com.yacc.integration.repository.IntegrationConnectionProfileRepository;
-import com.yacc.integration.service.EncryptionService;
-import com.yacc.message.repository.AttachmentRepository;
-import com.yacc.message.repository.MessageRepository;
-import com.yacc.message.repository.RawPayloadRepository;
-import com.yacc.note.repository.NoteRepository;
-import com.yacc.notification.repository.NotificationRepository;
-import com.yacc.routingrule.repository.RoutingRuleExecutionRepository;
-import com.yacc.routingrule.repository.RoutingRuleRepository;
-import com.yacc.tag.repository.TagRepository;
+import com.yacc.repository.ConversationRepository;
+import com.yacc.repository.ConversationTagRepository;
+import com.yacc.repository.DeadLetterQueueEntryRepository;
+import com.yacc.entity.IntegrationConnectionProfile;
+import com.yacc.repository.IntegrationConfigRepository;
+import com.yacc.repository.IntegrationConnectionProfileRepository;
+import com.yacc.service.EncryptionService;
+import com.yacc.repository.AttachmentRepository;
+import com.yacc.repository.MessageRepository;
+import com.yacc.repository.RawPayloadRepository;
+import com.yacc.repository.NoteRepository;
+import com.yacc.repository.NotificationRepository;
+import com.yacc.repository.RoutingRuleExecutionRepository;
+import com.yacc.repository.RoutingRuleRepository;
+import com.yacc.repository.TagRepository;
 
 /**
  * MIG-021 seed verification (AC-MIG-021-3): the deterministic seed produces
@@ -145,6 +145,20 @@ class DeterministicSeedIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(users.findById(state.adminId()).orElseThrow().getRole())
                 .isEqualTo(UserRole.ADMIN);
 
+        // PREREQ-ANG-003-S1: the fixture identities are the suite's
+        // non-privileged world, sign-in-reachable under the frozen auth
+        // contract (suite emails + suite password).
+        org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder encoder =
+                new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
+        assertThat(users.findByEmail("admin2@yacc.local").orElseThrow().getRole())
+                .isEqualTo(UserRole.ADMIN);
+        assertThat(users.findByEmail("manager@yacc.local").orElseThrow().getRole())
+                .isEqualTo(UserRole.MANAGER);
+        assertThat(users.findByEmail("user@yacc.local").orElseThrow().getRole())
+                .isEqualTo(UserRole.USER);
+        assertThat(encoder.matches(DeterministicSeed.FIXTURE_USER_PASSWORD,
+                users.findByEmail("manager@yacc.local").orElseThrow().getPasswordHash())).isTrue();
+
         // Seeded IRC credential is AES-256-GCM ciphertext of the fixture
         // secret — decryptable with the fresh-key service, never POC format.
         IntegrationConnectionProfile profile =
@@ -162,6 +176,34 @@ class DeterministicSeedIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(messages.findById(state.inboundMessageId())).isPresent();
         assertThat(tags.findById(state.vipTagId())).isPresent();
         assertThat(deadLetterQueue.count()).isEqualTo(1);
+
+        // PREREQ-ANG-003-S1 suite world: three routing rules under the
+        // fixtures.ts identifiers, the Follow-Up tag, the three
+        // assignment/mention notifications, and the 105 bulk conversations.
+        assertThat(routingRules.findById(
+                UUID.fromString("00000000-0000-0000-0000-000000002001")).orElseThrow().getName())
+                .isEqualTo("Auto-assign VIP to admin");
+        assertThat(routingRules.findById(
+                UUID.fromString("00000000-0000-0000-0000-000000002002")).orElseThrow().getName())
+                .isEqualTo("Auto-tag urgent keywords");
+        assertThat(routingRules.findById(
+                UUID.fromString("00000000-0000-0000-0000-000000002003")).orElseThrow().getStatus())
+                .isEqualTo("disabled");
+        assertThat(tags.findByNameAndCreatedById("Follow-Up",
+                users.findByEmail("manager@yacc.local").orElseThrow().getId())).isPresent();
+        assertThat(notifications.findById(
+                UUID.fromString("00000000-0000-0000-0000-000000005001")).orElseThrow().getType())
+                .isEqualTo("assignment");
+        assertThat(notifications.findById(
+                UUID.fromString("00000000-0000-0000-0000-000000005002")).orElseThrow().getType())
+                .isEqualTo("mention");
+        assertThat(notifications.findById(
+                UUID.fromString("00000000-0000-0000-0000-000000005003")).orElseThrow().isRead())
+                .isTrue();
+        for (int i = 0; i < 105; i++) {
+            assertThat(conversations.findById(UUID.fromString("00000000-0000-0000-0000-"
+                    + String.format("%012d", 3000 + i)))).isPresent();
+        }
     }
 
     @Test

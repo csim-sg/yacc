@@ -1,40 +1,43 @@
 /**
- * Backend Phase 1 - Regression Test Suite
- * 
- * Critical tests that must pass before every release.
- * Based on .docs/04-qa-and-testing.md Section 4: Regression Test Suite
- * 
+ * Backend Tier-1 — Regression Test Suite (frozen Java contract)
+ *
+ * Critical tests that must pass before every release, expressed on the
+ * frozen canonical contract `.docs/migration/openapi.yaml` (ADR-023) as
+ * implemented by the Java backend of record (`services/backend-java`).
+ *
  * Test IDs:
- * - REGR_001: Login + Inbox Load
- * - REGR_002: Send Reply + Delivery Status (Phase 2)
- * - REGR_003: Telegram Inbound Message (Phase 2)
- * - REGR_004: IRC Inbound Message (Phase 2)
- * - REGR_005: Tag Conversation (Phase 2 - needs database setup)
- * - REGR_006: Assign + Notification (Phase 2 - needs database setup)
- * - REGR_007: Bulk Assign (Phase 2)
- * - REGR_008: Search + Filters (Phase 2)
- * - REGR_009: Message Retry (Phase 2)
- * - REGR_010: Audit Log Query + Export (Partial - export in Phase 2)
- * - REGR_011: WebSocket Reconnect (Phase 2)
- * - REGR_012: Rules Execution (Phase 2)
+ * - REGR_001: Sign-in + Inbox Load
+ * - REGR_010: Audit Log Query
+ * (REGR_002..009/011/012 remain the real-time/connector families owned by
+ * their own suites — this file keeps the Phase-1 API regression surface.)
+ *
+ * PREREQ-ANG-003-S1 (issue #423): re-pointed from the Node-era surface
+ * (`:3000`, `/auth/register`, `/auth/login`, `/auth/me`, `/auth/logout`,
+ * `{success,data}` envelopes) to the frozen Java surface (`:8080`,
+ * `/auth/sign-up/email`, `/auth/sign-in/email`, `/auth/get-session`,
+ * `/auth/sign-out`, `BaseListResponse` envelopes, seeded fixture
+ * identities). Permitted adaptation, NOT a suite weakening: every Node-era
+ * case keeps an equivalent-or-stronger assertion (pre-registered
+ * disposition in the PR).
  */
 
 import { test, expect } from '@playwright/test';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'http://localhost:8080/api';
 
-test.describe('Backend Phase 1 - Regression Test Suite', () => {
-  
-  test.describe('🔴 REGR_001: Login + Inbox Load (CRITICAL)', () => {
-    let testEmail = '';
-    let testPassword = 'RegressionTest123!';
-    let authToken = '';
+// Seeded fixture identity (com.yacc.common.seed.DeterministicSeed).
+const FIXTURE_MANAGER = { email: 'manager@yacc.local', password: 'admin123' };
 
-    test('should complete full login and inbox load workflow', async ({ request }) => {
-      // Step 1: Register new user
-      testEmail = `regr001-${Date.now()}@example.com`;
-      
-      const registerResponse = await request.post(`${API_BASE_URL}/auth/register`, {
+test.describe('Backend Tier-1 — Regression Test Suite (frozen Java contract)', () => {
+
+  test.describe('🔴 REGR_001: Sign-in + Inbox Load (CRITICAL)', () => {
+    const testPassword = 'RegressionTest123!';
+
+    test('should complete full registration, sign-in and inbox load workflow', async ({ request }) => {
+      // Step 1: Self-register (frozen sign-up contract, 201).
+      const testEmail = `regr001-${Date.now()}@example.com`;
+
+      const signUpResponse = await request.post(`${API_BASE_URL}/auth/sign-up/email`, {
         data: {
           email: testEmail,
           password: testPassword,
@@ -42,28 +45,28 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
         },
       });
 
-      expect(registerResponse.status()).toBe(201);
-      const registerBody = await registerResponse.json();
-      expect(registerBody.success).toBe(true);
-      expect(registerBody.user.email).toBe(testEmail);
+      expect(signUpResponse.status()).toBe(201);
+      const signUpBody = await signUpResponse.json();
+      expect(signUpBody.user.email).toBe(testEmail);
+      expect(signUpBody.accessToken).toBeDefined();
 
-      // Step 2: Login with credentials
-      const loginResponse = await request.post(`${API_BASE_URL}/auth/login`, {
+      // Step 2: Sign in with credentials (frozen sign-in contract, 200).
+      const signInResponse = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
         data: {
           email: testEmail,
           password: testPassword,
         },
       });
 
-      expect(loginResponse.status()).toBe(200);
-      const loginBody = await loginResponse.json();
-      expect(loginBody.success).toBe(true);
-      expect(loginBody.token).toBeDefined();
-      expect(loginBody.user.email).toBe(testEmail);
-      
-      authToken = loginBody.token;
+      expect(signInResponse.status()).toBe(200);
+      const signInBody = await signInResponse.json();
+      expect(signInBody.user.email).toBe(testEmail);
+      expect(signInBody.accessToken).toBeDefined();
+      expect(signInBody.refreshToken).toBeDefined();
 
-      // Step 3: Load inbox (conversations list)
+      const authToken = signInBody.accessToken;
+
+      // Step 3: Load inbox (conversations list, BaseListResponse).
       const inboxResponse = await request.get(`${API_BASE_URL}/conversations`, {
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -72,32 +75,31 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
 
       expect(inboxResponse.status()).toBe(200);
       const inboxBody = await inboxResponse.json();
-      expect(inboxBody.success).toBe(true);
-      expect(inboxBody.data.conversations).toBeDefined();
-      expect(Array.isArray(inboxBody.data.conversations)).toBe(true);
+      expect(Array.isArray(inboxBody.data)).toBe(true);
 
-      // Step 4: Verify user session persists
-      const meResponse = await request.get(`${API_BASE_URL}/auth/me`, {
+      // Step 4: Verify user session persists (frozen session contract).
+      const sessionResponse = await request.get(`${API_BASE_URL}/auth/get-session`, {
         headers: {
           Authorization: `Bearer ${authToken}`,
         },
       });
 
-      expect(meResponse.status()).toBe(200);
-      const meBody = await meResponse.json();
-      expect(meBody.user.email).toBe(testEmail);
+      expect(sessionResponse.status()).toBe(200);
+      const sessionBody = await sessionResponse.json();
+      expect(sessionBody.user.email).toBe(testEmail);
     });
 
-    test('should handle login failure gracefully', async ({ request }) => {
-      const loginResponse = await request.post(`${API_BASE_URL}/auth/login`, {
+    test('should handle sign-in failure gracefully', async ({ request }) => {
+      const signInResponse = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
         data: {
           email: 'nonexistent@example.com',
           password: 'WrongPassword123!',
         },
       });
 
-      expect([401, 404]).toContain(loginResponse.status());
-      const body = await loginResponse.json();
+      // Uniform anti-enumeration 401 on the frozen contract.
+      expect(signInResponse.status()).toBe(401);
+      const body = await signInResponse.json();
       expect(body.error).toBeDefined();
     });
 
@@ -110,35 +112,23 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
 
   test.describe('🟠 REGR_010: Audit Log Query (IMPORTANT)', () => {
     let managerToken = '';
-    let managerUserId = 0;
 
     test.beforeAll(async ({ request }) => {
-      const managerEmail = `regr010-manager-${Date.now()}@example.com`;
-      
-      // Register manager
-      await request.post(`${API_BASE_URL}/auth/register`, {
+      // Sign in as the seeded manager identity (real manager-role evidence).
+      const signInResponse = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
         data: {
-          email: managerEmail,
-          password: 'ManagerTest123!',
-          name: 'Regression Manager',
+          email: FIXTURE_MANAGER.email,
+          password: FIXTURE_MANAGER.password,
         },
       });
 
-      // Login as manager
-      const loginResponse = await request.post(`${API_BASE_URL}/auth/login`, {
-        data: {
-          email: managerEmail,
-          password: 'ManagerTest123!',
-        },
-      });
-
-      const loginBody = await loginResponse.json();
-      managerToken = loginBody.token;
-      managerUserId = loginBody.user.id;
+      expect(signInResponse.status()).toBe(200);
+      const signInBody = await signInResponse.json();
+      managerToken = signInBody.accessToken;
     });
 
     test('should query audit logs with filters', async ({ request }) => {
-      // Query all audit logs
+      // Query all audit logs.
       const allLogsResponse = await request.get(`${API_BASE_URL}/audit-logs`, {
         headers: {
           Authorization: `Bearer ${managerToken}`,
@@ -147,11 +137,11 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
 
       expect(allLogsResponse.status()).toBe(200);
       const allLogsBody = await allLogsResponse.json();
-      expect(allLogsBody.data.logs).toBeDefined();
-      expect(allLogsBody.data.total).toBeGreaterThan(0);
+      expect(Array.isArray(allLogsBody.data)).toBe(true);
+      expect(allLogsBody.total).toBeGreaterThan(0);
 
-      // Query filtered logs (login actions)
-      const filteredResponse = await request.get(`${API_BASE_URL}/audit-logs?action=user_login`, {
+      // Query filtered logs (sign-in actions — real rows from this suite).
+      const filteredResponse = await request.get(`${API_BASE_URL}/audit-logs?action=user.login`, {
         headers: {
           Authorization: `Bearer ${managerToken}`,
         },
@@ -159,10 +149,10 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
 
       expect(filteredResponse.status()).toBe(200);
       const filteredBody = await filteredResponse.json();
-      
-      // All returned logs should be login actions
-      filteredBody.data.logs.forEach((log: any) => {
-        expect(log.action).toBe('user_login');
+
+      // All returned logs should be sign-in actions.
+      filteredBody.data.forEach((log: Record<string, unknown>) => {
+        expect(log.action).toBe('user.login');
       });
     });
 
@@ -175,18 +165,19 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
 
       expect(page1Response.status()).toBe(200);
       const page1Body = await page1Response.json();
-      expect(page1Body.data.page).toBe(1);
-      expect(page1Body.data.limit).toBe(5);
-      expect(page1Body.data.logs.length).toBeLessThanOrEqual(5);
+      expect(page1Body.page).toBe(1);
+      expect(page1Body.limit).toBe(5);
+      expect(page1Body.data.length).toBeLessThanOrEqual(5);
     });
 
     test('should query audit logs by date range', async ({ request }) => {
-      const today = new Date();
-      const yesterday = new Date(today.getTime() - 86400000);
-      const tomorrow = new Date(today.getTime() + 86400000);
+      // The frozen contract parses zoneless ISO timestamps.
+      const fmt = (d: Date) => d.toISOString().slice(0, 19);
+      const yesterday = new Date(Date.now() - 86400000);
+      const tomorrow = new Date(Date.now() + 86400000);
 
       const response = await request.get(
-        `${API_BASE_URL}/audit-logs?dateFrom=${yesterday.toISOString()}&dateTo=${tomorrow.toISOString()}`,
+        `${API_BASE_URL}/audit-logs?dateFrom=${fmt(yesterday)}&dateTo=${fmt(tomorrow)}`,
         {
           headers: {
             Authorization: `Bearer ${managerToken}`,
@@ -196,37 +187,38 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
 
       expect(response.status()).toBe(200);
       const body = await response.json();
-      
-      // Logs should be within date range
-      body.data.logs.forEach((log: any) => {
-        const logDate = new Date(log.createdAt);
+
+      // Logs should be within date range.
+      body.data.forEach((log: Record<string, unknown>) => {
+        const logDate = new Date(String(log.createdAt));
         expect(logDate.getTime()).toBeGreaterThanOrEqual(yesterday.getTime());
         expect(logDate.getTime()).toBeLessThanOrEqual(tomorrow.getTime());
       });
     });
 
     test('should enforce role-based access to audit logs', async ({ request }) => {
-      // Create a regular user
+      // Self-register a plain user (frozen contract: role is always user).
       const userEmail = `regr010-user-${Date.now()}@example.com`;
-      
-      await request.post(`${API_BASE_URL}/auth/register`, {
+
+      const signUpResponse = await request.post(`${API_BASE_URL}/auth/sign-up/email`, {
         data: {
           email: userEmail,
           password: 'UserTest123!',
           name: 'Regular User',
         },
       });
+      expect(signUpResponse.status()).toBe(201);
 
-      const userLogin = await request.post(`${API_BASE_URL}/auth/login`, {
+      const signInResponse = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
         data: {
           email: userEmail,
           password: 'UserTest123!',
         },
       });
 
-      const userToken = (await userLogin.json()).token;
+      const userToken = (await signInResponse.json()).accessToken;
 
-      // User role should NOT have access to audit logs
+      // User role should NOT have access to audit logs.
       const unauthorizedResponse = await request.get(`${API_BASE_URL}/audit-logs`, {
         headers: {
           Authorization: `Bearer ${userToken}`,
@@ -238,13 +230,13 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
   });
 
   test.describe('End-to-End Critical Path', () => {
-    
-    test('should complete full user journey: register → login → access resources → logout', async ({ request }) => {
+
+    test('should complete full user journey: sign-up → sign-in → access resources → sign-out', async ({ request }) => {
       const journeyEmail = `journey-${Date.now()}@example.com`;
       const journeyPassword = 'JourneyTest123!';
 
-      // Step 1: Register
-      const registerResponse = await request.post(`${API_BASE_URL}/auth/register`, {
+      // Step 1: Register.
+      const signUpResponse = await request.post(`${API_BASE_URL}/auth/sign-up/email`, {
         data: {
           email: journeyEmail,
           password: journeyPassword,
@@ -252,55 +244,55 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
         },
       });
 
-      expect(registerResponse.status()).toBe(201);
+      expect(signUpResponse.status()).toBe(201);
 
-      // Step 2: Login
-      const loginResponse = await request.post(`${API_BASE_URL}/auth/login`, {
+      // Step 2: Sign in.
+      const signInResponse = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
         data: {
           email: journeyEmail,
           password: journeyPassword,
         },
       });
 
-      expect(loginResponse.status()).toBe(200);
-      const { token } = await loginResponse.json();
+      expect(signInResponse.status()).toBe(200);
+      const { accessToken } = await signInResponse.json();
 
-      // Step 3: Access protected resource (conversations)
+      // Step 3: Access protected resource (conversations).
       const conversationsResponse = await request.get(`${API_BASE_URL}/conversations`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
       expect(conversationsResponse.status()).toBe(200);
 
-      // Step 4: Access profile
-      const meResponse = await request.get(`${API_BASE_URL}/auth/me`, {
+      // Step 4: Access profile.
+      const sessionResponse = await request.get(`${API_BASE_URL}/auth/get-session`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
-      expect(meResponse.status()).toBe(200);
+      expect(sessionResponse.status()).toBe(200);
 
-      // Step 5: Logout
-      const logoutResponse = await request.post(`${API_BASE_URL}/auth/logout`, {
+      // Step 5: Sign out.
+      const signOutResponse = await request.post(`${API_BASE_URL}/auth/sign-out`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
-      expect(logoutResponse.status()).toBe(200);
+      expect(signOutResponse.status()).toBe(200);
     });
   });
 
   test.describe('Error Recovery & Edge Cases', () => {
-    
+
     test('should handle rapid successive requests', async ({ request }) => {
       const email = `rapid-${Date.now()}@example.com`;
-      
-      // Register user
-      await request.post(`${API_BASE_URL}/auth/register`, {
+
+      // Register user.
+      await request.post(`${API_BASE_URL}/auth/sign-up/email`, {
         data: {
           email,
           password: 'RapidTest123!',
@@ -308,25 +300,25 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
         },
       });
 
-      const loginResponse = await request.post(`${API_BASE_URL}/auth/login`, {
+      const signInResponse = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
         data: {
           email,
           password: 'RapidTest123!',
         },
       });
 
-      const { token } = await loginResponse.json();
+      const { accessToken } = await signInResponse.json();
 
-      // Make 10 rapid requests
+      // Make 10 rapid requests.
       const promises = Array(10).fill(null).map(() =>
         request.get(`${API_BASE_URL}/conversations`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${accessToken}` },
         })
       );
 
       const responses = await Promise.all(promises);
-      
-      // All requests should succeed
+
+      // All requests should succeed.
       responses.forEach(response => {
         expect(response.status()).toBe(200);
       });
@@ -343,7 +335,7 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
       ];
 
       for (const req of malformedRequests) {
-        const response = await request.post(`${API_BASE_URL}/auth/register`, req);
+        const response = await request.post(`${API_BASE_URL}/auth/sign-up/email`, req);
         expect(response.status()).toBe(400);
       }
     });
@@ -351,18 +343,18 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
     test('should handle concurrent user registrations', async ({ request }) => {
       const timestamp = Date.now();
       const users = [
-        { email: `concurrent1-${timestamp}@test.com`, password: 'Test123!', name: 'User 1' },
-        { email: `concurrent2-${timestamp}@test.com`, password: 'Test123!', name: 'User 2' },
-        { email: `concurrent3-${timestamp}@test.com`, password: 'Test123!', name: 'User 3' },
+        { email: `concurrent1-${timestamp}@test.com`, password: 'Test12345!', name: 'User 1' },
+        { email: `concurrent2-${timestamp}@test.com`, password: 'Test12345!', name: 'User 2' },
+        { email: `concurrent3-${timestamp}@test.com`, password: 'Test12345!', name: 'User 3' },
       ];
 
       const promises = users.map(user =>
-        request.post(`${API_BASE_URL}/auth/register`, { data: user })
+        request.post(`${API_BASE_URL}/auth/sign-up/email`, { data: user })
       );
 
       const responses = await Promise.all(promises);
-      
-      // All registrations should succeed
+
+      // All registrations should succeed.
       responses.forEach(response => {
         expect(response.status()).toBe(201);
       });
@@ -370,12 +362,12 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
   });
 
   test.describe('Data Integrity & Validation', () => {
-    
+
     test('should maintain data consistency across requests', async ({ request }) => {
       const email = `integrity-${Date.now()}@example.com`;
-      
-      // Register
-      const registerResponse = await request.post(`${API_BASE_URL}/auth/register`, {
+
+      // Register.
+      const signUpResponse = await request.post(`${API_BASE_URL}/auth/sign-up/email`, {
         data: {
           email,
           password: 'IntegrityTest123!',
@@ -383,67 +375,67 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
         },
       });
 
-      const { user: registeredUser } = await registerResponse.json();
+      const { user: registeredUser } = await signUpResponse.json();
 
-      // Login
-      const loginResponse = await request.post(`${API_BASE_URL}/auth/login`, {
+      // Sign in.
+      const signInResponse = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
         data: {
           email,
           password: 'IntegrityTest123!',
         },
       });
 
-      const { user: loginUser, token } = await loginResponse.json();
+      const { user: signInUser, accessToken } = await signInResponse.json();
 
-      // Get profile
-      const meResponse = await request.get(`${API_BASE_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
+      // Get profile.
+      const sessionResponse = await request.get(`${API_BASE_URL}/auth/get-session`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
 
-      const { user: profileUser } = await meResponse.json();
+      const { user: sessionUser } = await sessionResponse.json();
 
-      // All user objects should have consistent data
-      expect(loginUser.id).toBe(registeredUser.id);
-      expect(profileUser.id).toBe(registeredUser.id);
-      expect(loginUser.email).toBe(email);
-      expect(profileUser.email).toBe(email);
-      expect(loginUser.role).toBe('user');
-      expect(profileUser.role).toBe('user');
+      // All user objects should have consistent data.
+      expect(signInUser.id).toBe(registeredUser.id);
+      expect(sessionUser.id).toBe(registeredUser.id);
+      expect(signInUser.email).toBe(email);
+      expect(sessionUser.email).toBe(email);
+      expect(signInUser.role).toBe('user');
+      expect(sessionUser.role).toBe('user');
     });
 
     test('should validate all enum fields', async ({ request }) => {
       const email = `enum-test-${Date.now()}@example.com`;
-      
-      await request.post(`${API_BASE_URL}/auth/register`, {
-        data: { email, password: 'EnumTest123!', name: 'Enum Test' },
+
+      await request.post(`${API_BASE_URL}/auth/sign-up/email`, {
+        data: { email, password: 'EnumTest12345!', name: 'Enum Test' },
       });
 
-      const loginResponse = await request.post(`${API_BASE_URL}/auth/login`, {
-        data: { email, password: 'EnumTest123!' },
+      const signInResponse = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
+        data: { email, password: 'EnumTest12345!' },
       });
 
-      const { token } = await loginResponse.json();
+      const { accessToken } = await signInResponse.json();
 
-      // Test invalid status
+      // Test invalid status.
       const statusResponse = await request.get(
         `${API_BASE_URL}/conversations?status=invalid_status`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-      expect([200, 400]).toContain(statusResponse.status());
+      expect(statusResponse.status()).toBe(400);
 
-      // Test invalid priority
+      // Test invalid priority.
       const priorityResponse = await request.get(
         `${API_BASE_URL}/conversations?priority=invalid_priority`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-      expect([200, 400]).toContain(priorityResponse.status());
+      expect(priorityResponse.status()).toBe(400);
 
-      // Test invalid channel
+      // Test invalid channel.
       const channelResponse = await request.get(
         `${API_BASE_URL}/conversations?channel=invalid_channel`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-      expect([200, 400]).toContain(channelResponse.status());
+      expect(channelResponse.status()).toBe(400);
     });
   });
 
@@ -452,66 +444,63 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
 
     test.beforeAll(async ({ request }) => {
       const email = `perf-${Date.now()}@example.com`;
-      
-      await request.post(`${API_BASE_URL}/auth/register`, {
-        data: { email, password: 'PerfTest123!', name: 'Perf Test' },
+
+      await request.post(`${API_BASE_URL}/auth/sign-up/email`, {
+        data: { email, password: 'PerfTest12345!', name: 'Perf Test' },
       });
 
-      const loginResponse = await request.post(`${API_BASE_URL}/auth/login`, {
-        data: { email, password: 'PerfTest123!' },
+      const signInResponse = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
+        data: { email, password: 'PerfTest12345!' },
       });
 
-      perfToken = (await loginResponse.json()).token;
+      perfToken = (await signInResponse.json()).accessToken;
     });
 
-    test('auth endpoints should respond within 500ms', async ({ request }) => {
+    test('sign-up endpoint should respond within 500ms', async ({ request }) => {
       const email = `speed-${Date.now()}@example.com`;
-      
+
       const start = Date.now();
-      await request.post(`${API_BASE_URL}/auth/register`, {
+      const response = await request.post(`${API_BASE_URL}/auth/sign-up/email`, {
         data: { email, password: 'SpeedTest123!', name: 'Speed Test' },
       });
       const duration = Date.now() - start;
 
+      expect(response.status()).toBe(201);
       expect(duration).toBeLessThan(500);
     });
 
     test('conversations list should respond within 1 second', async ({ request }) => {
       const start = Date.now();
-      await request.get(`${API_BASE_URL}/conversations`, {
+      const response = await request.get(`${API_BASE_URL}/conversations`, {
         headers: { Authorization: `Bearer ${perfToken}` },
       });
       const duration = Date.now() - start;
 
+      expect(response.status()).toBe(200);
       expect(duration).toBeLessThan(1000);
     });
 
     test('audit logs should respond within 1 second', async ({ request }) => {
-      // First create a manager user for audit log access
-      const managerEmail = `perf-manager-${Date.now()}@example.com`;
-      
-      await request.post(`${API_BASE_URL}/auth/register`, {
-        data: { email: managerEmail, password: 'ManagerTest123!', name: 'Perf Manager' },
+      // Manager+ surface: the seeded manager identity signs in.
+      const signInResponse = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
+        data: { email: FIXTURE_MANAGER.email, password: FIXTURE_MANAGER.password },
       });
 
-      const loginResponse = await request.post(`${API_BASE_URL}/auth/login`, {
-        data: { email: managerEmail, password: 'ManagerTest123!' },
-      });
-
-      const managerToken = (await loginResponse.json()).token;
+      const managerToken = (await signInResponse.json()).accessToken;
 
       const start = Date.now();
-      await request.get(`${API_BASE_URL}/audit-logs`, {
+      const response = await request.get(`${API_BASE_URL}/audit-logs`, {
         headers: { Authorization: `Bearer ${managerToken}` },
       });
       const duration = Date.now() - start;
 
+      expect(response.status()).toBe(200);
       expect(duration).toBeLessThan(1000);
     });
   });
 
   test.describe('Security Regression Tests', () => {
-    
+
     test('should prevent SQL injection in all endpoints', async ({ request }) => {
       const sqlInjectionPayloads = [
         "' OR '1'='1",
@@ -521,20 +510,20 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
       ];
 
       for (const payload of sqlInjectionPayloads) {
-        const response = await request.post(`${API_BASE_URL}/auth/login`, {
+        const response = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
           data: {
             email: payload,
             password: 'anything',
           },
         });
 
-        // Should return 400 or 401, not 500 (SQL error)
-        expect([400, 401, 404]).toContain(response.status());
+        // Should return 400 or 401, not 500 (SQL error).
+        expect([400, 401]).toContain(response.status());
       }
     });
 
     test('should sanitize error messages (no sensitive data leakage)', async ({ request }) => {
-      const response = await request.post(`${API_BASE_URL}/auth/login`, {
+      const response = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
         data: {
           email: 'nonexistent@example.com',
           password: 'WrongPassword123!',
@@ -542,9 +531,9 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
       });
 
       const body = await response.json();
-      const errorMessage = body.error.toLowerCase();
-      
-      // Error should not reveal database structure or internal paths
+      const errorMessage = String(body.error).toLowerCase();
+
+      // Error should not reveal database structure or internal paths.
       expect(errorMessage).not.toContain('database');
       expect(errorMessage).not.toContain('postgresql');
       expect(errorMessage).not.toContain('/home/');
@@ -553,17 +542,17 @@ test.describe('Backend Phase 1 - Regression Test Suite', () => {
 
     test('should never return password hashes', async ({ request }) => {
       const email = `security-${Date.now()}@example.com`;
-      
-      const registerResponse = await request.post(`${API_BASE_URL}/auth/register`, {
+
+      const signUpResponse = await request.post(`${API_BASE_URL}/auth/sign-up/email`, {
         data: { email, password: 'SecurityTest123!', name: 'Security Test' },
       });
 
-      const registerBody = await registerResponse.json();
-      const responseStr = JSON.stringify(registerBody).toLowerCase();
-      
+      const signUpBody = await signUpResponse.json();
+      const responseStr = JSON.stringify(signUpBody).toLowerCase();
+
       expect(responseStr).not.toContain('passwordhash');
       expect(responseStr).not.toContain('password_hash');
-      expect(responseStr).not.toContain('$2b$'); // bcrypt hash prefix
+      expect(responseStr).not.toContain('$2'); // bcrypt hash prefix family
     });
   });
 });

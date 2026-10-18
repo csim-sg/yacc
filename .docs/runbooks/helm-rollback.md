@@ -1,650 +1,326 @@
-# Helm Rollback Operational Runbook
+# Backend Incident Runbook (Roll-Forward) — `helm-rollback.md`
 
 **Author**: Enterprise Architect  
-**Date**: 2026-02-26  
-**Status**: Final (ADR-019 Approved)  
+**Date**: 2026-02-26 (rewritten 2026-10-18, MIG-090 #365)  
+**Status**: Current for the Java/Spring service (ADR-029 envelope)  
 **Audience**: Operations/SRE, On-Call Engineers, DevOps Team  
-**Related**: ADR-019 (Rollback Decision), K3s Cluster Requirements
+**Related**: ADR-019 (K3s + Helm), ADR-029 (JVM deployment envelope), K3s Cluster Requirements
+
+> **Why this file keeps its name**: `deploy/helm/yacc-backend/README.md` links to `.docs/runbooks/helm-rollback.md` by path. The **procedure** below is roll-forward: `helm rollback` is not the primary recovery path. The historical rollback runbook was retired with the migration posture (ARCH-004 §1; ADR-030 Decision 6).
+>
+> **Rehearsal status**: the rehearsal-evidenced incident/stop-authority procedure is **AC-MIG-070-2 (#361)**. Everything marked **[pending MIG-070]** below must be treated as documented intent until that rehearsal evidences it.
 
 ---
 
 ## Table of Contents
 
-1. [Overview & Trigger Conditions](#overview--trigger-conditions)
-2. [Pre-Rollback Checklist](#pre-rollback-checklist)
-3. [Rollback Procedures](#rollback-procedures)
-4. [Post-Rollback Verification](#post-rollback-verification)
-5. [Root Cause Analysis](#root-cause-analysis)
-6. [Common Issues & Troubleshooting](#common-issues--troubleshooting)
-7. [Escalation & Communication](#escalation--communication)
+1. [Posture: Roll-Forward Only](#posture-roll-forward-only)
+2. [Trigger Conditions](#trigger-conditions)
+3. [Incident Procedure](#incident-procedure)
+4. [Forward-Verification](#forward-verification)
+5. [Stop Authority & Escalation](#stop-authority--escalation)
+6. [Audit Trail](#audit-trail)
+7. [Common Issues & Troubleshooting](#common-issues--troubleshooting)
+8. [Communication Templates](#communication-templates)
 
 ---
 
-## Overview & Trigger Conditions
+## Posture: Roll-Forward Only
 
-### When to Rollback (Decision Tree)
+**Guiding principle**: remediate by deploying a forward fix. Do **not** run `helm rollback` to "un-break" a release.
 
-**IMMEDIATE ROLLBACK** (no investigation):
-- ✅ Health endpoint returns non-200 (5xx error, timeout)
-- ✅ Pod in `CrashLoopBackOff` state (repeated restart failure)
-- ✅ Database migrations failed (startup error in logs)
-- ✅ Critical API endpoint returns 500+ errors (>50% failure rate, 5+ min)
-- ✅ Pod unable to reach Running state after 2 minutes (debugging afterward)
+- **Schema state is forward-only**: Flyway migrations (ADR-027) are not designed for reversal; a rolled-back image against a forward-migrated database is an undefined state.
+- **Rolling updates, not reversions**: the Deployment strategy is `RollingUpdate`; the recovery unit is a new image tag.
+- **Manual review required** for every forward-fix deploy during an incident (no automated redeploy).
+- **Traceability mandatory**: who triggered, when, why, which image tag (see Audit Trail).
+- **Post-incident investigation required**: root cause documented in an issue within 24 hours.
 
-**INVESTIGATION FIRST** (do NOT rollback):
-- ⚠️ Single pod temporarily unavailable (may self-recover)
-- ⚠️ Intermittent 5xx errors (<50% failure rate)
-- ⚠️ Non-critical feature degraded (proceed with caution)
-- ⚠️ Ingress not responding (may be DNS/TLS issue, not code)
-
-### Rollback Philosophy
-
-**Guiding Principle**: "When in doubt about root cause, rolling back is safer than investigating in production."
-
-- **Manual review required** for every rollback (no automated rollback to avoid cascades)
-- **Traceability mandatory** (who triggered, when, why, what revision)
-- **Post-rollback investigation required** (root cause must be documented in issue/PR)
-- **Communication essential** (notify team, document decision)
+`helm history` remains an **audit tool** (what was deployed, when, by whom) — not a recovery mechanism.
 
 ---
 
-## Pre-Rollback Checklist
+## Trigger Conditions
 
-**CRITICAL**: Complete these steps BEFORE executing rollback.
+### Act immediately (deploy a forward fix or stop traffic)
 
-### Step 1: Verify the Problem
+- ✅ `/health/live` returns non-200 (pod restart loop — liveness failing 3×)
+- ✅ Pod in `CrashLoopBackOff` (repeated startup failure)
+- ✅ Flyway migration failure at startup (check logs for `migration failed`)
+- ✅ Critical API endpoint returns 5xx for >50% of requests for 5+ minutes
+- ✅ Pod unable to reach `Running` within 2 minutes of rollout
+
+### Investigate first (do not redeploy in panic)
+
+- ⚠️ Single pod temporarily unavailable (may self-recover; check events)
+- ⚠️ Intermittent 5xx below the 50% failure threshold
+- ⚠️ Non-critical feature degraded
+- ⚠️ Ingress not responding (likely DNS/TLS, not the backend)
+
+### Do not touch the deployment (underlying infrastructure issue)
+
+- ⛔ PostgreSQL pod unhealthy → fix the database first (a new backend pod will not help)
+- ⛔ Missing/invalid secrets → fix the Secret, then restart the deployment
+
+---
+
+## Incident Procedure
+
+### Step 1: Verify the problem
 
 ```bash
-# 1a. Check pod status
+# 1a. Pod status
 kubectl get pods -n yacc-staging -o wide
 
-# Expected output should show clear failure:
-# NAME                             READY   STATUS             RESTARTS   AGE
-# yacc-backend-7f8c9d4b9b-xxxxx    0/1     CrashLoopBackOff   5          2m
+# 1b. Pod logs (last 50 lines) — look for:
+#   - "Flyway" / "migration failed"
+#   - HikariPool / connection errors
+#   - JVM heap ("OutOfMemoryError") / "ExitOnOutOfMemoryError" exits
+kubectl logs -n yacc-staging -l app.kubernetes.io/name=yacc-backend --tail=50
 
-# 1b. Check pod logs (last 50 lines)
-kubectl logs -n yacc-staging -l app=yacc-backend --tail=50
-
-# Look for error messages:
-# - "cannot connect to database"
-# - "failed to start"
-# - "panic:"
-# - "migration failed"
-
-# 1c. Check pod events
+# 1c. Events
 kubectl describe pod <pod-name> -n yacc-staging | grep -A 20 "Events:"
 
-# 1d. Test health endpoint (if accessible)
+# 1d. Health endpoints (actuator wire paths, ADR-029)
 kubectl port-forward -n yacc-staging svc/yacc-backend 8080:8080 &
 sleep 2
-curl -i http://localhost:8080/health
+curl -i http://localhost:8080/health/live
+curl -i http://localhost:8080/health/ready
 kill %1
-
-# Expected: 200 OK with { "status": "ok" }
-# If failing: Confirm need for rollback
 ```
 
-### Step 2: Notify Team
+### Step 2: Capture the audit state (before changing anything)
 
 ```bash
-# Send message to ops channel (Slack/Teams):
-"""
-🚨 INCIDENT: YACC Backend deployment failure
-- Status: CrashLoopBackOff (pod not starting)
-- First detected: <timestamp>
-- Deployed version: <commit-sha>
-- Action: Investigating, may rollback
-- Slack thread: <link>
-"""
+helm history yacc-backend -n yacc-staging          # deployed revisions + image tags
+helm get values yacc-backend -n yacc-staging > /tmp/yacc-values-$(date +%s).yaml
+kubectl get events -n yacc-staging --sort-by='.lastTimestamp' > /tmp/yacc-events-$(date +%s).txt
 ```
 
-### Step 3: Check Deployment History
+### Step 3: Classify and decide
 
-```bash
-# View recent Helm releases
-helm history yacc-backend -n yacc-staging
-
-# Expected output:
-# REVISION  UPDATED                     STATUS      CHART            APP VERSION  DESCRIPTION
-# 1         Thu Feb 26 10:00:00 2026    superseded  yacc-backend-1.0.0  v1.0.0
-# 2         Thu Feb 26 10:05:00 2026    superseded  yacc-backend-1.0.0  v1.0.1      upgraded
-# 3         Thu Feb 26 10:15:00 2026    deployed    yacc-backend-1.0.0  v1.0.2      upgraded
-
-# Revision 3 = current (failed)
-# Revision 2 = last known good
+```
+Is the failure caused by the release (image/config)?
+├─ YES → Forward fix (Step 4)
+├─ NO  → Is PostgreSQL/cluster healthy?
+│        ├─ NO  → Fix infrastructure first (Step 5; no backend redeploy)
+│        └─ YES → Investigate (Step 1 evidence) before any deploy
 ```
 
-### Step 4: Verify Rollback Is Safe
+### Step 4: Forward fix
 
 ```bash
-# Check if backing services (DB, Redis, Secrets) are healthy
+# 4a. Fix the defect on a branch; merge through the normal PR gate.
+#     (Emergency hotfixes still go through review — see Stop Authority.)
+
+# 4b. Deploy the fixed image tag
+helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \
+  -n yacc-staging --set image.tag=<fixed-tag>
+
+# 4c. Monitor the forward rollout
+kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
+```
+
+### Step 5: Infrastructure-first failures
+
+```bash
+# PostgreSQL down → restore the database, not the app
 kubectl get pods -n yacc-staging -l app=postgres
-kubectl get pods -n yacc-staging -l app=redis
+kubectl rollout restart statefulset/postgres -n yacc-staging   # if restart helps
+# Restore from backup if data is corrupted [restore tooling: pending MIG-070]
 
-# Expected: Both pods in "Running" state
-# If either is down: DO NOT ROLLBACK (underlying issue, not deployment)
-
-# Verify secrets exist
-kubectl get secret yacc-backend-secrets -n yacc-staging
-
-# Expected: Secret should exist
-# If missing: DO NOT ROLLBACK (secrets issue, not deployment)
+# Secret invalid → fix the Secret, then bounce the workload
+kubectl patch secret yacc-backend-secrets -p '{"data":{...}}' -n yacc-staging
+kubectl rollout restart deployment/yacc-backend -n yacc-staging
 ```
 
 ---
 
-## Rollback Procedures
+## Forward-Verification
 
-### Procedure A: Quick Helm Rollback (Recommended)
-
-**Use Case**: Pod won't start, health check failing, clear deployment issue
-
-**Duration**: ~30 seconds
+### Immediately after the forward deploy (30 seconds)
 
 ```bash
-# Step 1: Identify last good revision
-helm history yacc-backend -n yacc-staging
-
-# Example output (look for last "deployed" or "superseded" with healthy app):
-# REVISION  UPDATED                     STATUS      CHART                    APP VERSION
-# 1         Thu Feb 26 10:00:00 2026    superseded  yacc-backend-1.0.0      v1.0.0    
-# 2         Thu Feb 26 10:05:00 2026    deployed    yacc-backend-1.0.0      v1.0.1
-# 3         Thu Feb 26 10:15:00 2026    deployed    yacc-backend-1.0.0      v1.0.2  ← CURRENT (FAILED)
-
-# Step 2: Rollback to revision 2 (last known good)
-helm rollback yacc-backend 2 -n yacc-staging
-
-# Expected output:
-# Rollback "yacc-backend" from release version 2 to 1
-# release "yacc-backend" rolled back to revision 2
-
-# Step 3: Monitor pod restart
-kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
-
-# Expected: Deployment rolled out successfully
-# If timeout: Check logs, may need manual intervention
-```
-
-### Procedure B: Rollback via Specific Revision Number
-
-**Use Case**: You know exact revision to rollback to
-
-```bash
-# Rollback to specific revision (e.g., revision 1)
-helm rollback yacc-backend 1 -n yacc-staging
-
-# Monitor
-kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
-```
-
-### Procedure C: Rollback N Revisions Ago
-
-**Use Case**: You want to go back 2-3 versions quickly
-
-```bash
-# Get current revision
-CURRENT_REVISION=$(helm list -n yacc-staging -o json | \
-  jq '.[] | select(.name=="yacc-backend") | .revision')
-
-echo "Current revision: $CURRENT_REVISION"
-
-# Calculate target revision (e.g., 2 versions back)
-TARGET_REVISION=$((CURRENT_REVISION - 2))
-
-echo "Rolling back to revision: $TARGET_REVISION"
-
-# Perform rollback
-helm rollback yacc-backend $TARGET_REVISION -n yacc-staging
-
-# Monitor
-kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
-```
-
-### Procedure D: Full Cluster State Rollback (Emergency Only)
-
-**Use Case**: Multiple services broken, cluster unstable, need full revert
-
-**WARNING**: This removes entire deployment and re-installs from scratch
-
-```bash
-# STEP 1: Delete entire Helm release (removes all pods)
-helm uninstall yacc-backend -n yacc-staging
-
-# Expected: release "yacc-backend" uninstalled
-
-# STEP 2: Wait for pods to terminate
-kubectl get pods -n yacc-staging
-# Should show no yacc-backend pods
-
-# STEP 3: Re-install from last known good values
-helm install yacc-backend ./deploy/helm/yacc-backend \
-  -n yacc-staging \
-  -f deploy/helm/yacc-backend/values-staging.yaml.backup
-
-# Note: values-staging.yaml.backup must be pre-saved (see Pre-Deployment Checklist)
-
-# STEP 4: Verify
-kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
-```
-
----
-
-## Post-Rollback Verification
-
-### Immediate Verification (30 seconds)
-
-```bash
-# 1. Check pod status
+# 1. Pods Running
 kubectl get pods -n yacc-staging -o wide
 
-# Expected:
-# NAME                             READY   STATUS    RESTARTS   AGE
-# yacc-backend-7f8c9d4b9b-yyyyy    1/1     Running   0          10s
-
-# 2. Check health endpoint
+# 2. Health endpoints (actuator groups)
 kubectl port-forward -n yacc-staging svc/yacc-backend 8080:8080 &
 sleep 2
-HEALTH=$(curl -s http://localhost:8080/health)
+curl -s http://localhost:8080/health/live | jq '.'
+curl -s http://localhost:8080/health/ready | jq '.'
 kill %1
 
-echo "$HEALTH" | jq '.'
-# Expected: { "status": "ok" }
-
-# 3. Check logs for startup success
-kubectl logs -n yacc-staging -l app=yacc-backend --tail=20 | tail -5
-
-# Expected: No error messages, should see "Server started on port 8080"
+# 3. Startup logs clean (Flyway applied, no ERROR/FATAL)
+kubectl logs -n yacc-staging -l app.kubernetes.io/name=yacc-backend --tail=20
 ```
 
-### Full Service Verification (2-3 minutes)
+### Service verification (2–3 minutes)
 
 ```bash
-# 1. Check database connectivity
-kubectl logs -n yacc-staging -l app=yacc-backend | grep -i "database\|connected\|migration"
+# 1. Database connectivity/tables present
+kubectl logs -n yacc-staging -l app.kubernetes.io/name=yacc-backend | grep -i "flyway\|hikari"
 
-# Expected: "Database connected", "migrations completed"
-
-# 2. Check Redis connectivity
-kubectl logs -n yacc-staging -l app=yacc-backend | grep -i "redis\|cache"
-
-# Expected: "Redis connected", no connection errors
-
-# 3. Test critical API endpoint
-BACKEND_IP=$(kubectl get svc yacc-backend -n yacc-staging -o jsonpath='{.spec.clusterIP}')
-
+# 2. Critical API path
 kubectl run -it --rm --image=curlimages/curl --restart=Never debug -- \
-  curl -s -X GET "http://$BACKEND_IP:8080/api/conversations?limit=1" \
+  curl -s -X GET "http://yacc-backend.yacc-staging.svc.cluster.local:8080/api/auth/get-session" \
   -H "Authorization: Bearer <test-token>"
+# Expect: 401 for an invalid token (proves the route + security chain), 2xx for a valid one.
 
-# Expected: 200 OK with message data (or 401 if auth required)
+# 3. Real-time channel
+#   WebSocket upgrade at /ws?token=<jwt> must complete for a valid token
+#   (handshake interceptor verifies JWT + identity status).
 ```
 
-### Smoke Test Deployment (Full)
+### Verification checklist
 
 ```bash
-# Run integration test suite (if available)
-kubectl run -it --rm --image=<yacc-test-image> --restart=Never \
-  test-runner -- npm run test:smoke
-
-# OR manually test critical flows:
-# 1. Login endpoint
-curl -X POST http://<backend-ip>:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"test"}'
-
-# 2. Conversations list
-curl -X GET http://<backend-ip>:8080/api/conversations \
-  -H "Authorization: Bearer <token>"
-
-# 3. Messaging
-curl -X POST http://<backend-ip>:8080/api/conversations/<id>/messages \
-  -H "Authorization: Bearer <token>" \
-  -d '{"body":"Test message"}'
-
-# All should return 2xx status
-```
-
-### Verification Checklist
-
-```bash
-# Use this template to verify all critical systems:
-
-echo "=== POST-ROLLBACK VERIFICATION ==="
-echo ""
-echo "[?] Pod Status:"
-kubectl get pods -n yacc-staging -l app=yacc-backend -o wide
-echo ""
-
-echo "[?] Health Check:"
-kubectl exec -it $(kubectl get pod -n yacc-staging -l app=yacc-backend -o name | head -1) \
-  -- curl -s http://localhost:8080/health | jq '.'
-echo ""
-
-echo "[?] Database:"
-kubectl logs -n yacc-staging -l app=yacc-backend | grep -i "database" | tail -1
-echo ""
-
-echo "[?] Redis:"
-kubectl logs -n yacc-staging -l app=yacc-backend | grep -i "redis" | tail -1
-echo ""
-
-echo "[?] API Response:"
-kubectl port-forward -n yacc-staging svc/yacc-backend 8080:8080 &
-sleep 1
-curl -s http://localhost:8080/api/conversations | jq '.' | head -5
-kill %1
+echo "=== FORWARD-VERIFICATION ==="
+echo "[?] Pod Status:";  kubectl get pods -n yacc-staging -l app.kubernetes.io/name=yacc-backend -o wide
+echo "[?] Liveness:";     kubectl exec -it $(kubectl get pod -n yacc-staging -l app.kubernetes.io/name=yacc-backend -o name | head -1) -- curl -s http://localhost:8080/health/live
+echo "[?] Readiness:";    kubectl exec -it $(kubectl get pod -n yacc-staging -l app.kubernetes.io/name=yacc-backend -o name | head -1) -- curl -s http://localhost:8080/health/ready
+echo "[?] Migration:";    kubectl logs -n yacc-staging -l app.kubernetes.io/name=yacc-backend | grep -i flyway | tail -3
 ```
 
 ---
 
-## Root Cause Analysis
+## Stop Authority & Escalation
 
-### Post-Rollback Investigation (Required)
+**Stop authority** = the explicit decision to halt deployments/traffic rather than continue forward-fixing. **[The rehearsal-evidenced stop-authority drill is AC-MIG-070-2 (#361); the matrix below is documented intent.]**
 
-**Purpose**: Prevent same issue from happening again
+| Level | Role | Authority | Triggered when |
+| ----- | ---- | ---------- | --------------- |
+| 1 | On-Call Engineer | Execute the forward fix; monitor; open the incident ticket | Any trigger condition fires |
+| 2 | DevOps Lead | Halt further deploys; order infrastructure-first recovery; own RCA | Forward fix fails, DB impaired, multiple simultaneous failures |
+| 3 | Founder / VP Engineering | Service stop/traffic cut; customer communication | Service down >30 min, suspected data loss, security incident |
 
-**Timeline**: Complete within 24 hours of rollback
+Rules:
 
-### Step 1: Collect Artifacts
+- Escalate one level after **two failed forward-fix attempts** of the same defect.
+- Level 2+ stop authority is **explicit and recorded** (who, when, why — see Audit Trail); it is never implicit.
+- Never trade data integrity for availability: if in doubt between migrating forward and preserving state, stop and escalate.
+
+---
+
+## Audit Trail
+
+Every incident records, in the incident issue:
+
+1. **Timeline**: detection → decision → deploy(s) → verification → closure (UTC).
+2. **Revisions**: `helm history` output before and after; the exact image tags deployed.
+3. **Actors**: who executed each deploy and who exercised stop authority.
+4. **Evidence**: log/event exports (`/tmp` captures from Step 2), health-check outputs.
+5. **RCA + prevention**: root cause, forward fix PR link, prevention item merged within 48 hours.
+
+Artifact capture:
 
 ```bash
-# 1a. Export pod logs (full history)
-kubectl logs -n yacc-staging -l app=yacc-backend --all-containers=true --timestamps=true \
+kubectl logs -n yacc-staging -l app.kubernetes.io/name=yacc-backend --all-containers=true --timestamps=true \
   > /tmp/yacc-backend-logs-$(date +%s).txt
-
-# 1b. Export pod events
-kubectl get events -n yacc-staging --sort-by='.lastTimestamp' \
-  > /tmp/yacc-events-$(date +%s).txt
-
-# 1c. Export Helm values used (from failed release)
-helm get values yacc-backend -n yacc-staging --revision 3 \
-  > /tmp/yacc-values-failed-revision-3.yaml
-
-# 1d. Export Helm release metadata
-helm get all yacc-backend -n yacc-staging --revision 3 \
-  > /tmp/yacc-full-state-revision-3.yaml
+helm get all yacc-backend -n yacc-staging > /tmp/yacc-full-state-$(date +%s).yaml
 ```
-
-### Step 2: Identify Root Cause
-
-**Use Decision Tree**:
-
-```
-Was pod in CrashLoopBackOff?
-├─ YES → Check logs for: "cannot connect to database", "panic:", "migration failed"
-│  ├─ Database error → Check: Is PostgreSQL pod running? Secret values correct?
-│  ├─ Migration error → Check: Was schema changed? Is migration reversible?
-│  └─ Application error → Check: Was code change deployed? Is version compatible?
-│
-└─ NO (pod stuck in Pending)
-   ├─ Check: Is storage claim pending? → Local-path provisioner issue
-   ├─ Check: Is memory/CPU insufficient? → Resource quota issue
-   └─ Check: Are node selectors blocking? → Check node labels
-```
-
-### Step 3: Document Findings
-
-**Create GitHub Issue** with template:
-
-```markdown
-# Rollback RCA: [Release Version] (Revision X)
-
-## Incident Summary
-- **Date**: [timestamp]
-- **Duration**: [how long before rollback]
-- **Symptom**: [CrashLoopBackOff / Pending / Health check failing]
-- **Rolled back to**: Revision [X]
-
-## Root Cause
-[Describe root cause in detail]
-
-Example:
-- Database migration script had syntax error
-- PostgreSQL pod was down during deployment
-- New environment variable was missing from K8s Secret
-
-## Evidence
-[Link to logs, events, code changes]
-
-## Fix Applied
-- Merged PR #123 to fix migration script
-- Redeployed with revision [X]
-- All systems healthy
-
-## Prevention
-- Add migration syntax validation to CI/CD
-- Add health check for dependency services before deployment
-- Implement automated secret validation
-
-## Related PRs
-- Fixes: #456
-- Depends on: #789
-```
-
-### Step 4: Implement Prevention
-
-**Example Preventions**:
-
-| Root Cause | Prevention |
-|-----------|-----------|
-| Migration script error | Run migrations against test DB in CI before deploy |
-| Missing secret | Pre-validate all required secrets before deployment |
-| Resource conflict | Run capacity test before deploying large resource changes |
-| Code incompatibility | Run E2E tests in staging before prod deployment |
-| Dependency down | Add pre-deployment health check for all dependencies |
 
 ---
 
 ## Common Issues & Troubleshooting
 
-### Issue 1: Rollback Hangs (Pod Stuck in "Terminating")
+### Issue 1: Rollout hangs (pod stuck "Terminating")
 
-**Symptoms**: Rollback command runs, but pod never restarts
-
-**Diagnosis**:
 ```bash
-# Check pod status
-kubectl describe pod <pod-name> -n yacc-staging
-
-# Look for: "Termination Grace Period" (default 30s)
-```
-
-**Solution**:
-```bash
-# Force delete pod (triggers immediate restart)
 kubectl delete pod <pod-name> -n yacc-staging --grace-period=0 --force
-
-# Monitor restart
 kubectl get pods -n yacc-staging -w
-
-# Pod should restart with new replica
 ```
 
-### Issue 2: Rollback Completes, But Pod Still Fails
+### Issue 2: New pod also fails (forward fix incomplete)
 
-**Symptoms**: Rollback succeeds, but new pod also crashes
+- The defect is not fully fixed — do **not** roll back; fix forward again.
+- Two failed attempts → escalate to Level 2 (Stop Authority).
 
-**Diagnosis**:
+### Issue 3: Flyway migration failed at startup
+
 ```bash
-# The previous revision was also broken (cascading failure)
-helm history yacc-backend -n yacc-staging
-
-# Check if older revisions were healthy
-# May need to rollback further (e.g., 2-3 revisions ago)
+kubectl logs -n yacc-staging -l app.kubernetes.io/name=yacc-backend | grep -i flyway
 ```
 
-**Solution**:
+- Migration failures fail the boot (fail-closed by design). Fix the migration in a **new** forward migration; never edit an applied one.
+
+### Issue 4: Secrets invalid after redeploy
+
 ```bash
-# Try earlier revision
-helm rollback yacc-backend 1 -n yacc-staging  # Go back further
-
-# Monitor
-kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
-
-# If all revisions fail: Issue with cluster (DB, secrets, resources)
-# Escalate to infrastructure team
-```
-
-### Issue 3: Database Corrupted After Rollback
-
-**Symptoms**: Pod running, but database errors in logs
-
-**Diagnosis**:
-```bash
-# Check PostgreSQL pod
-kubectl get pods -n yacc-staging -l app=postgres
-
-# Check PostgreSQL logs
-kubectl logs -n yacc-staging -l app=postgres | tail -50
-```
-
-**Solution**:
-```bash
-# Restore from backup (if available)
-# OR restart PostgreSQL pod (may auto-repair minor corruption)
-kubectl rollout restart statefulset/postgres -n yacc-staging
-
-# Monitor restart
-kubectl rollout status statefulset/postgres -n yacc-staging --timeout=2m
-```
-
-### Issue 4: Secrets Invalid After Rollback
-
-**Symptoms**: Pod running, but auth/connection errors in logs
-
-**Diagnosis**:
-```bash
-# Check secrets
 kubectl get secret yacc-backend-secrets -n yacc-staging -o yaml
-
-# Verify values match environment
-echo $DATABASE_URL
-echo $REDIS_URL
-
-# Check if secrets were updated between deployments
-```
-
-**Solution**:
-```bash
-# Update secret if values changed
-kubectl patch secret yacc-backend-secrets \
-  -p '{"data":{"DATABASE_URL":"'$(echo -n "$DATABASE_URL" | base64)'"}}' \
-  -n yacc-staging
-
-# Restart pod to pick up new secret
+kubectl get secret yacc-auth-secrets -n yacc-staging -o yaml   # ADR-025 bootstrap/recovery keys
 kubectl rollout restart deployment/yacc-backend -n yacc-staging
 ```
 
-### Issue 5: Helm Rollback Fails ("no revision x")
+### Issue 5: OOMKilled / JVM exits
 
-**Symptoms**: Error "release history for rollback must include at least 1 revision"
+- The envelope is 1Gi request / 2Gi limit with `MaxRAMPercentage=75` (ADR-029); heap dumps go to `/app/heap-dumps`.
+- Persistent pressure → raise the node/limit envelope via a reviewed values change (forward fix), not ad-hoc `kubectl set resources` in production.
 
-**Diagnosis**:
-```bash
-# Check release history
-helm history yacc-backend -n yacc-staging
+---
 
-# May show: "No release history"
-# Happens if release was uninstalled and reinstalled
+## Communication Templates
+
+**Immediate**:
+
+```
+🚨 INCIDENT #123: YACC backend (staging)
+- Severity: [HIGH/MEDIUM/LOW]
+- Status: FORWARD FIX IN PROGRESS
+- Failing revision/image: <tag>
+- Fix tag: <tag>
+- Details: https://github.com/csim-sg/yacc/issues/123
 ```
 
-**Solution**:
-```bash
-# Cannot use helm rollback (history lost)
-# Must manually redeploy from known-good values
+**After the forward deploy**:
 
-# Option 1: Use values backup (should exist)
-helm install yacc-backend ./deploy/helm/yacc-backend \
-  -n yacc-staging \
-  -f deploy/helm/yacc-backend/values-staging.yaml.backup
+```
+✅ FORWARD FIX DEPLOYED: YACC backend
+- Previous image: <tag> (failing)
+- Deployed image: <tag>
+- Verification: /health/live + /health/ready 200, rollout clean
+- RCA: investigating <summary>
+- Thread: <link>
+```
 
-# Option 2: Redeploy from git tag (known good version)
-git checkout v1.0.1
-helm install yacc-backend ./deploy/helm/yacc-backend \
-  -n yacc-staging \
-  -f deploy/helm/yacc-backend/values-staging.yaml
+**Post-incident (24h)**:
+
+```
+📋 INCIDENT REPORT #123 PUBLISHED
+- Root cause: <description>
+- Fix merged: PR #456
+- Prevention: <action>
+- Review: <link to RCA>
 ```
 
 ---
 
-## Escalation & Communication
+## Quick Reference (Copy-Paste)
 
-### Escalation Matrix
+```bash
+# Audit: what is deployed
+helm history yacc-backend -n yacc-staging
 
-**Level 1: On-Call Engineer** (YOU)
-- Detect incident (health check, alert, customer report)
-- Verify problem severity
-- Execute rollback (Procedures A-C above)
-- Monitor post-rollback (30 minutes)
-- Create incident ticket
+# Forward fix
+helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \
+  -n yacc-staging --set image.tag=<fixed-tag>
+kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
 
-**Level 2: DevOps Lead**
-- Triggered if: Rollback fails, DB corrupted, multiple failures
-- Responsibility: Root cause analysis, prevent recurrence
-- Notify: Engineering lead + Product owner
+# Health (actuator wires)
+kubectl port-forward -n yacc-staging svc/yacc-backend 8080:8080 &
+curl http://localhost:8080/health/live
+curl http://localhost:8080/health/ready
+kill %1
 
-**Level 3: VP Engineering**
-- Triggered if: Service down >30 min, data loss suspected, security incident
-- Responsibility: Customer communication, status page
-- Notify: Customer support, executive team
-
-### Communication Template
-
-**Slack/Teams Notification** (Immediate):
+# Evidence capture
+kubectl logs -n yacc-staging -l app.kubernetes.io/name=yacc-backend --all-containers=true --timestamps=true > /tmp/logs.txt
 ```
-🚨 INCIDENT #123: YACC Backend Deployment Failed
-- Severity: [HIGH/MEDIUM/LOW]
-- Status: ROLLBACK IN PROGRESS
-- ETA: 2 minutes
-- Details: https://github.com/csim-sg/yacc/issues/123
-```
-
-**Update After Rollback** (5 minutes):
-```
-✅ ROLLBACK COMPLETE: YACC Backend
-- Previous version: Revision 3 (failed)
-- Rolled back to: Revision 2 (stable)
-- Status: HEALTHY (all services online)
-- RCA: Investigating [root cause summary]
-- Next: Will deploy fix tomorrow AM
-- Slack thread: https://slack.com/archives/...
-```
-
-**Post-Incident Update** (24 hours):
-```
-📋 INCIDENT REPORT #123 PUBLISHED
-- Root cause: [Description]
-- Fix merged: PR #456
-- Prevention: [Action taken]
-- Will redeploy: [timestamp]
-- Review: [link to RCA document]
-```
-
-### Documentation Requirements
-
-**After every rollback, create:**
-
-1. **GitHub Issue** (incident ticket)
-   - Symptom, timeline, root cause
-   - Link to logs/artifacts
-   - Fix status
-
-2. **RCA Document** (GitHub wiki or Confluence)
-   - What happened
-   - Why it happened
-   - What we did
-   - How we prevent next time
-
-3. **PR with Prevention** (merge within 48 hours)
-   - Code fix OR
-   - CI/CD validation OR
-   - Documentation update
 
 ---
 
 ## Related Documentation
 
-- **ADR-019**: K3s + Helm deployment decision (Sections 3.6)
+- **ADR-019**: K3s + Helm deployment decision (envelope amended by ADR-029)
+- **ADR-027**: Flyway-only schema management (why rollback is not a recovery path)
 - **K3s Cluster Requirements**: `.docs/infrastructure/k3s-cluster-requirements.md`
 - **Implementation Guide**: `.docs/03-implementation-guide.md` (Helm section)
 - **Helm Official Docs**: https://helm.sh/docs/
@@ -652,33 +328,6 @@ helm install yacc-backend ./deploy/helm/yacc-backend \
 
 ---
 
-## Quick Reference (Copy-Paste Commands)
-
-```bash
-# Emergency Rollback (30 seconds)
-helm rollback yacc-backend -n yacc-staging
-kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
-
-# View history
-helm history yacc-backend -n yacc-staging
-
-# Rollback to specific revision
-helm rollback yacc-backend 2 -n yacc-staging
-
-# Health check
-kubectl port-forward -n yacc-staging svc/yacc-backend 8080:8080 &
-curl http://localhost:8080/health
-kill %1
-
-# Collect logs for RCA
-kubectl logs -n yacc-staging -l app=yacc-backend --all-containers=true --timestamps=true > /tmp/logs.txt
-
-# Notify team
-echo "🚨 Rolled back to Revision X, all healthy. RCA in progress."
-```
-
----
-
-**Last Updated**: 2026-02-26  
-**Next Review**: 2026-06-26 (post-MVP monitoring integration)  
+**Last Updated**: 2026-10-18 (roll-forward rewrite, MIG-090 #365)  
+**Next Review**: at the MIG-070 (#361) cutover rehearsal — the rehearsal evidences the stop-authority drill and finalizes this runbook  
 **Feedback**: Send issues to #infrastructure-engineering

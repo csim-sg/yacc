@@ -2,7 +2,7 @@
  * FE-004: API Integration Layer - E2E Tests
  *
  * Tests for:
- * - TanStack Query hooks (useConversations, useMessages, useUser)
+ * - TanStack Query hooks (useConversations, useMessages, useCurrentUser)
  * - Mutation hooks (useSendMessage, useAssignConversation, useUpdateConversationStatus)
  * - API client (fetch-based HTTP client)
  * - Error handling (401, 403, 404, 5xx)

@@ -38,7 +38,6 @@ export interface User {
   name: string;
   role: 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'USER';
   status: string;
-  emailVerified: boolean;
   createdAt?: string;
 }
 
@@ -50,7 +49,6 @@ function toUiUser(user: AuthUser): User {
     name: user.name,
     role: normalizeRole(user.role),
     status: user.status,
-    emailVerified: user.emailVerified,
     createdAt: user.createdAt,
   };
 }

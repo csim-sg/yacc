@@ -24,7 +24,7 @@
 ## 1. Product Overview
 
 ### Concept
-**YACC (Yet Another Chat Client)** is a cloud-hosted, single-tenant omni-channel chat platform that centralizes social communications (MVP Phase 1: Telegram groups/channels and IRC) into one unified inbox. Built with React, Node.js, PostgreSQL, and deployed to Cloudflare R2 + CDN for frontend assets and file storage, with backend deployed to K3s via Helm (ADR-019).
+**YACC (Yet Another Chat Client)** is a cloud-hosted, single-tenant omni-channel chat platform that centralizes social communications (MVP Phase 1: Telegram groups/channels and IRC) into one unified inbox. Built with a React frontend and a Java 21 / Spring Boot backend (`services/backend-java`) on PostgreSQL, deployed to Cloudflare R2 + CDN for frontend assets and file storage, with the backend targeting K3s via Helm (ADR-019; JVM envelope per ADR-029); production deployment/cutover remains pending MIG-070..072. The Node/TypeScript POC backend remains in the repo transitionally until decommissioning (MIG-080).
 
 **Initial Release (Phase 1 MVP)**: Single-tenant deployment with unified inbox, auth, messaging (Telegram/IRC), collaboration features, routing rules, and notifications.  
 **Post-MVP**: Multi-tenant support, additional channels (WhatsApp/WeChat/Meta/X), and vault-based credential management.
@@ -101,7 +101,7 @@ All roles and data access are scoped to a **tenant (organization)** unless expli
 - ✅ Full-text search (sender, message body, date range)
 - ✅ Notifications (in-app: assignment, @mentions, unread badges)
 - ✅ Attachment handling (5 MB max, stored on R2, re-hosted)
-- ✅ Message retry with exponential backoff (Redis + BullMQ)
+- ✅ Message retry with exponential backoff (Quartz + PostgreSQL DB DLQ, ADR-028)
 
 ### Deferred Features (Post-MVP)
 - Email notifications
@@ -934,7 +934,7 @@ flowchart TD
 
 **AC:**
 - On outbound message failure: retry with exponential backoff (1m, 5m, 30m; 3 attempts total)
-- Use Redis + BullMQ to queue retries asynchronously
+- Queue retries asynchronously (Quartz + PostgreSQL DB DLQ, ADR-028)
 - After 3 attempts → move to dead-letter queue (DLQ) for ops review
 - Message status: pending → sent (success) or failed (after max retries)
 - User can retry manually via "Retry" button (one additional attempt)

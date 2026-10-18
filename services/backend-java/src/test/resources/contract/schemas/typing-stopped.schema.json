@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yacc/ws/typing-stopped.schema.json",
+  "title": "typing.stopped payload",
+  "description": "SPEC-002 MIG-002 capture @98db628. Baseline: TypingStoppedPayloadSchema in packages/backend/src/types/websocket.types.ts:68 (typing.timeout handler emits {conversationId, userId} — same fields).",
+  "type": "object",
+  "required": ["conversationId", "userId"],
+  "properties": {
+    "conversationId": {"type": "string", "format": "uuid"},
+    "userId": {"type": "string", "format": "uuid"}
+  }
+}

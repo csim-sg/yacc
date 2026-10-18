@@ -14,8 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 
 import com.yacc.common.testsupport.AbstractPostgresIntegrationTest;
-import com.yacc.realtime.model.WebSocketMetric;
-import com.yacc.realtime.service.MetricsSink;
+import com.yacc.api.realtime.WebSocketMetric;
+import com.yacc.api.realtime.MetricsSink;
 
 /**
  * Boots the application on a real port and verifies the observability wire

@@ -1,7 +1,8 @@
 /**
- * useUser Hook
+ * Current-session user hooks
  *
- * TanStack Query hook for fetching user profile information
+ * TanStack Query hooks for the authenticated user's own profile
+ * (in-contract `GET /api/auth/get-session`).
  *
  * Features:
  * - Automatic caching (60s staleTime - user data changes less frequently)
@@ -15,11 +16,7 @@
  * // Fetch current logged-in user
  * const { data: user, isLoading } = useCurrentUser();
  *
- * // Fetch specific user by ID
- * const { data: user, isLoading } = useUser('user-123');
- *
  * if (isLoading) return <LoadingSpinner />;
- * if (!user) return <ErrorMessage>User not found</ErrorMessage>;
  *
  * return <div>{user.name} ({user.email})</div>;
  * ```
@@ -88,71 +85,6 @@ export function useCurrentUser(): UseQueryResult<User, Error> {
 
     // Refetch interval: 5 minutes (optional, for long-lived sessions)
     // refetchInterval: 5 * 60 * 1000,
-  });
-}
-
-/**
- * useUser Hook
- *
- * Fetch a specific user by ID
- *
- * @param userId - The user ID to fetch (optional)
- * @returns Query result with user data
- *
- * @example
- * const { data: user } = useUser('user-456');
- *
- * @example
- * // Hook can be disabled by not providing userId
- * const userId = selectedUser?.id;
- * const { data: user } = useUser(userId);
- */
-export function useUser(userId?: string): UseQueryResult<User, Error> {
-  return useQuery({
-    // Query key includes user ID for proper cache isolation
-    queryKey: userId ? queryKeys.user.detail(userId) : ['user-empty'],
-
-    // Query function that fetches user by ID
-    queryFn: async () => {
-      if (!userId) {
-        throw new Error('User ID is required');
-      }
-
-      const response = await apiClient.get(`/api/users/${userId}`);
-
-      // Validate response with Zod schema
-      const validatedData = UserSchema.parse(response);
-      return validatedData;
-    },
-
-    // Only run query if userId is provided
-    enabled: !!userId,
-
-    // Cache settings
-    staleTime: 60 * 1000, // 60 seconds
-    gcTime: 10 * 60 * 1000, // 10 minutes
-
-    // Retry strategy
-    retry: (failureCount, error) => {
-      // Don't retry on 401, 403 (no permission), or 404 (user not found)
-      if (error instanceof Error) {
-        const errorMessage = error.message;
-        if (
-          errorMessage.includes('401') ||
-          errorMessage.includes('403') ||
-          errorMessage.includes('404')
-        ) {
-          return false;
-        }
-      }
-
-      // Retry up to 3 times for other errors
-      return failureCount < 3;
-    },
-
-    // Refetching behavior
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
   });
 }
 
