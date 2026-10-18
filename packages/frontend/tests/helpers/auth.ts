@@ -1,4 +1,10 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
+
+/**
+ * Java service request base (PREREQ-ANG-003-S1 helper re-point — mirrors
+ * `helpers/api.ts`; the frozen Java OpenAPI contract is the test target).
+ */
+const API_BASE_URL = process.env.API_URL || 'http://localhost:8080/api';
 
 /**
  * Test fixture user credentials for different roles.
@@ -6,6 +12,16 @@ import { expect, type Page } from '@playwright/test';
  * MIG-034: credentials are resolved by the Spring auth contract
  * (`POST /api/auth/sign-in/email`); in mocked runs these shapes ride
  * `page.route` stubs, in live runs against the seeded Java service.
+ *
+ * Super-admin mapping a-1 (PREREQ-ANG-003-S1; SPEC-003 AD-5 option (a),
+ * pre-registered disposition): the suite's super-admin identity is served by
+ * the ADR-025 first-run bootstrap Super Admin — created only by
+ * `SuperAdminBootstrap` at Java-service startup from
+ * `YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL` + `YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL`
+ * (E2E boot: admin@yacc.local / admin123). The fixture seed never creates a
+ * `super_admin` row; these credentials map onto the bootstrap identity, and
+ * {@link ensureSuperAdminCredential} performs the forced-password-change
+ * step the bootstrap identity carries.
  */
 export const TEST_USERS = {
   superAdmin: {
@@ -65,6 +81,65 @@ export function authSessionFor(user: {
     refreshToken: `refresh-${user.id}`,
     mustChangePassword: false,
   };
+}
+
+/**
+ * Sign in with the frozen `/api/auth/sign-in/email` contract and return the
+ * raw session response payload (`{user, accessToken, refreshToken,
+ * mustChangePassword}`).
+ */
+export async function apiSignIn(
+  request: APIRequestContext,
+  email: string,
+  password: string
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const response = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
+    data: { email, password },
+  });
+  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  return { status: response.status(), body };
+}
+
+/**
+ * Super-admin mapping a-1 forced-password-change step (PREREQ-ANG-003-S1;
+ * pre-registered disposition): the ADR-025 bootstrap Super Admin carries the
+ * `must_change_password` flag, so its first sign-in answers
+ * `mustChangePassword: true` and the identity is denied everything outside
+ * `/api/auth/*` until the credential is replaced. This helper signs in, and
+ * when the forced-change state is present performs the credential
+ * replacement via the frozen `POST /api/auth/change-password` contract
+ * (same-value rotation: admin123 → admin123), then re-signs-in so the
+ * returned session is fully usable.
+ *
+ * Test-helper adaptation only — no `*.spec.ts` edit and no production
+ * auth behaviour change (the flag is cleared through the shipped
+ * MIG-030 endpoint, exactly as a real first login would).
+ */
+export async function ensureSuperAdminCredential(
+  request: APIRequestContext
+): Promise<{ status: number; body: Record<string, unknown>; passwordChangePerformed: boolean }> {
+  const { email, password } = TEST_USERS.superAdmin;
+  const first = await apiSignIn(request, email, password);
+  if (first.status !== 200 || first.body.mustChangePassword !== true) {
+    return { ...first, passwordChangePerformed: false };
+  }
+
+  const change = await request.post(`${API_BASE_URL}/auth/change-password`, {
+    headers: {
+      Authorization: `Bearer ${String(first.body.accessToken ?? '')}`,
+    },
+    data: { currentPassword: password, newPassword: password },
+  });
+  if (change.status() !== 200) {
+    return {
+      status: change.status(),
+      body: (await change.json().catch(() => ({}))) as Record<string, unknown>,
+      passwordChangePerformed: false,
+    };
+  }
+
+  const second = await apiSignIn(request, email, password);
+  return { ...second, passwordChangePerformed: true };
 }
 
 /**

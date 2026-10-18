@@ -1,6 +1,13 @@
-import { Page, APIRequestContext } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
-const API_BASE_URL = process.env.API_URL || 'http://localhost:3000/api';
+/**
+ * PREREQ-ANG-003-S1: the request base targets the Java backend of record
+ * (`services/backend-java`, frozen `.docs/migration/openapi.yaml` contract)
+ * on :8080. `API_URL` keeps the harness override; the hardcoded Node-era
+ * `http://localhost:3000` default is gone (pre-registered disposition —
+ * Tier-1 helper re-point, not a suite weakening).
+ */
+const API_BASE_URL = process.env.API_URL || 'http://localhost:8080/api';
 
 /**
  * Common API Response Types
@@ -106,7 +113,8 @@ export async function createTag(
     throw new Error(`Failed to create tag: ${response.status} - ${response.text}`);
   }
 
-  const data = response.data as { id: string; name: string; color: string };
+  // Frozen contract: simple resource envelope `{data: <entity>}`.
+  const data = (response.data as { data: { id: string; name: string; color: string } }).data;
   return data;
 }
 
@@ -123,7 +131,8 @@ export async function getTags(page: Page): Promise<Array<{ id: string; name: str
     throw new Error(`Failed to get tags: ${response.status}`);
   }
 
-  const data = response.data as Array<{ id: string; name: string; color: string }>;
+  // Frozen contract: tags envelope `{data: [...]}`.
+  const data = (response.data as { data: Array<{ id: string; name: string; color: string }> }).data;
   return data;
 }
 
@@ -217,7 +226,7 @@ export async function assignConversation(
   const response = await apiRequest(page, {
     method: 'POST',
     endpoint: `/conversations/${conversationId}/assign`,
-    body: { userId },
+    body: { assignedUserId: userId },
   });
 
   if (response.status !== 200 && response.status !== 201) {
@@ -243,7 +252,8 @@ export async function createNote(
     throw new Error(`Failed to create note: ${response.status}`);
   }
 
-  return response.data as { id: string; body: string };
+  // Frozen contract: simple resource envelope `{data: <entity>}`.
+  return (response.data as { data: { id: string; body: string } }).data;
 }
 
 /**
@@ -260,7 +270,14 @@ export async function getNotifications(page: Page): Promise<Notification[]> {
   }
 
   const data = response.data as Record<string, unknown> | Notification[];
-  return Array.isArray(data) ? data : ((data as Record<string, unknown>).notifications as Notification[]) || [];
+  if (Array.isArray(data)) {
+    return data;
+  }
+  // Frozen contract: BaseListResponse envelope `{data, page, limit, total}`.
+  if (data && 'data' in data && Array.isArray(data.data)) {
+    return data.data as Notification[];
+  }
+  return [];
 }
 
 /**
@@ -304,9 +321,9 @@ export async function getAuditLogs(
   if (Array.isArray(data)) {
     return data;
   }
-  // Handle paginated response with "items" field (current API spec)
-  if (data && 'items' in data && Array.isArray(data.items)) {
-    return data.items as AuditLog[];
+  // Frozen contract: BaseListResponse envelope `{data, page, limit, total}`.
+  if (data && 'data' in data && Array.isArray(data.data)) {
+    return data.data as AuditLog[];
   }
   // Fallback for legacy response shape with "logs" field
   if (data && 'logs' in data && Array.isArray(data.logs)) {
@@ -329,7 +346,14 @@ export async function getRoutingRules(page: Page): Promise<Array<Record<string, 
   }
 
   const data = response.data as Record<string, unknown> | Array<Record<string, unknown>>;
-  return Array.isArray(data) ? data : ((data as Record<string, unknown>).rules as Array<Record<string, unknown>>) || [];
+  if (Array.isArray(data)) {
+    return data;
+  }
+  // Frozen contract: BaseListResponse envelope `{data, page, limit, total}`.
+  if (data && 'data' in data && Array.isArray(data.data)) {
+    return data.data as Array<Record<string, unknown>>;
+  }
+  return ((data as Record<string, unknown>).rules as Array<Record<string, unknown>>) || [];
 }
 
 /**
@@ -397,7 +421,8 @@ export async function bulkAction(
     endpoint: '/conversations/bulk',
     body: {
       conversationIds: options.conversationIds,
-      [options.action]: options.value,
+      action: options.action,
+      data: options.value as Record<string, unknown>,
     },
   });
 
@@ -405,5 +430,6 @@ export async function bulkAction(
     throw new Error(`Failed to perform bulk action: ${response.status}`);
   }
 
-  return response.data as BulkActionResponse;
+  // Frozen contract: `{data: {successCount, failureCount, failures}}`.
+  return (response.data as { data: BulkActionResponse }).data;
 }
