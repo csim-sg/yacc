@@ -1,0 +1,20 @@
+<div class="flex h-screen bg-base-100">
+  <!-- Mobile overlay -->
+  @if (sidebarOpen()) {
+    <div class="fixed inset-0 bg-black/50 z-40 lg:hidden" (click)="sidebarOpen.set(false)" aria-hidden="true"></div>
+  }
+
+  <!-- Sidebar Navigation -->
+  <app-navigation [isOpen]="sidebarOpen()" (closed)="sidebarOpen.set(false)" />
+
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- Header -->
+    <app-header (menuClick)="sidebarOpen.set(!sidebarOpen())" />
+
+    <!-- Page Content -->
+    <main class="flex-1 overflow-y-auto">
+      <router-outlet />
+    </main>
+  </div>
+</div>

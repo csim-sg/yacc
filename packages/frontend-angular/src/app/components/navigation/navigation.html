@@ -1,0 +1,84 @@
+@if (isLoading()) {
+  <!-- Loading state while the session restore is pending -->
+  <nav class="w-64 bg-base-100 border-r border-base-300 p-4" aria-busy="true" aria-label="Navigation">
+    <div class="space-y-3">
+      @for (row of [1, 2, 3, 4]; track row) {
+        <div class="h-10 bg-base-200 rounded-lg animate-pulse"></div>
+      }
+    </div>
+  </nav>
+} @else if (!user()) {
+  <!-- Not authenticated: render nothing (React `<></>` parity) -->
+} @else {
+  <nav
+    class="fixed inset-y-0 left-0 z-50 w-64 bg-base-100 border-r border-base-300 transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:z-0 {{ isOpen() ? 'translate-x-0' : '-translate-x-full' }}"
+    aria-label="Main navigation"
+  >
+    <div class="flex flex-col h-screen p-4">
+      <!-- Close button for mobile -->
+      <div class="lg:hidden mb-4 flex justify-end">
+        <button type="button" class="btn btn-ghost btn-sm btn-circle" (click)="close()" aria-label="Close navigation">
+          ✕
+        </button>
+      </div>
+
+      <!-- Logo/App name -->
+      <div class="mb-8 flex items-center gap-2">
+        <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+          <span class="text-primary-content font-bold">Y</span>
+        </div>
+        <span class="font-bold text-lg">YACC</span>
+      </div>
+
+      <!-- User info -->
+      <div class="mb-6 pb-6 border-b border-base-300">
+        <div class="text-sm">
+          <p class="font-semibold text-base-content truncate">{{ user()!.name || 'User' }}</p>
+          <p class="text-xs text-base-content/60 truncate">{{ user()!.email }}</p>
+          <p class="text-xs text-base-content/50 mt-1">Role: {{ user()!.role }}</p>
+        </div>
+      </div>
+
+      <!-- Navigation items -->
+      <div class="flex-1 space-y-2 overflow-y-auto">
+        @if (accessibleItems().length > 0) {
+          @for (item of accessibleItems(); track item.id) {
+            <a
+              [routerLink]="item.href"
+              class="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors {{ isActive(item) ? 'bg-primary text-primary-content font-semibold' : 'text-base-content hover:bg-base-200' }}"
+              [attr.aria-current]="isActive(item) ? 'page' : null"
+            >
+              @if (item.icon) {
+                <span class="text-lg">{{ item.icon }}</span>
+              }
+              <span>{{ item.label }}</span>
+            </a>
+          }
+        } @else {
+          <div class="text-center text-base-content/50 text-sm py-8">No accessible items</div>
+        }
+      </div>
+
+      <!-- Logout button -->
+      <div class="pt-6 border-t border-base-300">
+        <button type="button" class="btn btn-outline btn-block gap-2" (click)="signOut()" aria-label="Sign out from application">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="1.5"
+            stroke="currentColor"
+            class="w-5 h-5"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M8.25 9V5.25A2.25 2.25 0 0110.5 3h6a2.25 2.25 0 012.25 2.25v13.5A2.25 2.25 0 0116.5 21h-6a2.25 2.25 0 01-2.25-2.25V15m-3 0l3-3m0 0l3 3m-3-3v12"
+            />
+          </svg>
+          Sign Out
+        </button>
+      </div>
+    </div>
+  </nav>
+}
