@@ -706,6 +706,9 @@ test('R1-W19-1: transport drop enters the app-owned ladder (indicator); server r
   const reconnectCursor = appFrames.length;
 
   // The refetches happen as soon as the client reconnects; watch from now.
+  // (Message-list GET responses are COLLECTED — a stale-while-revalidate
+  // touch may interleave, so the failed row is asserted over the collected
+  // set instead of one specific response.)
   const conversationsRefetch = page.waitForRequest(
     (request) =>
       request.method() === 'GET' &&
@@ -713,13 +716,17 @@ test('R1-W19-1: transport drop enters the app-owned ladder (indicator); server r
       !request.url().includes('/messages'),
     { timeout: 180_000 },
   );
-  const messagesRefetch = page.waitForResponse(
-    (response) =>
+  const messageListResponses: import('@playwright/test').Response[] = [];
+  const messageResponseCollector = (response: import('@playwright/test').Response) => {
+    if (
       response.request().method() === 'GET' &&
       response.url().includes('/api/conversations') &&
-      response.url().includes('/messages'),
-    { timeout: 180_000 },
-  );
+      response.url().includes('/messages')
+    ) {
+      messageListResponses.push(response);
+    }
+  };
+  page.on('response', messageResponseCollector);
 
   await stopService(pidFile);
 
@@ -778,18 +785,40 @@ test('R1-W19-1: transport drop enters the app-owned ladder (indicator); server r
   expect(postState.lastConnectTime).toBeTruthy();
   expect(postState.lastConnectTime).not.toBe(preDropConnectTime);
 
-  // connect$ → cache invalidation: both loaded families refetched, and the
-  // message list the client pulls back carries the server-side `failed`
-  // transition of the R1-MSG-1 row.
+  // connect$ → cache invalidation: both loaded families refetched, and a
+  // message list the client pulls back after the drop carries the
+  // server-side `failed` transition of the R1-MSG-1 row.
   await conversationsRefetch;
-  const messagesResponse = await messagesRefetch;
-  expect(messagesResponse.ok()).toBe(true);
-  const messageList = (await messagesResponse.json()) as {
-    messages?: Array<{ id: string; status: string }>;
-  };
-  expect(
-    messageList.messages?.find((message) => message.id === sentMessageId)?.status,
-  ).toBe('failed');
+  await expect
+    .poll(
+      async () => {
+        while (messageListResponses.length > 0) {
+          const response = messageListResponses.shift() as import('@playwright/test').Response;
+          if (!response.ok()) {
+            continue;
+          }
+          try {
+            const body = (await response.body()) as Buffer;
+            const list = JSON.parse(body.toString('utf8')) as {
+              messages?: Array<{ id: string; status: string }>;
+            };
+            if (
+              list.messages?.some(
+                (message) => message.id === sentMessageId && message.status === 'failed',
+              )
+            ) {
+              return true;
+            }
+          } catch {
+            // body unreadable (client gone) — keep polling the remainder
+          }
+        }
+        return false;
+      },
+      { timeout: 60_000 },
+    )
+    .toBeTruthy();
+  page.off('response', messageResponseCollector);
 });
 
 test('R1-W19-3: a same-server reconnection within the window is server-recognized (reconnection marker) and replays the durable backlog', async () => {
