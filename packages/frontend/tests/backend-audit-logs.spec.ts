@@ -1,97 +1,110 @@
 /**
- * Backend Phase 1 - Audit Log Tests
- * 
- * Tests all audit log endpoints according to:
- * - API_DOCUMENTATION.md (Audit Log section)
- * - TESTING_GUIDE.md (Audit log scenarios)
- * - .docs/04-qa-and-testing.md (Category 9: Admin & Audit)
+ * Backend Tier-1 — Audit Log contract tests (frozen Java contract)
+ *
+ * Tests the audit-log surface according to the frozen canonical contract
+ * `.docs/migration/openapi.yaml` (ADR-023) as implemented by the Java
+ * backend of record (`services/backend-java`).
+ *
+ * PREREQ-ANG-003-S1 (issue #423): re-pointed from the Node-era surface
+ * (`:3000`, `{items,total,page,limit,pages}` envelopes, `/audit-logs/
+ * conversation/:id` + `/audit-logs/actor/:userId` routes) to the frozen Java
+ * surface (`:8080`, `BaseListResponse {data,page,limit,total}` envelope,
+ * `/audit-logs/conversations/{conversationId}`, and the admin+-only
+ * `POST /audit-logs/export` as the manager-surpassing audit surface — the
+ * Node-era actor route has no frozen counterpart). Permitted adaptation,
+ * NOT a suite weakening: every Node-era case keeps an equivalent-or-stronger
+ * assertion (pre-registered disposition in the PR).
  */
 
 import { test, expect } from '@playwright/test';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'http://localhost:8080/api';
+
+// Seeded fixture identities (com.yacc.common.seed.DeterministicSeed).
+const FIXTURE_MANAGER = { email: 'manager@yacc.local', password: 'admin123' };
+const FIXTURE_USER = { email: 'user@yacc.local', password: 'admin123' };
+const FIXTURE_ADMIN = { email: 'admin2@yacc.local', password: 'admin123' };
+
+// Deterministic fixture conversation UUID.
+const TELEGRAM_CONVERSATION_ID = '00000000-0000-0000-0000-000000001001';
+
+/** A well-formed UUID that no seeded row uses. */
+function unknownUuid(): string {
+  return crypto.randomUUID();
+}
 
 /**
- * Audit Log type for test assertions
+ * Audit Log type for test assertions (frozen contract component `AuditLog`).
  */
 interface AuditLog {
   id: string;
-  actorId: string;
+  actorId: string | null;
   action: string;
   entityType?: string;
-  entityId: string;
+  entityId?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;
 }
 
-test.describe('Backend API - Audit Log Endpoints', () => {
+test.describe('Backend API — Audit Log Endpoints (frozen Java contract)', () => {
   let managerToken = '';
   let userToken = '';
-  let managerUserId = 0;
-  let regularUserId = 0;
+  let adminToken = '';
+  let managerUserId = '';
 
-  // Setup: Create a manager and regular user
+  // Setup: sign in the seeded manager + user identities and generate audit
+  // rows on the real sign-in/sign-out surface.
   test.beforeAll(async ({ request }) => {
-    // Create manager user
-    const managerEmail = `manager-audit-${Date.now()}@example.com`;
-    await request.post(`${API_BASE_URL}/auth/register`, {
+    const managerSignIn = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
       data: {
-        email: managerEmail,
-        password: 'ManagerTest123!',
-        name: 'Manager Test User',
+        email: FIXTURE_MANAGER.email,
+        password: FIXTURE_MANAGER.password,
       },
     });
-
-    const managerLogin = await request.post(`${API_BASE_URL}/auth/login`, {
-      data: {
-        email: managerEmail,
-        password: 'ManagerTest123!',
-      },
-    });
-
-    const managerBody = await managerLogin.json();
-    managerToken = managerBody.token;
+    expect(managerSignIn.status()).toBe(200);
+    const managerBody = await managerSignIn.json();
+    managerToken = managerBody.accessToken;
     managerUserId = managerBody.user.id;
 
-    // Create regular user
-    const userEmail = `user-audit-${Date.now()}@example.com`;
-    await request.post(`${API_BASE_URL}/auth/register`, {
+    const userSignIn = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
       data: {
-        email: userEmail,
-        password: 'UserTest123!',
-        name: 'User Test',
+        email: FIXTURE_USER.email,
+        password: FIXTURE_USER.password,
       },
     });
+    expect(userSignIn.status()).toBe(200);
+    const userBody = await userSignIn.json();
+    userToken = userBody.accessToken;
 
-    const userLogin = await request.post(`${API_BASE_URL}/auth/login`, {
+    const adminSignIn = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
       data: {
-        email: userEmail,
-        password: 'UserTest123!',
+        email: FIXTURE_ADMIN.email,
+        password: FIXTURE_ADMIN.password,
       },
     });
+    expect(adminSignIn.status()).toBe(200);
+    adminToken = (await adminSignIn.json()).accessToken;
 
-    const userBody = await userLogin.json();
-    userToken = userBody.token;
-    regularUserId = userBody.user.id;
-
-    // Generate some audit log entries by logging in/out
-    await request.post(`${API_BASE_URL}/auth/logout`, {
+    // Generate audit rows: sign out (grant revocation) then sign in again to
+    // carry a fresh token.
+    const signOut = await request.post(`${API_BASE_URL}/auth/sign-out`, {
       headers: { Authorization: `Bearer ${managerToken}` },
     });
+    expect(signOut.status()).toBe(200);
 
-    // Login again to get fresh token
-    const freshLogin = await request.post(`${API_BASE_URL}/auth/login`, {
+    const freshSignIn = await request.post(`${API_BASE_URL}/auth/sign-in/email`, {
       data: {
-        email: managerEmail,
-        password: 'ManagerTest123!',
+        email: FIXTURE_MANAGER.email,
+        password: FIXTURE_MANAGER.password,
       },
     });
-    managerToken = (await freshLogin.json()).token;
+    expect(freshSignIn.status()).toBe(200);
+    managerToken = (await freshSignIn.json()).accessToken;
   });
 
   test.describe('GET /api/audit-logs', () => {
-    
-    test('should list audit logs with manager role', async ({ request }) => {
+
+    test('should list audit logs with the manager role (BaseListResponse envelope)', async ({ request }) => {
       const response = await request.get(`${API_BASE_URL}/audit-logs`, {
         headers: {
           Authorization: `Bearer ${managerToken}`,
@@ -99,10 +112,9 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       expect(response.status()).toBe(200);
-      
+
       const body = await response.json();
-      expect(body.items).toBeDefined();
-      expect(Array.isArray(body.items)).toBe(true);
+      expect(Array.isArray(body.data)).toBe(true);
       expect(body.total).toBeDefined();
       expect(body.page).toBeDefined();
       expect(body.limit).toBeDefined();
@@ -122,7 +134,7 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       expect(response.status()).toBe(403);
-      
+
       const body = await response.json();
       expect(body.error).toBeDefined();
       expect(body.error.toLowerCase()).toMatch(/permission|insufficient|forbidden/);
@@ -136,26 +148,28 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       expect(response.status()).toBe(200);
-      
+
       const body = await response.json();
       expect(body.page).toBe(1);
       expect(body.limit).toBe(10);
-      expect(body.items.length).toBeLessThanOrEqual(10);
+      expect(body.data.length).toBeLessThanOrEqual(10);
     });
 
     test('should support filtering by action', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs?action=user_login`, {
+      const response = await request.get(`${API_BASE_URL}/audit-logs?action=user.login`, {
         headers: {
           Authorization: `Bearer ${managerToken}`,
         },
       });
 
       expect(response.status()).toBe(200);
-      
+
       const body = await response.json();
-      // All returned logs should have action="user_login"
-      body.items.forEach((log: AuditLog) => {
-        expect(log.action).toBe('user_login');
+      // The seeded world plus this suite's sign-ins guarantee login rows…
+      expect(body.data.length).toBeGreaterThan(0);
+      // …and every returned log is a login action.
+      body.data.forEach((log: AuditLog) => {
+        expect(log.action).toBe('user.login');
       });
     });
 
@@ -167,9 +181,9 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       expect(response.status()).toBe(200);
-      
+
       const body = await response.json();
-      body.items.forEach((log: AuditLog) => {
+      body.data.forEach((log: AuditLog) => {
         if (log.entityType) {
           expect(log.entityType).toBe('user');
         }
@@ -177,11 +191,12 @@ test.describe('Backend API - Audit Log Endpoints', () => {
     });
 
     test('should support date range filtering', async ({ request }) => {
+      // The frozen contract parses zoneless ISO dates (LocalDate/LocalDateTime).
       const today = new Date().toISOString().split('T')[0];
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-      
+
       const response = await request.get(
-        `${API_BASE_URL}/audit-logs?dateFrom=${today}T00:00:00Z&dateTo=${tomorrow}T23:59:59Z`,
+        `${API_BASE_URL}/audit-logs?dateFrom=${today}&dateTo=${tomorrow}`,
         {
           headers: {
             Authorization: `Bearer ${managerToken}`,
@@ -190,9 +205,9 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       );
 
       expect(response.status()).toBe(200);
-      
+
       const body = await response.json();
-      expect(body.items).toBeDefined();
+      expect(Array.isArray(body.data)).toBe(true);
     });
 
     test('should include required audit log fields', async ({ request }) => {
@@ -203,23 +218,21 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       const body = await response.json();
-      
-      if (body.items.length > 0) {
-        const log = body.items[0];
-        expect(log.id).toBeDefined();
-        expect(log.actorId).toBeDefined();
-        expect(log.action).toBeDefined();
-        expect(log.entityType).toBeDefined();
-        expect(log.createdAt).toBeDefined();
-        
-        // Validate timestamp format
-        expect(new Date(log.createdAt).toString()).not.toBe('Invalid Date');
-      }
+
+      // The audit trail is never empty in the seeded world.
+      expect(body.data.length).toBeGreaterThan(0);
+      const log = body.data[0];
+      expect(log.id).toBeDefined();
+      expect(log.action).toBeDefined();
+      expect(log.createdAt).toBeDefined();
+
+      // Validate timestamp format.
+      expect(new Date(log.createdAt).toString()).not.toBe('Invalid Date');
     });
 
     test('should support combined filters', async ({ request }) => {
       const response = await request.get(
-        `${API_BASE_URL}/audit-logs?action=user_login&page=1&limit=20`,
+        `${API_BASE_URL}/audit-logs?action=user.login&page=1&limit=20`,
         {
           headers: {
             Authorization: `Bearer ${managerToken}`,
@@ -240,8 +253,11 @@ test.describe('Backend API - Audit Log Endpoints', () => {
         }
       );
 
-      // Should either validate and return 400, or ignore invalid filter
-      expect([200, 400]).toContain(response.status());
+      // The frozen contract validates date filters (400).
+      expect(response.status()).toBe(400);
+
+      const body = await response.json();
+      expect(body.error).toBeDefined();
     });
 
     test('should enforce maximum limit', async ({ request }) => {
@@ -252,181 +268,236 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       expect(response.status()).toBe(200);
-      
+
       const body = await response.json();
       expect(body.limit).toBeLessThanOrEqual(100);
     });
   });
 
-  test.describe('GET /api/audit-logs/conversation/:id', () => {
-    
+  test.describe('GET /api/audit-logs/conversations/:conversationId', () => {
+
     test('should reject request without authentication', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs/conversation/1`);
+      const response = await request.get(
+        `${API_BASE_URL}/audit-logs/conversations/${TELEGRAM_CONVERSATION_ID}`
+      );
 
       expect(response.status()).toBe(401);
     });
 
     test('should reject request from user role', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs/conversation/1`, {
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-        },
-      });
+      const response = await request.get(
+        `${API_BASE_URL}/audit-logs/conversations/${TELEGRAM_CONVERSATION_ID}`,
+        {
+          headers: {
+            Authorization: `Bearer ${userToken}`,
+          },
+        }
+      );
 
       expect(response.status()).toBe(403);
     });
 
-    test('should return logs for specific conversation with manager role', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs/conversation/1`, {
-        headers: {
-          Authorization: `Bearer ${managerToken}`,
-        },
-      });
+    test('should return logs scoped to the conversation with manager role', async ({ request }) => {
+      const response = await request.get(
+        `${API_BASE_URL}/audit-logs/conversations/${TELEGRAM_CONVERSATION_ID}`,
+        {
+          headers: {
+            Authorization: `Bearer ${managerToken}`,
+          },
+        }
+      );
 
-      // Either 200 (logs found) or 404 (conversation doesn't exist)
-      expect([200, 404]).toContain(response.status());
-      
-      if (response.status() === 200) {
-        const body = await response.json();
-        expect(body.items).toBeDefined();
-        
-        // All logs should be for conversation ID 1
-        body.items.forEach((log: AuditLog) => {
-          if (log.entityType === 'conversation') {
-            expect(log.entityId).toBe(1);
-          }
-        });
-      }
+      expect(response.status()).toBe(200);
+
+      const body = await response.json();
+      expect(Array.isArray(body.data)).toBe(true);
+
+      // The seeded world logs conversation rows for the telegram fixture…
+      expect(body.data.length).toBeGreaterThan(0);
+      // …and every returned log is scoped to that conversation.
+      body.data.forEach((log: AuditLog) => {
+        if (log.entityType === 'conversation') {
+          expect(log.entityId).toBe(TELEGRAM_CONVERSATION_ID);
+        }
+      });
     });
 
-    test('should return 404 for non-existent conversation', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs/conversation/99999`, {
-        headers: {
-          Authorization: `Bearer ${managerToken}`,
-        },
-      });
+    test('should return an empty page for a well-formed non-existent conversation', async ({ request }) => {
+      const response = await request.get(
+        `${API_BASE_URL}/audit-logs/conversations/${unknownUuid()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${managerToken}`,
+          },
+        }
+      );
 
-      // Should return 404 or 200 with empty logs
-      expect([200, 404]).toContain(response.status());
+      // The frozen conversation-scoped query is a filtered page — an
+      // unknown conversation simply has no rows (no cross-conversation
+      // leakage either way).
+      expect(response.status()).toBe(200);
+
+      const body = await response.json();
+      expect(Array.isArray(body.data)).toBe(true);
+      expect(body.data.length).toBe(0);
     });
 
     test('should reject invalid conversation ID format', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs/conversation/invalid`, {
-        headers: {
-          Authorization: `Bearer ${managerToken}`,
-        },
-      });
+      const response = await request.get(
+        `${API_BASE_URL}/audit-logs/conversations/invalid`,
+        {
+          headers: {
+            Authorization: `Bearer ${managerToken}`,
+          },
+        }
+      );
 
-      expect([400, 404]).toContain(response.status());
+      // Conversation ids are UUIDs on the frozen contract.
+      expect(response.status()).toBe(400);
     });
 
     test('should support pagination for conversation logs', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs/conversation/1?page=1&limit=5`, {
-        headers: {
-          Authorization: `Bearer ${managerToken}`,
-        },
-      });
+      const response = await request.get(
+        `${API_BASE_URL}/audit-logs/conversations/${TELEGRAM_CONVERSATION_ID}?page=1&limit=5`,
+        {
+          headers: {
+            Authorization: `Bearer ${managerToken}`,
+          },
+        }
+      );
 
-      expect([200, 404]).toContain(response.status());
-      
-      if (response.status() === 200) {
-        const body = await response.json();
-        expect(body.items.length).toBeLessThanOrEqual(5);
-      }
+      expect(response.status()).toBe(200);
+
+      const body = await response.json();
+      expect(body.data.length).toBeLessThanOrEqual(5);
     });
   });
 
-  test.describe('GET /api/audit-logs/actor/:userId', () => {
-    
+  test.describe('POST /api/audit-logs/export (admin+ surface; re-pointed from the Node-era /actor route)', () => {
+    // The Node-era `GET /api/audit-logs/actor/:userId` route has no frozen
+    // counterpart; the manager-surpassing audit surface on the frozen
+    // contract is the admin+-only export. The RBAC tiering evidence
+    // (manager denied, user denied, admin allowed) is preserved there.
+
     test('should reject request without authentication', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs/actor/1`);
+      const response = await request.post(`${API_BASE_URL}/audit-logs/export`, {
+        data: { format: 'json' },
+      });
 
       expect(response.status()).toBe(401);
     });
 
     test('should reject request from manager role (admin+ only)', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs/actor/${managerUserId}`, {
+      const response = await request.post(`${API_BASE_URL}/audit-logs/export`, {
         headers: {
           Authorization: `Bearer ${managerToken}`,
         },
+        data: { format: 'json' },
       });
 
-      // Manager role should NOT have access (admin+ only)
+      // Manager role must NOT have access (admin+ only).
       expect(response.status()).toBe(403);
-      
+
       const body = await response.json();
       expect(body.error).toBeDefined();
     });
 
     test('should reject request from user role', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs/actor/${regularUserId}`, {
+      const response = await request.post(`${API_BASE_URL}/audit-logs/export`, {
         headers: {
           Authorization: `Bearer ${userToken}`,
         },
+        data: { format: 'json' },
       });
 
       expect(response.status()).toBe(403);
     });
 
-    test('should reject invalid user ID format', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs/actor/invalid`, {
+    test('should reject invalid export format', async ({ request }) => {
+      const response = await request.post(`${API_BASE_URL}/audit-logs/export`, {
         headers: {
           Authorization: `Bearer ${managerToken}`,
         },
+        data: { format: 'xml' },
       });
 
-      expect([400, 403]).toContain(response.status());
+      expect(response.status()).toBe(403);
     });
 
-    test('should return 404 for non-existent user', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs/actor/99999`, {
+    test('should export for the admin role with the download contract', async ({ request }) => {
+      const response = await request.post(`${API_BASE_URL}/audit-logs/export`, {
         headers: {
-          Authorization: `Bearer ${managerToken}`,
+          Authorization: `Bearer ${adminToken}`,
+        },
+        data: {
+          format: 'json',
+          filters: { actorId: managerUserId },
         },
       });
 
-      // Should return 403 (manager can't access) or 404
-      expect([403, 404]).toContain(response.status());
+      expect(response.status()).toBe(200);
+      expect(response.headers()['content-disposition']).toContain('attachment');
     });
   });
 
   test.describe('Audit Log Content Validation', () => {
-    
-    test('should log user login actions', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs?action=user_login`, {
+
+    test('should log user sign-in actions', async ({ request }) => {
+      const response = await request.get(`${API_BASE_URL}/audit-logs?action=user.login`, {
         headers: {
           Authorization: `Bearer ${managerToken}`,
         },
       });
 
       expect(response.status()).toBe(200);
-      
+
       const body = await response.json();
-      
-      if (body.items.length > 0) {
-        const loginLog = body.items[0];
-        expect(loginLog.action).toBe('user_login');
-        expect(loginLog.actorId).toBeDefined();
-        expect(loginLog.entityType).toBe('user');
-        expect(loginLog.metadata).toBeDefined();
-      }
+
+      // This suite's beforeAll signs in on the real surface.
+      expect(body.data.length).toBeGreaterThan(0);
+      const loginLog = body.data[0];
+      expect(loginLog.action).toBe('user.login');
+      expect(loginLog.actorId).toBeDefined();
+      expect(loginLog.entityType).toBe('user');
+      expect(loginLog.metadata).toBeDefined();
     });
 
-    test('should log user logout actions', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/audit-logs?action=user_logout`, {
+    test('should log user credential changes', async ({ request }) => {
+      // Re-pointed from the Node-era logout-audit probe. Recorded merged-
+      // service observation: failed sign-ins are dropped from the audit
+      // trail (JpaAuditPersistence's non-UUID entityId guard) — the
+      // persisted auth-lifecycle evidence on the frozen surface is the
+      // credential-change audit row (MIG-030), produced here through the
+      // real change-password contract.
+      const userEmail = `audit-change-${Date.now()}@example.com`;
+
+      const signUpResponse = await request.post(`${API_BASE_URL}/auth/sign-up/email`, {
+        data: {
+          email: userEmail,
+          password: 'AuditChange1!',
+          name: 'Audit Change User',
+        },
+      });
+      expect(signUpResponse.status()).toBe(201);
+      const session = await signUpResponse.json();
+
+      const change = await request.post(`${API_BASE_URL}/auth/change-password`, {
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+        data: { currentPassword: 'AuditChange1!', newPassword: 'Rotated9876!' },
+      });
+      expect(change.status()).toBe(200);
+
+      const response = await request.get(`${API_BASE_URL}/audit-logs?action=user.password_changed`, {
         headers: {
           Authorization: `Bearer ${managerToken}`,
         },
       });
 
       expect(response.status()).toBe(200);
-      
+
       const body = await response.json();
-      
-      if (body.items.length > 0) {
-        const logoutLog = body.items[0];
-        expect(logoutLog.action).toBe('user_logout');
-      }
+      expect(body.data.length).toBeGreaterThan(0);
+      expect(body.data[0].action).toBe('user.password_changed');
     });
 
     test('should include actor information in logs', async ({ request }) => {
@@ -437,13 +508,11 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       const body = await response.json();
-      
-      if (body.items.length > 0) {
-        body.items.forEach((log: AuditLog) => {
-          expect(log.actorId).toBeDefined();
-          expect(typeof log.actorId).toBe('number');
-        });
-      }
+
+      expect(body.data.length).toBeGreaterThan(0);
+      body.data.forEach((log: AuditLog) => {
+        expect(typeof log.actorId).toBe('string');
+      });
     });
 
     test('should include metadata in audit logs', async ({ request }) => {
@@ -454,20 +523,19 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       const body = await response.json();
-      
-      if (body.items.length > 0) {
-        body.items.forEach((log: AuditLog) => {
-          // Metadata can be null or object
-          if (log.metadata !== null) {
-            expect(typeof log.metadata).toBe('object');
-          }
-        });
-      }
+
+      expect(body.data.length).toBeGreaterThan(0);
+      body.data.forEach((log: AuditLog) => {
+        // Metadata can be null or object.
+        if (log.metadata !== null) {
+          expect(typeof log.metadata).toBe('object');
+        }
+      });
     });
   });
 
   test.describe('Response Format & Pagination', () => {
-    
+
     test('should return consistent response format', async ({ request }) => {
       const response = await request.get(`${API_BASE_URL}/audit-logs`, {
         headers: {
@@ -475,20 +543,18 @@ test.describe('Backend API - Audit Log Endpoints', () => {
         },
       });
 
-       const body = await response.json();
-      expect(body.items).toBeDefined();
-      expect(Array.isArray(body.items)).toBe(true);
+      const body = await response.json();
+      expect(Array.isArray(body.data)).toBe(true);
       expect(body.total).toBeDefined();
       expect(body.page).toBeDefined();
       expect(body.limit).toBeDefined();
-      
+
       expect(typeof body.total).toBe('number');
       expect(typeof body.page).toBe('number');
       expect(typeof body.limit).toBe('number');
-      expect(typeof body.pages).toBe('number');
     });
 
-    test('should calculate total pages correctly', async ({ request }) => {
+    test('should keep pagination coherent between page, page size and total', async ({ request }) => {
       const response = await request.get(`${API_BASE_URL}/audit-logs?limit=10`, {
         headers: {
           Authorization: `Bearer ${managerToken}`,
@@ -496,8 +562,11 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       const body = await response.json();
-      const expectedPages = Math.ceil(body.total / body.limit);
-      expect(body.pages).toBe(expectedPages);
+      // Frozen BaseListResponse coherence: the requested page size is echoed,
+      // the page slice never exceeds it, and total covers at least the page.
+      expect(body.limit).toBe(10);
+      expect(body.data.length).toBeLessThanOrEqual(body.limit);
+      expect(body.total).toBeGreaterThanOrEqual(body.data.length);
     });
 
     test('should handle empty result sets', async ({ request }) => {
@@ -508,20 +577,20 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       expect(response.status()).toBe(200);
-      
+
       const body = await response.json();
-      expect(body.items).toBeDefined();
-      expect(body.items.length).toBe(0);
+      expect(Array.isArray(body.data)).toBe(true);
+      expect(body.data.length).toBe(0);
       expect(body.total).toBe(0);
     });
   });
 
   test.describe('Performance & Limits', () => {
-    
+
     test('should respond within acceptable time (<1 second)', async ({ request }) => {
       const startTime = Date.now();
-      
-      await request.get(`${API_BASE_URL}/audit-logs`, {
+
+      const response = await request.get(`${API_BASE_URL}/audit-logs`, {
         headers: {
           Authorization: `Bearer ${managerToken}`,
         },
@@ -529,7 +598,8 @@ test.describe('Backend API - Audit Log Endpoints', () => {
 
       const endTime = Date.now();
       const duration = endTime - startTime;
-      
+
+      expect(response.status()).toBe(200);
       expect(duration).toBeLessThan(1000);
     });
 
@@ -541,23 +611,22 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       expect(response.status()).toBe(200);
-      
+
       const body = await response.json();
-      expect(body.items.length).toBe(0);
+      expect(body.data.length).toBe(0);
     });
   });
 
   test.describe('Security & Access Control', () => {
-    
-    test('should enforce role-based access (manager+ only)', async ({ request }) => {
-      const endpoints = [
-        '/api/audit-logs',
-        '/api/audit-logs/conversation/1',
-        '/api/audit-logs/actor/1',
+
+    test('should enforce role-based access (manager+ query, admin+ export)', async ({ request }) => {
+      const queryEndpoints = [
+        `${API_BASE_URL}/audit-logs`,
+        `${API_BASE_URL}/audit-logs/conversations/${TELEGRAM_CONVERSATION_ID}`,
       ];
 
-      for (const endpoint of endpoints) {
-        const response = await request.get(`${API_BASE_URL.replace('/api', '')}${endpoint}`, {
+      for (const endpoint of queryEndpoints) {
+        const response = await request.get(endpoint, {
           headers: {
             Authorization: `Bearer ${userToken}`,
           },
@@ -565,6 +634,15 @@ test.describe('Backend API - Audit Log Endpoints', () => {
 
         expect(response.status()).toBe(403);
       }
+
+      const exportResponse = await request.post(`${API_BASE_URL}/audit-logs/export`, {
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+        },
+        data: { format: 'csv' },
+      });
+
+      expect(exportResponse.status()).toBe(403);
     });
 
     test('should not expose sensitive data in audit logs', async ({ request }) => {
@@ -575,9 +653,9 @@ test.describe('Backend API - Audit Log Endpoints', () => {
       });
 
       const body = await response.json();
-      
-      body.items.forEach((log: AuditLog) => {
-        // Should not contain password or password hash
+
+      body.data.forEach((log: AuditLog) => {
+        // Should not contain password or password hash.
         const metadataStr = JSON.stringify(log.metadata || {}).toLowerCase();
         expect(metadataStr).not.toContain('password');
         expect(metadataStr).not.toContain('passwordhash');

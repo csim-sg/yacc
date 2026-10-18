@@ -54,26 +54,39 @@ import com.yacc.repository.TagRepository;
  * AC-MIG-021-3; ADR-027 — "deterministic fresh seed, not migrated data").
  *
  * <p>Inserts a fixed, repeatable fixture dataset (stable identifiers in the
- * {@code 00000000-...} fixture range, {@code *.fixture.yacc.local} emails)
- * through the JPA repositories, leaving the database in a known
- * bootstrap-ready state. Deliberate boundaries:</p>
+ * {@code 00000000-...} fixture range) through the JPA repositories, leaving
+ * the database in a known bootstrap-ready state. Since PREREQ-ANG-003-S1
+ * (issue #423; SPEC-003 AD-5) the fixture world is the Playwright suite's
+ * expected non-privileged world: identities {@code admin2@yacc.local}
+ * (admin), {@code manager@yacc.local} (manager) and {@code user@yacc.local}
+ * (user) with the suite password (see {@link #FIXTURE_USER_PASSWORD}),
+ * conversations {@code …1001}/{@code …1002}, tags VIP/Urgent/Follow-Up,
+ * routing rules {@code …2001}/{@code …2002}/{@code …2003}, the suite's
+ * assignment/mention notifications, and the 105 bulk-action conversations
+ * ({@code …3000}..). Deliberate boundaries:</p>
  *
  * <ul>
  *   <li><strong>No Super Admin.</strong> The first SUPER_ADMIN comes into
  *       existence only via the MIG-030 deterministic bootstrap (ADR-025);
- *       this seed never creates privileged identities.</li>
+ *       this seed never creates privileged identities. The suite's
+ *       super-admin credentials map onto that bootstrap identity (test-helper
+ *       mapping a-1), never onto a seeded row.</li>
  *   <li><strong>No migrated data.</strong> Nothing is copied from the POC —
  *       every row is a fresh fixture value; no POC-format credential
  *       ciphertext exists (IRC credentials are sealed by the MIG-021
  *       AES-256-GCM {@link EncryptionService}).</li>
  *   <li><strong>Idempotent.</strong> Every insert is insert-if-absent (fixed
  *       ids / natural keys), so re-running against a seeded database is a
- *       no-op and yields the same logical state.</li>
+ *       no-op and yields the same logical state. Fixture identifiers may
+ *       repeat across <em>different</em> tables (e.g. the inbound message id
+ *       {@code …2001} and routing-rule PK {@code …2001}) — that is
+ *       DB-legal and intentional.</li>
  *   <li><strong>Not wired to startup.</strong> The seed is an explicitly
- *       invoked tool (tests, reset/bootstrap tooling, MIG-071's full reset) —
- *       a plain class, not a startup bean — so application startup never
- *       seeds fixture rows and DB-free Spring contexts are unaffected. It is
- *       a cross-cutting {@code common} data-layer component (ADR-030 §4).</li>
+ *       invoked tool (tests, the profile/opt-in-gated E2E entrypoint, and
+ *       reset/bootstrap tooling) — a plain class, not a startup bean — so
+ *       application startup never seeds fixture rows and DB-free Spring
+ *       contexts are unaffected. It is a cross-cutting {@code common}
+ *       data-layer component (ADR-030 §4).</li>
  * </ul>
  */
 public class DeterministicSeed {
@@ -81,8 +94,13 @@ public class DeterministicSeed {
     /** Fixture plaintext sealed into the IRC profile (fixture-only material). */
     public static final String FIXTURE_IRC_CREDENTIAL = "fixture-irc-nicksecret";
 
-    /** Fixed fixture password for the fixture users (fixture-only material). */
-    public static final String FIXTURE_USER_PASSWORD = "fixture-only-password";
+    /**
+     * Fixed fixture password for the three fixture users (fixture-only
+     * material). PREREQ-ANG-003-S1 aligned this with the value the Playwright
+     * suite sends for every fixture identity ({@code admin123}) so the seeded
+     * world is sign-in-reachable through the frozen auth contract.
+     */
+    public static final String FIXTURE_USER_PASSWORD = "admin123";
 
     /** Identifiers of the seeded rows, for verification and downstream use. */
     public record SeedState(
@@ -110,12 +128,30 @@ public class DeterministicSeed {
             UUID.fromString("00000000-0000-0000-0000-000000002002");
     private static final UUID ATTACHMENT_ID = UUID.fromString("00000000-0000-0000-0000-000000003001");
     private static final UUID NOTE_ID = UUID.fromString("00000000-0000-0000-0000-000000004001");
-    private static final UUID NOTIFICATION_ID = UUID.fromString("00000000-0000-0000-0000-000000005001");
-    private static final UUID RULE_ID = UUID.fromString("00000000-0000-0000-0000-000000006001");
     private static final UUID AUDIT_LOG_ID = UUID.fromString("00000000-0000-0000-0000-000000007001");
     private static final UUID DLQ_ID = UUID.fromString("00000000-0000-0000-0000-000000008001");
     private static final String SESSION_ID = "00000000-0000-0000-0000-000000009001";
     private static final String VERIFICATION_ID = "00000000-0000-0000-0000-000000009101";
+
+    /** Suite routing-rule identifiers (fixtures.ts FIXTURE_IDS.routingRules). */
+    private static final UUID RULE_AUTO_ASSIGN_VIP_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000002001");
+    private static final UUID RULE_AUTO_TAG_URGENT_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000002002");
+    private static final UUID RULE_DISABLED_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000002003");
+
+    /** Suite notification identifiers (assignment/mention fixtures). */
+    private static final UUID MANAGER_ASSIGNMENT_NOTIFICATION_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000005001");
+    private static final UUID USER_MENTION_NOTIFICATION_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000005002");
+    private static final UUID ADMIN_ASSIGNMENT_NOTIFICATION_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000005003");
+
+    /** Suite bulk-action conversation range: …3000..…3104 (105 rows). */
+    private static final int BULK_CONVERSATION_COUNT = 105;
+    private static final int BULK_CONVERSATION_START_ID = 3000;
 
     private final UserRepository users;
     private final AccountRepository accounts;
@@ -192,11 +228,13 @@ public class DeterministicSeed {
 
     private String seedUsers() {
         String passwordHash = new BCryptPasswordEncoder().encode(FIXTURE_USER_PASSWORD);
-        // Fixture identities only — deliberately no super_admin (the first
-        // SUPER_ADMIN is created exclusively by the MIG-030 bootstrap).
-        upsertUser(ADMIN_ID, "admin@fixture.yacc.local", "Fixture Admin", UserRole.ADMIN, passwordHash);
-        upsertUser(MANAGER_ID, "manager@fixture.yacc.local", "Fixture Manager", UserRole.MANAGER, passwordHash);
-        upsertUser(USER_ID, "user@fixture.yacc.local", "Fixture User", UserRole.USER, passwordHash);
+        // Suite fixture identities only — deliberately no super_admin (the
+        // first SUPER_ADMIN is created exclusively by the MIG-030 bootstrap;
+        // the suite's super-admin credentials are served by test-helper
+        // mapping a-1 onto that bootstrap identity).
+        upsertUser(ADMIN_ID, "admin2@yacc.local", "Admin User", UserRole.ADMIN, passwordHash);
+        upsertUser(MANAGER_ID, "manager@yacc.local", "Manager User", UserRole.MANAGER, passwordHash);
+        upsertUser(USER_ID, "user@yacc.local", "Support User", UserRole.USER, passwordHash);
         return ADMIN_ID;
     }
 
@@ -265,7 +303,7 @@ public class DeterministicSeed {
     }
 
     private void seedAggregateRows(UUID conversationId, String adminId, String managerId) {
-        // Tag + join row
+        // Suite tags: VIP (admin), Urgent (admin), Follow-Up (manager).
         Tag vip = tags.findByNameAndCreatedById("VIP", adminId).orElseGet(() ->
                 tags.save(new Tag("VIP", "#2563EB", adminId)));
         ConversationTagId vipJoin = new ConversationTagId(conversationId, vip.getId());
@@ -274,6 +312,9 @@ public class DeterministicSeed {
         }
         if (tags.findByNameAndCreatedById("Urgent", adminId).isEmpty()) {
             tags.save(new Tag("Urgent", "#EF4444", adminId));
+        }
+        if (tags.findByNameAndCreatedById("Follow-Up", managerId).isEmpty()) {
+            tags.save(new Tag("Follow-Up", "#F97316", managerId));
         }
 
         // Message-scoped rows (attachment + raw payload)
@@ -294,23 +335,70 @@ public class DeterministicSeed {
             notes.save(note);
         }
 
-        // Notification
-        if (notifications.findById(NOTIFICATION_ID).isEmpty()) {
-            notifications.save(new Notification(NOTIFICATION_ID, managerId,
-                    "conversation.assigned", conversationId, adminId,
+        // Suite notifications (assignment/mention fixtures; helpers/api.ts
+        // Notification type union assignment|mention).
+        if (notifications.findById(MANAGER_ASSIGNMENT_NOTIFICATION_ID).isEmpty()) {
+            notifications.save(new Notification(MANAGER_ASSIGNMENT_NOTIFICATION_ID, managerId,
+                    "assignment", conversationId, adminId,
                     "Fixture conversation assigned"));
         }
+        if (notifications.findById(USER_MENTION_NOTIFICATION_ID).isEmpty()) {
+            notifications.save(new Notification(USER_MENTION_NOTIFICATION_ID, USER_ID,
+                    "mention", IRC_CONVERSATION_ID, managerId,
+                    "Fixture conversation mention"));
+        }
+        if (notifications.findById(ADMIN_ASSIGNMENT_NOTIFICATION_ID).isEmpty()) {
+            Notification read = new Notification(ADMIN_ASSIGNMENT_NOTIFICATION_ID, adminId,
+                    "assignment", IRC_CONVERSATION_ID, adminId,
+                    "Fixture conversation assigned");
+            read.setRead(true);
+            notifications.save(read);
+        }
 
-        // Routing rule + execution
-        RoutingRule rule = routingRules.findById(RULE_ID).orElseGet(() ->
-                routingRules.save(new RoutingRule(RULE_ID, "fixture-auto-assign", "active", 100,
+        // Suite routing rules …2001/2002/2003 (fixtures.ts routingRules) —
+        // the id overlap with the message namespace above is cross-table and
+        // DB-legal by design.
+        RoutingRule autoAssignVip = routingRules.findById(RULE_AUTO_ASSIGN_VIP_ID).orElseGet(() ->
+                routingRules.save(new RoutingRule(RULE_AUTO_ASSIGN_VIP_ID,
+                        "Auto-assign VIP to admin", "active", 100,
                         "[{\"field\":\"tag\",\"operator\":\"has\",\"value\":\"VIP\"}]",
                         "[{\"type\":\"assign\",\"value\":\"" + adminId + "\"}]",
                         adminId)));
-        if (routingRuleExecutions.findByRuleIdAndConversationId(rule.getId(), conversationId).isEmpty()) {
-            routingRuleExecutions.save(new RoutingRuleExecution(rule.getId(), conversationId,
+        if (routingRules.findById(RULE_AUTO_TAG_URGENT_ID).isEmpty()) {
+            routingRules.save(new RoutingRule(RULE_AUTO_TAG_URGENT_ID,
+                    "Auto-tag urgent keywords", "active", 101,
+                    "[{\"field\":\"keyword\",\"operator\":\"contains\",\"value\":\"yacc-seed-urgent-keyword-xyz\"}]",
+                    "[{\"type\":\"priority\",\"value\":\"high\"}]",
+                    adminId));
+        }
+        if (routingRules.findById(RULE_DISABLED_ID).isEmpty()) {
+            routingRules.save(new RoutingRule(RULE_DISABLED_ID,
+                    "Disabled rule for testing", "disabled", 102,
+                    "[{\"field\":\"channel\",\"operator\":\"eq\",\"value\":\"telegram\"}]",
+                    "[{\"type\":\"priority\",\"value\":\"low\"}]",
+                    adminId));
+        }
+        if (routingRuleExecutions
+                .findByRuleIdAndConversationId(autoAssignVip.getId(), conversationId).isEmpty()) {
+            routingRuleExecutions.save(new RoutingRuleExecution(autoAssignVip.getId(), conversationId,
                     "[{\"field\":\"tag\",\"operator\":\"has\",\"value\":\"VIP\"}]",
                     "[{\"type\":\"assign\",\"value\":\"" + adminId + "\"}]"));
+        }
+
+        // Suite bulk-action conversations …3000..…3104 (105 rows; max-100
+        // bulk limit + overflow evidence for the suite's bulk tests).
+        for (int i = 0; i < BULK_CONVERSATION_COUNT; i++) {
+            UUID bulkId = bulkConversationId(i);
+            if (conversations.findById(bulkId).isEmpty()) {
+                Conversation bulk = new Conversation(bulkId,
+                        i % 2 == 0 ? ChannelType.TELEGRAM : ChannelType.IRC,
+                        "bulk-test-" + i);
+                bulk.setTitle("Bulk Test Conversation " + (i + 1));
+                if (i % 3 == 0) {
+                    bulk.setAssignedUserId(managerId);
+                }
+                conversations.save(bulk);
+            }
         }
 
         // Audit log
@@ -335,7 +423,7 @@ public class DeterministicSeed {
                     "fixture-session-token"));
         }
         if (verifications.findById(VERIFICATION_ID).isEmpty()) {
-            verifications.save(new Verification(VERIFICATION_ID, "user@fixture.yacc.local",
+            verifications.save(new Verification(VERIFICATION_ID, "user@yacc.local",
                     "fixture-verification", LocalDateTime.now().plusHours(1)));
         }
         if (passwordResetTokens.findByToken("fixture-reset-token").isEmpty()) {
@@ -351,5 +439,11 @@ public class DeterministicSeed {
 
     private java.util.Optional<Tag> findVipTag(String adminId) {
         return tags.findByNameAndCreatedById("VIP", adminId);
+    }
+
+    /** Deterministic bulk-conversation identifier {@code …3000+i} (12 digits). */
+    private static UUID bulkConversationId(int index) {
+        return UUID.fromString("00000000-0000-0000-0000-"
+                + String.format("%012d", BULK_CONVERSATION_START_ID + index));
     }
 }
