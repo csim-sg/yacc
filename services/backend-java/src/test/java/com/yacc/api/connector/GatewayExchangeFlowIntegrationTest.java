@@ -70,9 +70,12 @@ import com.yacc.service.JwtTokenService;
  * WS-QEV-001/002): Telegram/IRC inbound ingestion parity (conversation
  * find-or-create + G12 profile identity + auto-reopen + audit +
  * {@code message.received}), the REST 201/PENDING &rarr; async-dispatch
- * round-trip ({@code message.sent}/{@code message.failed} + DLQ + retry
- * cycle), the breaker fail-fast/un-wedge pair with single-sourced failure
- * counting, and the redelivery seam through the merged MIG-063 worker
+ * round-trip ({@code message.sent}/{@code message.failed} + DLQ row + retry
+ * cycle; {@code message.failed} is retry-pending only and the terminal
+ * exhaustion emits the single frozen {@code queue.message.dlq} frame with
+ * the committed counters), the breaker fail-fast/un-wedge pair with
+ * single-sourced failure counting, and the redelivery seam through the
+ * merged MIG-063 worker
  * (driven synchronously for determinism — no Quartz threads needed).
  *
  * <p>Deliberately NOT {@code @Transactional}: the dispatch runs on the
@@ -377,9 +380,16 @@ class GatewayExchangeFlowIntegrationTest extends AbstractPostgresIntegrationTest
         assertThat(failed.get("attempt").asInt()).isEqualTo(1);
         assertThat(failed.get("retryAt").isTextual()).isTrue();
         validateAgainstFrozenSchema(failed, "message-failed");
-        awaitFrame(RealtimeEvents.QUEUE_MESSAGE_DLQ, data -> true);
         JsonNode retryScheduled = awaitFrameFor(RealtimeEvents.MESSAGE_RETRY_SCHEDULED, messageId);
         assertThat(retryScheduled.get("messageId").asText()).isEqualTo(messageId.toString());
+        // No queue.message.dlq at first failure (G15): the row is created
+        // with retries pending — the frozen event belongs to the exhaustion
+        // transition only (retry.scheduled is the failure path's last
+        // emission, so the absence below is final for this dispatch).
+        assertThat(frameCount(RealtimeEvents.QUEUE_MESSAGE_DLQ,
+                data -> data.has("messageId")
+                        && messageId.toString().equals(data.get("messageId").asText())))
+                .isZero();
 
         var entry = await(() -> dlqEntries.findByMessageId(messageId).orElse(null));
         assertThat(entry.getConversationId()).isEqualTo(conversation.getId());
@@ -470,7 +480,7 @@ class GatewayExchangeFlowIntegrationTest extends AbstractPostgresIntegrationTest
     }
 
     @Test
-    void exhaustionTerminatesAfterThreeFailedRedeliveriesWithoutATerminalEmission()
+    void exhaustionEmitsTheTerminalDlqFrameOnceWithCommittedCounters()
             throws Exception {
         seedSuperUser();
         Conversation conversation = conversations.save(new Conversation(UUID.randomUUID(),
@@ -482,20 +492,42 @@ class GatewayExchangeFlowIntegrationTest extends AbstractPostgresIntegrationTest
             retryQueue.executeRetryAttempt(messageId.toString());
         }
 
+        // The terminal wire signal (founder Option A, G15): exactly ONE
+        // enveloped queue.message.dlq frame at the exhaustion transition,
+        // published AFTER the durable terminal commit — the frame's counters
+        // are the committed row's.
+        JsonNode dlqFrame = awaitFrame(RealtimeEvents.QUEUE_MESSAGE_DLQ,
+                data -> data.has("messageId")
+                        && messageId.toString().equals(data.get("messageId").asText()));
+        assertThat(dlqFrame.get("failureReason").asText())
+                .isEqualTo("max_retries_exceeded");
+        assertThat(dlqFrame.get("requiresReview").asBoolean()).isTrue();
+        assertThat(dlqFrame.get("totalAttempts").asInt()).isGreaterThanOrEqualTo(4);
+        assertThat(frameCount(RealtimeEvents.QUEUE_MESSAGE_DLQ,
+                data -> data.has("messageId")
+                        && messageId.toString().equals(data.get("messageId").asText())))
+                .isEqualTo(1);
+
+        // The durable terminal row: committed counters, the documented
+        // terminal vocabulary, the exhausted marker; job gone, failed state.
         var entry = await(() -> dlqEntries.findByMessageId(messageId)
                 .filter(candidate -> candidate.getMetadata() != null
                         && candidate.getMetadata().contains("exhausted"))
                 .orElse(null));
         assertThat(entry.getTotalAttempts()).isGreaterThanOrEqualTo(4);
+        assertThat(entry.getFailureReason()).isEqualTo("max_retries_exceeded");
         await(() -> jobExists(messageId).isEmpty());
-        // E3 posture: the terminal (exhausted) failure emits no message.failed
-        // — attempts 1 (initial), 2 and 3 (redeliveries) were emitted.
+        assertThat(retryQueue.jobState(messageId)).isEqualTo("failed");
+        assertThat(messages.findById(messageId).orElseThrow().getStatus().getLabel())
+                .isEqualTo("failed");
+
+        // message.failed stays retry-pending only: attempts 1 (initial),
+        // 2 and 3 (redeliveries) were emitted — the terminal failure
+        // emitted none.
         await(() -> frameCount(RealtimeEvents.MESSAGE_FAILED) >= framesAfterInitial + 2
                 ? Optional.of(1) : Optional.empty());
         assertThat(frameCount(RealtimeEvents.MESSAGE_FAILED))
                 .isEqualTo(framesAfterInitial + 2);
-        assertThat(messages.findById(messageId).orElseThrow().getStatus().getLabel())
-                .isEqualTo("failed");
     }
 
     // --- helpers ---
@@ -541,12 +573,17 @@ class GatewayExchangeFlowIntegrationTest extends AbstractPostgresIntegrationTest
     }
 
     private long frameCount(String event) {
+        return frameCount(event, data -> true);
+    }
+
+    private long frameCount(String event, java.util.function.Predicate<JsonNode> data) {
         ArgumentCaptor<WebSocketEnvelope> captor = ArgumentCaptor
                 .forClass(WebSocketEnvelope.class);
         verify(publisher, atLeast(0)).publishToAll(captor.capture());
         verify(publisher, atLeast(0)).publishToRoom(any(), captor.capture());
         return captor.getAllValues().stream()
                 .filter(envelope -> event.equals(envelope.event()))
+                .filter(envelope -> data.test(envelope.data()))
                 .count();
     }
 

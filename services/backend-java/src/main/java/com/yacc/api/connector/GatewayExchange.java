@@ -61,10 +61,15 @@ import jakarta.annotation.PreDestroy;
  *       / {@code message.failed} (both broadcast — baseline
  *       {@code queue-database-integration} {@code emitGlobally} parity; the
  *       tracker's own emitter was a no-op stub) &rarr; on failure a DLQ entry
- *       with real identities + {@code queue.message.dlq} + the retry cycle
+ *       with real identities (FK fail-closed, G7) + the retry cycle
  *       via {@code QueueRetryService.scheduleCycle} (guardrail G7 — the
  *       once-only {@code retry_attempt} flag is never touched) +
- *       {@code message.retry.scheduled}.</li>
+ *       {@code message.retry.scheduled}. {@code message.failed} is the
+ *       retry-pending signal only (founder Option A); the terminal
+ *       exhaustion outcome is the frozen {@code queue.message.dlq}
+ *       broadcast at the exhaustion transition (G15) —
+ *       {@link #onCycleExhausted}, notified by the worker after the
+ *       durable terminal commit.</li>
  *   <li><b>redelivery (D4)</b> — the production redelivery logic behind the
  *       {@link GatewayRedeliveryHandler} seam bean: one {@code deliver} =
  *       exactly one attempt with the same
@@ -90,7 +95,12 @@ public class GatewayExchange implements TelegramUpdateReceiver, IrcMessageReceiv
 
     private static final Logger log = LoggerFactory.getLogger(GatewayExchange.class);
 
-    /** Initial-dispatch DLQ failure reason (free-form REST-DLQ filter value). */
+    /**
+     * Initial-dispatch DLQ failure reason at row creation (free-form
+     * REST-DLQ filter value; the row is created with retries pending —
+     * documented terminal vocabulary alignment is MIG-090 territory, the
+     * terminal exhaustion writes {@code max_retries_exceeded} over it).
+     */
     static final String SEND_FAILED_REASON = "SEND_FAILED";
 
     private final ConnectorRegistry registry;
@@ -336,11 +346,19 @@ public class GatewayExchange implements TelegramUpdateReceiver, IrcMessageReceiv
     /**
      * The failure accounting (baseline failure-path parity): status
      * &rarr; {@code failed} with error/correlation metadata; the enveloped
-     * {@code message.failed} with the truthful attempt/retryAt derivation of
-     * {@link MessageFailedPayload} (a terminal exhausted failure emits
-     * nothing — E3 posture); on the initial dispatch also the DLQ entry with
-     * real identities (FK fail-closed, G7), the {@code queue.message.dlq}
-     * emission and the retry cycle + {@code message.retry.scheduled}.
+     * {@code message.failed} with the truthful attempt/retryAt derivation
+     * of {@link MessageFailedPayload} — <b>retry-pending only</b> (founder
+     * Option A, AC-MIG-062-3): every failure that is really followed by a
+     * scheduled retry is emitted with {@code attempt} 1..3 and the truthful
+     * next {@code retryAt}; a terminal exhausted failure emits none (no
+     * truthful {@code retryAt} exists — the worker notifies the terminal
+     * {@code queue.message.dlq} signal through
+     * {@link #onCycleExhausted} instead). On the initial dispatch also the
+     * DLQ entry with real identities (FK fail-closed, G7) and the retry
+     * cycle + {@code message.retry.scheduled}. The DLQ row is created with
+     * retries pending — <b>no</b> {@code queue.message.dlq} is emitted at
+     * first failure (the frozen event belongs to the exhaustion transition,
+     * G15; a first-failure count of 1 is not a lifecycle total).
      */
     private RetryOutcome recordFailure(Message message, String error, boolean redelivery) {
         messages.markFailed(message.getId(), error);
@@ -365,13 +383,13 @@ public class GatewayExchange implements TelegramUpdateReceiver, IrcMessageReceiv
                             message.getConversationId(), "failed", error, retryAt, attempt)));
         } else {
             log.warn("Terminal redelivery failure of {} (cycle attempt exhausted) —"
-                    + " no retry follows, message.failed is not emitted (frozen schema requires"
-                    + " a truthful retryAt; E3 posture); the DLQ terminal state is the"
-                    + " observable record", message.getId());
+                    + " no retry follows, message.failed is not emitted (frozen schema"
+                    + " requires a truthful retryAt); the terminal queue.message.dlq"
+                    + " signal is emitted by the worker through"
+                    + " onCycleExhausted (G15)", message.getId());
         }
         if (!redelivery) {
             enqueueDlqEntry(message, error);
-            publishToAll(RealtimeEvents.QUEUE_MESSAGE_DLQ, dlqPayload(message, error));
             try {
                 retryQueue.getObject().scheduleCycle(message.getId());
                 publishToAll(RealtimeEvents.MESSAGE_RETRY_SCHEDULED,
@@ -414,19 +432,65 @@ public class GatewayExchange implements TelegramUpdateReceiver, IrcMessageReceiv
                 SEND_FAILED_REASON, 1, error, correlationOf(message), metadata.toString());
     }
 
-    private ObjectNode dlqPayload(Message message, String error) {
-        ObjectNode payload = mapper.createObjectNode()
-                .put("messageId", message.getId().toString())
-                .put("conversationId", message.getConversationId().toString())
-                .put("failureReason", SEND_FAILED_REASON)
-                .put("totalAttempts", 1)
-                .put("lastError", error)
-                .put("requiresReview", true);
-        String correlationId = correlationOf(message);
-        if (correlationId != null) {
-            payload.put("correlationId", correlationId);
+    /**
+     * The terminal exhaustion notification (founder Option A; guardrails
+     * G15/G16), invoked exactly once per terminal transition by the retry
+     * worker through the {@link GatewayRedeliveryHandler} seam —
+     * <b>after</b> the durable terminal state committed (durable first,
+     * then publish; never inside a DB transaction). Builds the enveloped
+     * {@code queue.message.dlq} payload from the <b>committed</b> row —
+     * {@code failureReason}, {@code totalAttempts} and {@code lastError}
+     * are read verbatim from the terminal row (the single source of truth;
+     * {@code totalAttempts} equals the value the REST DLQ surface reports
+     * for the same row, and {@code failureReason} is the documented
+     * {@code max_retries_exceeded} terminal vocabulary written in the
+     * terminal transaction) — and broadcasts it globally (POC
+     * {@code emitGlobally} parity; frozen canonical channel, backlog
+     * eligible). No-op when the row is absent (already cleared/consumed).
+     * Never throws: a notification failure must not break the worker.
+     *
+     * <p>Guarantee bound: best-effort, non-durable, at-most-once per
+     * terminal transition — exactly-once is <b>not</b> claimed and no
+     * outbox exists. A missing notification is possible only in the crash
+     * window between the terminal commit and this in-memory fan-out; the
+     * durable record (terminal DLQ row, {@code failed} message status,
+     * {@code failed} job state, {@code GET /api/dlq}) is authoritative. A
+     * manual re-queue clears the terminal marker, so a later cycle's own
+     * exhaustion is a new transition and legitimately emits again. This is
+     * the ONLY {@code queue.message.dlq} emission: a first failure emits
+     * none (the row is created with retries pending — the POC emitted the
+     * event only at exhaustion, and a first-failure count of 1 is not a
+     * lifecycle total).</p>
+     */
+    public void onCycleExhausted(UUID messageId) {
+        try {
+            var entry = dlq.findByMessageId(messageId).orElse(null);
+            if (entry == null) {
+                log.info("Terminal-cycle notification for {}: the DLQ row is already"
+                        + " cleared/consumed — nothing to publish", messageId);
+                return;
+            }
+            ObjectNode payload = mapper.createObjectNode()
+                    .put("messageId", entry.getMessageId().toString())
+                    .put("conversationId", entry.getConversationId().toString())
+                    .put("failureReason", entry.getFailureReason())
+                    .put("lastError", entry.getLastError())
+                    .put("requiresReview", true);
+            if (entry.getTotalAttempts() != null) {
+                payload.put("totalAttempts", entry.getTotalAttempts());
+            }
+            if (entry.getCorrelationId() != null) {
+                payload.put("correlationId", entry.getCorrelationId());
+            }
+            publishToAll(RealtimeEvents.QUEUE_MESSAGE_DLQ, payload);
+            log.info("Retry cycle exhausted for {} — queue.message.dlq broadcast"
+                    + " (failureReason={}, totalAttempts={})", messageId,
+                    entry.getFailureReason(), entry.getTotalAttempts());
+        } catch (RuntimeException failure) {
+            log.error("Terminal-cycle notification for {} failed (best-effort; the"
+                    + " durable DLQ terminal state is the authoritative record): {}",
+                    messageId, failure.toString());
         }
-        return payload;
     }
 
     private ObjectNode retryScheduledPayload(Message message, LocalDateTime nextRetryAt) {

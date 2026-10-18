@@ -12,16 +12,19 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * schema's {@code failed} constant and {@code attempt} is bounded
  * {@code 1..3}.
  *
- * <p><b>Truthful attempt/retryAt derivation (guardrail E3 posture):</b>
+ * <p><b>Truthful attempt/retryAt derivation (founder Option A):</b>
  * {@code attempt} counts the failed delivery — the initial dispatch failure
  * is attempt 1; a failed redelivery of cycle attempt {@code N} is attempt
  * {@code N+1}. {@code retryAt} is always the actual next scheduled retry
- * fire time on the frozen ladder. A <b>terminal</b> (exhausted) failure is
- * therefore deliberately <b>not emitted</b>: no retry follows, so a
+ * fire time on the frozen ladder. {@code message.failed} is therefore the
+ * <b>retry-pending</b> signal only: exactly attempts {@code 1..3}, each
+ * with a truthful next {@code retryAt}. A <b>terminal</b> (exhausted)
+ * failure is deliberately <b>not emitted</b>: no retry follows, so a
  * schema-valid truthful {@code retryAt} does not exist and inventing a wire
- * value is forbidden (E3). The terminal state stays observable through the
- * DLQ row (terminal cycle state, {@code total_attempts}/{@code last_error}),
- * the {@code queue.message.dlq} failure-path emission and the
+ * value is forbidden. The terminal outcome is signalled by the frozen
+ * {@code queue.message.dlq} broadcast at the exhaustion transition
+ * ({@code GatewayExchange.onCycleExhausted}, notified by the worker after
+ * the durable terminal commit) plus the durable terminal DLQ row and the
  * REST-QUEUE-006 {@code failed} job state.</p>
  *
  * @param messageId      the persisted message id

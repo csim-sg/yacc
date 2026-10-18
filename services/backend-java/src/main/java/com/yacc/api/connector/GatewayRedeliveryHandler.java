@@ -20,7 +20,9 @@ import com.yacc.api.queue.RetryDeliveryHandler;
  * points. The exchange's {@code QueueRetryService} dependency stays lazy
  * ({@code ObjectProvider}) for the same reason: the worker's delivery seam
  * leads back to this exchange while the exchange's failure path schedules
- * cycles on the worker (guardrail G7).</p>
+ * cycles on the worker (guardrail G7). The terminal-exhaustion
+ * notification ({@code onCycleExhausted}, G15/G16) is delegated the same
+ * way: the exchange owns the payload construction and the emission.</p>
  */
 @Component
 public class GatewayRedeliveryHandler implements RetryDeliveryHandler {
@@ -34,5 +36,10 @@ public class GatewayRedeliveryHandler implements RetryDeliveryHandler {
     @Override
     public RetryOutcome deliver(UUID messageId) {
         return exchange.deliver(messageId);
+    }
+
+    @Override
+    public void onCycleExhausted(UUID messageId) {
+        exchange.onCycleExhausted(messageId);
     }
 }

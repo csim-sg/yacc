@@ -50,7 +50,14 @@ import com.yacc.service.DlqService;
  * invocation without an outcome is CONSUMED (counted once, terminal at
  * the limit), a manual re-queue of a terminal entry restores a fresh
  * 3-attempt budget while the P0 once-only flag stays frozen, and orphaned
- * jobs are swept. The policy is overridden to fast, deterministic values —
+ * jobs are swept. The MIG-062 terminal notification (founder Option A,
+ * G15/G16) is covered on both terminal paths: the delivery-path exhaustion
+ * and the interrupted-claim settlement notify the
+ * {@code RetryDeliveryHandler.onCycleExhausted} seam exactly once per
+ * transition, non-terminal failures never notify, repeated firings/polls
+ * never duplicate the notification, a failing notification never breaks
+ * the cycle, and a manual re-queue makes a later exhaustion a NEW
+ * transition. The policy is overridden to fast, deterministic values —
  * no long sleeps; every wait is a bounded condition poll; faults are
  * injected with spies or by driving the worker seam directly (the frozen
  * 1m/5m/30m ladder itself is pinned by {@link QueueRetryPropertiesTest}).
@@ -160,11 +167,19 @@ class QueueRetryWorkerIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(dlq.retryCycleAttempt(entry)).isEqualTo(3);
         assertThat(entry.getTotalAttempts()).isEqualTo(4); // 1 seed + 3 redelivery attempts
         assertThat(entry.getLastError()).isEqualTo("smtp still down");
+        // G15: the terminal row carries the documented terminal vocabulary,
+        // written in the same transaction as the terminal marker.
+        assertThat(entry.getFailureReason()).isEqualTo("max_retries_exceeded");
         assertThat(entry.getUpdatedAt()).isAfter(entry.getCreatedAt());
 
         assertThat(scheduler.checkExists(QueueRetryService.jobKey(messageId))).isFalse();
         // REST-QUEUE-006 state vocabulary: exhausted cycle maps to "failed"
         assertThat(queueRetry.jobState(messageId)).isEqualTo("failed");
+
+        // The terminal notification fired exactly once — after the durable
+        // terminal commit (G15/G16), on the delivery-path exhaustion.
+        verify(handler, times(3)).deliver(messageId);
+        verify(handler, times(1)).onCycleExhausted(messageId);
 
         // A exhausted entry is never rescheduled — further polls are no-ops.
         queueRetry.consumeRetriedMarkers();
@@ -332,6 +347,9 @@ class QueueRetryWorkerIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(reloaded.getLastError()).isEqualTo("smtp still down");
         verify(handler, times(1)).deliver(messageId);
 
+        // Non-terminal settlements never notify (G15 — only exhaustion does).
+        verify(handler, never()).onCycleExhausted(any());
+
         // The next firing walks the ladder to the terminal state.
         queueRetry.executeRetryAttempt(messageId.toString());
         reloaded = dlq.findByMessageId(messageId).orElseThrow();
@@ -339,6 +357,8 @@ class QueueRetryWorkerIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(dlq.retryCycleAttempt(reloaded)).isEqualTo(3);
         assertThat(reloaded.getTotalAttempts()).isEqualTo(4);
         verify(handler, times(2)).deliver(messageId);
+        // The delivery-path exhaustion notified exactly once.
+        verify(handler, times(1)).onCycleExhausted(messageId);
     }
 
     @Test
@@ -362,6 +382,11 @@ class QueueRetryWorkerIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(reloaded.getTotalAttempts()).isEqualTo(2); // seed + the started invocation
         verify(handler, never()).deliver(any());
         assertThat(queueRetry.jobState(messageId)).isEqualTo("failed");
+        // The interrupted-claim settlement is a terminal transition too —
+        // the exchange seam is notified exactly once, with no delivery at
+        // all on this path (G15: only the worker observes it).
+        verify(handler, times(1)).onCycleExhausted(messageId);
+        assertThat(reloaded.getFailureReason()).isEqualTo("max_retries_exceeded");
     }
 
     @Test
@@ -526,6 +551,51 @@ class QueueRetryWorkerIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
+    void theTerminalNotificationIsEmittedExactlyOncePerTransition() throws SchedulerException {
+        UUID messageId = UUID.randomUUID();
+        seedRetriedMarker(messageId);
+        Mockito.<RetryDeliveryHandler.RetryOutcome>when(handler.deliver(any()))
+                .thenReturn(RetryDeliveryHandler.RetryOutcome.failure("smtp still down"));
+
+        queueRetry.consumeRetriedMarkers();
+        await(CYCLE_TIMEOUT, () -> cycleExhausted(messageId) && jobGone(messageId));
+        verify(handler, times(1)).onCycleExhausted(messageId);
+
+        // No-duplicate proof (G15/G16): repeated firings and repeated
+        // marker polls after the terminal commit never notify again — the
+        // committed retryCycle.exhausted marker short-circuits every worker
+        // entry point.
+        queueRetry.executeRetryAttempt(messageId.toString());
+        queueRetry.consumeRetriedMarkers();
+        queueRetry.consumeRetriedMarkers();
+        verify(handler, times(1)).onCycleExhausted(messageId);
+    }
+
+    @Test
+    void aFailingTerminalNotificationNeverBreaksTheCycle() throws SchedulerException {
+        UUID messageId = UUID.randomUUID();
+        seedRetriedMarker(messageId);
+        Mockito.<RetryDeliveryHandler.RetryOutcome>when(handler.deliver(any()))
+                .thenReturn(RetryDeliveryHandler.RetryOutcome.failure("smtp still down"));
+        // Best-effort proof (G16): the notification fans out AFTER the
+        // durable terminal commit — when it fails, the durable state is
+        // already terminal and stands as the authoritative record.
+        doThrow(new RuntimeException("notification fan-out down"))
+                .when(handler).onCycleExhausted(any());
+
+        queueRetry.consumeRetriedMarkers();
+
+        await(CYCLE_TIMEOUT, () -> cycleExhausted(messageId) && jobGone(messageId));
+        DeadLetterQueueEntry entry = dlq.findByMessageId(messageId).orElseThrow();
+        assertThat(dlq.retryCycleAttempt(entry)).isEqualTo(3);
+        assertThat(entry.getTotalAttempts()).isEqualTo(4);
+        assertThat(entry.getFailureReason()).isEqualTo("max_retries_exceeded");
+        assertThat(queueRetry.jobState(messageId)).isEqualTo("failed");
+        verify(handler, times(3)).deliver(messageId);
+        verify(handler, times(1)).onCycleExhausted(messageId);
+    }
+
+    @Test
     void requeueOfATerminalEntryStartsAFreshCycle() throws SchedulerException {
         UUID messageId = UUID.randomUUID();
         seedRetriedMarker(messageId);
@@ -556,6 +626,10 @@ class QueueRetryWorkerIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(dlq.retryCycleAttempt(terminalAgain)).isEqualTo(3);
         assertThat(terminalAgain.getTotalAttempts()).isEqualTo(totalAfterFirstCycle + 3);
         verify(handler, times(6)).deliver(messageId); // 3 + 3 real invocations
+        // The second exhaustion is a NEW transition (the manual re-queue
+        // cleared the terminal marker): it legitimately notifies again —
+        // two transitions, two notifications, never a duplicate (G15/G16).
+        verify(handler, times(2)).onCycleExhausted(messageId);
     }
 
     @Test

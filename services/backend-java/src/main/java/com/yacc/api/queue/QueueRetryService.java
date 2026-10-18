@@ -83,6 +83,16 @@ import com.yacc.service.DlqService;
  * this loss. The handler seam is documented to tolerate repeated
  * {@code deliver} calls keyed by messageId.</p>
  *
+ * <p><b>Terminal notification (G15/G16):</b> the worker owns the
+ * detection of every terminal transition — the delivery-path exhaustion
+ * and the interrupted-claim settlement (which can exhaust with no
+ * delivery at all) — and notifies the exchange through the additive
+ * {@link RetryDeliveryHandler#onCycleExhausted} seam <b>after</b> the
+ * durable terminal write commits. The exchange owns the payload and the
+ * emission; this module holds no realtime dependency. At-most-once per
+ * transition, best-effort, non-durable; the DLQ row and the {@code failed}
+ * job/message state are the authoritative record.</p>
+ *
  * <p><b>Self-healing scheduling:</b> cycle state lives on the DLQ row,
  * never in RAM. A durable job can be left without a trigger when the
  * persistence or reschedule step fails between the one-shot fire and the
@@ -274,7 +284,7 @@ public class QueueRetryService {
         String error = (outcome.error() == null || outcome.error().isBlank())
                 ? "unknown redelivery failure"
                 : outcome.error();
-        dlq.recordFailedAttempt(current.getId(), error, attempt, exhausted);
+        recordFailedAttemptAndNotify(current, error, attempt, exhausted);
         if (exhausted) {
             removeJobQuietly(messageId, "retry cycle exhausted (max_retries_exceeded)");
             log.error("Retry cycle exhausted for message {} after {} attempts — DLQ terminal",
@@ -334,13 +344,52 @@ public class QueueRetryService {
             return ClaimSettlement.RELEASED;
         }
         boolean exhausted = claimed >= properties.maxAttempts();
-        dlq.recordFailedAttempt(entry.getId(),
+        recordFailedAttemptAndNotify(entry,
                 "redelivery attempt " + claimed
                         + " started but its outcome was never recorded (crash recovery)",
                 claimed, exhausted);
         log.warn("Settled the interrupted redelivery invocation of message {} (attempt {}{})",
                 entry.getMessageId(), claimed, exhausted ? " — cycle exhausted" : "");
         return exhausted ? ClaimSettlement.CONSUMED_EXHAUSTED : ClaimSettlement.CONSUMED;
+    }
+
+    /**
+     * The single route for every failed-attempt write and the only place a
+     * terminal transition is notified (guardrails G15/G16): the durable
+     * write commits first ({@link DlqService#recordFailedAttempt} is its
+     * own transaction); only after it returns — on the worker thread,
+     * never inside a DB transaction — and only when the cycle is
+     * exhausted, is the exchange notified through the additive
+     * {@link RetryDeliveryHandler#onCycleExhausted} seam (the exchange owns
+     * the payload/emission; this module builds no wire payload and holds no
+     * realtime dependency). Both terminal paths — the delivery-path
+     * exhaustion in {@link #executeRetryAttempt} and the interrupted-claim
+     * settlement in {@link #settleInterruptedClaim} (reached from the
+     * firing and the marker-poll recovery alike) — funnel through here, so
+     * the notification happens exactly once per terminal transition: the
+     * committed {@code retryCycle.exhausted} marker short-circuits every
+     * later entry point, so no firing, poll or settlement re-notifies (a
+     * manual re-queue clears the marker — a later exhaustion is a new
+     * transition). A notification failure is logged and swallowed: it must
+     * never break the state machine, the scheduler thread or the job
+     * removal. Best-effort, non-durable, at-most-once per transition —
+     * exactly-once is not claimed, no outbox exists; the DLQ row, the
+     * {@code failed} message status and the {@code failed} job state are
+     * the authoritative record.
+     */
+    private void recordFailedAttemptAndNotify(DeadLetterQueueEntry entry, String error,
+            int attempt, boolean exhausted) {
+        dlq.recordFailedAttempt(entry.getId(), error, attempt, exhausted);
+        if (!exhausted) {
+            return;
+        }
+        try {
+            handler.onCycleExhausted(entry.getMessageId());
+        } catch (RuntimeException failure) {
+            log.error("Terminal-cycle notification failed for {} (best-effort; the"
+                    + " durable DLQ terminal state is the authoritative record): {}",
+                    entry.getMessageId(), failure.toString());
+        }
     }
 
     /**

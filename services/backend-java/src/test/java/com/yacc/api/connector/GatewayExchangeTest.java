@@ -1,9 +1,11 @@
 package com.yacc.api.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -159,16 +161,18 @@ class GatewayExchangeTest {
 
         exchange.dispatchOutbound(MESSAGE_ID);
 
-        // Initial dispatch path (async): DLQ entry + retry cycle are scheduled.
-        // The retry-scheduled emission is the task's last observable effect —
-        // waiting for it makes the plain verifies below deterministic.
+        // Initial dispatch path (async): no queue.message.dlq at first
+        // failure (G15 — the frozen event belongs to the exhaustion
+        // transition); the retry-scheduled emission is the task's last
+        // observable effect — waiting for it makes the plain verifies below
+        // deterministic.
         ArgumentCaptor<WebSocketEnvelope> envelope = ArgumentCaptor
                 .forClass(WebSocketEnvelope.class);
-        verify(publisher, timeout(2_000).times(3)).publishToAll(envelope.capture());
+        verify(publisher, timeout(2_000).times(2)).publishToAll(envelope.capture());
         assertThat(envelope.getAllValues().stream().map(WebSocketEnvelope::event))
                 .containsExactly(RealtimeEvents.MESSAGE_FAILED,
-                        RealtimeEvents.QUEUE_MESSAGE_DLQ,
-                        RealtimeEvents.MESSAGE_RETRY_SCHEDULED);
+                        RealtimeEvents.MESSAGE_RETRY_SCHEDULED)
+                .doesNotContain(RealtimeEvents.QUEUE_MESSAGE_DLQ);
         verify(messages).markFailed(eq(MESSAGE_ID), anyString());
         verify(telegram, never()).sendMessage(any());
         verify(dlq).enqueue(eq(MESSAGE_ID), eq(CONVERSATION_ID), anyString(),
@@ -191,11 +195,11 @@ class GatewayExchangeTest {
         // fail-fast properties deterministically.
         ArgumentCaptor<WebSocketEnvelope> envelope = ArgumentCaptor
                 .forClass(WebSocketEnvelope.class);
-        verify(publisher, timeout(2_000).times(3)).publishToAll(envelope.capture());
+        verify(publisher, timeout(2_000).times(2)).publishToAll(envelope.capture());
         assertThat(envelope.getAllValues().stream().map(WebSocketEnvelope::event))
                 .containsExactly(RealtimeEvents.MESSAGE_FAILED,
-                        RealtimeEvents.QUEUE_MESSAGE_DLQ,
-                        RealtimeEvents.MESSAGE_RETRY_SCHEDULED);
+                        RealtimeEvents.MESSAGE_RETRY_SCHEDULED)
+                .doesNotContain(RealtimeEvents.QUEUE_MESSAGE_DLQ);
         verify(messages).markFailed(eq(MESSAGE_ID), anyString());
         verify(telegram, never()).sendMessage(any());
         assertThat(breaker.failureCount("telegram")).isEqualTo(5);
@@ -237,7 +241,7 @@ class GatewayExchangeTest {
         verifyNoInteractions(dlq, retryQueue, publisher);
     }
 
-    // --- truthful E3 emission posture + G7 initial-path accounting ---
+    // --- retry-pending-only message.failed + G7 initial-path accounting ---
 
     @Test
     void nonTerminalRedeliveryFailureEmitsFailedWithTheNextLadderStep() {
@@ -273,8 +277,57 @@ class GatewayExchangeTest {
         verify(messages).markFailed(eq(MESSAGE_ID), anyString());
     }
 
-    private void redeliveryInFlight(int cycleAttempt) {
-        Message message = outbound(MessageStatus.FAILED);
+    // --- terminal exhaustion notification (founder Option A; G15/G16) ---
+
+    @Test
+    void onCycleExhaustedPublishesOneEnvelopedFrameFromTheCommittedRow() {
+        when(dlq.findByMessageId(MESSAGE_ID)).thenReturn(Optional.of(terminalRow(4)));
+
+        exchange.onCycleExhausted(MESSAGE_ID);
+
+        ArgumentCaptor<WebSocketEnvelope> envelope = ArgumentCaptor
+                .forClass(WebSocketEnvelope.class);
+        verify(publisher, times(1)).publishToAll(envelope.capture());
+        assertThat(envelope.getValue().event()).isEqualTo(RealtimeEvents.QUEUE_MESSAGE_DLQ);
+        JsonNode data = envelope.getValue().data();
+        assertThat(data.get("messageId").asText()).isEqualTo(MESSAGE_ID.toString());
+        assertThat(data.get("conversationId").asText()).isEqualTo(CONVERSATION_ID.toString());
+        assertThat(data.get("failureReason").asText()).isEqualTo("max_retries_exceeded");
+        assertThat(data.get("totalAttempts").asInt()).isEqualTo(4);
+        assertThat(data.get("lastError").asText()).isEqualTo("transport down");
+        assertThat(data.get("correlationId").asText()).isEqualTo("corr-42");
+        assertThat(data.get("requiresReview").asBoolean()).isTrue();
+    }
+
+    @Test
+    void onCycleExhaustedIsANoOpWhenTheRowIsAbsent() {
+        when(dlq.findByMessageId(MESSAGE_ID)).thenReturn(Optional.empty());
+
+        exchange.onCycleExhausted(MESSAGE_ID);
+
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void onCycleExhaustedNeverThrowsWhenThePublisherFails() {
+        when(dlq.findByMessageId(MESSAGE_ID)).thenReturn(Optional.of(terminalRow(4)));
+        doThrow(new RuntimeException("publisher down")).when(publisher).publishToAll(any());
+
+        assertThatCode(() -> exchange.onCycleExhausted(MESSAGE_ID))
+                .doesNotThrowAnyException();
+        verify(publisher, times(1)).publishToAll(any());
+    }
+
+    /** A committed terminal row as the DlqService transaction leaves it. */
+    private com.yacc.entity.DeadLetterQueueEntry terminalRow(int totalAttempts) {
+        com.yacc.entity.DeadLetterQueueEntry entry = new com.yacc.entity.DeadLetterQueueEntry(
+                null, MESSAGE_ID, CONVERSATION_ID, "{}", "max_retries_exceeded",
+                totalAttempts, "transport down", LocalDateTime.now().plusDays(7));
+        entry.setCorrelationId("corr-42");
+        return entry;
+    }
+
+    private void redeliveryInFlight(int cycleAttempt) {        Message message = outbound(MessageStatus.FAILED);
         when(messages.findForDispatch(MESSAGE_ID)).thenReturn(Optional.of(message));
         when(conversationAccess.routingOf(CONVERSATION_ID)).thenReturn(Optional.of(
                 new ConversationAccessService.ConversationRouting(CONVERSATION_ID,
