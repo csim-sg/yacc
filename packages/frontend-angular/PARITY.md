@@ -17,21 +17,24 @@ Playwright suite runs **unchanged**. The gate is the conjunction of:
 | **PB-2 — E2E parity gate** | Tier-0 Playwright set passes **100% against the Angular build** with **zero regression vs the archived React baseline**: no test green on React that fails on Angular; no test skipped/removed/weakened/made conditional without a pre-registered disposition | `pnpm --filter @yacc/frontend-angular test:e2e` | pre-cutover (ANG-016); CI wiring is ANG-015 |
 | **PB-3 — Unit gate** | Angular unit suite green **and** coverage thresholds met as a merge gate: ≥85% lines / statements / functions, ≥80% branches on new Angular code | `pnpm --filter @yacc/frontend-angular test:unit:coverage` | from ANG-003 (thresholds fail the run below target); CI wiring is ANG-015 |
 
-**Baseline precondition (blocking for PB-2, CP-3):** the React-baseline E2E green-state is
-to be archived at `parity/baseline/react-e2e-baseline-230bd226/` (full HTML report + per-case
-listing + commit SHA + environment versions; capture procedure in the runbook). PB-2's
-"zero regression" anchors to that **recorded** state — red-at-baseline is recorded, never
-assumed green.
-**Current status (2026-10-10): NOT captured.** Prerequisite #408/#409 (`2a7e7e2`) fixed
-the backend body-parser regression (RC-1) and added a deterministic non-production
-limiter posture (RC-2, `APP_ENV=test` only; production values unchanged and
-test-asserted). A third pre-existing blocker remains: BetterAuth email/password is
-structurally non-functional against the current DB schema (`users.password_hash`/`role`/
-`status` NOT NULL break sign-up with `422`; `account` has no `password` column so every
-sign-in `401`s) — see the diagnostic README §6 and runbook §6 (RC-3). Capture attempts
-stay environment-red; a labeled-invalid diagnostic lives at
-`parity/baseline/react-e2e-baseline-230bd226-DIAGNOSTIC-INVALID/` — it is **not** a PB-2
-anchor. CP-3 is open pending a further separately-authorized backend prerequisite.
+**Baseline precondition (blocking for PB-2, CP-3):** the React-baseline E2E state is
+archived at `parity/baseline/react-e2e-baseline-ae42c67-on-java/` (full per-case record + commit
+SHAs + environment versions + dispositions; capture record in the runbook §7). Per the
+founder-approved Java Baseline Plan (AD-1), the anchor is the **React-on-Java** run — React at
+pinned `dev` `ae42c67` against the Java backend of record at the same SHA (S1 E2E fixture
+posture), **real login**. PB-2's "zero regression" anchors to that **recorded** state —
+red-at-baseline is recorded, never assumed green.
+**Current status (2026-10-18): CAPTURED — real-auth + non-auth REST anchor exists.** The
+capture is a completed, environment-healthy run with real login: 1395 cases — 503 pass / 664
+fail / 174 timeout / 54 skip / 0 flaky; **Tier-1 real-auth + REST 390/390 green**; acceptance
+UI real-login canary HP-AUTH-001 green ×3. Failure classes are pre-registered and itemized in
+the archive README (residual `:3000` inline-API files, non-fixture identities, Node-era contract
+expectations, socket.io-vs-raw-WS real-time rows, debug/utility specs). **CP-3/PB-2 remain
+blocking** pending reviewer/tech-lead acceptance of the evidence; the 2026-10-08 Node-era
+diagnostic stays at `parity/baseline/react-e2e-baseline-230bd226-DIAGNOSTIC-INVALID/` (labeled
+invalid; historical record only). **Real-time rows are NOT anchored by this capture** — they
+require the separate R1 evidence (frozen `asyncapi.yaml` + Java server + Angular raw-WS client,
+AD-2) and stay blocking until it exists.
 
 ## 2. Disposition-register discipline
 

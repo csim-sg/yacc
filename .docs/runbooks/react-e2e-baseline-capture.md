@@ -5,13 +5,18 @@ pinned pre-implementation commit, so the Angular parity gate (PB-2, "zero regres
 SPEC-003 AC-03) anchors to a **recorded** state instead of an assumed-green suite.
 Blocking precondition for the parity gate (SPEC-001 T4 §5, T5 CP-3).
 
-**Baseline status (ANG-003, 2026-10-08):** NOT captured — capture attempts against the
-pinned commit `230bd226` are **environment-red** (backend login endpoint broken on `dev`
-since `0ba6edb`/#267; in-memory login rate limiter makes full-suite runs structurally
-red). A labeled-invalid diagnostic archive (not a baseline) is kept at
+**Baseline status (ANG-003 S2, 2026-10-18):** **CAPTURED — React-on-Java baseline at pinned
+`dev` `ae42c67`** (Java E2E fixture posture per S1 #423; real login; 503 pass / 664 fail /
+174 timeout / 54 skip / 0 flaky over 1395 cases; Tier-1 real-auth + REST **390/390 green**).
+Archive:
+`packages/frontend-angular/parity/baseline/react-e2e-baseline-ae42c67-on-java/` (README with
+pinned SHAs, env versions, failure classes, dispositions; per-case TSV; raw JSON). This is the
+AD-1 anchor for auth + non-auth REST rows; real-time rows stay on the separate R1 evidence track
+(AD-2) and CP-3/PB-2 remain **blocking** until reviewer/tech-lead accept the evidence. The
+2026-10-06→10-10 attempts against the Node backend (`230bd226`) are historical; their
+labeled-invalid diagnostic stays at
 `packages/frontend-angular/parity/baseline/react-e2e-baseline-230bd226-DIAGNOSTIC-INVALID/`.
-CP-3 remains open pending a tech-lead decision (backend repair is out of SPEC-003 scope).
-See §6 for the full record.
+See §6 (history) and §7 (S2 capture record).
 
 ---
 
@@ -184,3 +189,54 @@ Founder decision A authorized a bounded backend prerequisite (#408, merged via P
   stays open pending a further separately-authorized backend prerequisite
   (schema/auth alignment for BetterAuth email/password, or an equivalent deterministic
   credential seed path).
+
+## 7. S2 capture record — React-on-Java baseline CAPTURED (2026-10-18)
+
+Founder-approved Java Baseline Plan executed through S1 (#423, merged `ae42c67`) → S2 (this
+record). The Node-backend capture route (§2–§5's `:3000`/`db:fixtures` environment) is
+**superseded for future re-captures** by the Java posture below; §2–§5 remain as the historical
+Node-era procedure.
+
+**Pins:** React app + suite + Java service byte-identical to `dev` `ae42c674` (S1 merge);
+worktree HEAD at capture `56e036d` (merge of `origin/dev` into `task/ANG-003` — merge only, no
+rebase/force). **0 spec-file edits vs `dev`** by this capture.
+
+**Procedure (Java posture — replaces §2/§3 environment for re-captures):**
+
+1. Scratch loopback DB (e.g. `yacc_e2e` in the local compose PostgreSQL — Flyway builds the
+   schema at boot; no manual migration step, no Redis, no Node backend).
+2. Boot the service with the S1 E2E posture (all gates explicit, fail-closed):
+   `SPRING_PROFILES_ACTIVE=e2e SPRING_APPLICATION_JSON='{"yacc":{"e2e":{"seed-enabled":true}}}'
+   DATABASE_URL=jdbc:postgresql://localhost:5432/yacc_e2e YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL=admin@yacc.local
+   YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL=admin123 YACC_AUTH_TOKEN_SIGNING_KEY=<b64 RSA-2048>
+   YACC_INTEGRATION_ENCRYPTION_MASTER_KEY=<b64 32B>` — booted via bootJar +
+   `-Dloader.path=<cached postgresql driver>` (PropertiesLauncher; `postgresql` is
+   `testRuntimeOnly` — S1 PR #424's recorded local-boot method; no build-file change). Wait for
+   `E2E fixture seed applied` + `First-run Super Admin bootstrap` log lines and `GET /health/live`
+   → 200.
+3. Pre-capture battery: curl real sign-in (`admin2@yacc.local`/`admin123`), a-1 super-admin flow
+   (`mustChangePassword` true → change-password → re-sign-in false), RBAC tiering on
+   `GET /api/users` (user 403 / admin 403 / super_admin 200), fixture world (`total: 107`
+   conversations), UI real-login probe through Vite (:5173 same-origin proxy → :8080), then the
+   Tier-1 canary `tests/backend-auth.spec.ts` × chromium (36/36 expected).
+4. Frontend env for the run: `VITE_API_BASE_URL=` (empty → same-origin), `VITE_API_URL=http://localhost:8080`,
+   `API_URL=http://localhost:8080/api`, `PLAYWRIGHT_TEST_API_BASE_URL=http://localhost:8080`.
+5. Full capture: same command shape as §4 (HTML+JSON reporters, `--retries=2`).
+
+**Outcome (2026-10-18):** 1395 cases / 35 files × 3 browsers in 2 h 16 m — **503 passed / 664
+failed / 174 timedOut / 54 skipped / 0 flaky**. Tier-1 real-auth + REST **390/390 green**
+(backend-auth 108, backend-conversations 126, backend-audit-logs 99, backend-regression 57);
+acceptance UI real-login canary HP-AUTH-001 green ×3; `frontend-login.spec.ts` 27/27. Failures
+are fully classified in the archive README (residual `:3000` inline-API files, non-fixture
+identities, Node-era contract expectations, socket.io-vs-raw-WS real-time rows, debug/utility
+specs) — each class pre-registered; no test edited/skipped/weakened for the capture.
+
+**Archive:** `packages/frontend-angular/parity/baseline/react-e2e-baseline-ae42c67-on-java/`
+(README.md with pins/env/evidence/dispositions · per-case-listing.tsv · summary.txt ·
+env-versions.txt · baseline-report.json · ui-real-login-probe-result.json). The full HTML report
+(382 MB incl. traces) exceeds git-committable size — zipped on the capture host with SHA256
+recorded in the archive README; the committed JSON is the complete durable per-case record.
+
+**Gates unchanged:** CP-3/PB-2 remain **blocking** pending reviewer/tech-lead acceptance of this
+evidence; real-time rows remain on the separate R1 track (AD-2) and are **not** satisfied by this
+capture.
