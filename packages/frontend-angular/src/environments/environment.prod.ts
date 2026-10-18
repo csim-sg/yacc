@@ -10,4 +10,8 @@
 export const environment = {
   apiBaseUrl: '',
   wsUrl: 'ws://localhost:3000',
+  /** AS issuer base URL; empty = same origin (React `VITE_OIDC_ISSUER` default). */
+  oidcIssuer: '',
+  /** Registered public SPA client id (React `VITE_OIDC_CLIENT_ID` default). */
+  oidcClientId: 'yacc-frontend',
 } as const;
