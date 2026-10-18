@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.UUID;
 
+import javax.sql.DataSource;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.DefaultApplicationArguments;
@@ -13,6 +15,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.zaxxer.hikari.HikariDataSource;
 import com.yacc.common.testsupport.AbstractPostgresIntegrationTest;
 import com.yacc.entity.UserRole;
 import com.yacc.repository.AccountRepository;
@@ -43,8 +46,12 @@ import com.yacc.repository.TagRepository;
  *   <li><strong>Inert by default</strong> — a non-{@code e2e} boot (this
  *       test-profile context) registers no seed bean/runner;</li>
  *   <li><strong>Fail-closed</strong> — a missing opt-in property or a
- *       non-loopback (production-like) datasource aborts with an explicit
- *       error and zero partial seeding;</li>
+ *       non-loopback <em>effective</em> datasource aborts with an explicit
+ *       error and zero partial seeding: the guard follows the actual pool
+ *       URL (a Hikari {@code jdbc-url} override wins over the generic
+ *       {@code spring.datasource.url}), accepts only numeric
+ *       {@code 127.0.0.0/8} or {@code localhost}, and refuses hostnames
+ *       that merely mimic {@code 127.*} (review finding 6249309362);</li>
  *   <li><strong>No privileged identity</strong> — a successful run creates
  *       no SUPER_ADMIN row (ADR-025 bootstrap exclusivity).</li>
  * </ul>
@@ -124,16 +131,29 @@ class E2EFixtureSeedTest extends AbstractPostgresIntegrationTest {
     }
 
     private E2EFixtureSeed newRunner(boolean seedEnabled, String datasourceUrl) {
-        DataSourceProperties datasource = new DataSourceProperties();
+        DataSourceProperties datasourceProperties = new DataSourceProperties();
         if (datasourceUrl != null) {
-            datasource.setUrl(datasourceUrl);
+            datasourceProperties.setUrl(datasourceUrl);
         }
+        return newRunner(seedEnabled, datasourceProperties, null);
+    }
+
+    private E2EFixtureSeed newRunner(boolean seedEnabled, String datasourceUrl, DataSource pool) {
+        DataSourceProperties datasourceProperties = new DataSourceProperties();
+        if (datasourceUrl != null) {
+            datasourceProperties.setUrl(datasourceUrl);
+        }
+        return newRunner(seedEnabled, datasourceProperties, pool);
+    }
+
+    private E2EFixtureSeed newRunner(boolean seedEnabled,
+            DataSourceProperties datasourceProperties, DataSource pool) {
         return new E2EFixtureSeed(users, accounts, sessions, verifications,
                 passwordResetTokens, conversations, conversationTags, messages,
                 attachments, rawPayloads, notes, tags, routingRules,
                 routingRuleExecutions, notifications, auditLogs, deadLetterQueue,
                 integrationConfigs, integrationProfiles, encryption,
-                new E2EFixtureSeedProperties(seedEnabled), datasource);
+                new E2EFixtureSeedProperties(seedEnabled), pool, datasourceProperties);
     }
 
     @Test
@@ -165,6 +185,62 @@ class E2EFixtureSeedTest extends AbstractPostgresIntegrationTest {
         long conversationsBefore = conversations.count();
 
         assertThatThrownBy(() -> newRunner(true, PROD_LIKE_URL)
+                .run(new DefaultApplicationArguments()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("non-production");
+
+        // Zero partial seeding.
+        assertThat(users.count()).isEqualTo(usersBefore);
+        assertThat(conversations.count()).isEqualTo(conversationsBefore);
+    }
+
+    @Test
+    void refusesToRunWhenTheHikariPoolOverridesWithARemoteUrl() {
+        // The generic spring.datasource.url claims loopback, but the pool the
+        // service actually connects through (Hikari; spring.datasource.hikari
+        // .jdbc-url override) points at a remote production-like host. The
+        // guard must follow the effective pool URL, refuse, and write nothing.
+        HikariDataSource pool = new HikariDataSource();
+        pool.setJdbcUrl(PROD_LIKE_URL);
+        long usersBefore = users.count();
+        long conversationsBefore = conversations.count();
+
+        assertThatThrownBy(() -> newRunner(true,
+                "jdbc:postgresql://localhost:5432/yacc_e2e_fixture", pool)
+                .run(new DefaultApplicationArguments()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("non-production")
+                .hasMessageContaining("Hikari");
+        // Zero partial seeding.
+        assertThat(users.count()).isEqualTo(usersBefore);
+        assertThat(conversations.count()).isEqualTo(conversationsBefore);
+    }
+
+    @Test
+    void theEffectiveHikariPoolUrlWinsOverTheGenericDatasourceUrl() {
+        // Mirror direction of the override test: the generic URL is remote
+        // but the pool the service writes through is loopback — the pool is
+        // the authority, so the seed runs (in the rolled-back test tx).
+        HikariDataSource pool = new HikariDataSource();
+        pool.setJdbcUrl("jdbc:postgresql://localhost:5432/yacc_e2e_fixture");
+        long usersBefore = users.count();
+
+        newRunner(true, PROD_LIKE_URL, pool).run(new DefaultApplicationArguments());
+
+        assertThat(users.count()).isEqualTo(usersBefore + 3);
+        assertThat(users.findByEmail("admin2@yacc.local")).isPresent();
+    }
+
+    @Test
+    void refusesToRunAgainstAHostnameThatMimicsLoopback() {
+        // "127." as a textual prefix is NOT a loopback proof: a DNS hostname
+        // such as 127.production.example resolves remotely and must fail
+        // closed before any fixture write.
+        long usersBefore = users.count();
+        long conversationsBefore = conversations.count();
+
+        assertThatThrownBy(() -> newRunner(true,
+                "jdbc:postgresql://127.production.example:5432/yacc_prod")
                 .run(new DefaultApplicationArguments()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("non-production");
@@ -221,5 +297,44 @@ class E2EFixtureSeedTest extends AbstractPostgresIntegrationTest {
                 "jdbc:postgresql://10.1.2.3:5432/staging")).isFalse();
         assertThat(E2EFixtureSeed.isLoopbackDatabase(null)).isFalse();
         assertThat(E2EFixtureSeed.isLoopbackDatabase("not-a-jdbc-url")).isFalse();
+    }
+
+    /**
+     * The loopback test is strictly numeric for IPv4 (127.0.0.0/8): a
+     * textual "127." prefix alone proves nothing and must fail closed
+     * (review finding 6249309362).
+     */
+    @Test
+    void datasourceGuardAcceptsOnlyNumericIpv4LoopbackAddresses() {
+        // True 127.0.0.0/8 addresses are accepted numerically.
+        assertThat(E2EFixtureSeed.isLoopbackDatabase(
+                "jdbc:postgresql://127.1.2.3:5432/yacc_e2e")).isTrue();
+        // Hostnames that merely start with "127." are NOT loopback.
+        assertThat(E2EFixtureSeed.isLoopbackDatabase(
+                "jdbc:postgresql://127.production.example:5432/prod")).isFalse();
+        // Malformed/ambiguous numeric forms fail closed.
+        assertThat(E2EFixtureSeed.isLoopbackDatabase(
+                "jdbc:postgresql://127.0.0.256:5432/db")).isFalse();
+        assertThat(E2EFixtureSeed.isLoopbackDatabase(
+                "jdbc:postgresql://127.0.0.01:5432/db")).isFalse();
+        assertThat(E2EFixtureSeed.isLoopbackDatabase(
+                "jdbc:postgresql://127.1:5432/db")).isFalse();
+        assertThat(E2EFixtureSeed.isLoopbackDatabase(
+                "jdbc:postgresql://128.0.0.1:5432/db")).isFalse();
+        assertThat(E2EFixtureSeed.isLoopbackDatabase("")).isFalse();
+    }
+
+    /** The pool URL is the guard target; a Hikari override wins. */
+    @Test
+    void effectiveJdbcUrlPrefersTheHikariPoolOverTheGenericProperties() {
+        HikariDataSource pool = new HikariDataSource();
+        pool.setJdbcUrl(PROD_LIKE_URL);
+        DataSourceProperties loopback = new DataSourceProperties();
+        loopback.setUrl("jdbc:postgresql://localhost:5432/yacc_e2e_fixture");
+
+        assertThat(E2EFixtureSeed.effectiveJdbcUrl(pool, loopback)).isEqualTo(PROD_LIKE_URL);
+        // No pool → the typed properties URL is the effective target.
+        assertThat(E2EFixtureSeed.effectiveJdbcUrl(null, loopback))
+                .isEqualTo("jdbc:postgresql://localhost:5432/yacc_e2e_fixture");
     }
 }
