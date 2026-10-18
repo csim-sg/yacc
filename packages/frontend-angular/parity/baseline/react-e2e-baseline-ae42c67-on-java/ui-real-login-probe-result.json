@@ -1,0 +1,11 @@
+{
+  "steps": [
+    "login page loaded: YACC - Yet Another Chat Client / h1=Welcome Back!",
+    "redirected to: http://localhost:5173/inbox"
+  ],
+  "ok": true,
+  "tokenStored": true,
+  "hasRefresh": true,
+  "finalUrl": "http://localhost:5173/inbox",
+  "headingVisible": true
+}
