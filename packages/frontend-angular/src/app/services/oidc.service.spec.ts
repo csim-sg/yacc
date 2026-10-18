@@ -73,8 +73,13 @@ describe('OidcService', () => {
       await service.beginLogin('access-jwt');
 
       const [, consentInit] = fetchMock.mock.calls[1] as [string, RequestInit];
-      expect(String(consentInit.body)).toContain('state=consent-state-1');
       expect(new Headers(consentInit.headers).get('Authorization')).toBe('Bearer access-jwt');
+      // The consent form posts one `scope` field per granted scope — every
+      // requested value must survive (MIG-033: openid profile email); a
+      // keyed-object body would collapse them and drop `openid`.
+      const consentBody = new URLSearchParams(String(consentInit.body));
+      expect(consentBody.get('state')).toBe('consent-state-1');
+      expect(consentBody.getAll('scope')).toEqual(['openid', 'profile', 'email']);
       expect(assignSpy).toHaveBeenCalledWith(expect.stringContaining('/auth/callback'));
     });
 

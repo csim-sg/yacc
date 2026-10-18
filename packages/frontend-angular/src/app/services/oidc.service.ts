@@ -76,18 +76,25 @@ export class OidcService {
     if (response.ok && !finalUrl.includes(OidcService.CALLBACK_PATH)) {
       // Consent is always required (MIG-033 policy): the 200 body is the
       // framework consent page whose form carries a fresh consent state.
+      // The consent form posts one `scope` field per granted scope (plus
+      // `client_id`/`state`), so each scope is appended as a repeated form
+      // parameter — a keyed object would collapse the values to the last
+      // one (`email`), dropping `openid`/`profile` from the grant.
       const consentState = OidcService.extractConsentState(await response.text());
+      const consentBody = new URLSearchParams({
+        client_id: this.clientId(),
+        state: consentState,
+      });
+      for (const scope of OidcService.SCOPES) {
+        consentBody.append('scope', scope);
+      }
       const consentResponse = await fetch(`${this.issuer()}/oauth2/authorize`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams({
-          client_id: this.clientId(),
-          state: consentState,
-          ...Object.fromEntries(OidcService.SCOPES.map((scope) => ['scope', scope])),
-        }),
+        body: consentBody,
       });
       finalUrl = consentResponse.url;
     }
