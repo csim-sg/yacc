@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
+import { installRealtimeDevtools } from './lib/realtime-devtools';
 import { ReconnectingIndicator } from './components/reconnecting-indicator';
 import { RealtimeBindingService } from './services/realtime-binding.service';
 
@@ -24,5 +25,7 @@ export class App {
 
   constructor() {
     this.realtime.start();
+    // Dev-only observation seam for the shared harness (no-op in prod).
+    installRealtimeDevtools();
   }
 }
