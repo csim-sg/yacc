@@ -1,3 +1,4 @@
+import { Location } from '@angular/common';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component } from '@angular/core';
@@ -180,6 +181,65 @@ describe('Inbox page', () => {
     );
 
     expect(router.url).toContain('page=2');
+  });
+
+  it('replaces history on every filter/page/search update (no pushed entries)', async () => {
+    // Start from a real prior entry (as a user arriving at /inbox through
+    // the app would), then load the list.
+    const paged = { ...listResponse, total: 45 };
+    await router.navigateByUrl('/login');
+    fixture.detectChanges();
+    await render();
+    await flushList(paged);
+
+    // The Router commits a navigation to browser history through the
+    // `Location` service: `go()` pushes an entry, `replaceState()` rewrites
+    // the current one (the exact push/replace fork is
+    // `Router.setBrowserUrl`). Spying there observes the real history
+    // semantics (React `setSearchParams(params, { replace: true })` parity).
+    const location = TestBed.inject(Location);
+    const goSpy = vi.spyOn(location, 'go');
+    const replaceSpy = vi.spyOn(location, 'replaceState');
+    goSpy.mockClear();
+    replaceSpy.mockClear();
+
+    // 1. Search submit (page already 1).
+    const input = inboxElement().querySelector('[data-testid="search-input"]') as HTMLInputElement;
+    input.value = 'needle';
+    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await flushList(
+      paged,
+      '/api/conversations?page=1&limit=20&sortBy=lastActivity&sortOrder=desc&search=needle',
+    );
+    expect(router.url).toContain('search=needle');
+
+    // 2. Pagination: Next (search kept).
+    buttonWithText('Next', '[data-testid="pagination-controls"]').click();
+    await flushList(
+      paged,
+      '/api/conversations?page=2&limit=20&sortBy=lastActivity&sortOrder=desc&search=needle',
+    );
+    expect(router.url).toContain('page=2');
+
+    // 3. Channel filter change (resets to page 1).
+    setSelect('channel-filter', 'telegram');
+    await flushList(
+      paged,
+      '/api/conversations?page=1&limit=20&sortBy=lastActivity&sortOrder=desc&channel=telegram&search=needle',
+    );
+    expect(router.url).toContain('channel=telegram');
+
+    // Replace semantics: three successive URL writes pushed NO history
+    // entries — every one rewrote the current entry instead.
+    expect(goSpy).not.toHaveBeenCalled();
+    expect(replaceSpy).toHaveBeenCalledTimes(3);
+
+    // The user-visible Back semantics (one Back exits the inbox instead of
+    // stepping through `?search=…` / `?page=2` states) are evidenced in the
+    // browser-history E2E row (real Chromium `page.goBack()`); TestBed's
+    // MockPlatformLocation popstate handling is not a real-history
+    // environment.
   });
 
   it('submits the trimmed search on Enter and resets to page 1', async () => {

@@ -193,7 +193,9 @@ export class Inbox {
       if (this.unreadOnly()) {
         queryParams['unread'] = 'true';
       }
-      untracked(() => void this.router.navigate([], { relativeTo: this.route, queryParams }));
+      untracked(() =>
+        void this.router.navigate([], { relativeTo: this.route, queryParams, replaceUrl: true }),
+      );
     });
   }
 
@@ -459,11 +461,6 @@ export class Inbox {
   }
 
   protected refetch(): void {
-    // eslint-disable-next-line no-console
-    console.log('REFETCH_CALLED');
-    const snap = this.conversationsStore.listSnapshot(this.listParams());
-    // eslint-disable-next-line no-console
-    console.log('REFETCH_SNAP loading=', snap?.loading, 'hasData=', snap?.data !== undefined, 'hasError=', snap?.error != null);
     void this.conversationsStore.loadList(this.listParams());
   }
 
