@@ -1,7 +1,7 @@
 # Execution Status Index
 
-**Last Updated**: 2026-10-06  
-**Status**: ✅ **PHASE 1 COMPLETE** (all features, architecture, docs, infra) | ✅ Phase 2 EA APPROVED (ready for 2026-03-05 kickoff) | 📋 See GOV-033 for Phase 1 final completion review
+**Last Updated**: 2026-10-18  
+**Status**: ✅ **PHASE 1 + PHASE 2 COMPLETE** | ✅ **SPEC-002 (Java backend) PHASES 0–6 MERGED** (Java service is the backend of record; Phase 7–8 cutover/decommission pending) | 📋 Historical phase records below are retained for reference (ADR-015)
 
 ---
 
@@ -17,12 +17,12 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - Phase 1 Frontend (P0 Option 2): ✅ **MERGED** (All 6 blockers fixed, 25+ E2E tests, merged to dev)
 - Phase 1.5 Backend Refactoring (DEV-002-006): ✅ **COMPLETE & MERGED** (Auth consolidation, Gateway-exchange, Adapter migration, Inbound/outbound pipeline refactoring - all 5 tasks complete)
 - Gateway Plugin Architecture (GPA-003/004/005/006): ✅ **COMPLETE & MERGED** (AdapterRegistry PR #324 merged)
-- Gateway Plugin Architecture (GPA-007): 🟡 **READY (GAP ANALYSIS COMPLETE)** (next execution item)
+- Gateway Plugin Architecture (GPA-007): ⏸️ **FROZEN under GOV-038** (migration scope lock; not scheduled during the Java migration)
 - **Infrastructure Phase (DEV-013-015)**: ✅ **COMPLETE & MERGED** (K3s + Helm + GitHub Actions, production-ready)
-- Phase 2 (Collaboration + Rules): ✅ **EA APPROVED** (tags/notes/assignments/routing-rules/audit; EA final gate passed 2026-02-25; see `.docs/plans/02-PHASE2-PLANNING.md` + `.docs/governance/GOV-034-phase2-final-ea-approval.md` + `.docs/adr/ADR-021-...md`; ready for implementation kickoff 2026-03-05)
-- SPEC-002 (Java backend migration): 🟡 **IN IMPLEMENTATION** (ADRs 023..030 accepted; MIG issues executing)
+- Phase 2 (Collaboration + Rules): ✅ **COMPLETE & MERGED** (tags/notes/assignments/routing-rules/audit; EA final gate passed 2026-02-25)
+- SPEC-002 (Java backend migration): 🟡 **PHASES 0–6 MERGED — Phase 7–8 pending** (milestone #3: 28/37 issues closed; `services/backend-java` complete through auth/identity (MIG-030..034), REST + contract tests (MIG-040..041), raw WebSocket incl. presence/typing/backlog/reconnect (MIG-050..051), terminal-failure signal (MIG-052 scope settled by founder Option A), Telegram + IRC connectors (MIG-060..061), Quartz retry worker + DB DLQ + circuit breaker (MIG-063), and the MIG-100/MIG-101 package-layout correction pass. Remaining: cutover/rehearsal MIG-070..072 (#361–#363, held behind the MIG-052 #356 frontend decision), threat model MIG-073 (#367), test/QA parity MIG-091 (#366), docs sweep MIG-090 (#365, in progress), decommission MIG-080 (#364). Contract source: frozen `.docs/migration/{openapi.yaml,asyncapi.yaml,schemas/*}` per ADR-023.)
 - SPEC-003 (React→Angular frontend migration): 🟡 **IN IMPLEMENTATION** (milestone #4, 17 issues ANG-001..017; founder override 2026-09-26: parallel-with-Java, React-contracts 1:1; ANG-001 scaffold + Angular-target ARCH `.docs/architecture/005-...` + ADR-031 committed; ANG-002 local Zod contract layer + single HTTP/socket seam + contracts manifest committed in `packages/frontend-angular/src/app/contracts/`; production stays React until ANG-016 cutover)
-- QA: ⏳ Not Started
+- QA: 🟡 **PARTIAL** (Node-era regression suite + Playwright E2E cover the transitional React/Node stack; Java-side test/QA parity is MIG-091 (#366), pending — see `.docs/04-qa-and-testing.md`)
 
 ## Shared Code Hygiene Phase (SH-003, SH-004, SH-005)
 

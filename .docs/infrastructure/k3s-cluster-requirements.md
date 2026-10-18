@@ -31,7 +31,7 @@ YACC MVP uses a **single-node K3s cluster** deployed on a standard VPS with the 
 - **Deployment Model**: All-in-one (control plane + worker on same node)
 - **Environment Scope**: Staging and production on separate clusters (not shared)
 - **Scalability**: Vertical scaling (increase node resources) for MVP; horizontal scaling (multi-node) post-MVP
-- **Dependency Management**: PostgreSQL + Redis managed via Helm (not external services)
+- **Dependency Management**: PostgreSQL managed in the cluster; no Redis (ADR-028 removed it — async state lives in PostgreSQL)
 - **Access Control**: RBAC configured for user segregation (admin vs read-only)
 
 ### Logical Component Diagram
@@ -50,16 +50,17 @@ YACC MVP uses a **single-node K3s cluster** deployed on a standard VPS with the 
 │  │              yacc-staging Namespace                       │  │
 │  ├────────────────────────────────────────────────────────────┤  │
 │  │                                                            │  │
-│  │  ┌─────────────────┐  ┌──────────────┐  ┌────────────┐   │  │
-│  │  │   Backend Pod   │  │ PostgreSQL   │  │   Redis    │   │  │
-│  │  │   (Node.js)     │  │   Pod        │  │   Pod      │   │  │
-│  │  │   8080:8080     │  │   5432:5432  │  │   6379:6379│   │  │
-│  │  │                 │  │              │  │            │   │  │
-│  │  │   Service       │  │   StatefulSet│  │ StatefulSet│   │  │
-│  │  │   ClusterIP     │  │              │  │            │   │  │
-│  │  └─────────────────┘  └──────────────┘  └────────────┘   │  │
-│  │         ↑                    ↓                  ↓          │  │
-│  │         │              PV (5GB)           PV (500MB)      │  │
+│  │  ┌─────────────────┐  ┌──────────────┐                    │  │
+│  │  │   Backend Pod   │  │ PostgreSQL   │                    │  │
+│  │  │   (Java 21 /    │  │   Pod        │                    │  │
+│  │  │   Spring Boot)  │  │   5432:5432  │                    │  │
+│  │  │   8080:8080     │  │              │                    │  │
+│  │  │                 │  │              │                    │  │
+│  │  │   Service       │  │   StatefulSet│                    │  │
+│  │  │   ClusterIP     │  │              │                    │  │
+│  │  └─────────────────┘  └──────────────┘                    │  │
+│  │         ↑                    ↓                            │  │
+│  │         │              PV (5GB)                           │  │
 │  │         │                                                 │  │
 │  └─────────┼─────────────────────────────────────────────────┘  │
 │            │                                                    │
@@ -79,8 +80,9 @@ Data Flow:
 1. External request → Ingress (Traefik, port 80/443)
 2. Traefik routes to backend-svc (ClusterIP: 10.43.x.x)
 3. Backend pod resolves postgres-svc via CoreDNS → PostgreSQL pod
-4. Backend pod resolves redis-svc via CoreDNS → Redis pod
-5. Pod logs & metrics collected by kubelet (local monitoring)
+4. Pod logs & metrics collected by kubelet (local monitoring)
+
+(No Redis pod — ADR-028 removed it; retry/DLQ/WS-backlog state lives in PostgreSQL.)
 ```
 
 ---
@@ -91,8 +93,8 @@ Data Flow:
 
 | Resource | Requirement | Rationale |
 |----------|-------------|-----------|
-| **CPU** | 2 cores (vCPU) | Backend (500m) + PostgreSQL (500m) + Redis (250m) + K3s system (~750m) + 25% buffer |
-| **RAM** | 4 GB | 3 GB available after OS/K3s; pods ~2.3 GB; headroom for spikes |
+| **CPU** | 2 cores (vCPU) | Backend (500m) + PostgreSQL (500m) + K3s system (~750m) + buffer (no Redis — ADR-028) |
+| **RAM** | 4 GB minimum, more headroom preferred | Backend JVM envelope is 1Gi request / 2Gi limit (ADR-029); PostgreSQL ~1 GB; K3s ~1 GB |
 | **Disk** | 20 GB SSD | 10 GB K3s system + 5 GB PostgreSQL storage + 1 GB app logs + 4 GB headroom |
 | **Network** | 1 Gbps (public IP) | Standard; private networking for pod-to-pod communication |
 | **Bandwidth** | Unmetered (typical VPS) | Development workload; not production-grade |
@@ -119,7 +121,6 @@ Data Flow:
 
 /var/lib/rancher/k3s/storage/
 ├── pvc-postgres/            (PostgreSQL PV)       ~5 GB
-├── pvc-redis/               (Redis PV)            ~500 MB
 └── ...
 
 /var/log/
@@ -230,7 +231,6 @@ metrics-server-7ff846c968-k8xyz            1/1     Running   0          2d
 ```bash
 # Internal DNS names:
 postgres-svc.yacc-staging.svc.cluster.local  → ClusterIP (e.g., 10.43.56.78)
-redis-svc.yacc-staging.svc.cluster.local     → ClusterIP (e.g., 10.43.99.12)
 yacc-backend.yacc-staging.svc.cluster.local  → ClusterIP (e.g., 10.43.12.34)
 
 # Environment injection (Kubernetes auto-populates):
@@ -310,7 +310,7 @@ curl -I https://api-staging.example.com
 ```bash
 kubectl create namespace yacc-staging
 
-# Deploy backend + PostgreSQL + Redis to this namespace
+# Deploy backend + PostgreSQL to this namespace
 helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \
   -n yacc-staging \
   -f deploy/helm/yacc-backend/values-staging.yaml
@@ -380,32 +380,9 @@ spec:
 - Upload to S3 for off-site retention
 - Restore procedure: Copy snapshot back to local storage, restart pod
 
-### Redis Persistence
+### Async Durability Storage (PostgreSQL — no Redis)
 
-**PersistentVolume**:
-```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: redis-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: local-path
-  resources:
-    requests:
-      storage: 500Mi  # RDB file + AOF log
-```
-
-**Configuration** (in Helm values):
-```yaml
-redis:
-  persistence:
-    enabled: true
-    size: 500Mi
-    # RDB snapshots every 60 seconds (default)
-    # AOF enabled for durability
-```
+**No Redis PersistentVolume** (ADR-028): the Quartz JDBC job store, `dead_letter_queue` and `websocket_backlog` tables live inside the PostgreSQL PV above; there is no Redis pod, PVC, or `REDIS_URL` to provision.
 
 ### Attachment Storage (Cloudflare R2)
 
@@ -587,9 +564,11 @@ annotations:
   
   kubectl create secret generic yacc-backend-secrets \
     --from-literal=DATABASE_URL="postgresql://user:pass@postgres-svc:5432/yacc" \
-    --from-literal=REDIS_URL="redis://:pass@redis-svc:6379/0" \
     --from-literal=TELEGRAM_BOT_TOKEN="xxxxx:xxxxx" \
     -n yacc-staging
+
+  # Spring auth + recovery secrets (ADR-025) — see deploy/helm/yacc-backend/values.yaml
+  # (bootstrap Super Admin + founder recovery keys; no Redis/JWT/BetterAuth secrets)
   ```
 
 ### Backend Helm Deployment
@@ -755,7 +734,7 @@ sudo systemctl restart k3s
 
 ### Network Issues (Pod-to-Pod Communication)
 
-**Symptoms**: Backend can't reach PostgreSQL/Redis despite DNS resolution
+**Symptoms**: Backend can't reach PostgreSQL despite DNS resolution
 
 **Diagnosis**:
 ```bash
