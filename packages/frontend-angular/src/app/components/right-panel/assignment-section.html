@@ -1,0 +1,62 @@
+<div class="px-4 py-4 border-b border-base-300" data-testid="assignment-section">
+  <div class="flex items-center justify-between mb-2">
+    <label class="text-sm font-semibold text-base-content/80">Assigned to</label>
+  </div>
+
+  <div class="relative">
+    <button
+      type="button"
+      (click)="toggle()"
+      class="w-full btn btn-sm btn-outline"
+      [disabled]="assigning()"
+      data-testid="assignment-button"
+    >
+      <span class="text-xs">{{ currentAssigneeDisplay() }}</span>
+    </button>
+
+    @if (isOpen()) {
+      <div
+        class="absolute top-full left-0 right-0 mt-2 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto"
+        data-testid="assignment-dropdown"
+      >
+        <!-- Unassign is not available in the Phase-2 MVP (backend requires assignedUserId). -->
+        @if (users.length === 0) {
+          <div
+            class="w-full text-left px-4 py-2 text-sm text-base-content/50"
+            data-testid="no-users-message"
+          >
+            User list coming in Phase 3
+          </div>
+        }
+
+        @for (user of users; track user.id) {
+          <button
+            type="button"
+            (click)="assign(user.id)"
+            class="w-full text-left px-4 py-2 text-sm hover:bg-base-200 {{
+              user.id === conversation().assignedUserId ? 'bg-primary/10 text-primary' : ''
+            }}"
+            [disabled]="assigning()"
+            [attr.data-testid]="'user-option-' + user.id"
+          >
+            <div class="font-medium">{{ user.name }}</div>
+            <div class="text-xs opacity-70">{{ user.email }}</div>
+          </button>
+        }
+      </div>
+    }
+  </div>
+
+  @if (assigning()) {
+    <div class="mt-2 flex items-center gap-2">
+      <div class="loading loading-spinner loading-xs"></div>
+      <span class="text-xs text-base-content/60">Updating...</span>
+    </div>
+  }
+
+  @if (assignFailed()) {
+    <div class="mt-2 alert alert-error alert-sm">
+      <span class="text-xs">Failed to update assignment</span>
+    </div>
+  }
+</div>
