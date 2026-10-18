@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-YACC MVP backend is deployed to Kubernetes (K3s) via Helm. This guide covers:
+The YACC backend deploys to Kubernetes (K3s) via Helm; production deployment/cutover remains pending MIG-070..072. This guide covers:
 
 - **Local Development**: k3d single-node cluster (testing & validation)
 - **Staging Environment**: K3s 1.30+ on VPS (public testing)
@@ -558,5 +558,5 @@ gh run cancel <run-id>
 ---
 
 **Last Updated**: 2026-10-18 (Java/Spring backend — MIG-090 docs sweep)  
-**Status**: Java service is the deployed backend (Node POC transitional until MIG-080)  
-**Next Steps**: Production deployment (post-MVP) with multi-region HA
+**Status**: Java service is the backend of record; production deployment/cutover pending MIG-070..072 (#361–#363) — Node POC transitional until MIG-080  
+**Next Steps**: Cutover and first production deployment via MIG-070..072 (#361–#363); multi-region HA post-MVP

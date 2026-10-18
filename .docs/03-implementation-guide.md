@@ -1337,7 +1337,7 @@ const { data } = useConversations({ page: 0, limit: 20, status: 'open' });
 
 ### Overview
 
-YACC backend is deployed to Kubernetes via Helm (ADR-019 approved; pod envelope amended by ADR-029). The Helm chart deploys the **Java/Spring backend** built from `services/backend-java/Dockerfile` (Temurin 21 JRE, non-root uid 1000, read-only root filesystem). PostgreSQL is managed as a Kubernetes StatefulSet; there is **no Redis** in the cluster (ADR-028).
+YACC backend deploys to Kubernetes via Helm (ADR-019 approved; pod envelope amended by ADR-029); production deployment/cutover remains pending MIG-070..072 (#361–#363). The Helm chart deploys the **Java/Spring backend** built from `services/backend-java/Dockerfile` (Temurin 21 JRE, non-root uid 1000, read-only root filesystem). PostgreSQL is managed as a Kubernetes StatefulSet; there is **no Redis** in the cluster (ADR-028).
 
 **Scope**: Backend deployment only. Frontend remains AWS S3 + CloudFront (separate pipeline).
 
