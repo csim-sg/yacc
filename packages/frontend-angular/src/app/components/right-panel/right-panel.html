@@ -1,0 +1,27 @@
+<div
+  class="w-80 bg-base-100 border-l border-base-300 flex flex-col overflow-hidden"
+  data-testid="right-panel"
+>
+  <!-- Header -->
+  <div class="px-4 py-4 border-b border-base-300">
+    <h3 class="text-lg font-semibold">Details</h3>
+  </div>
+
+  <!-- Scrollable Content -->
+  <div class="flex-1 overflow-y-auto">
+    <!-- Assignment Section -->
+    <app-assignment-section
+      [conversation]="conversation()"
+      (change)="assignmentChange.emit()"
+    />
+
+    <!-- Tags Section -->
+    <app-tags-section
+      [conversation]="conversation()"
+      (change)="tagsChange.emit()"
+    />
+
+    <!-- Notes Section -->
+    <app-notes-section [conversation]="conversation()" />
+  </div>
+</div>
