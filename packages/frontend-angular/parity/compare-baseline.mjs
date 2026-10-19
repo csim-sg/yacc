@@ -37,14 +37,29 @@ import { createHash } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Playwright's JSON reporter test-level vocabulary (`expected`/`unexpected`)
+// and the classic per-attempt/TSV vocabulary (`passed`/`failed`/`timedOut`).
+// Unknown statuses must fail loudly — a silently unmapped status hides rows.
 const STATUS_FAMILY = {
   passed: 'passed',
+  expected: 'passed',
   flaky: 'passed', // green after retries — surfaced as a stability warning
   failed: 'red',
+  unexpected: 'red',
   timedOut: 'red',
   interrupted: 'red',
   skipped: 'skipped',
 };
+
+/** Canonical row status for reports/TSVs (anchor vocabulary). */
+function canonicalStatus(status, results) {
+  if (status === 'expected') return 'passed';
+  if (status === 'unexpected') {
+    const last = results && results.length > 0 ? results[results.length - 1].status : undefined;
+    return last === 'timedOut' || last === 'interrupted' ? last : 'failed';
+  }
+  return status;
+}
 
 const ANCHOR_HEADER = ['project', 'file', 'status', 'retries', 'duration_ms', 'test', 'suite-path'];
 
@@ -255,10 +270,14 @@ function parseRunJson(path) {
       const describeTitles = suiteTitles.filter((t) => t && t !== spec.file);
       const suitePath = [file, ...describeTitles].join(' > ');
       const results = test.results ?? [];
+      const status = canonicalStatus(test.status, results);
+      if (!(status in STATUS_FAMILY)) {
+        fail(`run row has unknown status "${test.status}" (${file} › ${spec.title}) — extend the status mapping deliberately (fail-closed)`);
+      }
       rows.push({
         project: test.projectName,
         file,
-        status: test.status,
+        status,
         retries: Math.max(0, results.length - 1),
         durationMs: results.reduce((sum, r) => sum + (r.duration ?? 0), 0),
         test: spec.title,
