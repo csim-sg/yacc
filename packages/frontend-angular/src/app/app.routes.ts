@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { AppShell } from './components/app-shell/app-shell';
+import { AuditLogs } from './pages/audit-logs/audit-logs';
 import { IrcProfiles } from './pages/irc-profiles/irc-profiles';
 import { Inbox } from './pages/inbox/inbox';
 import { Conversation } from './pages/conversation/conversation';
@@ -79,6 +80,16 @@ export const routes: Routes = [
         path: 'integrations/irc-profiles',
         component: IrcProfiles,
         canActivate: [roleGuard('ADMIN')],
+      },
+      // ANG-013 (#383): the audit-logs row — MANAGER-gated compliance
+      // surface (React `ProtectedRoute requiredRole="MANAGER"` +
+      // `AuditLogsPage` parity; the nav row in `lib/navigation.ts`
+      // filters identically; the export endpoint is API-only parity,
+      // U4 — no export UI).
+      {
+        path: 'audit-logs',
+        component: AuditLogs,
+        canActivate: [roleGuard('MANAGER')],
       },
       { path: '', pathMatch: 'full', redirectTo: 'inbox' },
     ],
