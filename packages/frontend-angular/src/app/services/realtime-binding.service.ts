@@ -1,6 +1,7 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, effect, inject, untracked } from '@angular/core';
 import { Subscription } from 'rxjs';
 
+import { AuthService } from './auth.service';
 import { TokenStorageService } from './token-storage.service';
 import { WebSocketClientService } from './websocket-client.service';
 import { ConversationEventsService } from './conversation-events.service';
@@ -30,13 +31,19 @@ import { MessagesStore } from './messages.store';
  *   from `TokenStorageService` and handed to the client. With no stored
  *   token no connection is attempted — the Java upgrade is
  *   fail-closed (401), so a guaranteed-failure ladder is never entered.
- *   Reconnect across a login/unlogin boundary is the inbox feature
- *   surface's concern (ANG-007+); this binding starts once per app.
+ *   The binding starts once per app, and the auth/session transition is
+ *   bound here (AC-ANG-007-8, React `WebSocketInitializer` parity): a
+ *   real sign-in without a page reload reaches a live raw-WS connection
+ *   and logout/session expiry disconnects — through the idempotent
+ *   `ensureConnected()`/`client.disconnect()` edges only. The transport
+ *   (socket, envelope/router, ladder/backoff, handlers) stays
+ *   ANG-006's (`websocket-client.service.ts` untouched).
  */
 @Injectable({ providedIn: 'root' })
 export class RealtimeBindingService {
   private readonly client = inject(WebSocketClientService);
   private readonly tokenStorage = inject(TokenStorageService);
+  private readonly auth = inject(AuthService);
   private readonly conversations = inject(ConversationsStore);
   private readonly messages = inject(MessagesStore);
   private readonly conversationEvents = inject(ConversationEventsService);
@@ -48,6 +55,56 @@ export class RealtimeBindingService {
   private started = false;
   private listenersSubscription: Subscription | null = null;
   private connectSubscription: Subscription | null = null;
+  /** Last observed auth state (AC-ANG-007-8 transition detection). */
+  private lastAuthenticated: boolean | null = null;
+
+  constructor() {
+    // Boot observation is synchronous: `start()` owns the with-token
+    // connect for a restored session, so the initial value only seeds the
+    // transition detector (effects flush lazily — the first scheduled run
+    // must never swallow a transition that already happened).
+    this.lastAuthenticated = this.auth.isAuthenticated();
+
+    // AC-ANG-007-8 (the one bounded additive auth/session-transition
+    // binding; the transport client/backoff/handlers are untouched): one
+    // effect over the delivered `AuthService.isAuthenticated` signal.
+    // - false → true (real sign-in without a reload, or the boot session
+    //   restore): idempotent `ensureConnected()` — a live/in-flight
+    //   connection is never duplicated (the client no-ops).
+    // - true → false (logout / session expiry): deliberate
+    //   `client.disconnect()`.
+    effect(() => {
+      const authenticated = this.auth.isAuthenticated();
+      untracked(() => this.onAuthTransition(authenticated));
+    });
+  }
+
+  /**
+   * AC-ANG-007-8: connect the single raw-WS client from the CURRENTLY
+   * stored access token, idempotently — the transport's `connect()` already
+   * no-ops on a live or in-flight connection, so a restored-session boot
+   * (already connected by `start()`) never opens a second socket. With no
+   * stored token this is a no-op (fail-closed server — no doomed attempt).
+   */
+  ensureConnected(): void {
+    const accessToken = this.tokenStorage.getAccessToken();
+    if (accessToken) {
+      this.client.connect(accessToken);
+    }
+  }
+
+  /** Auth-transition reducer (no-op when the observed state is unchanged). */
+  private onAuthTransition(authenticated: boolean): void {
+    if (this.lastAuthenticated === authenticated) {
+      return;
+    }
+    this.lastAuthenticated = authenticated;
+    if (authenticated) {
+      this.ensureConnected();
+    } else {
+      this.client.disconnect();
+    }
+  }
 
   /**
    * Start the real-time binding: register the fixed listener set, wire

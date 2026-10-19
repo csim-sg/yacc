@@ -41,6 +41,12 @@ import { expect, test, type Page } from '@playwright/test';
  *   Bell interactions below use real DOM events on the element
  *   (`dispatchEvent`) instead of pointer targeting; this is a styling
  *   limitation, not a structural or behavioral mock.
+ * - ANG007-WS-1 (AC-ANG-007-8) reads the ANG-006 dev-only observation seam
+ *   `window.__yaccRealtimeDevtools` (read-only client snapshot; dev builds
+ *   only — `ng serve` webServer) and observes the app's real raw-WS
+ *   upgrade via Playwright's `websocket` event. No transport behavior is
+ *   mocked or driven; the seam is the same allowed evidence channel the
+ *   #376 R1 rows use. Not a production surface (DCE'd from prod builds).
  */
 
 test.describe('ANG-007 shell + inbox + notifications (real backend)', () => {
@@ -91,6 +97,12 @@ test.describe('ANG-007 shell + inbox + notifications (real backend)', () => {
     // Default inbox: clean URL, loaded fixture rows.
     await expect(page).toHaveURL(/\/inbox$/);
     await expect(page.locator('[data-testid="conversation-card"]').first()).toBeVisible();
+    // The UNFILTERED row count — the post-bounce display must return to it
+    // (the store serves the still-fresh default key from cache, so no
+    // reload request is expected after the bounce — TanStack staleTime
+    // parity; the DISPLAYED list is the proof).
+    const unfilteredCount = await page.locator('[data-testid="conversation-card"]').count();
+    expect(unfilteredCount).toBeGreaterThan(0);
 
     const historyAtStart = await page.evaluate(() => history.length);
 
@@ -125,10 +137,79 @@ test.describe('ANG-007 shell + inbox + notifications (real backend)', () => {
     await expect(page).toHaveURL(/\/inbox$/);
     await expect(page).toHaveURL((url) => !url.search, { timeout: 10_000 });
 
+    // Review-loop-2 regression (guard-bounce desync — URL is the source of
+    // truth on re-entry): the bounce re-uses the live Inbox component, so
+    // the filter state must be re-initialized from the clean URL — chips
+    // cleared, search input empty, page 1, and the DISPLAYED list restored
+    // to the unfiltered dataset (served from the store's still-fresh
+    // default cache; no reload request is expected — TanStack staleTime
+    // parity).
+    await expect(page.locator('button', { hasText: 'Channel: Telegram' })).toHaveCount(0);
+    await expect(page.locator('button', { hasText: 'Search: Fixture' })).toHaveCount(0);
+    await expect(page.getByPlaceholder('Search conversations')).toHaveValue('');
+    await expect(page.locator('[data-testid="page-info"]')).toContainText('Page 1');
+    await expect(page.locator('[data-testid="conversation-card"]')).toHaveCount(unfilteredCount);
+
     // The filter session created exactly ONE in-app entry: the next Back
     // exits the app instead of surfacing another filter state.
     await page.goBack();
     await expect(page).toHaveURL(/about:blank/);
+  });
+
+  test('ANG007-WS-1: a real sign-in connects the raw-WS client without a reload; sign-out disconnects (AC-ANG-007-8)', async ({
+    page,
+  }) => {
+    // The app's own raw-WS upgrades (environment.wsUrl targets the Java
+    // :8080 `/ws` directly — the runner's YACC_REALTIME_WS_ALLOWED_ORIGINS
+    // makes the cross-origin upgrade legal; same posture as the R1 rows).
+    const appSockets: Array<{ url: string; isClosed: () => boolean }> = [];
+    page.on('websocket', (ws) => {
+      if (ws.url().includes('/ws?token=')) {
+        appSockets.push({ url: ws.url(), isClosed: () => ws.isClosed() });
+      }
+    });
+    const devtoolsState = () =>
+      page.evaluate(
+        () =>
+          (window as unknown as { __yaccRealtimeDevtools?: { client(): { connectionState: string } } })
+            .__yaccRealtimeDevtools?.client().connectionState ?? null,
+      );
+
+    // Signed-out boot: no session token, no socket attempt, binding idle.
+    await page.goto('/login');
+    await expect(page.getByTestId('login-email')).toBeVisible();
+    await expect.poll(devtoolsState, { timeout: 15_000 }).toBe('disconnected');
+    expect(appSockets).toHaveLength(0);
+
+    // REAL sign-in — SPA navigation to /inbox; there is NO page reload
+    // between boot and this point, so any connected socket below was
+    // reached through the auth/session transition alone (React
+    // `WebSocketInitializer` parity).
+    await page.getByTestId('login-email').fill(MANAGER.email);
+    await page.getByTestId('login-password').fill(MANAGER.password);
+    await page.getByTestId('login-submit').click();
+    await page.waitForURL(/\/inbox/);
+
+    await expect.poll(devtoolsState, { timeout: 15_000 }).toBe('connected');
+    expect(appSockets).toHaveLength(1);
+
+    // The upgrade rode the freshly stored access token (not a stale one).
+    const storedToken = await page.evaluate(() => localStorage.getItem('yacc_token'));
+    expect(storedToken).toBeTruthy();
+    expect(appSockets[0].url).toContain(`token=${encodeURIComponent(storedToken as string)}`);
+
+    // Sign-out (shell session control → delivered AuthService): the
+    // binding deliberately disconnects the live socket.
+    await page.evaluate(() => {
+      (document.querySelector('button[aria-label="Logout"]') as HTMLElement).click();
+    });
+    await page.locator('.modal button:has-text("Sign Out")').click();
+    await page.waitForURL(/\/login/);
+
+    await expect.poll(devtoolsState, { timeout: 15_000 }).toBe('disconnected');
+    // The client state flips synchronously; the underlying TCP close lands
+    // a tick later — poll the observed socket closure.
+    await expect.poll(() => appSockets[0].isClosed(), { timeout: 15_000 }).toBe(true);
   });
 
   test('ANG007-NOTIF-1: the notification center is reachable in the shell; the live panel opens (empty) and closes on outside mousedown', async ({

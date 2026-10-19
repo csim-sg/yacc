@@ -1,5 +1,6 @@
 import { Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, type ParamMap } from '@angular/router';
 
 import type {
   ChannelType,
@@ -44,6 +45,26 @@ const PRIORITY_BADGE: Record<ConversationPriority, string> = {
 type ChannelFilter = ChannelType | 'all';
 type StatusFilter = ConversationStatus | 'all';
 type PriorityFilter = ConversationPriority | 'all';
+
+/** URL query keys the page owns (React `searchParams` parity). */
+const FILTER_KEYS = [
+  'page',
+  'channel',
+  'status',
+  'priority',
+  'search',
+  'dateFrom',
+  'dateTo',
+  'unread',
+] as const;
+
+/**
+ * True when every owned URL param equals the state projection (params the
+ * page does not own are ignored) — the write-back loop guard.
+ */
+function urlMatchesProjection(params: ParamMap, projected: Record<string, string>): boolean {
+  return FILTER_KEYS.every((key) => (params.get(key) ?? null) === (projected[key] ?? null));
+}
 
 /**
  * Inbox Page (React `pages/InboxPage.tsx` port — W5/W6).
@@ -113,28 +134,7 @@ export class Inbox {
     // W5: initialize the filters from the URL exactly once (React
     // `initializedFromUrl` effect parity) — invalid values fall back to
     // their defaults.
-    const params = this.route.snapshot.queryParamMap;
-    const pageParam = Number(params.get('page') || 1);
-    this.page.set(Number.isNaN(pageParam) ? 1 : pageParam);
-    const channelParam = params.get('channel');
-    this.channel.set(
-      PHASE1_CHANNELS.includes(channelParam as ChannelType) ? (channelParam as ChannelType) : 'all',
-    );
-    const statusParam = params.get('status');
-    this.status.set(
-      this.statusValues.includes(statusParam as ConversationStatus) ? (statusParam as ConversationStatus) : 'all',
-    );
-    const priorityParam = params.get('priority');
-    this.priority.set(
-      this.priorityValues.includes(priorityParam as ConversationPriority)
-        ? (priorityParam as ConversationPriority)
-        : 'all',
-    );
-    this.search.set(params.get('search') || '');
-    this.searchInput.set(params.get('search') || '');
-    this.dateFrom.set(params.get('dateFrom') || '');
-    this.dateTo.set(params.get('dateTo') || '');
-    this.unreadOnly.set(params.get('unread') === 'true');
+    this.readFiltersFromUrl(this.route.snapshot.queryParamMap);
 
     // React resize parity: the in-page sidebar opens on large screens.
     const checkScreenSize = (): void => {
@@ -166,37 +166,99 @@ export class Inbox {
     });
 
     // W5: write the non-default filters back to the URL (replace) —
-    // React `setSearchParams(params, { replace: true })` parity.
+    // React `setSearchParams(params, { replace: true })` parity. The
+    // navigation is skipped when the URL already equals the projection
+    // (the guard-bounce re-entry below re-initializes the state from an
+    // externally-set URL), so the write-back can never chase its own tail.
     effect(() => {
-      const queryParams: Record<string, string> = {};
-      if (this.page() > 1) {
-        queryParams['page'] = String(this.page());
-      }
-      if (this.channel() !== 'all') {
-        queryParams['channel'] = this.channel();
-      }
-      if (this.status() !== 'all') {
-        queryParams['status'] = this.status();
-      }
-      if (this.priority() !== 'all') {
-        queryParams['priority'] = this.priority();
-      }
-      if (this.search()) {
-        queryParams['search'] = this.search();
-      }
-      if (this.dateFrom()) {
-        queryParams['dateFrom'] = this.dateFrom();
-      }
-      if (this.dateTo()) {
-        queryParams['dateTo'] = this.dateTo();
-      }
-      if (this.unreadOnly()) {
-        queryParams['unread'] = 'true';
-      }
-      untracked(() =>
-        void this.router.navigate([], { relativeTo: this.route, queryParams, replaceUrl: true }),
-      );
+      const queryParams = this.filterQueryParams();
+      untracked(() => {
+        if (urlMatchesProjection(this.route.snapshot.queryParamMap, queryParams)) {
+          return;
+        }
+        void this.router.navigate([], { relativeTo: this.route, queryParams, replaceUrl: true });
+      });
     });
+
+    // AC-ANG-007-1 (guard-bounce re-entry — React remount parity): the
+    // public-guard redirect (`createUrlTree(['/inbox'])`) re-enters this
+    // route as a query-param-only navigation while Angular REUSES this
+    // component instance, so the constructor's one-time read above never
+    // re-runs — the URL would be clean while the filter signals kept their
+    // stale values (a reload would show unfiltered). The URL is the source
+    // of truth on re-entry: any emission that does not match the state
+    // projection is an external URL change (guard bounce, Back re-entry)
+    // and re-initializes every filter from it. The page's own write-back
+    // emissions always match the projection by construction, so this
+    // converges after at most one normalizing write-back — no loop.
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        if (urlMatchesProjection(params, this.filterQueryParams())) {
+          return;
+        }
+        this.readFiltersFromUrl(params);
+      });
+  }
+
+  /**
+   * W5: read every filter from the URL (invalid values fall back to their
+   * defaults — React `initializedFromUrl` parity). Runs once at
+   * construction and again on external URL changes (the guard-bounce
+   * re-entry subscription below).
+   */
+  private readFiltersFromUrl(params: ParamMap): void {
+    const pageParam = Number(params.get('page') || 1);
+    this.page.set(Number.isNaN(pageParam) ? 1 : pageParam);
+    const channelParam = params.get('channel');
+    this.channel.set(
+      PHASE1_CHANNELS.includes(channelParam as ChannelType) ? (channelParam as ChannelType) : 'all',
+    );
+    const statusParam = params.get('status');
+    this.status.set(
+      this.statusValues.includes(statusParam as ConversationStatus) ? (statusParam as ConversationStatus) : 'all',
+    );
+    const priorityParam = params.get('priority');
+    this.priority.set(
+      this.priorityValues.includes(priorityParam as ConversationPriority)
+        ? (priorityParam as ConversationPriority)
+        : 'all',
+    );
+    this.search.set(params.get('search') || '');
+    this.searchInput.set(params.get('search') || '');
+    this.dateFrom.set(params.get('dateFrom') || '');
+    this.dateTo.set(params.get('dateTo') || '');
+    this.unreadOnly.set(params.get('unread') === 'true');
+  }
+
+  /** Non-default filters as URL query params (the write-back projection). */
+  private filterQueryParams(): Record<string, string> {
+    const queryParams: Record<string, string> = {};
+    if (this.page() > 1) {
+      queryParams['page'] = String(this.page());
+    }
+    if (this.channel() !== 'all') {
+      queryParams['channel'] = this.channel();
+    }
+    if (this.status() !== 'all') {
+      queryParams['status'] = this.status();
+    }
+    if (this.priority() !== 'all') {
+      queryParams['priority'] = this.priority();
+    }
+    if (this.search()) {
+      queryParams['search'] = this.search();
+    }
+    if (this.dateFrom()) {
+      queryParams['dateFrom'] = this.dateFrom();
+    }
+    if (this.dateTo()) {
+      queryParams['dateTo'] = this.dateTo();
+    }
+    if (this.unreadOnly()) {
+      queryParams['unread'] = 'true';
+    }
+    return queryParams;
   }
 
   /** GET /api/conversations params for the current filters. */

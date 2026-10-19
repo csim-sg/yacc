@@ -242,6 +242,62 @@ describe('Inbox page', () => {
     // environment.
   });
 
+  it('re-initializes filters from the clean URL when the public-guard bounce re-enters /inbox (no write-back loop)', async () => {
+    await render();
+    // The UNFILTERED default dataset (2 rows) — cached fresh by this first
+    // load, so the post-bounce re-entry is served from the store (30s
+    // freshness, TanStack `staleTime` parity) without a second request.
+    await flushList();
+    expect(inboxElement().querySelectorAll('[data-testid="conversation-card"]')).toHaveLength(2);
+
+    // Filter session: the channel write-back puts the param on the URL and
+    // the filtered world renders a DISTINCT (single-row) dataset.
+    setSelect('channel-filter', 'telegram');
+    await flushList(
+      { ...listResponse, data: [listResponse.data[0]], total: 1 },
+      '/api/conversations?page=1&limit=20&sortBy=lastActivity&sortOrder=desc&channel=telegram',
+    );
+    expect(router.url).toContain('channel=telegram');
+    expect(inboxElement().textContent).toContain('Channel: Telegram');
+    expect(inboxElement().querySelectorAll('[data-testid="conversation-card"]')).toHaveLength(1);
+
+    // Guard-bounce parity (the real public guard is not wired in this
+    // spec's router): the guard redirects an authenticated /login visit
+    // with `createUrlTree(['/inbox'])` — a query-param-only navigation
+    // that REUSES this live component instance (React remounts its
+    // InboxPage instead). Driving the same navigation here observes
+    // exactly the re-entry semantics the bounce produces.
+    const location = TestBed.inject(Location);
+    const replaceSpy = vi.spyOn(location, 'replaceState');
+
+    await router.navigateByUrl('/inbox');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    // The URL was the source of truth on re-entry: every filter returned
+    // to its default, the stale chip is gone, and the DISPLAYED list is
+    // the unfiltered default world again (the store's cached default key —
+    // no request is expected for a still-fresh key).
+    expect(inboxElement().textContent).not.toContain('Channel: Telegram');
+    expect(
+      (inboxElement().querySelector('[data-testid="channel-filter"]') as HTMLSelectElement).value,
+    ).toBe('all');
+    expect(
+      (inboxElement().querySelector('[data-testid="search-input"]') as HTMLInputElement).value,
+    ).toBe('');
+    expect(inboxElement().querySelector('[data-testid="page-info"]')?.textContent).toContain(
+      'Page 1',
+    );
+    expect(router.url).not.toContain('channel=');
+    expect(inboxElement().querySelectorAll('[data-testid="conversation-card"]')).toHaveLength(2);
+
+    // No write-back loop: the re-initialization did not push the stale
+    // filters back onto the clean URL (the write-back skips a URL that
+    // already matches the state projection).
+    expect(replaceSpy).not.toHaveBeenCalled();
+  });
+
   it('submits the trimmed search on Enter and resets to page 1', async () => {
     await render('/inbox?page=3');
     await flushList(undefined, '/api/conversations?page=3&limit=20&sortBy=lastActivity&sortOrder=desc');
