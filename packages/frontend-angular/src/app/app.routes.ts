@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { AppShell } from './components/app-shell/app-shell';
+import { IrcProfiles } from './pages/irc-profiles/irc-profiles';
 import { Inbox } from './pages/inbox/inbox';
 import { Conversation } from './pages/conversation/conversation';
 import { RoutingRules } from './pages/routing-rules/routing-rules';
@@ -69,6 +70,15 @@ export const routes: Routes = [
         path: 'users',
         component: Users,
         canActivate: [roleGuard('SUPER_ADMIN')],
+      },
+      // ANG-012 (#382): the IRC-profiles row — ADMIN-gated management page
+      // (React `ProtectedRoute requiredRole="ADMIN"` + `IrcProfilesPage`
+      // parity; the nav row in `lib/navigation.ts` filters identically —
+      // super_admin mutation gating is in-component per endpoint RBAC).
+      {
+        path: 'integrations/irc-profiles',
+        component: IrcProfiles,
+        canActivate: [roleGuard('ADMIN')],
       },
       { path: '', pathMatch: 'full', redirectTo: 'inbox' },
     ],

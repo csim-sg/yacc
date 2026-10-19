@@ -174,7 +174,10 @@ describe('contract layer (frozen wire shapes)', () => {
       expect(
         CreateIrcProfileRequestSchema.parse({
           name: 'Ops profile',
-          config: { server: 'irc.example.com', port: 6697, username: 'yacc', channels: ['#ops'] },
+          server: 'irc.example.com',
+          port: 6697,
+          nick: 'yacc',
+          channels: ['#ops'],
         })
       ).toBeTruthy();
       expect(ListConversationsParamsSchema.parse({ page: 1, limit: 25, status: 'open' })).toBeTruthy();

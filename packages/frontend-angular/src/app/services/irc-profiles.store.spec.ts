@@ -53,7 +53,14 @@ describe('IrcProfilesStore', () => {
   it('create/activate/disable/delete invalidate the profiles caches', async () => {
     await loadProfiles();
 
-    const created = store.createProfile({ name: 'ops-irc', config: profile.config });
+    // Frozen flat IrcProfileWrite (frozen-contract wire truth).
+    const created = store.createProfile({
+      name: 'ops-irc',
+      server: 'irc.example.com',
+      port: 6697,
+      nick: 'yacc',
+      channels: ['#ops'],
+    });
     http.expectOne('/api/integrations/irc/profiles').flush(profile);
     await created;
     await loadProfiles();

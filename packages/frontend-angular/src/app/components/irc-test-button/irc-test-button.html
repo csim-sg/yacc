@@ -1,0 +1,73 @@
+@if (testState() === 'success') {
+  <!-- Success state — result with dismiss button (React parity). -->
+  <div
+    class="alert alert-success {{ extraClass() }}"
+    role="status"
+    aria-live="polite"
+    data-testid="irc-test-button"
+    data-state="success"
+  >
+    <span class="text-success text-lg" aria-hidden="true">✓</span>
+    <span class="flex-1">Connected to IRC server successfully</span>
+    <button
+      type="button"
+      class="btn btn-ghost btn-sm"
+      (click)="clearResult()"
+      aria-label="Dismiss success message"
+    >
+      ✕
+    </button>
+  </div>
+} @else if (testState() === 'error') {
+  <!-- Error state — result with dismiss + retry buttons (React parity). -->
+  <div
+    class="alert alert-error {{ extraClass() }}"
+    role="alert"
+    aria-live="polite"
+    data-testid="irc-test-button"
+    data-state="error"
+  >
+    <div class="flex flex-col w-full">
+      <div class="flex items-center">
+        <span class="text-error text-lg" aria-hidden="true">✗</span>
+        <span class="ml-2 flex-1">{{ errorMessage() }}</span>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          (click)="clearResult()"
+          aria-label="Dismiss error message"
+        >
+          ✕
+        </button>
+      </div>
+      <button
+        type="button"
+        class="btn btn-sm btn-outline btn-error mt-2"
+        (click)="runTest()"
+        aria-label="Retry connection test"
+        data-testid="irc-retry-button"
+      >
+        Retry
+      </button>
+    </div>
+  </div>
+} @else {
+  <!-- Loading or idle state — the test button itself (React parity). -->
+  <button
+    type="button"
+    class="btn btn-primary {{ extraClass() }}"
+    (click)="runTest()"
+    [disabled]="disabled() || testState() === 'loading'"
+    aria-label="Test IRC connection"
+    [attr.aria-busy]="testState() === 'loading'"
+    data-testid="irc-test-button"
+    [attr.data-state]="testState()"
+  >
+    @if (testState() === 'loading') {
+      <span class="loading loading-spinner loading-sm" aria-hidden="true"></span>
+      <span class="ml-2">Testing...</span>
+    } @else {
+      Test Connection
+    }
+  </button>
+}
