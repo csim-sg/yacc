@@ -1,0 +1,149 @@
+<div class="relative inline-block">
+  <!-- Bell icon button -->
+  <button
+    type="button"
+    class="relative inline-flex items-center justify-center w-9 h-9 rounded-lg hover:bg-base-200 transition-colors"
+    (click)="toggle()"
+    [attr.aria-label]="'Notifications ' + (unreadCount() > 0 ? '(' + unreadCount() + ' unread)' : '')"
+    [attr.aria-expanded]="isOpen()"
+  >
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+      />
+    </svg>
+
+    <!-- Unread badge -->
+    @if (unreadCount() > 0) {
+      <span
+        class="absolute top-1 right-1 flex items-center justify-center w-5 h-5 bg-error text-error-content text-xs font-bold rounded-full"
+        [attr.aria-label]="unreadCount() + ' unread notifications'"
+      >
+        {{ unreadCount() > 9 ? '9+' : unreadCount() }}
+      </span>
+    }
+  </button>
+
+  <!-- Notification panel -->
+  @if (isOpen()) {
+    <div
+      class="absolute right-0 mt-2 w-80 bg-base-100 border border-base-300 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto"
+      role="region"
+      aria-label="Notifications"
+    >
+      <!-- Header -->
+      <div class="sticky top-0 px-4 py-3 bg-base-100 border-b border-base-200 flex items-center justify-between">
+        <h3 class="font-semibold">Notifications</h3>
+        @if (unreadCount() > 0) {
+          <button type="button" class="text-xs text-primary hover:underline" (click)="markAllAsRead()">
+            Mark all as read
+          </button>
+        }
+      </div>
+
+      <!-- Notification list -->
+      @if (notifications().length === 0) {
+        <div class="px-4 py-8 text-center text-base-content/60">
+          <p class="text-sm">No notifications yet</p>
+        </div>
+      } @else {
+        <div role="list">
+          @for (notification of notifications(); track notification.id) {
+            <div role="listitem">
+              <div
+                class="px-4 py-3 border-b border-base-200 hover:bg-base-100 transition-colors cursor-pointer {{ !notification.isRead ? 'bg-primary/5' : '' }}"
+                (click)="openNotification(notification)"
+              >
+                <div class="flex items-start gap-3">
+                  <!-- Icon -->
+                  <div class="text-primary flex-shrink-0 mt-0.5">
+                    @switch (notification.type) {
+                      @case ('assignment') {
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                          <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                          <path
+                            fill-rule="evenodd"
+                            d="M4 5a2 2 0 012-2 1 1 0 000 2H3a1 1 0 00-1 1v10a1 1 0 001 1h14a1 1 0 001-1V6a1 1 0 00-1-1h-3a1 1 0 000-2 2 2 0 00-2-2H6a2 2 0 00-2 2zM9 9a1 1 0 100 2h2a1 1 0 100-2H9z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                      }
+                      @case ('mention') {
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                          <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" />
+                          <path d="M6.5 7a.75.75 0 100-1.5.75.75 0 000 1.5z" fill="white" fill-opacity="0.2" />
+                        </svg>
+                      }
+                      @default {
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                          <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+                        </svg>
+                      }
+                    }
+                  </div>
+
+                  <!-- Content -->
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-sm">{{ notification.message }}</p>
+                    <time class="text-xs text-base-content/40 mt-1">
+                      {{ formatTime(notification.createdAt) }}
+                    </time>
+                  </div>
+
+                  <!-- Actions -->
+                  <div class="flex items-center gap-1 flex-shrink-0">
+                    @if (!notification.isRead) {
+                      <button
+                        type="button"
+                        class="p-1 hover:bg-base-200 rounded transition-colors"
+                        (click)="markAsRead(notification)"
+                        title="Mark as read"
+                        aria-label="Mark notification as read"
+                      >
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                          <path
+                            fill-rule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    }
+
+                    <button
+                      type="button"
+                      class="p-1 hover:bg-base-200 rounded transition-colors"
+                      (click)="dismiss(notification)"
+                      title="Dismiss"
+                      aria-label="Dismiss notification"
+                    >
+                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                        <path
+                          fill-rule="evenodd"
+                          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Footer -->
+      @if (notifications().length > 0) {
+        <div class="sticky bottom-0 px-4 py-2 bg-base-100 border-t border-base-200">
+          <button type="button" class="w-full text-sm text-primary hover:underline py-1" (click)="clearAll()">
+            Clear all
+          </button>
+        </div>
+      }
+    </div>
+  }
+</div>

@@ -111,4 +111,37 @@ export class ConversationsStore {
     this.invalidateDetail(conversationId);
     this.invalidateLists();
   }
+
+  /**
+   * Optimistic unread clear (W6 — React `useUnreadBadges.markAsRead`
+   * parity): patch the loaded list entry's row for `conversationId` to
+   * `unreadCount: 0`. A synchronous cache write (React `setQueriesData`
+   * parity): no HTTP call, the patched data becomes fresh, and an
+   * in-flight response cannot overwrite it (`ResourceState.update`
+   * semantics). Nothing loaded under `params` → no-op (React only
+   * patches loaded `['conversations']` queries).
+   *
+   * Bounded adaptation (ANG-007): React patches EVERY loaded
+   * `['conversations', params]` variant via prefix matching; this store's
+   * `ResourceState` exposes per-entry writes only, so the caller passes
+   * the entry it displays. The `message.received` refresh path stays on
+   * `invalidateLists()` (ANG-006) — unchanged.
+   */
+  markAsRead(conversationId: string, params: ListConversationsParams = {}): void {
+    if (this.lists.snapshot(cacheKeys.conversations.list(params)) === undefined) {
+      return;
+    }
+    this.lists.update(cacheKeys.conversations.list(params), (previous) =>
+      previous
+        ? {
+            ...previous,
+            data: previous.data.map((conversation) =>
+              conversation.id === conversationId
+                ? { ...conversation, unreadCount: 0 }
+                : conversation,
+            ),
+          }
+        : undefined,
+    );
+  }
 }

@@ -1,0 +1,10 @@
+@if (count() !== 0) {
+  <span
+    class="badge badge-sm badge-error transition-all duration-200 {{ className() }}"
+    role="status"
+    aria-live="polite"
+    [attr.aria-label]="count() + ' unread message' + (count() === 1 ? '' : 's')"
+  >
+    {{ count() > 99 ? '99+' : count() }}
+  </span>
+}

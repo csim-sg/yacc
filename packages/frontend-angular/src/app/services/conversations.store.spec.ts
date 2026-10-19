@@ -122,4 +122,60 @@ describe('ConversationsStore', () => {
 
     await expect(pending).rejects.toBeDefined();
   });
+
+  describe('markAsRead (W6 optimistic unread clear — ANG-007)', () => {
+    const unreadResponse = {
+      ...listResponse,
+      data: [{ ...listResponse.data[0], unreadCount: 3 }],
+    };
+
+    it('patches the loaded list entry row to unreadCount 0 with no HTTP call', async () => {
+      const load = store.loadList({});
+      http.expectOne('/api/conversations').flush(unreadResponse);
+      await load;
+
+      store.markAsRead('c1', {});
+
+      const snapshot = store.listSnapshot({});
+      expect(snapshot?.data?.data[0]?.unreadCount).toBe(0);
+
+      // Synchronous cache patch: no refetch, no HTTP.
+      http.expectNone('/api/conversations');
+    });
+
+    it('leaves other rows untouched', async () => {
+      const load = store.loadList({});
+      const twoRows = {
+        ...unreadResponse,
+        data: [...unreadResponse.data, { ...unreadResponse.data[0], id: 'c2', unreadCount: 4 }],
+      };
+      http.expectOne('/api/conversations').flush(twoRows);
+      await load;
+
+      store.markAsRead('c1', {});
+
+      const rows = store.listSnapshot({})?.data?.data ?? [];
+      expect(rows.find((row) => row.id === 'c1')?.unreadCount).toBe(0);
+      expect(rows.find((row) => row.id === 'c2')?.unreadCount).toBe(4);
+    });
+
+    it('is a no-op for an entry that was never loaded (no entry created)', () => {
+      store.markAsRead('c1', { page: 9 });
+
+      expect(store.listSnapshot({ page: 9 })).toBeUndefined();
+      http.expectNone('/api/conversations');
+    });
+
+    it('patches become fresh: the next load inside the window serves the patched cache', async () => {
+      const load = store.loadList({});
+      http.expectOne('/api/conversations').flush(unreadResponse);
+      await load;
+
+      store.markAsRead('c1', {});
+
+      await store.loadList({});
+      http.expectNone('/api/conversations');
+      expect(store.listSnapshot({})?.data?.data[0]?.unreadCount).toBe(0);
+    });
+  });
 });
