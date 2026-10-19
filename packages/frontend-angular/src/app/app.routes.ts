@@ -4,6 +4,7 @@ import { AppShell } from './components/app-shell/app-shell';
 import { Inbox } from './pages/inbox/inbox';
 import { Conversation } from './pages/conversation/conversation';
 import { RoutingRules } from './pages/routing-rules/routing-rules';
+import { Users } from './pages/users/users';
 import { authGuard } from './guards/auth-guard';
 import { publicGuard } from './guards/public-guard';
 import { roleGuard } from './guards/role-guard';
@@ -60,6 +61,14 @@ export const routes: Routes = [
         path: 'routing-rules',
         component: RoutingRules,
         canActivate: [roleGuard('ADMIN')],
+      },
+      // ANG-011 (#381): the users row — SUPER_ADMIN-gated management page
+      // (React `ProtectedRoute requiredRole="SUPER_ADMIN"` + `UsersPage`
+      // parity; the nav row in `lib/navigation.ts` filters identically).
+      {
+        path: 'users',
+        component: Users,
+        canActivate: [roleGuard('SUPER_ADMIN')],
       },
       { path: '', pathMatch: 'full', redirectTo: 'inbox' },
     ],
