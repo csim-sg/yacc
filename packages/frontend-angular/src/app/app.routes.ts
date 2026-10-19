@@ -3,8 +3,10 @@ import { Routes } from '@angular/router';
 import { AppShell } from './components/app-shell/app-shell';
 import { Inbox } from './pages/inbox/inbox';
 import { Conversation } from './pages/conversation/conversation';
+import { RoutingRules } from './pages/routing-rules/routing-rules';
 import { authGuard } from './guards/auth-guard';
 import { publicGuard } from './guards/public-guard';
+import { roleGuard } from './guards/role-guard';
 import { ChangePassword } from './pages/change-password';
 import { ForgotPassword } from './pages/forgot-password';
 import { Login } from './pages/login';
@@ -51,6 +53,14 @@ export const routes: Routes = [
       // the inbox cards and the shell NotificationCenter click-through
       // (React `path="/conversations/:id"` parity).
       { path: 'conversations/:id', component: Conversation },
+      // ANG-010 (#380): the routing-rules row — ADMIN-gated management page
+      // (React `ProtectedRoute requiredRole="ADMIN"` + `RoutingRulesPage`
+      // parity; the nav row in `lib/navigation.ts` filters identically).
+      {
+        path: 'routing-rules',
+        component: RoutingRules,
+        canActivate: [roleGuard('ADMIN')],
+      },
       { path: '', pathMatch: 'full', redirectTo: 'inbox' },
     ],
   },
