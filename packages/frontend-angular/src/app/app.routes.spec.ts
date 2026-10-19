@@ -1,5 +1,6 @@
 import { routes } from './app.routes';
 import { AppShell } from './components/app-shell/app-shell';
+import { AuditLogs } from './pages/audit-logs/audit-logs';
 import { IrcProfiles } from './pages/irc-profiles/irc-profiles';
 import { Inbox } from './pages/inbox/inbox';
 import { Conversation } from './pages/conversation/conversation';
@@ -9,7 +10,7 @@ import { Users } from './pages/users/users';
 /**
  * Route-table spec (ANG-004 auth slice + ANG-007 shell slice + ANG-008
  * conversation-detail row + ANG-010 routing-rules row + ANG-011 users row
- * + ANG-012 IRC-profiles row).
+ * + ANG-012 IRC-profiles row + ANG-013 audit-logs row).
  *
  * Pins the route matrix: public auth forms behind `publicGuard`, the
  * unguarded OIDC redirect-uri route, the authGuard-protected
@@ -61,6 +62,7 @@ describe('routes', () => {
       'routing-rules',
       'users',
       'integrations/irc-profiles',
+      'audit-logs',
       '',
     ]);
     expect(children[0]?.component).toBe(Inbox);
@@ -79,8 +81,14 @@ describe('routes', () => {
     // gating is in-component per endpoint RBAC).
     expect(children[4]?.component).toBe(IrcProfiles);
     expect(children[4]?.canActivate).toBeDefined();
+    // ANG-013: the audit-logs row — MANAGER-gated via roleGuard (React
+    // `ProtectedRoute requiredRole="MANAGER"` parity; hierarchy semantics
+    // let SUPER_ADMIN/ADMIN pass; the export endpoint is API-only
+    // parity, U4).
+    expect(children[5]?.component).toBe(AuditLogs);
+    expect(children[5]?.canActivate).toBeDefined();
     // The empty child redirects to /inbox (React `/` → inbox parity).
-    expect(children[5]?.redirectTo).toBe('inbox');
+    expect(children[6]?.redirectTo).toBe('inbox');
   });
 
   it('redirects unknown paths to /inbox (React `path="*"` parity)', () => {
