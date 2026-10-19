@@ -2,10 +2,11 @@ import { routes } from './app.routes';
 import { AppShell } from './components/app-shell/app-shell';
 import { Inbox } from './pages/inbox/inbox';
 import { Conversation } from './pages/conversation/conversation';
+import { RoutingRules } from './pages/routing-rules/routing-rules';
 
 /**
  * Route-table spec (ANG-004 auth slice + ANG-007 shell slice + ANG-008
- * conversation-detail row).
+ * conversation-detail row + ANG-010 routing-rules row).
  *
  * Pins the route matrix: public auth forms behind `publicGuard`, the
  * unguarded OIDC redirect-uri route, the authGuard-protected
@@ -51,12 +52,21 @@ describe('routes', () => {
     expect(shell?.canActivate).toBeDefined();
 
     const children = shell?.children ?? [];
-    expect(children.map((child) => child.path)).toEqual(['inbox', 'conversations/:id', '']);
+    expect(children.map((child) => child.path)).toEqual([
+      'inbox',
+      'conversations/:id',
+      'routing-rules',
+      '',
+    ]);
     expect(children[0]?.component).toBe(Inbox);
     // ANG-008: the conversation detail row under the shell group.
     expect(children[1]?.component).toBe(Conversation);
+    // ANG-010: the routing-rules row — ADMIN-gated via roleGuard (React
+    // `ProtectedRoute requiredRole="ADMIN"` parity).
+    expect(children[2]?.component).toBe(RoutingRules);
+    expect(children[2]?.canActivate).toBeDefined();
     // The empty child redirects to /inbox (React `/` → inbox parity).
-    expect(children[2]?.redirectTo).toBe('inbox');
+    expect(children[3]?.redirectTo).toBe('inbox');
   });
 
   it('redirects unknown paths to /inbox (React `path="*"` parity)', () => {
