@@ -48,20 +48,39 @@ export const ListIrcProfilesResponseSchema = z.array(IrcProfileSchema);
 
 export type ListIrcProfilesResponse = z.infer<typeof ListIrcProfilesResponseSchema>;
 
-/** POST /api/integrations/irc/profiles. */
+/**
+ * POST /api/integrations/irc/profiles — the frozen `IrcProfileWrite`
+ * (openapi.yaml): canonicalized FLAT shape `{name, server, port, nick,
+ * channels}` (MIG-003 shape reconciliation; `password` rides the
+ * documented additional property, and the merged Java `ProfileWrite`
+ * re-emits absent members as absent).
+ *
+ * ANG-012 wire-truth alignment (ANG-008 U3 precedent): the previously
+ * delivered nested `config{}` body was the Node-POC claim — against the
+ * Java backend of record it stores an empty config. The response row
+ * schema below keeps the delivered embedded `config` shape (matches the
+ * Java `Profile` record).
+ */
 export const CreateIrcProfileRequestSchema = z.object({
   name: z.string(),
-  config: IrcProfileConfigSchema,
+  server: z.string(),
+  port: z.number().int(),
+  nick: z.string(),
+  channels: z.array(z.string()),
   password: z.string().optional(),
 });
 
 export type CreateIrcProfileRequest = z.infer<typeof CreateIrcProfileRequestSchema>;
 
-/** PUT /api/integrations/irc/profiles/:id. */
+/** PUT /api/integrations/irc/profiles/:id — same flat shape, all optional. */
 export const UpdateIrcProfileRequestSchema = z.object({
   name: z.string().optional(),
-  config: IrcProfileConfigSchema.optional(),
+  server: z.string().optional(),
+  port: z.number().int().optional(),
+  nick: z.string().optional(),
+  channels: z.array(z.string()).optional(),
   password: z.string().optional(),
+  enabled: z.boolean().optional(),
 });
 
 export type UpdateIrcProfileRequest = z.infer<typeof UpdateIrcProfileRequestSchema>;
@@ -76,15 +95,26 @@ export const TestConnectionResultSchema = z.object({
 export type TestConnectionResult = z.infer<typeof TestConnectionResultSchema>;
 
 /**
- * POST /api/integrations/irc/test — live W16 consumer; answers
- * `{ data: { success, message } }` (envelope-verified controller).
+ * POST /api/integrations/irc/test request body — the frozen
+ * `IrcConfigBody` (openapi.yaml): when a body is present, server/port/
+ * username/channels are required, password is optional, and every channel
+ * is '#'-prefixed (the merged Java `IrcTestRequest` bean validation
+ * rejects partial bodies with 400 `validation_error`). The body itself is
+ * optional at the operation level — omitting it entirely tests the stored
+ * config.
+ *
+ * ANG-012 wire-truth alignment (ANG-008 U3 precedent): the previously
+ * delivered `nick`/`channel` all-optional partial shape mis-claimed this
+ * operation — frozen contract (ADR-023) + merged Java record are the wire
+ * truth. The response envelope below is unchanged.
  */
 export const IrcTestRequestSchema = z
   .object({
-    server: z.string().optional(),
-    port: z.number().int().optional(),
-    nick: z.string().optional(),
-    channel: z.string().optional(),
+    server: z.string().min(1),
+    port: z.number().int().min(1).max(65535),
+    username: z.string().min(1),
+    password: z.string().optional(),
+    channels: z.array(z.string().regex(/^#/)).min(1),
   })
   .optional();
 

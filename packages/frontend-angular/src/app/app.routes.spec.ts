@@ -1,5 +1,6 @@
 import { routes } from './app.routes';
 import { AppShell } from './components/app-shell/app-shell';
+import { IrcProfiles } from './pages/irc-profiles/irc-profiles';
 import { Inbox } from './pages/inbox/inbox';
 import { Conversation } from './pages/conversation/conversation';
 import { RoutingRules } from './pages/routing-rules/routing-rules';
@@ -7,7 +8,8 @@ import { Users } from './pages/users/users';
 
 /**
  * Route-table spec (ANG-004 auth slice + ANG-007 shell slice + ANG-008
- * conversation-detail row + ANG-010 routing-rules row + ANG-011 users row).
+ * conversation-detail row + ANG-010 routing-rules row + ANG-011 users row
+ * + ANG-012 IRC-profiles row).
  *
  * Pins the route matrix: public auth forms behind `publicGuard`, the
  * unguarded OIDC redirect-uri route, the authGuard-protected
@@ -58,6 +60,7 @@ describe('routes', () => {
       'conversations/:id',
       'routing-rules',
       'users',
+      'integrations/irc-profiles',
       '',
     ]);
     expect(children[0]?.component).toBe(Inbox);
@@ -71,8 +74,13 @@ describe('routes', () => {
     // `ProtectedRoute requiredRole="SUPER_ADMIN"` parity).
     expect(children[3]?.component).toBe(Users);
     expect(children[3]?.canActivate).toBeDefined();
+    // ANG-012: the IRC-profiles row — ADMIN-gated via roleGuard (React
+    // `ProtectedRoute requiredRole="ADMIN"` parity; super_admin mutation
+    // gating is in-component per endpoint RBAC).
+    expect(children[4]?.component).toBe(IrcProfiles);
+    expect(children[4]?.canActivate).toBeDefined();
     // The empty child redirects to /inbox (React `/` → inbox parity).
-    expect(children[4]?.redirectTo).toBe('inbox');
+    expect(children[5]?.redirectTo).toBe('inbox');
   });
 
   it('redirects unknown paths to /inbox (React `path="*"` parity)', () => {

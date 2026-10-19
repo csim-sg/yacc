@@ -1,0 +1,316 @@
+@if (!canManage()) {
+  <!-- No-access alert (React `!canManage` early-return parity). -->
+  <div class="flex items-center justify-center min-h-screen">
+    <div class="alert alert-error max-w-md" data-testid="access-denied">
+      <span>{{ actionError() }}</span>
+    </div>
+  </div>
+} @else if (isLoading()) {
+  <!-- First-load spinner (React `loading` early-return parity). -->
+  <div class="flex items-center justify-center min-h-screen" data-testid="loading-state">
+    <span class="loading loading-spinner loading-lg"></span>
+  </div>
+} @else {
+  <div class="p-6 bg-base-100">
+    <div class="max-w-6xl mx-auto">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-8">
+        <div>
+          <h1 class="text-3xl font-bold">IRC Profiles</h1>
+          <p class="text-base-content/70 mt-1">Manage IRC connection profiles</p>
+        </div>
+        @if (isSuperAdmin() && !showCreateForm()) {
+          <button class="btn btn-primary" (click)="openCreateForm()" data-testid="create-profile-btn">
+            Create Profile
+          </button>
+        }
+      </div>
+
+      <!-- Error Alert (action errors are dismissable; load errors retry) -->
+      @if (errorMessage(); as message) {
+        <div class="alert alert-error mb-6" data-testid="error-alert">
+          <span>{{ message }}</span>
+          @if (hasLoadError()) {
+            <button class="btn btn-sm" (click)="retry()">Retry</button>
+          } @else {
+            <button class="btn btn-sm" (click)="actionError.set(null)">Dismiss</button>
+          }
+        </div>
+      }
+
+      <!-- Create Form -->
+      @if (showCreateForm() && isSuperAdmin()) {
+        <div class="card bg-base-200 shadow-md mb-6" data-testid="create-form">
+          <div class="card-body">
+            <h3 class="card-title mb-4">Create New IRC Profile</h3>
+
+            @if (formError(); as createError) {
+              <div class="alert alert-error mb-4">
+                <span>{{ createError }}</span>
+              </div>
+            }
+
+            <form (ngSubmit)="submitCreate()" class="space-y-4">
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold">Profile Name *</span>
+                </label>
+                <input
+                  type="text"
+                  class="input input-bordered"
+                  placeholder="e.g., Production IRC"
+                  name="nameInput"
+                  [(ngModel)]="nameInput"
+                  required
+                  data-testid="profile-name-input"
+                />
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Server *</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="input input-bordered"
+                    placeholder="irc.example.com"
+                    name="serverInput"
+                    [(ngModel)]="serverInput"
+                    required
+                    data-testid="server-input"
+                  />
+                </div>
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Port *</span>
+                  </label>
+                  <input
+                    type="number"
+                    class="input input-bordered"
+                    placeholder="6667"
+                    name="portInput"
+                    [ngModel]="portInput"
+                    (ngModelChange)="onPortChange($event)"
+                    required
+                    min="1"
+                    max="65535"
+                    data-testid="port-input"
+                  />
+                </div>
+              </div>
+
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold">Username *</span>
+                </label>
+                <input
+                  type="text"
+                  class="input input-bordered"
+                  placeholder="bot_user"
+                  name="usernameInput"
+                  [(ngModel)]="usernameInput"
+                  required
+                  data-testid="username-input"
+                />
+              </div>
+
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold">Password (optional)</span>
+                </label>
+                <input
+                  type="password"
+                  class="input input-bordered"
+                  placeholder="Leave empty if not required"
+                  name="passwordInput"
+                  [(ngModel)]="passwordInput"
+                  data-testid="password-input"
+                />
+              </div>
+
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold">
+                    Channels (comma-separated, e.g. #general, #dev) *
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  class="input input-bordered"
+                  placeholder="#general, #dev"
+                  name="channelsInput"
+                  [(ngModel)]="channelsInput"
+                  required
+                  data-testid="channels-input"
+                />
+              </div>
+
+              <div class="flex flex-wrap gap-2 pt-4">
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  [disabled]="isCreating()"
+                  data-testid="submit-btn"
+                >
+                  @if (isCreating()) {
+                    <span class="loading loading-spinner loading-xs"></span>
+                    Creating...
+                  } @else {
+                    Create Profile
+                  }
+                </button>
+                <app-irc-test-button
+                  [config]="testConfig"
+                  [disabled]="!isTestable || isCreating()"
+                  extraClass="btn-outline"
+                />
+                <button
+                  type="button"
+                  class="btn btn-outline"
+                  (click)="showCreateForm.set(false)"
+                  [disabled]="isCreating()"
+                  data-testid="cancel-btn"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      }
+
+      <!-- Profiles List -->
+      @if (profiles().length === 0) {
+        @if (!hasLoadError()) {
+          <div class="alert alert-info" data-testid="empty-state">
+            <span>No IRC profiles configured yet</span>
+          </div>
+        }
+      } @else {
+        <div class="grid gap-6">
+          @for (profile of profiles(); track profile.id) {
+            <div class="card bg-base-200 shadow-md" [attr.data-testid]="'profile-card-' + profile.id">
+              <div class="card-body">
+                <!-- Header -->
+                <div class="flex justify-between items-start mb-4">
+                  <div>
+                    <h2 class="card-title">{{ profile.name }}</h2>
+                    <p class="text-sm text-base-content/70">
+                      {{ profile.config.server }}:{{ profile.config.port }}
+                    </p>
+                  </div>
+                  <div class="flex gap-2">
+                    @if (profile.isActive) {
+                      <div class="badge badge-success">Active</div>
+                    }
+                    @if (!profile.isEnabled) {
+                      <div class="badge badge-error">Disabled</div>
+                    }
+                  </div>
+                </div>
+
+                <!-- Config Details -->
+                <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+                  <div>
+                    <span class="font-semibold">Username:</span>
+                    <span class="ml-2">{{ profile.config.username }}</span>
+                  </div>
+                  <div>
+                    <span class="font-semibold">Channels:</span>
+                    <span class="ml-2">{{ profile.config.channels.join(', ') }}</span>
+                  </div>
+                </div>
+
+                <!-- Test Status -->
+                @if (profile.lastTestedAt) {
+                  <div class="text-sm text-base-content/70 mb-4">
+                    <span>Last tested: {{ formattedDateTime(profile.lastTestedAt) }}</span>
+                    @if (profile.lastTestPassed !== undefined) {
+                      <span
+                        class="ml-3 badge {{ profile.lastTestPassed ? 'badge-success' : 'badge-error' }}"
+                      >
+                        {{ profile.lastTestPassed ? 'Passed' : 'Failed' }}
+                      </span>
+                    }
+                  </div>
+                }
+
+                <!-- Test Result Alert -->
+                @if (testResult(); as result) {
+                  @if (result.profileId === profile.id) {
+                    <div
+                      class="alert mb-4 {{ result.passed ? 'alert-success' : 'alert-error' }}"
+                      [attr.data-testid]="'test-result-' + profile.id"
+                    >
+                      <div class="flex flex-col">
+                        <span class="font-semibold">
+                          {{ result.passed ? '✓ Connection Successful' : '✗ Connection Failed' }}
+                        </span>
+                        @if (result.reason) {
+                          <span class="text-sm mt-1">{{ result.reason }}</span>
+                        }
+                        @if (result.duration > 0) {
+                          <span class="text-sm mt-1">Duration: {{ result.duration }}ms</span>
+                        }
+                      </div>
+                    </div>
+                  }
+                }
+
+                <!-- Action Buttons -->
+                @if (isSuperAdmin()) {
+                  <div class="flex gap-2 mt-4 flex-wrap">
+                    <button
+                      class="btn btn-sm {{
+                        testingProfileId() === profile.id ? 'btn-disabled' : 'btn-outline'
+                      }}"
+                      (click)="handleTestConnection(profile.id)"
+                      [disabled]="testingProfileId() === profile.id"
+                      [attr.data-testid]="'test-btn-' + profile.id"
+                    >
+                      @if (testingProfileId() === profile.id) {
+                        <span class="loading loading-spinner loading-xs"></span>
+                        Testing...
+                      } @else {
+                        Test Connection
+                      }
+                    </button>
+
+                    @if (!profile.isActive) {
+                      <button
+                        class="btn btn-sm btn-success"
+                        (click)="handleActivate(profile.id)"
+                        [attr.data-testid]="'activate-btn-' + profile.id"
+                      >
+                        Activate
+                      </button>
+                    } @else {
+                      <button
+                        class="btn btn-sm btn-warning"
+                        (click)="handleDisable(profile.id)"
+                        [attr.data-testid]="'disable-btn-' + profile.id"
+                      >
+                        Disable
+                      </button>
+                    }
+
+                    <button
+                      class="btn btn-sm btn-error"
+                      (click)="handleDelete(profile.id)"
+                      [disabled]="profile.isActive"
+                      [title]="profile.isActive ? 'Disable before deleting' : ''"
+                      [attr.data-testid]="'delete-btn-' + profile.id"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}
