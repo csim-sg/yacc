@@ -252,6 +252,8 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p /tmp/opencode/parity
+          export PLAYWRIGHT_JSON_OUTPUT_DIR=/tmp/opencode/parity
+          export PLAYWRIGHT_JSON_OUTPUT_NAME=parity-run.json
           # The comparator owns the gate decision: the suite's own exit code is
           # expected to be non-zero while anchor-red rows stay red. A crash
           # that produces no report still fails the gate (comparator is
@@ -410,6 +412,8 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p /tmp/opencode/capture
+          export PLAYWRIGHT_JSON_OUTPUT_DIR=/tmp/opencode/capture
+          export PLAYWRIGHT_JSON_OUTPUT_NAME=baseline-report.json
           # Same command shape as the S2 capture (runbook §7.5): HTML + JSON
           # reporters, CI retries. Red rows are recorded as-is — the capture
           # anchors the recorded state, it does not require green.
