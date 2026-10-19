@@ -1,0 +1,113 @@
+<div class="flex flex-col gap-3">
+  <!-- Error alert -->
+  @if (error() && showError()) {
+    <div class="alert alert-error shadow-lg" role="alert" data-testid="error-message">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="stroke-current shrink-0 h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      <div class="flex-1">
+        <h3 class="font-bold">Failed to send message</h3>
+        <div class="text-sm">{{ error() }}</div>
+      </div>
+      <button
+        type="button"
+        class="btn btn-sm btn-ghost"
+        (click)="onErrorDismiss()"
+        aria-label="Dismiss error message"
+        data-testid="error-dismiss-button"
+      >
+        Dismiss
+      </button>
+    </div>
+  }
+
+  <!-- Composer card -->
+  <div class="card bg-base-100 border border-base-300">
+    <div class="card-body p-0 gap-0">
+      <!-- Textarea -->
+      <textarea
+        class="w-full p-4 resize-none focus:outline-none focus:ring-0 min-h-24 max-h-48 bg-base-100 text-base"
+        [value]="body()"
+        (input)="onInput($event)"
+        (keydown)="handleTextareaKeyDown($event)"
+        [disabled]="isSending() || isLocalSending()"
+        [placeholder]="placeholder()"
+        aria-label="Message body"
+        [attr.aria-describedby]="isAtLimit() ? 'char-limit-warning' : 'char-counter'"
+        data-testid="reply-composer-textarea"
+      ></textarea>
+
+      <!-- Footer with character counter and send button -->
+      <div class="flex items-center justify-between px-4 py-3 bg-base-200 border-t border-base-300 gap-3">
+        <!-- Character counter -->
+        <div
+          id="{{ isAtLimit() ? 'char-limit-warning' : 'char-counter' }}"
+          class="text-xs font-medium whitespace-nowrap {{ isAtLimit() ? 'text-error font-bold' : 'text-base-content/60' }}"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="character-counter"
+        >
+          {{ charCount().toLocaleString() }} / {{ maxLength().toLocaleString() }}
+          @if (isAtLimit()) {
+            <span class="ml-1">(limit reached)</span>
+          }
+        </div>
+
+        <!-- Send button -->
+        <button
+          type="button"
+          class="btn btn-primary btn-sm gap-2"
+          (click)="handleSend()"
+          [disabled]="isDisabled()"
+          aria-label="Send message"
+          data-testid="reply-composer-send-button"
+        >
+          @if (isSending() || isLocalSending()) {
+            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <span>Sending...</span>
+          } @else {
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              class="w-4 h-4"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M6 12L3.269 3.125A59.769 59.769 0 0121.94 12c0 .135-.007.27-.02.404.662-.32 1.283-.823 1.844-1.382l2.494-2.494c.09-.09.182-.179.273-.268-.663.72-1.423 1.331-2.262 1.787m0 0a48.972 48.972 0 016.02 6.022c-7.449 7.449-15.809 6.627-17.708-4.185m0 0a6.977 6.977 0 001.347-2.395m0 0a6.979 6.979 0 01.5-1.636M21 12a9 9 0 11-18 0z"
+              />
+            </svg>
+            <span>Send</span>
+          }
+        </button>
+      </div>
+
+      <!-- Hint text -->
+      <div class="px-4 py-2 bg-base-100 text-xs text-base-content/50 border-t border-base-300">
+        Press
+        <kbd class="px-1.5 py-0.5 bg-base-200 rounded text-xs font-semibold">Ctrl+Enter</kbd>
+        to send
+      </div>
+    </div>
+  </div>
+</div>

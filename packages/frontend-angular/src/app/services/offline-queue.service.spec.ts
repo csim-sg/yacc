@@ -31,15 +31,18 @@ describe('OfflineQueueService', () => {
 
   function sentRow(id: string, conversationId: string): SendMessageResponse {
     return {
-      id,
-      conversationId,
-      senderId: null,
-      senderName: 'Operator',
-      body: 'queued while offline',
-      status: 'sent',
-      direction: 'outbound',
-      createdAt: '2026-10-19T00:00:00',
-      updatedAt: '2026-10-19T00:00:00',
+      // Frozen `{ data: Message }` send envelope (ANG-008 U3 disposition).
+      data: {
+        id,
+        conversationId,
+        senderId: null,
+        senderName: 'Operator',
+        body: 'queued while offline',
+        status: 'sent',
+        direction: 'outbound',
+        createdAt: '2026-10-19T00:00:00',
+        updatedAt: '2026-10-19T00:00:00',
+      },
     };
   }
 

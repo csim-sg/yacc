@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 
 import type {
   ListMessagesResponse,
+  Message,
   RetryMessageResponse,
   SendMessageRequest,
   SendMessageResponse,
@@ -42,15 +43,22 @@ export class MessagesService {
     );
   }
 
-  /** POST /api/conversations/:conversationId/messages — raw message (201). */
-  send(conversationId: string, body: SendMessageRequest): Promise<SendMessageResponse> {
-    return firstValueFrom(
+  /**
+   * POST /api/conversations/:conversationId/messages — the frozen
+   * `{ data: Message }` envelope (201). The envelope is unwrapped here
+   * (IO owns the wire shape) so the store's confirmed-append receives
+   * the message row itself — React appends `response.data` (the U3
+   * send-envelope disposition rides the frozen-contract operation).
+   */
+  async send(conversationId: string, body: SendMessageRequest): Promise<Message> {
+    const response = await firstValueFrom(
       this.http.post<SendMessageResponse>(
         `/api/conversations/${conversationId}/messages`,
         body,
         { context: mutationContext() },
       ),
     );
+    return response.data;
   }
 
   /** POST .../messages/:messageId/retry — `{ data: message }` (exactly-once click tracking preserved by the caller). */
