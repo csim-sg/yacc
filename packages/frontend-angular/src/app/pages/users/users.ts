@@ -204,11 +204,16 @@ export class Users implements OnDestroy {
     });
   }
 
-  /** React unmount cleanup — clear the pending search debounce. */
-  ngOnDestroy(): void {
+  /** Cancel a scheduled-but-unfired search debounce timer, if any. */
+  private cancelSearchDebounce(): void {
     if (this.searchTimeout !== null) {
       clearTimeout(this.searchTimeout);
     }
+  }
+
+  /** React unmount cleanup — clear the pending search debounce. */
+  ngOnDestroy(): void {
+    this.cancelSearchDebounce();
   }
 
   /**
@@ -217,9 +222,7 @@ export class Users implements OnDestroy {
    */
   protected onSearchChange(value: string): void {
     this.searchInput = value;
-    if (this.searchTimeout !== null) {
-      clearTimeout(this.searchTimeout);
-    }
+    this.cancelSearchDebounce();
     this.searchTimeout = setTimeout(() => {
       this.debouncedSearch.set(value || undefined);
       this.page.set(1);
@@ -256,8 +259,14 @@ export class Users implements OnDestroy {
     }
   }
 
-  /** React `clearFilters` — filters, search and page reset. */
+  /**
+   * React `clearFilters` — filters, search and page reset. The pending
+   * debounce is canceled first: a typed-but-not-yet-applied search must
+   * not fire after the clear and reapply the query while the input is
+   * blank (review loop 1 — PR #433 finding #6258676322).
+   */
   protected clearFilters(): void {
+    this.cancelSearchDebounce();
     this.filters.set({});
     this.searchInput = '';
     this.debouncedSearch.set(undefined);

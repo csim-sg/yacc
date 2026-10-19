@@ -380,6 +380,48 @@ describe('Users page', () => {
     expect(pageElement().textContent).toContain('Showing 1-1 of 1 users');
   });
 
+  it('canceling filters before the debounce expires drops the pending search (no stale reapply)', async () => {
+    await renderSignedIn(SUPER_ADMIN);
+    await flushUsers();
+
+    // Activate a role filter so the Clear Filters button is visible, then
+    // type a search WITHOUT letting the 300ms debounce fire (fake timers).
+    setSelect('role-filter', 'admin');
+    fixture.detectChanges();
+    http
+      .expectOne('/api/users?role=admin&page=1&limit=20')
+      .flush(listResponse([user({ role: 'admin', email: 'admin2@example.com' })], 1));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    vi.useFakeTimers();
+    // ngModel view→model is synchronous: onSearchChange runs here and
+    // schedules the (fake) 300ms debounce.
+    setInput('search-input', 'manager');
+    // NgModel syncs the [ngModel] binding through a microtask — drain it
+    // between the two user events (the real-browser zone.js ticks).
+    fixture.detectChanges();
+    await Promise.resolve();
+    button('clear-filters-btn').click();
+    fixture.detectChanges();
+    await Promise.resolve();
+
+    // The clear applies immediately: the input is blank and nothing is active.
+    expect((query('search-input') as HTMLInputElement).value).toBe('');
+    expect(query('clear-filters-btn')).toBeNull();
+
+    // The canceled debounce must not fire and reapply the cleared query.
+    vi.advanceTimersByTime(300);
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
+    vi.useRealTimers();
+
+    http.expectNone('/api/users?search=manager&page=1&limit=20');
+    // The view stays on the unfiltered default key (served from store cache).
+    expect(pageElement().textContent).toContain('Showing 1-3 of 3 users');
+  });
+
   it('paginates through the list and flips prev/next at the boundaries', async () => {
     await renderSignedIn(SUPER_ADMIN);
     await flushUsers(listResponse(defaultUsers(), 45));
