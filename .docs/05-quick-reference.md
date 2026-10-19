@@ -97,12 +97,14 @@ pnpm --filter @yacc/common lint       # Common package linter
 
 | Capability | Super Admin | Admin | Manager | User |
 |-----------|------------|-------|---------|------|
-| **View all conversations** | ✅ | ✅ | ✅ | ❌ (assigned only) |
+| **View all conversations** | ✅ | ✅ | ✅ | ✅ |
 | **View assigned conversations** | ✅ | ✅ | ✅ | ✅ |
 | **Reply on conversation** | ✅ | ✅ | ✅ | ✅ (if assigned) |
 | **Retry failed message** | ✅ | ✅ | ✅ | ✅ (if assigned) |
 | **See all notifications** | ✅ | ✅ | ✅ | ✅ |
 | **Mark notifications read** | ✅ | ✅ | ✅ | ✅ |
+
+> **Founder decision (2026-10-18)** — shared-inbox viewing: all active authenticated identities (all roles, including self-registered/OIDC-first-login Users) may **view** all conversation content (messages, status, notes) of every conversation (assigned, unassigned, or assigned to another user). User **reply/retry** remain assignment-bound. Recorded in [#367 (comment 6268859088)](https://github.com/csim-sg/yacc/issues/367#issuecomment-6268859088); amends the "Locked Defaults" **view** wording only — no other permission change.
 
 ---
 
