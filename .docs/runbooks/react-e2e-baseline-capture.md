@@ -240,3 +240,18 @@ recorded in the archive README; the committed JSON is the complete durable per-c
 **Gates unchanged:** CP-3/PB-2 remain **blocking** pending reviewer/tech-lead acceptance of this
 evidence; real-time rows remain on the separate R1 track (AD-2) and are **not** satisfied by this
 capture.
+
+## 8. Automated CI capture (ANG-015, 2026-10-19)
+
+§7's procedure is now automated as the `react-baseline-capture` job in
+`.github/workflows/frontend-angular-parity.yml` (CP-3, AC-ANG-015-3): `workflow_dispatch`
+only; boots the Java backend of record in the same S1 E2E fixture posture (PostgreSQL
+service container — no Redis, ADR-028), runs the React harness (HTML+JSON reporters,
+CI retries) at the checked-out SHA, derives the per-case TSV with
+`packages/frontend-angular/parity/compare-baseline.mjs tsv`, records environment
+versions, and uploads everything as workflow artifacts (JSON + TSV + env + run log +
+HTML report). Non-gating evidence: archiving a new anchor into the repo remains a
+deliberate act — a reviewed register (§1) + `parity/gate-scope.json` anchor-block update
+(SHA-256s, declared counts). The same workflow's `parity` job enforces PB-2 against the
+committed anchor (fail-closed comparator); §2–§5 above remain the historical Node-era
+procedure.

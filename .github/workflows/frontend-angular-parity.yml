@@ -1,0 +1,455 @@
+name: Frontend Angular Parity Gates
+
+# ANG-015 (#385) — CP-3/CP-4 wiring (SPEC-003 AC-03/AC-05; SPEC-001 T5 §3.4).
+#
+# Makes the parity bar (PARITY.md PB-1/PB-2/PB-3) mechanically enforced in CI:
+#
+#   unit-coverage          PB-3 merge gate: Angular unit suite + coverage
+#                          thresholds >=85/85/85/80 (angular.json; the run exits
+#                          non-zero below target — never lowered).
+#   parity                 PB-2 E2E parity gate: boots the Java backend of record
+#                          in the S1 (#423) fail-closed E2E fixture posture
+#                          (PostgreSQL ONLY — the Java service has no Redis,
+#                          ADR-028; the issue body's "postgres+redis" wording is
+#                          superseded by the tech-lead reconciliation on #385),
+#                          runs the framework-agnostic Playwright suite in the
+#                          U10 gate scope against the Angular dev server, then
+#                          compares every case against the archived React-on-Java
+#                          anchor (AD-1, S2 #373) with parity/compare-baseline.mjs.
+#                          The comparator is the single gate decision: it fails
+#                          the job on regressions (anchor-green rows red on
+#                          Angular — routed to the owning port issue, never a
+#                          register entry), skipped/weakened rows, scope leaks,
+#                          register gaps, and missing results, and it fails
+#                          closed on a missing/bad/mismatched baseline
+#                          (declared row counts + SHA-256 provenance). Expected
+#                          red, unanchored red/green, improvements and flaky
+#                          rows are surfaced in the job summary — never hidden.
+#   react-baseline-capture CP-3: automated React-on-Java baseline capture
+#                          (workflow_dispatch only — a full-suite 3-browser run).
+#                          Boots the same Java posture, runs the REACT harness,
+#                          derives the per-case TSV + env versions, and uploads
+#                          everything as workflow artifacts. Non-gating evidence;
+#                          archiving a new anchor into the repo is a separate
+#                          deliberate register/gate-scope update.
+#
+# Safety posture: no AWS/deploy credentials, no `environment:`, no access to
+# any deployed system — the Java service is a throwaway boot against an
+# ephemeral loopback PostgreSQL service container (the S1 seed is itself
+# fail-closed: explicit e2e profile + opt-in property + loopback guard, no
+# partial seed, no super_admin row, ADR-025). This workflow never re-points the
+# production `deploy` job (ANG-014/ANG-016 own deploy enablement/cutover).
+#
+# Spec-file integrity is enforced per PR: modified/renamed/deleted files under
+# packages/frontend/tests|e2e fail the parity job (spec files are never edited
+# to make Angular pass; additive specs are visible to review and must be
+# registered in parity/gate-scope.json — unknown files fail the comparator).
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'packages/frontend-angular/**'
+      - 'packages/frontend/tests/**'
+      - 'packages/frontend/e2e/**'
+      - '.github/workflows/frontend-angular-parity.yml'
+  pull_request:
+    paths:
+      - 'packages/frontend-angular/**'
+      - 'packages/frontend/tests/**'
+      - 'packages/frontend/e2e/**'
+      - '.github/workflows/frontend-angular-parity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-angular-parity-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # ------------------------------------------------------------------
+  # PB-3 — unit + coverage merge gate (>=85/85/85/80, AC-ANG-015-2)
+  # ------------------------------------------------------------------
+  unit-coverage:
+    name: unit-coverage (PB-3 >=85/85/85/80)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Unit suite + coverage thresholds (exit non-zero below target)
+        run: pnpm --filter @yacc/frontend-angular test:unit:coverage
+
+      - name: Upload coverage report (evidence)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: angular-unit-coverage
+          path: packages/frontend-angular/coverage/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # ------------------------------------------------------------------
+  # PB-2 — E2E parity gate vs the archived React-on-Java anchor (AC-ANG-015-1)
+  # ------------------------------------------------------------------
+  parity:
+    name: parity (PB-2 vs ae42c67 anchor)
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    services:
+      # Postgres ONLY: the Java backend of record has no Redis (ADR-028 —
+      # Quartz + PostgreSQL DB DLQ). Loopback :5432 satisfies the S1 seed's
+      # non-production datasource guard.
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: yacc_user
+          POSTGRES_PASSWORD: yacc_password
+          POSTGRES_DB: yacc_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U yacc_user -d yacc_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # E2E posture (identical to the S2 anchor capture env, runbook §7)
+      YACC_API_PROXY_TARGET: http://localhost:8080
+      API_URL: http://localhost:8080/api
+      PLAYWRIGHT_TEST_API_BASE_URL: http://localhost:8080
+      # W19 restart handles required by tests/realtime-rawws-r1.spec.ts
+      # (real SIGTERM + real restart of the S1-posture service — never a
+      # fabricated disconnect).
+      YACC_JAVA_PID_FILE: /tmp/opencode/java-service.pid
+      YACC_JAVA_RESTART_CMD: bash /tmp/opencode/boot-java.sh
+      CI: 'true'
+    steps:
+      - name: Checkout (full history — spec-edit gate + provenance)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'pnpm'
+
+      - name: Set up Temurin 21 (satisfies the Gradle toolchain, ADR-024)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Spec-file integrity gate (0 edits to existing suite files)
+        if: github.event_name == 'pull_request'
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          git fetch --no-tags origin "$base"
+          changed="$(git diff --name-only --diff-filter=MRD "$base"...HEAD -- packages/frontend/tests packages/frontend/e2e || true)"
+          if [ -n "$changed" ]; then
+            echo "::error::Spec files must never be edited to make Angular pass (PB-2; a wiring need is itself a disposition-register entry):"
+            echo "$changed"
+            exit 1
+          fi
+          echo "No existing suite file modified/renamed/deleted — integrity gate OK."
+
+      - name: Baseline pre-flight (fail-closed anchor validation)
+        run: node packages/frontend-angular/parity/compare-baseline.mjs check
+
+      - name: Build Java bootJar (backend of record)
+        working-directory: services/backend-java
+        run: ./gradlew --no-daemon bootJar
+
+      - name: Start Java service (S1 E2E fixture posture, fail-closed)
+        run: |
+          set -euo pipefail
+          JAR="$(ls services/backend-java/build/libs/yacc-backend-*.jar | head -1)"
+          LOADER_ARGS=()
+          # The postgresql driver is testRuntimeOnly; if it is not packaged in
+          # the bootJar (flyway-database-postgresql usually carries it), fall
+          # back to the S1-recorded loader.path boot with the cached driver
+          # (explicit PropertiesLauncher — the bootJar's own launcher is
+          # JarLauncher, which ignores loader.path).
+          if ! unzip -l "$JAR" | grep -q 'org/postgresql/Driver.class'; then
+            PG_JAR="$(find ~/.gradle/caches/modules-2/files-2.1/org.postgresql -name 'postgresql-*.jar' 2>/dev/null | head -1)"
+            if [ -z "$PG_JAR" ]; then
+              echo "::error::postgresql driver neither packaged in the bootJar nor present in the Gradle cache (fail-closed)"
+              exit 1
+            fi
+            mkdir -p /tmp/opencode/pgdriver
+            cp "$PG_JAR" /tmp/opencode/pgdriver/
+            LOADER_ARGS=(-Dloader.path=/tmp/opencode/pgdriver)
+          fi
+          # One launcher definition, used for the initial boot AND the W19
+          # in-spec restart (YACC_JAVA_RESTART_CMD points at this script).
+          cat > /tmp/opencode/boot-java.sh <<SCRIPT
+          #!/usr/bin/env bash
+          set -euo pipefail
+          SIGNING_KEY="\$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null | openssl pkcs8 -topk8 -nocrypt -outform DER 2>/dev/null | base64 -w0)"
+          MASTER_KEY="\$(openssl rand -base64 32)"
+          env SPRING_PROFILES_ACTIVE=e2e \\
+            SPRING_APPLICATION_JSON='{"yacc":{"e2e":{"seed-enabled":true}}}' \\
+            DATABASE_URL=jdbc:postgresql://localhost:5432/yacc_e2e \\
+            POSTGRES_USER=yacc_user POSTGRES_PASSWORD=yacc_password \\
+            YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL=admin@yacc.local \\
+            YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL=admin123 \\
+            YACC_AUTH_TOKEN_SIGNING_KEY="\$SIGNING_KEY" \\
+            YACC_INTEGRATION_ENCRYPTION_MASTER_KEY="\$MASTER_KEY" \\
+            nohup java ${LOADER_ARGS[*]+"${LOADER_ARGS[*]}"} -cp "$JAR" org.springframework.boot.loader.launch.PropertiesLauncher >> /tmp/opencode/java-service.log 2>&1 &
+          echo \$! > /tmp/opencode/java-service.pid
+          SCRIPT
+          chmod +x /tmp/opencode/boot-java.sh
+          bash /tmp/opencode/boot-java.sh
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/health/live > /dev/null; then
+              echo "Java service healthy (attempt $i) — E2E fixture posture up."
+              grep -E 'E2E fixture seed applied|First-run Super Admin bootstrap' /tmp/opencode/java-service.log || true
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Java service did not become healthy within 120s (fail-closed)"
+          tail -50 /tmp/opencode/java-service.log
+          exit 1
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @yacc/frontend-angular exec playwright install --with-deps chromium firefox webkit
+
+      - name: Run parity suite (U10 gate scope, 3 browsers)
+        id: run_parity
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/opencode/parity
+          # The comparator owns the gate decision: the suite's own exit code is
+          # expected to be non-zero while anchor-red rows stay red. A crash
+          # that produces no report still fails the gate (comparator is
+          # fail-closed on a missing run report).
+          pnpm --filter @yacc/frontend-angular exec playwright test \
+            --reporter=html,json 2>&1 | tee /tmp/opencode/parity/run-output.log
+          code=$?
+          echo "playwright_exit=$code" >> "$GITHUB_OUTPUT"
+          echo "Playwright exited $code (anchor-red rows are expected red; the comparator decides the gate)."
+          exit 0
+
+      - name: Compare against the anchor (single gate decision)
+        if: always()
+        run: |
+          set -o pipefail
+          node packages/frontend-angular/parity/compare-baseline.mjs compare \
+            --json-report /tmp/opencode/parity/parity-run.json \
+            --report /tmp/opencode/parity/comparison-report.json \
+            | tee /tmp/opencode/parity/comparison-summary.md
+          cat /tmp/opencode/parity/comparison-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload parity evidence (always — failures are surfaced, never hidden)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-evidence
+          path: |
+            /tmp/opencode/parity/parity-run.json
+            /tmp/opencode/parity/comparison-report.json
+            /tmp/opencode/parity/comparison-summary.md
+            /tmp/opencode/parity/run-output.log
+            /tmp/opencode/java-service.log
+            packages/frontend-angular/playwright-report/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # ------------------------------------------------------------------
+  # CP-3 — automated React-on-Java baseline capture (AC-ANG-015-3).
+  # workflow_dispatch only: a full-suite 3-browser run (~2.5 h). Evidence
+  # job — outcomes are archived as artifacts, never a silent gate input.
+  # ------------------------------------------------------------------
+  react-baseline-capture:
+    name: react-baseline-capture (CP-3 evidence)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: yacc_user
+          POSTGRES_PASSWORD: yacc_password
+          POSTGRES_DB: yacc_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U yacc_user -d yacc_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # React anchor env (runbook §7.4): same-origin Vite proxy -> Java :8080
+      VITE_API_BASE_URL: ''
+      VITE_API_URL: http://localhost:8080
+      API_URL: http://localhost:8080/api
+      PLAYWRIGHT_TEST_API_BASE_URL: http://localhost:8080
+      # W19 restart handles required by tests/realtime-rawws-r1.spec.ts
+      YACC_JAVA_PID_FILE: /tmp/opencode/java-service.pid
+      YACC_JAVA_RESTART_CMD: bash /tmp/opencode/boot-java.sh
+      CI: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'pnpm'
+
+      - name: Set up Temurin 21 (satisfies the Gradle toolchain, ADR-024)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Baseline pre-flight (validate the committed anchor this capture would succeed)
+        run: node packages/frontend-angular/parity/compare-baseline.mjs check
+
+      - name: Build Java bootJar (backend of record)
+        working-directory: services/backend-java
+        run: ./gradlew --no-daemon bootJar
+
+      - name: Start Java service (S1 E2E fixture posture, fail-closed)
+        run: |
+          set -euo pipefail
+          JAR="$(ls services/backend-java/build/libs/yacc-backend-*.jar | head -1)"
+          LOADER_ARGS=()
+          if ! unzip -l "$JAR" | grep -q 'org/postgresql/Driver.class'; then
+            PG_JAR="$(find ~/.gradle/caches/modules-2/files-2.1/org.postgresql -name 'postgresql-*.jar' 2>/dev/null | head -1)"
+            if [ -z "$PG_JAR" ]; then
+              echo "::error::postgresql driver neither packaged in the bootJar nor present in the Gradle cache (fail-closed)"
+              exit 1
+            fi
+            mkdir -p /tmp/opencode/pgdriver
+            cp "$PG_JAR" /tmp/opencode/pgdriver/
+            LOADER_ARGS=(-Dloader.path=/tmp/opencode/pgdriver)
+          fi
+          # One launcher definition, used for the initial boot AND the W19
+          # in-spec restart (YACC_JAVA_RESTART_CMD points at this script).
+          cat > /tmp/opencode/boot-java.sh <<SCRIPT
+          #!/usr/bin/env bash
+          set -euo pipefail
+          SIGNING_KEY="\$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null | openssl pkcs8 -topk8 -nocrypt -outform DER 2>/dev/null | base64 -w0)"
+          MASTER_KEY="\$(openssl rand -base64 32)"
+          env SPRING_PROFILES_ACTIVE=e2e \\
+            SPRING_APPLICATION_JSON='{"yacc":{"e2e":{"seed-enabled":true}}}' \\
+            DATABASE_URL=jdbc:postgresql://localhost:5432/yacc_e2e \\
+            POSTGRES_USER=yacc_user POSTGRES_PASSWORD=yacc_password \\
+            YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL=admin@yacc.local \\
+            YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL=admin123 \\
+            YACC_AUTH_TOKEN_SIGNING_KEY="\$SIGNING_KEY" \\
+            YACC_INTEGRATION_ENCRYPTION_MASTER_KEY="\$MASTER_KEY" \\
+            nohup java ${LOADER_ARGS[*]+"${LOADER_ARGS[*]}"} -cp "$JAR" org.springframework.boot.loader.launch.PropertiesLauncher >> /tmp/opencode/java-service.log 2>&1 &
+          echo \$! > /tmp/opencode/java-service.pid
+          SCRIPT
+          chmod +x /tmp/opencode/boot-java.sh
+          bash /tmp/opencode/boot-java.sh
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/health/live > /dev/null; then
+              echo "Java service healthy (attempt $i)."
+              grep -E 'E2E fixture seed applied|First-run Super Admin bootstrap' /tmp/opencode/java-service.log || true
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Java service did not become healthy within 120s (fail-closed)"
+          tail -50 /tmp/opencode/java-service.log
+          exit 1
+
+      - name: Install Playwright browsers (React package)
+        run: pnpm --filter @yacc/frontend exec playwright install --with-deps chromium firefox webkit
+
+      - name: Capture React-on-Java baseline (full suite, anchor run shape)
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/opencode/capture
+          # Same command shape as the S2 capture (runbook §7.5): HTML + JSON
+          # reporters, CI retries. Red rows are recorded as-is — the capture
+          # anchors the recorded state, it does not require green.
+          pnpm --filter @yacc/frontend exec playwright test \
+            --reporter=html,json 2>&1 | tee /tmp/opencode/capture/run-output.log
+          exit 0
+
+      - name: Derive per-case TSV + environment provenance
+        if: always()
+        run: |
+          set -euo pipefail
+          node packages/frontend-angular/parity/compare-baseline.mjs tsv \
+            --json-report /tmp/opencode/capture/baseline-report.json \
+            --out /tmp/opencode/capture/per-case-listing.tsv
+          {
+            echo "capture_sha: ${{ github.sha }}"
+            echo "event: ${{ github.event_name }}"
+            echo "node: $(node --version)"
+            echo "pnpm: $(pnpm --version)"
+            echo "playwright: $(pnpm --filter @yacc/frontend exec playwright --version)"
+            echo "java: $(java -version 2>&1 | head -1)"
+            echo "gradle: $(cd services/backend-java && ./gradlew --no-daemon --version 2>/dev/null | grep '^Gradle' | head -1)"
+            echo "postgres: postgres:15-alpine (service container, yacc_e2e)"
+            echo "posture: SPRING_PROFILES_ACTIVE=e2e + yacc.e2e.seed-enabled=true + loopback DATABASE_URL (S1 #423)"
+            echo "status totals:"
+            tail -n +2 /tmp/opencode/capture/per-case-listing.tsv | cut -f3 | sort | uniq -c | sort -rn | sed 's/^/  /'
+          } > /tmp/opencode/capture/env-versions.txt
+          cat /tmp/opencode/capture/env-versions.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload baseline capture artifacts (evidence archive)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: react-on-java-baseline-${{ github.sha }}
+          path: |
+            /tmp/opencode/capture/baseline-report.json
+            /tmp/opencode/capture/per-case-listing.tsv
+            /tmp/opencode/capture/env-versions.txt
+            /tmp/opencode/capture/run-output.log
+            /tmp/opencode/java-service.log
+            packages/frontend/playwright-report/
+          retention-days: 14
+          if-no-files-found: warn

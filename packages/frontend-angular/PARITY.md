@@ -67,6 +67,13 @@ AD-2) and stay blocking until it exists.
 - Requires the E2E environment (runbook §Prerequisites): PostgreSQL + Redis + backend
   `:3000` + fixtures. The suite seeds fixtures itself via `globalSetup`.
 
+> **Corrected 2026-10-19 (ANG-015):** the Node-era environment above is superseded — the E2E
+> environment of record is the **Java** backend in the S1 fixture posture: **PostgreSQL only
+> (no Redis — ADR-028)**, `services/backend-java` booted with `SPRING_PROFILES_ACTIVE=e2e` +
+> `yacc.e2e.seed-enabled=true` + a loopback `DATABASE_URL`; `globalSetup` health-checks the
+> Java service. See `.docs/runbooks/react-e2e-baseline-capture.md` §7 and the disposition
+> register §8.
+
 ```bash
 pnpm --filter @yacc/frontend-angular test:e2e                      # full suite × 3 browsers
 pnpm --filter @yacc/frontend-angular test:e2e -- --project=chromium <spec>   # targeted
@@ -146,3 +153,23 @@ pnpm --filter @yacc/frontend-angular build
 # PB-3 unit + thresholds green:
 pnpm --filter @yacc/frontend-angular test:unit:coverage
 ```
+
+## 8. Gate scope (U10) + CI wiring (ANG-015, 2026-10-19)
+
+ANG-015 (#385) resolved **U10** and wired the parity bar into CI; the authoritative record is
+`parity/disposition-register.md` (§5 U10, §8 CI ownership) + `parity/gate-scope.json` (the
+machine-readable scope this harness and the CI comparator both read). Summary:
+
+- **Promoted:** the excluded `e2e/` set (6 files / 107 cases) now runs in the parity gate;
+  the `tests/tags.e2e.spec.ts` wrapper is superseded by direct `e2e/` discovery (no
+  double-run).
+- **Excluded:** the 9 assertion-free debug/inspector specs (T4 §2) via `testIgnore`.
+- **CI** (`.github/workflows/frontend-angular-parity.yml`): `unit-coverage` job (PB-3
+  thresholds ≥85/85/85/80), `parity` job (PB-2 vs the archived React-on-Java anchor —
+  fail-closed baseline validation incl. SHA-256, zero-regression comparison, no-silent-
+  regression buckets surfaced in the job summary), `react-baseline-capture` dispatch job
+  (CP-3 evidence, archived as workflow artifacts). PB-1 remains the `build-angular` job in
+  `frontend-deploy.yml`; Tier-1 remains `backend-java-ci.yml`.
+- **E2E environment of record:** Java service in the S1 fail-closed fixture posture,
+  PostgreSQL only (no Redis, ADR-028); same-origin dev-server relay (`proxy.conf.js`);
+  §3's Node-era environment note above is superseded (dated correction in place).
