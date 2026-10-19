@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 
 import { AppShell } from './components/app-shell/app-shell';
 import { Inbox } from './pages/inbox/inbox';
+import { Conversation } from './pages/conversation/conversation';
 import { authGuard } from './guards/auth-guard';
 import { publicGuard } from './guards/public-guard';
 import { ChangePassword } from './pages/change-password';
@@ -28,7 +29,8 @@ import { ResetPassword } from './pages/reset-password';
  *   wrapping the authenticated feature routes behind `authGuard`
  *   (React `ProtectedRoute` → `MainLayout` parity). Feature issues
  *   (ANG-008, ANG-010..013) append their own rows as its children —
- *   ANG-007 is the sole writer of this group.
+ *   ANG-007 is the sole writer of this group; ANG-008 appended the
+ *   `conversations/:id` detail row (append only).
  * - The catch-all redirects to `/inbox` (React `path="*"` parity); for
  *   unauthenticated visitors the shell guard then redirects to `/login`.
  */
@@ -45,6 +47,10 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: 'inbox', component: Inbox },
+      // ANG-008 (#378): the conversation detail row — the destination of
+      // the inbox cards and the shell NotificationCenter click-through
+      // (React `path="/conversations/:id"` parity).
+      { path: 'conversations/:id', component: Conversation },
       { path: '', pathMatch: 'full', redirectTo: 'inbox' },
     ],
   },

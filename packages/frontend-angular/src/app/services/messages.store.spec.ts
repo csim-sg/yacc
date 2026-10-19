@@ -74,7 +74,9 @@ describe('MessagesStore', () => {
     const pending = store.send('c1', { body: 'new reply' });
     const request = http.expectOne('/api/conversations/c1/messages');
     expect(request.request.body).toEqual({ body: 'new reply' });
-    request.flush(message('m2', 'new reply'));
+    // Frozen `{ data: Message }` send envelope (ANG-008 U3 disposition —
+    // the service unwraps it; the store appends the confirmed row).
+    request.flush({ data: message('m2', 'new reply') });
     await pending;
 
     const messages = store.listSnapshot('c1')?.data?.messages ?? [];
