@@ -20,7 +20,7 @@ import { test, expect, Page } from '@playwright/test';
 
 test.describe('P0 Frontend Option 2: Core Workflow & Account Recovery', () => {
   const API_BASE = 'http://localhost:3000/api';
-  const FE_BASE = 'http://localhost:5173';
+  const FE_BASE = process.env.BASE_URL || 'http://localhost:5173';
   
   // Test users - match backend test data
   const TEST_USER = {
