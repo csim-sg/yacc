@@ -4,7 +4,7 @@
 **Date**: 2026-10-20 (re-assessment; initial review 2026-10-18/19 at `1300436`) · **Author**: builder (managed do-tasks pass) · **Method owner**: `security-review` skill
 **Reviewed revision**: `origin/dev` @ `f9436c610ff2ec2ffe1bb8d0a9b20db6480bfec6` (PR #438 merge). Branch merge commit `e88d159`.
 **Revision validity**: `services/backend-java`, `deploy`, `.docs/migration` and `.github` are **byte-identical** between the revision-1 anchor `13004361ffb278f865182b4e515f38e02158bc97` and `f9436c6` — `git diff 1300436 f9436c6 -- services deploy .docs/migration .github` is empty (verified in this re-assessment). Every revision-1 code/config/contract anchor therefore remains valid unchanged; this re-assessment is a revision bump plus policy-baseline correction, not a re-review of changed code.
-**Companion artifact**: [MIG-073-findings-ledger.md](MIG-073-findings-ledger.md) (finding → remediation ledger + dated finding report, ledger revision 3)
+**Companion artifact**: [MIG-073-findings-ledger.md](MIG-073-findings-ledger.md) (finding → remediation ledger + dated finding report, ledger revision 4)
 
 ---
 
@@ -16,11 +16,14 @@ authoring half of AC-MIG-073-1 (every named surface documented by concrete artif
 Sev-1/Sev-2 severity definitions that scope AC-MIG-073-2 for **threat-model findings**.
 
 Findings, severities, statuses, and the dated finding report live in the companion ledger
-(revision 3). The review outcome is **not** a passing zero-open-Sev-1/2 state and **not** declared
+(revision 4). The review outcome is **not** a passing zero-open-Sev-1/2 state and **not** declared
 either way by the builder: at this revision the ledger records one `open` Sev-2 finding
-(TM-011 send authorization); **TM-012 was adjudicated
-not a finding** by tech-lead (2026-10-20) on the accepted records (§ ledger §2); two
-`resolved-policy (candidate)` dispositions (TM-001, TM-002 read paths) whose effect on AC-MIG-073-2
+(TM-011 send authorization); **TM-012 and TM-015 were adjudicated
+not a finding** by tech-lead (2026-10-20) on the accepted records (ledger §2; TM-015 per
+adjudication #367 comment `6291375868`); two
+`resolved-policy (candidate)` dispositions — TM-001, **narrowed in revision 4** to the
+founder-named content classes the conversation room carries, and TM-002 (REST read paths) — whose
+effect on AC-MIG-073-2
 is expressly reserved to the fresh independent reviewer assessment and tech-lead decision. No
 waiver was granted, no severity was reclassified, and no remediation was performed inside MIG-073
 (fixes are separate issues by scope).
@@ -49,14 +52,14 @@ waiver was granted, no severity was reclassified, and no remediation was perform
 | # | Scope item (issue #367) | Verdict against `dev` @ `f9436c6` |
 |---|---|---|
 | 1 | Dual-role OIDC (RP + embedded AS, Spring Authorization Server) | Implemented — §4 S2, S3 |
-| 2 | Four-role RBAC + status enforcement | Implemented — §4 S1; **open finding TM-011**; TM-012 adjudicated not-a-finding; reads policy-open (TM-002 `resolved-policy` candidate) |
+| 2 | Four-role RBAC + status enforcement | Implemented — §4 S1; **open finding TM-011**; TM-012/TM-015 adjudicated not-a-finding; reads policy-open (TM-002 `resolved-policy` candidate) |
 | 3 | Token/refresh lifecycle | Implemented — §4 S1, S3 |
 | 4 | Key rotation (JWKS) | Implemented — §4 S3.4 |
 | 5 | Consent/claims/scopes | Implemented — §4 S3 |
 | 6 | Deterministic first-run bootstrap + founder-controlled recovery | Implemented — §4 S4 |
 | 7 | Secrets handling | Implemented — §4 S7; findings TM-003/TM-004 |
 | 8 | Telegram/IRC connector credential handling | Implemented — §4 S6; findings TM-004/TM-006; TM-013 (relay caller authorization) |
-| 9 | Raw WebSocket auth | Implemented — §4 S5; TM-001 `resolved-policy` candidate; findings TM-005/TM-013/TM-014 |
+| 9 | Raw WebSocket auth | Implemented — §4 S5; TM-001 `resolved-policy` candidate (narrowed in revision 4 to the founder-named content classes); typing receipt adjudicated not-a-finding (TM-015); findings TM-005/TM-013/TM-014 (typing **and global presence** identity spoofing; presence itself is a global broadcast, not room-scoped) |
 | 10 | Cloudflare R2 | **Configured-but-unused** — §4 S9 (E3 documentation, no inferred integration) |
 | 11 | SMTP/SendGrid integration | Implemented (live) — §4 S8 |
 | 12 | Audit coverage | Implemented — §4 S10; finding TM-009 |
@@ -377,24 +380,31 @@ the personal room `user:{userId}`, and demuxes the frozen inbound ops; malformed
 platform-validated (`platformOf` allows exactly `telegram|irc`). Room namespaces are
 `user:{userId}`, `conversation:{conversationId}`, `connector:{platform}` (`RealtimeRooms`).
 
-**Room-join receive path — re-dispositioned under the accepted policy (TM-001).** The revision-1
-finding recorded that `subscribe.conversation` joins `conversation:{id}`
+**Room-join receive path — founder-named content classes (TM-001, narrowed in revision 4).** The
+revision-1 finding recorded that `subscribe.conversation` joins `conversation:{id}`
 (`YaccWebSocketHandler.subscribeConversation`, `YaccWebSocketHandler.java:177-188`; room join at
 `:184`) with no resource-level authorization while those rooms carry message content
 (`GatewayExchange.publishMessageReceived` — `GatewayExchange.java:226-233` — publishes
 `MessageReceivedPayload` including `event.body()`), delivery-status events
 (`ConnectorRelayService` conversation-room publishes at `:65/:113/:129`), and typing events
 (`WebSocketTypingService.java:52/:65/:82`); `MESSAGE_SENT` is broadcast to all sessions
-(`GatewayExchange.java:335`), making conversation ids discoverable. Under the accepted shared-view
-policy (§1.1) the content classes those rooms carry — message bodies and message delivery status —
-are named view classes the founder approved every
-active authenticated identity to **view** on every conversation; conversation-scoped ephemeral
-typing presence is **not** expressly named by the policy and is assessed separately (**TM-014**
-stands independently of this disposition). The realtime room is the push
-channel of the approved universal view, so the receive path no longer crosses the boundary the
-revision-1 finding cited (the assignment-bounded view contract that no longer exists). The
-disposition is recorded as `resolved-policy (candidate)` — its AC-2 effect is the reviewer/tech-lead
-decision, not the builder's.
+(`GatewayExchange.java:335`), making conversation ids discoverable. In revision 4 the disposition
+is **narrowed** to exactly the founder-named content classes the room carries — message bodies,
+message delivery status, and the id-discovery broadcast — and nothing else. Under the accepted
+shared-view policy (§1.1) those classes are named view classes the founder approved every active
+authenticated identity to **view** on every conversation, so the receive path no longer crosses
+the boundary the revision-1 finding cited (the assignment-bounded view contract that no longer
+exists). The disposition is recorded as `resolved-policy (candidate)` — its AC-2 effect is the
+reviewer/tech-lead decision, not the builder's. Explicitly **excluded** from this disposition:
+typing **receipt** (conversation-scoped typing events delivered to room subscribers — assessed and
+adjudicated separately as **TM-015**, `not-a-finding`); typing/presence **identity** spoofing
+(**TM-014**, open Sev-4); relay **injection** (**TM-013**, open Sev-3). **Presence is not part of
+this room-join flow at all**: presence events are global broadcasts — `WebSocketPresenceService`
+publishes `presence.updated`/`user.online`/`user.offline`/`user.status` through
+`publisher.publishToAll` (`WebSocketPresenceService.java:58-88`; baseline `socket.broadcast.emit`,
+GOV-014:150-157; frozen `WS-OP-PRES-001..004` declare "broadcast all except sender"; accepted
+product behavior, Story 9.1, `.docs/01-product-specification.md` L786-795) — and no room join
+gates them; the earlier "room-scoped presence" wording was inaccurate and is corrected here.
 
 **What the view policy does not settle on this plane (new findings).** **TM-013**: the four
 `connector.*` relay ops (`connector.message.received|status.changed|message.error|message.ack`,
@@ -407,18 +417,22 @@ client emits these ops (grep over `packages/frontend/src` and `packages/frontend
 matches). **TM-014**: `WebSocketTypingService` fans out client-supplied `conversationId/userId/name`
 (`WebSocketTypingService.java:44-88`) without binding them to the authenticated handshake identity
 (`RealtimeSession` carries the verified identity; sender exclusion is by session id only).
+**TM-015** (separately adjudicated, `not-a-finding`): the conversation-scoped **typing receipt**
+carried to any room subscriber is assessed and adjudicated on the accepted records (ledger §2
+TM-015) — it is a disposition, not a finding; **TM-014** covers identity spoofing only, not
+receipt.
 **Finding TM-005**: the token-in-query transport can leak bearer tokens into ingress access logs —
 ledger (`unverified` for the log-capture half, E6). Backlog replay is per-user (1h window,
 `user:{userId}`-keyed stores) — no cross-user replay found.
 
 | STRIDE | Disposition |
 |---|---|
-| Spoofing | **M** for the transport — authenticated upgrade only (401 otherwise); identity attached server-side at handshake; unregistered sessions denied at the frame layer. **F-TM-013** (any authenticated session can inject connector-relay content attributed to platform senders) and **F-TM-014** (client-declared typing identity) remain open on the frame-content plane. |
+| Spoofing | **M** for the transport — authenticated upgrade only (401 otherwise); identity attached server-side at handshake; unregistered sessions denied at the frame layer. **F-TM-013** (any authenticated session can inject connector-relay content attributed to platform senders) and **F-TM-014** (client-declared typing **and global presence** identity) remain open on the frame-content plane. |
 | Tampering | **F-TM-013** (client-supplied relay payloads published into conversation rooms); **M** otherwise — frames are JSON-parsed server-side; ops are a closed enum; platform allow-list on connector ops. |
 | Repudiation | **M** — ingestion audited (`message.ingested`, S10); frame errors surfaced to the sender. |
-| Info disclosure | Room-join receive path re-dispositioned `resolved-policy (candidate)` (TM-001 — message/status content classes are the approved universal view; typing presence is assessed separately by TM-014); **F-TM-005** (token in query). Backlog, presence are per-user/room-scoped as designed. |
+| Info disclosure | Room-join receive path (founder-named content classes) re-dispositioned `resolved-policy (candidate)` (TM-001 — message/status content classes are the approved universal view; typing **receipt** is adjudicated separately as TM-015, `not-a-finding`; typing/presence **identity** spoofing is TM-014); **F-TM-005** (token in query). Backlog replay is per-user as designed; **presence is a global broadcast** (`publishToAll`, `WebSocketPresenceService.java:58-88`; baseline `socket.broadcast.emit`; frozen `WS-OP-PRES-001..004`), not room-scoped; typing is room-scoped with its receipt adjudicated (TM-015). |
 | DoS | **M** — bounded registry, idempotent unregister; per-frame parse errors answered, connection-level faults closed (`handleTransportError`); in-memory state matches the single-instance envelope. |
-| Elevation | **F-TM-013** (connector relay/subscribe ops assume the TB5 connector role but are reachable from any TB3 session, with no role gate); the room-join elevation claim of revision 1 is re-dispositioned with TM-001 (approved view scope). |
+| Elevation | **F-TM-013** (connector relay/subscribe ops assume the TB5 connector role but are reachable from any TB3 session, with no role gate); the room-join elevation claim of revision 1 is re-dispositioned with TM-001, narrowed in revision 4 to the approved view's content classes (typing receipt adjudicated separately as TM-015 — `not-a-finding`). |
 
 ### S6 — Telegram/IRC connectors + integration administration (MIG-060/MIG-061/MIG-062)
 
@@ -627,17 +641,22 @@ MIG-091's (#366, AC-MIG-091-4) — no duplicate taxonomy is created (stop E7).
 
 ## 6. Outcome (re-assessment, 2026-10-20)
 
-- Findings at this revision: **14 ledger rows / 13 findings** in ledger revision 3 — **0 × Sev-1**,
+- Findings at this revision: **15 ledger rows / 13 findings** in ledger revision 4 — **0 × Sev-1**,
   **1 × Sev-2 open (TM-011 outbound-send authorization)**, 5 × Sev-3 (TM-003…TM-006, TM-013),
   5 × Sev-4 (TM-007…TM-010, TM-014), **2 × `resolved-policy (candidate)`** (TM-001 WS room-join
-  receive path; TM-002 content reads), and **1 × `not-a-finding (adjudicated)`** (TM-012
-  notes-create — adjudicated by tech-lead 2026-10-20, excluded from finding totals).
+  receive path, narrowed in revision 4 to the founder-named content classes; TM-002 content reads),
+  and **2 × `not-a-finding (adjudicated)`** (TM-012 notes-create and TM-015 typing receipt —
+  adjudicated by tech-lead 2026-10-20, excluded from finding totals).
   Details, evidence, and routing:
   [MIG-073-findings-ledger.md](MIG-073-findings-ledger.md).
 - **Adjudication provenance.** TM-012 `not-a-finding (adjudicated)` and TM-011 retained open
   Sev-2 were recorded by the tech-lead adjudication of 2026-10-20 — #367 comment `6291002089`
   ([#6291002089](https://github.com/csim-sg/yacc/issues/367#issuecomment-6291002089)) and
-  PR #426 comment `6291005155`; no waiver, no reclassification, no residual acceptance.
+  PR #426 comment `6291005155`; TM-001 narrowed, TM-015 `not-a-finding (adjudicated)`, and the
+  TM-014 widening to typing **and global presence** identity were recorded by the review-loop-3
+  adjudication of 2026-10-20 — #367 comment `6291375868`
+  ([#6291375868](https://github.com/csim-sg/yacc/issues/367#issuecomment-6291375868)) and
+  PR #426 comment `6291380078`; no waiver, no reclassification, no residual acceptance.
 - **AC-MIG-073-2 is not declared by the builder.** On the ledger's face one Sev-2 row (TM-011) is
   `open`,
   so the gate cannot be asserted met at this revision; equally, the two `resolved-policy`
@@ -651,7 +670,7 @@ MIG-091's (#366, AC-MIG-091-4) — no duplicate taxonomy is created (stop E7).
   not a waiver, not residual-risk acceptance, and does not by itself close any finding; the
   dispositions above are decided on evidence and marked candidate where adjudication remains.
 - **No remediation was performed inside MIG-073** (out of scope; stops E1/E5). TM-011 is recorded
-  `open` (TM-012 is adjudicated not-a-finding) with owned routing to tech-lead; with one open Sev-2
+  `open` (TM-012 and TM-015 are adjudicated not-a-finding) with owned routing to tech-lead; with one open Sev-2
   row the outcome is
   recorded as **blocking for MIG-072 cutover** unless and until the reviewer/tech-lead adjudication
   changes the ledger state and AC-2 is satisfied through a decision this document does not make.
