@@ -1,10 +1,10 @@
-# Contracts Manifest — completeness registry (ANG-002)
+# Contracts Manifest — completeness registry (ANG-002; socket section re-pointed to the frozen AsyncAPI by ANG-006)
 
-**Baseline:** live backend controllers + socket emit paths at `dev` @ `230bd226` (2026-10-06), re-derived from SPEC-001 T3 §4.2 (HTTP) and §5.1 (Socket.io) per the ANG-002 issue. Live code is the baseline wherever this file, `.docs/02-api-and-data-model.md`, or React type claims disagree (T3 §4.4 method).
+**Baseline:** live backend controllers at `dev` @ `230bd226` (2026-10-06) for HTTP (re-derived from SPEC-001 T3 §4.2); the real-time section is re-pointed to the **frozen `.docs/migration/asyncapi.yaml`** + Java raw WebSocket (ADR-023/ADR-026; SPEC-003 §Java Baseline Approval AD-2/R1) — the Node Socket.io capture (T3 §5.1) is superseded as the real-time wire truth (R1; the ANG-002 seam reconciliation is discharged here). Live code is the baseline wherever this file, `.docs/02-api-and-data-model.md`, or React type claims disagree (T3 §4.4 method).
 
 **Rules (T3 §2.2):** every baseline endpoint/event maps to its owning schema file and its covering Playwright spec. A row with **no covering spec is a recorded, visible gap** — never silently dropped. Gap rows cite the T3 gap register (G1–G10) or a new **D-row** (DTO-claim drift verified in ANG-002, listed below). Production response parsing stays permissive; these schemas are parsed only by the parity harness (ANG-003), never `.parse()`-ed in the production path.
 
-**Source-of-truth files:** `contracts/common/*`, `contracts/http/*.schema.ts`, `contracts/ws/events.schema.ts`, `contracts/ws/connection.ts`, `contracts/cache-keys.ts`.
+**Source-of-truth files:** `contracts/common/*`, `contracts/http/*.schema.ts`, `contracts/ws/events.schema.ts` (frozen AsyncAPI envelope + per-channel data), `contracts/ws/connection.ts` (raw-WS transport pins), `contracts/cache-keys.ts`.
 
 ## DTO-claim drift register (verified 2026-10-06 @ `230bd226` — recorded, NOT fixed)
 
@@ -14,7 +14,7 @@ The founder override pins Angular to React's calls/behavior 1:1; where a React s
 |---|---|---|---|---|
 | D1 | Tags attach/detach routes | `POST /api/tags/conversations/:id`, `DELETE /api/tags/conversations/:id/tags/:tagId` | `POST /api/conversations/:id/tags`, `DELETE /api/conversations/:id/tags/:tagId` (no `/api/tags/conversations/*` route exists) | React attach/detach calls 404 today; W8 anchor is `tags.e2e.spec.ts`. Angular ports the wire routes; visible-behavior parity is judged by the W8 gate (ANG-009). |
 | D2 | Message list response | `{ data, page, pageSize, total }` | `{ messages, total, page, limit }` | React reads `.data` → empty message list on the detail page; W7 parity = same visible behavior (ANG-008 owns it). |
-| D3 | Message send response | `{ data: message }` | raw message (201) | React appends `response.data` (undefined) to its cache; W7 parity rides the visible reply path (ANG-008). |
+| D3 | Message send response | `{ data: message }` | raw message (201) | **Resolved in ANG-008 (#378, U3 disposition):** the send path consumes the approved frozen-contract operation (`sendConversationMessage` → `{ data: Message }` 201, the backend-of-record shape); `SendMessageResponseSchema` encodes the envelope and `MessagesService.send` unwraps it, so the store's confirmed append receives the message row (React appends `response.data` 1:1). The historical Node-era raw-wire note above is retained for provenance. |
 | D4 | Users list response | `{ users, pagination }` | `BaseListResponse` `{ data, page, limit, total }` | W15 coverage is nav-level only; ANG-011 ports the wire shape. |
 | D5 | Audit logs list response | `{ items, total, page, limit, pages }` | `BaseListResponse` `{ data, page, limit, total }` | W18 spec is API-level; ANG-013 ports the wire shape. |
 | D6 | Notes list response | `{ data, page, pageSize, total }` | `BaseListResponse` `{ data, page, limit, total }` (`pageSize` is request-param only) | W9 hook-level; ANG-009 ports the wire shape. |
@@ -77,25 +77,31 @@ The founder override pins Angular to React's calls/behavior 1:1; where a React s
 
 **Bulk note:** `POST /api/conversations/bulk` bodies are action-discriminated (`{ conversationIds, action: 'assign'|'tag'|'status', data }` with `data` = `{ assigneeId }` | `{ tagId }` | `{ status }`), consumed by the unwired `bulkActions.service` (G8/W13). When a family issue ports bulk actions (ANG-007+), its schema lands in `contracts/http/conversations.schema.ts` and this row is updated — recorded here so the surface is not silently dropped.
 
-## Socket.io events (T3 §5.1 — per-event wire format)
+## Real-time channels (frozen `asyncapi.yaml` — the R1 target, ANG-006)
 
-| Event | Direction | Wire format (verified @ `230bd226`) | Schema (symbol) | Covering Playwright spec | Status |
-|---|---|---|---|---|---|
-| `conversation.updated` | S→C | **flat** payload, room `conversation:{id}` | `ConversationUpdatedEventSchema` | `inbox-network.spec.ts` / `conversation-detail.spec.ts` (live-update assertions, W5/W7) | covered |
-| `message.received` | S→C | **flat** payload, conversation room | `MessageReceivedEventSchema` | `inbox-network.spec.ts`, `conversation-detail.spec.ts` (W7) | covered |
-| `message.sent` | S→C | **envelope** `{ event, data, timestamp }`, global (T3-G5 / U3: wire truth encoded; no frontend "fix") | `MessageSentEventSchema` | none asserting the envelope payload | **gap** (shape-mismatched consumer today; status UI rides the HTTP append — W7 covers the visible behavior) |
-| `message.failed` | S→C | **envelope**, global (T3-G5) | `MessageFailedEventSchema` | none asserting the envelope payload | **gap** (same as `message.sent`) |
-| `connection.established` | S→C | raw `{ socketId, timestamp }`, on connect | `ConnectionEstablishedEventSchema` | none (unconsumed) | **gap** (LIVE, unconsumed — recorded) |
-| `presence.updated` | S→C | raw `{ userId, isOnline, timestamp }`, global (T3-G4 wire truth) | `PresenceUpdatedEventSchema` | none (no live UI, W21) | **gap** (parity = same absence) |
-| `notification.received` | S→C | **no backend emitter** (T3-G2) | `NotificationReceivedEventSchema` (declared shape) | none (REST-only notification specs) | **gap** (declared, no emitter — parity = same absence) |
-| `conversation.reopened` | S→C | **no backend emitter** (T3-G3) | `ConversationReopenedEventSchema` (declared shape) | none | **gap** (declared, no emitter) |
-| `message.retry.scheduled` | S→C | envelope, global (legacy gateway) | `MessageRetryScheduledEventSchema` | none | **gap** (LIVE, unconsumed) |
-| `queue.message.dlq` | S→C | envelope, global (legacy gateway) | `QueueMessageDlqEventSchema` | none | **gap** (LIVE, unconsumed) |
-| `typing.started` / `typing.stopped` | S→C | producer unwired (`emitEvent` has zero callers, §5.3) | `TypingStartedEventSchema`, `TypingStoppedEventSchema` (declared) | none (no live UI, W20) | **gap** (unwired producer — parity = same absence) |
-| Other §5.3 unwired registry events (connector/emoji family) | S→C | unwired handler registry (§5.3) | *(not consumed by the frontend; not part of the live listener set)* | none | **gap** (unwired — recorded, not encoded) |
-| client→server (`subscribe.*`, `typing.*`, `presence.*`, acks) | C→S | **the frontend never emits anything** (T3-G10, T2 B14) | **none by design** — `WebSocketClientService` has no `emit` (inbound-only, ARCH-005 boundary 2) | n/a | by-design absence |
+Baseline row source superseded: this section is re-pointed from the Node Socket.io capture to the **frozen `.docs/migration/asyncapi.yaml`** (ADR-023, GOV-038) + Java raw Spring WebSocket (ADR-026) per SPEC-003 §Java Baseline Approval **AD-2/R1**. Every server→client frame carries the frozen `{event, data, timestamp}` envelope (`schemas/envelope.schema.json`); the per-channel `data` payload is the frozen schema. Wire shapes are encoded in `contracts/ws/events.schema.ts`; transport constants in `contracts/ws/connection.ts`.
 
-## Structural invariants (grep gates — issue AC-ANG-002-4/5)
+| Channel (frozen name) | Frozen disposition (`asyncapi.yaml`) | Angular listener | Writes to | Notes |
+|---|---|---|---|---|
+| `conversation.updated` | wired, enveloped | yes (`ConversationEventsService`) | invalidate conversation detail + conversations lists | B4 mapping; updates are idempotent refetches |
+| `conversation.reopened` | declared channel, payload shape not pinned | yes (`ConversationEventsService`) | same invalidations | **U2 open**: backend emitter is an open founder product decision — no live coverage claimed (parity-of-absence); `conversationId` consumed only when present |
+| `message.received` | wired, enveloped | yes (`MessageEventsService`) | append to loaded message list (id dedup) + invalidate conversations lists | inbound rows map onto the store `Message` shape (`status: 'sent'`, `direction: 'inbound'`) |
+| `message.sent` | wired, enveloped (`sentAt`) | yes (`MessageEventsService`) | patch row status → `sent` + invalidate conversations lists | frozen data schema supersedes the Node-era `platformMessageId`/`timestamp` members |
+| `message.failed` | wired, enveloped (`retryAt`, `attempt` ≤ 3) | yes (`MessageEventsService`) | patch row status → `failed` + invalidate conversations lists | same supersession (no `maxAttempts`/`isFinal`) |
+| `typing.started` / `typing.stopped` | wired, enveloped (`name`) | yes (`PresenceEventsService`) | `WebSocketStateService` typing rows + 5s auto-clear timers | W20 state half; UI is ANG-007/008 |
+| `presence.updated` | wired, enveloped — MIG-003 canonical `{userId, status: online\|offline, lastSeen}` | yes (`PresenceEventsService`) | `WebSocketStateService` presence rows | retired `{userId, isOnline, timestamp}` variant and the richer React listener type are NOT encoded (T3-G4 parity = canonical shape) |
+| `notification.received` | wired, enveloped (`schemas/notification.schema.json`, enum `assignment\|mention\|system`) | yes (`NotificationEventsService`) | `NotificationsStore.addNotification` | U1: whether the backend emits it is an open founder decision — wire truth only |
+| `notification.deleted` / `notification.read` / `notification.dismissed` | **`retained-no-emitter`** (MIG-003 parity-of-absence; target emits nothing; MIG-052 asserts no-emit) | **no listener** | — | U1 disposition recorded; registering a listener would claim coverage that does not exist |
+| `system.connection.established` | wired-in-target (replaces retired raw `connection.established`) | routed (`SystemEventsService`) | none (validated by the router) | single connect-time emit |
+| `system.reconnection.started` / `system.reconnection.failed` | wired-in-target (ADR-026 app-level reconnect) | routed (`SystemEventsService`) | none | no React store row exists; none invented |
+| `system.heartbeat` | wired-in-target (60s application-level) | routed (`SystemEventsService`) | client `lastHeartbeatAt` liveness timestamp | client never sends pings (inbound-only) |
+| `system.error` | wired-in-target (replaces retired raw `error`; SystemPayload) | routed (`SystemEventsService`) | `WebSocketStateService` last-error row | `data.error.message` surfaced |
+| `system.backlog.replay.started` / `system.backlog.replay.completed` | wired-in-target (ADR-026/ADR-028 PostgreSQL backlog) | routed (`SystemEventsService`) | none | backlog-replay consumption = message/conversation handlers applying replayed frames idempotently (id dedup) |
+| `message.retry.scheduled` / `queue.message.dlq` | wired (gateway envelopes) | **no listener** | — | LIVE, unconsumed at the React baseline — parity of absence |
+| `connection.established` / `error` (raw literals) | **retired** → canonical `system.*` (WS-EVT-014/018) | no listener | — | baseline provenance only; target does not emit them |
+| client→server (`subscribe.*`, `message.retry`, acks, presence/typing/reaction/connector publishes) | publish operations exist in the frozen contract | **none implemented** | — | the verified frontend surface emits nothing (T2 B14 / T3-G10; ARCH-005 boundary 2) — inbound-only by design; no `eventId` exists on the wire |
+
+## Structural invariants (grep gates — issue AC-ANG-002-4/5 + AC-ANG-006-1)
 
 Gate commands live in the ANG-002 issue "Verification" section and in PR evidence; stated invariant-only here (command literals would self-match the gates that scan `src/`):
 
@@ -105,7 +111,9 @@ Gate commands live in the ANG-002 issue "Verification" section and in PR evidenc
 | Single HTTP entry | zero bare-fetch calls outside spec files; exactly one `provideHttpClient()` wiring (app.config.ts) |
 | No auth drift | zero references to the dead React auth base path (T3 G1) — auth rides `/api/auth/*` only |
 | Lowercase role enum | `RoleSchema`/`UserStatusSchema` values are the lowercase wire labels (see `common/role.schema.ts`) |
-| Single socket entry | exactly one file imports the socket.io client: `services/websocket-client.service.ts` |
+| Single raw-WS socket entry | exactly one file constructs a WebSocket: `services/websocket-client.service.ts` (via the `WS_SOCKET_FACTORY` seam) |
+| No socket.io (ANG-006 re-point) | `rg -n "socket\.io-client" packages/frontend-angular` = 0 — zero references, zero dependency |
+| Inbound-only socket | `rg -n "\.emit\(" packages/frontend-angular/src --glob '!**/*.spec.ts'` = 0 — zero production client→server sends |
 | No ad-hoc cache keys | cache-key literals live only in `contracts/cache-keys.ts` |
 
 ## Change procedure (T3 §3)

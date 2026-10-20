@@ -1,0 +1,197 @@
+<div class="h-screen flex flex-col bg-base-200">
+  <!-- Header -->
+  <div class="navbar bg-primary text-primary-content shadow-lg sticky top-0 z-40">
+    <div class="flex-1">
+      <a routerLink="/" class="btn btn-ghost text-xl normal-case">← Back</a>
+    </div>
+    <div class="flex-none">
+      <h2 class="text-2xl font-bold">Audit Logs</h2>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="flex-1 overflow-auto p-6">
+    <div class="max-w-6xl mx-auto">
+      <!-- Filters Card -->
+      <div class="card bg-base-100 shadow-lg mb-6">
+        <div class="card-body">
+          <h3 class="card-title mb-4">Filters</h3>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label class="label">
+                <span class="label-text">Action</span>
+              </label>
+              <input
+                type="text"
+                placeholder="e.g., ASSIGN, TAG, NOTE_CREATE"
+                class="input input-bordered input-sm w-full"
+                [value]="filters().action"
+                (input)="onFilterChange('action', $event)"
+                data-testid="filter-action"
+              />
+            </div>
+
+            <div>
+              <label class="label">
+                <span class="label-text">Entity Type</span>
+              </label>
+              <input
+                type="text"
+                placeholder="e.g., CONVERSATION"
+                class="input input-bordered input-sm w-full"
+                [value]="filters().entityType"
+                (input)="onFilterChange('entityType', $event)"
+                data-testid="filter-entity-type"
+              />
+            </div>
+
+            <div>
+              <label class="label">
+                <span class="label-text">From Date</span>
+              </label>
+              <input
+                type="date"
+                class="input input-bordered input-sm w-full"
+                [value]="filters().dateFrom"
+                (input)="onFilterChange('dateFrom', $event)"
+                data-testid="filter-date-from"
+              />
+            </div>
+
+            <div>
+              <label class="label">
+                <span class="label-text">To Date</span>
+              </label>
+              <input
+                type="date"
+                class="input input-bordered input-sm w-full"
+                [value]="filters().dateTo"
+                (input)="onFilterChange('dateTo', $event)"
+                data-testid="filter-date-to"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs Table -->
+      <div class="card bg-base-100 shadow-lg">
+        <div class="card-body">
+          <h3 class="card-title mb-4">
+            Audit Logs
+            <span class="badge badge-lg ml-2">{{ total() }}</span>
+          </h3>
+
+          @if (isLoading()) {
+            <div class="flex justify-center py-8">
+              <div class="loading loading-spinner loading-lg"></div>
+            </div>
+          } @else if (hasListError()) {
+            <div class="alert alert-error" data-testid="query-error">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="stroke-current shrink-0 h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span>{{ errorMessage() }}</span>
+            </div>
+          } @else if (logs().length === 0) {
+            <div class="text-center py-8 text-base-content/50">
+              No audit logs found
+            </div>
+          } @else {
+            <!-- Table -->
+            <div class="overflow-x-auto">
+              <table class="table table-compact w-full">
+                <thead>
+                  <tr>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Entity Type</th>
+                    <th>Entity ID</th>
+                    <th>Timestamp</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (log of logs(); track log.id) {
+                    <tr [attr.data-testid]="'log-row-' + log.id">
+                      <td class="font-semibold">{{ log.actorId }}</td>
+                      <td>
+                        <span class="badge badge-sm badge-primary">
+                          {{ log.action }}
+                        </span>
+                      </td>
+                      <td>{{ log.entityType }}</td>
+                      <td class="font-mono text-xs">{{ log.entityId }}</td>
+                      <td class="text-xs text-base-content/70">
+                        {{ formattedTimestamp(log.createdAt) }}
+                      </td>
+                      <td>
+                        <details class="dropdown">
+                          <summary class="btn btn-xs btn-ghost">
+                            View
+                          </summary>
+                          <div class="dropdown-content menu bg-base-200 rounded-box w-52 p-2 shadow">
+                            <pre class="text-xs overflow-auto max-h-48">{{ metadataJson(log.metadata) }}</pre>
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination -->
+            @if (totalPages() > 1) {
+              <div class="flex justify-between items-center mt-6 pt-4 border-t">
+                <div class="text-sm text-base-content/70">
+                  Page {{ page() }} of {{ totalPages() }} ({{ total() }} total)
+                </div>
+                <div class="join">
+                  <button
+                    type="button"
+                    (click)="onPrevPage()"
+                    [disabled]="page() === 1"
+                    class="join-item btn btn-sm"
+                    data-testid="prev-page"
+                  >
+                    ← Prev
+                  </button>
+                  @for (pageNumber of pageButtons(); track pageNumber) {
+                    <button
+                      type="button"
+                      (click)="onPage(pageNumber)"
+                      class="join-item btn btn-sm {{ pageNumber === page() ? 'btn-active' : '' }}"
+                      [attr.data-testid]="'page-' + pageNumber"
+                    >
+                      {{ pageNumber }}
+                    </button>
+                  }
+                  <button
+                    type="button"
+                    (click)="onNextPage()"
+                    [disabled]="page() === totalPages()"
+                    class="join-item btn btn-sm"
+                    data-testid="next-page"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

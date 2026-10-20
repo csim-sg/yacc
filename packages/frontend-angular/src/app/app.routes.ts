@@ -1,3 +1,98 @@
 import { Routes } from '@angular/router';
 
-export const routes: Routes = [];
+import { AppShell } from './components/app-shell/app-shell';
+import { AuditLogs } from './pages/audit-logs/audit-logs';
+import { IrcProfiles } from './pages/irc-profiles/irc-profiles';
+import { Inbox } from './pages/inbox/inbox';
+import { Conversation } from './pages/conversation/conversation';
+import { RoutingRules } from './pages/routing-rules/routing-rules';
+import { Users } from './pages/users/users';
+import { authGuard } from './guards/auth-guard';
+import { publicGuard } from './guards/public-guard';
+import { roleGuard } from './guards/role-guard';
+import { ChangePassword } from './pages/change-password';
+import { ForgotPassword } from './pages/forgot-password';
+import { Login } from './pages/login';
+import { OidcCallback } from './pages/oidc-callback';
+import { Register } from './pages/register';
+import { ResetPassword } from './pages/reset-password';
+
+/**
+ * Route table (React `App.tsx` route map port — W2/W5/W23; the shell
+ * slice ANG-007).
+ *
+ * - Public auth forms sit behind `publicGuard` (authenticated users are
+ *   redirected to `/inbox`, React `PublicRoute` parity) and render NO
+ *   shell.
+ * - `/auth/callback` is the registered OIDC public-client redirect URI
+ *   (MIG-033) — deliberately unguarded: it must complete regardless of
+ *   prior state.
+ * - `/change-password` serves the ADR-025 forced credential change and is
+ *   `authGuard`-protected (an authenticated identity is required).
+ * - The empty-path group is the shared authenticated shell
+ *   (`AppShell` = `Navigation` + `Header` + `NotificationCenter` mount)
+ *   wrapping the authenticated feature routes behind `authGuard`
+ *   (React `ProtectedRoute` → `MainLayout` parity). Feature issues
+ *   (ANG-008, ANG-010..013) append their own rows as its children —
+ *   ANG-007 is the sole writer of this group; ANG-008 appended the
+ *   `conversations/:id` detail row (append only).
+ * - The catch-all redirects to `/inbox` (React `path="*"` parity); for
+ *   unauthenticated visitors the shell guard then redirects to `/login`.
+ */
+export const routes: Routes = [
+  { path: 'login', component: Login, canActivate: [publicGuard] },
+  { path: 'register', component: Register, canActivate: [publicGuard] },
+  { path: 'forgot-password', component: ForgotPassword, canActivate: [publicGuard] },
+  { path: 'reset-password', component: ResetPassword, canActivate: [publicGuard] },
+  { path: 'auth/callback', component: OidcCallback },
+  { path: 'change-password', component: ChangePassword, canActivate: [authGuard] },
+  {
+    path: '',
+    component: AppShell,
+    canActivate: [authGuard],
+    children: [
+      { path: 'inbox', component: Inbox },
+      // ANG-008 (#378): the conversation detail row — the destination of
+      // the inbox cards and the shell NotificationCenter click-through
+      // (React `path="/conversations/:id"` parity).
+      { path: 'conversations/:id', component: Conversation },
+      // ANG-010 (#380): the routing-rules row — ADMIN-gated management page
+      // (React `ProtectedRoute requiredRole="ADMIN"` + `RoutingRulesPage`
+      // parity; the nav row in `lib/navigation.ts` filters identically).
+      {
+        path: 'routing-rules',
+        component: RoutingRules,
+        canActivate: [roleGuard('ADMIN')],
+      },
+      // ANG-011 (#381): the users row — SUPER_ADMIN-gated management page
+      // (React `ProtectedRoute requiredRole="SUPER_ADMIN"` + `UsersPage`
+      // parity; the nav row in `lib/navigation.ts` filters identically).
+      {
+        path: 'users',
+        component: Users,
+        canActivate: [roleGuard('SUPER_ADMIN')],
+      },
+      // ANG-012 (#382): the IRC-profiles row — ADMIN-gated management page
+      // (React `ProtectedRoute requiredRole="ADMIN"` + `IrcProfilesPage`
+      // parity; the nav row in `lib/navigation.ts` filters identically —
+      // super_admin mutation gating is in-component per endpoint RBAC).
+      {
+        path: 'integrations/irc-profiles',
+        component: IrcProfiles,
+        canActivate: [roleGuard('ADMIN')],
+      },
+      // ANG-013 (#383): the audit-logs row — MANAGER-gated compliance
+      // surface (React `ProtectedRoute requiredRole="MANAGER"` +
+      // `AuditLogsPage` parity; the nav row in `lib/navigation.ts`
+      // filters identically; the export endpoint is API-only parity,
+      // U4 — no export UI).
+      {
+        path: 'audit-logs',
+        component: AuditLogs,
+        canActivate: [roleGuard('MANAGER')],
+      },
+      { path: '', pathMatch: 'full', redirectTo: 'inbox' },
+    ],
+  },
+  { path: '**', redirectTo: 'inbox' },
+];

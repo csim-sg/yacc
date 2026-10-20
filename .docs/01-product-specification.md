@@ -40,7 +40,7 @@ All roles and data access are scoped to a **tenant (organization)** unless expli
 | **Super Admin** | Full access, user/role management, integrations, routing rules |
 | **Admin** | Inbox operations, assignments, tags, notes, oversight |
 | **Manager** | Assignments, priority handling, team monitoring, view audit logs |
-| **User** | Handle assigned conversations, use tags, create notes, reply |
+| **User** | View all conversations, reply/retry on assigned conversations, use tags, create notes |
 
 ---
 
@@ -60,7 +60,8 @@ All roles and data access are scoped to a **tenant (organization)** unless expli
 - ✅ **E2E Tests**: Playwright test suite covering auth, recovery, workflow, real-time, notifications
 
 **P0 Locked Defaults**:
-- **Role Reply/Retry**: Super Admin, Admin, Manager can view/reply/retry on all conversations. User can only view/reply/retry on assigned conversations
+- **Role View** (founder decision 2026-10-18 — see Story 1.3 note): all active authenticated identities (Super Admin, Admin, Manager, User — including self-registered/OIDC-first-login Users) can view all conversation content (messages, status, notes) in every conversation: assigned, unassigned, or assigned to another user. Inactive/suspended denial unchanged
+- **Role Reply/Retry** (founder decision 2026-10-18; reply/retry scope unchanged): Super Admin, Admin, Manager can reply/retry on all conversations. User can reply/retry only on assigned conversations
 - **Reset Password Behavior**: Reset redirects to login page (no auto-login); invalidates all existing sessions
 - **Retry Exactly Once**: Manual retry button visible once per failed message; disabled after 1 attempt
 - **Notifications Assignment-Only**: P0 shows only assignment notifications (no @mention notifications yet)
@@ -450,7 +451,8 @@ flowchart TD
 
 **AC (P0)**:
 - Super Admin, Admin, Manager can view/reply/retry on all conversations
-- User role can only view/reply/retry on assigned conversations
+- Every active authenticated identity (all roles, including self-registered/OIDC-first-login Users) can view all conversations and their content (messages, status, notes) — founder decision 2026-10-18, see note below
+- User role can reply/retry only on assigned conversations
 - Unassigned conversations show as read-only (reply button disabled)
 - Retry button disabled for User if not assigned
 - Each API request validates role permissions (401/403 on failure)
@@ -460,9 +462,11 @@ flowchart TD
 **Locked P0 Role Matrix**:
 | Action | Super Admin | Admin | Manager | User |
 |--------|-------------|-------|---------|------|
-| View all conversations | ✅ | ✅ | ✅ | ❌ (assigned only) |
+| View all conversations | ✅ | ✅ | ✅ | ✅ |
 | Reply on conversation | ✅ | ✅ | ✅ | ✅ (if assigned) |
 | Retry failed message | ✅ | ✅ | ✅ | ✅ (if assigned) |
+
+> **Founder decision (2026-10-18)** — shared-inbox viewing: all active authenticated identities (all four roles, including self-registered/OIDC-first-login Users) may **view** all conversation content — messages, status, and notes — of every conversation (assigned, unassigned, or assigned to another user). User **reply/retry** remain assignment-bound. Recorded in [#367 (comment 6268859088)](https://github.com/csim-sg/yacc/issues/367#issuecomment-6268859088). This amends the "Locked Defaults" **view** wording only (originally locked in PR #293); no other permission, role, or AC text changes, and `inactive`/`suspended` denial is unchanged.
 
 **Test Coverage**: `p0-frontend-option2.spec.ts` - AUTH-004, WORKFLOW-006
 

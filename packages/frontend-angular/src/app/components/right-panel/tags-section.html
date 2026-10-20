@@ -1,0 +1,119 @@
+<div class="px-4 py-4 border-b border-base-300" data-testid="tags-section">
+  <div class="flex items-center justify-between mb-3">
+    <label class="text-sm font-semibold text-base-content/80">Tags</label>
+  </div>
+
+  <!-- Current tags -->
+  <div class="flex flex-wrap gap-2 mb-3">
+    @for (tag of conversationTags; track tag.id) {
+      <div
+        class="flex items-center gap-1 px-2 py-1 rounded-full text-white text-xs font-medium"
+        [style.backgroundColor]="tag.color"
+        [attr.data-testid]="'tag-badge-' + tag.id"
+      >
+        <span>{{ tag.name }}</span>
+        <button
+          type="button"
+          (click)="removeTag(tag.id)"
+          class="ml-1 hover:opacity-80 cursor-pointer"
+          [disabled]="removingTag()"
+          [attr.aria-label]="'Remove ' + tag.name + ' tag'"
+          [attr.data-testid]="'remove-tag-' + tag.id"
+        >
+          ✕
+        </button>
+      </div>
+    }
+  </div>
+
+  <!-- Add tag dropdown -->
+  @if (availableTags.length > 0 && !showCreateForm()) {
+    <div class="dropdown dropdown-top w-full">
+      <button type="button" class="btn btn-sm btn-outline w-full" data-testid="add-tag-button">
+        + Add Tag
+      </button>
+      <ul
+        class="dropdown-content z-50 menu p-2 shadow bg-base-100 rounded-box w-52 border border-base-300"
+      >
+        @for (tag of availableTags; track tag.id) {
+          <li>
+            <button
+              type="button"
+              (click)="addTag(tag.id)"
+              [disabled]="addingTag()"
+              class="flex items-center gap-2"
+              [attr.data-testid]="'add-tag-option-' + tag.id"
+            >
+              <div class="w-3 h-3 rounded-full" [style.backgroundColor]="tag.color"></div>
+              <span>{{ tag.name }}</span>
+            </button>
+          </li>
+        }
+        <li>
+          <button
+            type="button"
+            (click)="openCreateForm()"
+            class="text-primary"
+            data-testid="create-new-tag-button"
+          >
+            + Create New Tag
+          </button>
+        </li>
+      </ul>
+    </div>
+  }
+
+  <!-- Create new tag form -->
+  @if (showCreateForm()) {
+    <div class="space-y-3" data-testid="create-tag-form">
+      <input
+        type="text"
+        placeholder="Tag name"
+        [value]="newTagName()"
+        (input)="onNameInput($event)"
+        class="input input-sm input-bordered w-full"
+        data-testid="tag-name-input"
+      />
+      <div class="flex gap-2 flex-wrap">
+        @for (color of colors; track color) {
+          <button
+            type="button"
+            (click)="selectedColor.set(color)"
+            class="w-6 h-6 rounded-full border-2 {{
+              selectedColor() === color ? 'border-base-content' : 'border-transparent'
+            }}"
+            [style.backgroundColor]="color"
+            [attr.data-testid]="'color-option-' + color"
+          ></button>
+        }
+      </div>
+      <div class="flex gap-2">
+        <button
+          type="button"
+          (click)="createTag()"
+          [disabled]="newTagName().trim().length === 0 || creatingTag()"
+          class="btn btn-sm btn-primary flex-1"
+          data-testid="save-tag-button"
+        >
+          {{ creatingTag() ? 'Creating...' : 'Create' }}
+        </button>
+        <button
+          type="button"
+          (click)="cancelCreate()"
+          class="btn btn-sm btn-ghost flex-1"
+          data-testid="cancel-tag-button"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (addingTag()) {
+    <div class="mt-2 text-xs text-base-content/60">Adding tag...</div>
+  }
+
+  @if (removingTag()) {
+    <div class="mt-2 text-xs text-base-content/60">Removing tag...</div>
+  }
+</div>

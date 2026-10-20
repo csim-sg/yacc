@@ -8,8 +8,13 @@ import { dataEnvelopeSchema } from '../common/envelope.schema';
  * - `GET /api/conversations/:conversationId/messages` answers
  *   `{ messages, total, page, limit }` — NOT the `{ data, pageSize }`
  *   shape the React service type claims (DTO-claim drift row).
- * - `POST .../messages` answers the RAW message (201) — the React service
- *   claims `{ data }` (drift row; live reply parity rides this HTTP append).
+ * - `POST .../messages` answers `{ data: Message }` (201) — the FROZEN
+ *   OpenAPI operation (`sendConversationMessage`, ADR-023/GOV-038) and
+ *   the backend of record both answer the envelope; the earlier
+ *   "raw message" local claim contradicted the frozen contract and is
+ *   resolved to it in ANG-008 (U3 send-envelope disposition: the send
+ *   path consumes the approved frozen-contract operation; the store's
+ *   confirmed-append behavior is unchanged).
  * - `POST .../retry` answers `{ data }` (verified).
  */
 
@@ -50,8 +55,11 @@ export const SendMessageRequestSchema = z.object({
 
 export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
 
-/** POST response — the raw message, no envelope (verified wire truth). */
-export const SendMessageResponseSchema = MessageSchema;
+/**
+ * POST response — the frozen `{ data: Message }` envelope (201), identical
+ * to the retry envelope (frozen `sendConversationMessage` operation).
+ */
+export const SendMessageResponseSchema = dataEnvelopeSchema(MessageSchema);
 
 export type SendMessageResponse = z.infer<typeof SendMessageResponseSchema>;
 

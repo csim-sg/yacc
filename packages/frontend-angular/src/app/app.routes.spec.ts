@@ -1,15 +1,98 @@
 import { routes } from './app.routes';
+import { AppShell } from './components/app-shell/app-shell';
+import { AuditLogs } from './pages/audit-logs/audit-logs';
+import { IrcProfiles } from './pages/irc-profiles/irc-profiles';
+import { Inbox } from './pages/inbox/inbox';
+import { Conversation } from './pages/conversation/conversation';
+import { RoutingRules } from './pages/routing-rules/routing-rules';
+import { Users } from './pages/users/users';
 
 /**
- * App-shell route-table spec (ANG-003 scaffold).
+ * Route-table spec (ANG-004 auth slice + ANG-007 shell slice + ANG-008
+ * conversation-detail row + ANG-010 routing-rules row + ANG-011 users row
+ * + ANG-012 IRC-profiles row + ANG-013 audit-logs row).
  *
- * The scaffold ships an empty route table (no feature pages yet — feature
- * ports start at ANG-004). This spec pins that baseline so the table cannot
- * change silently; ANG-004 (auth + RBAC) replaces it with the real route/guard
- * matrix per PARITY.md.
+ * Pins the route matrix: public auth forms behind `publicGuard`, the
+ * unguarded OIDC redirect-uri route, the authGuard-protected
+ * forced-credential-change route, the shared authenticated shell group
+ * (`AppShell` wrapping the feature routes behind `authGuard`, children
+ * appended per feature issue), and the `/inbox` catch-all redirect
+ * (React `path="*"` parity).
  */
 describe('routes', () => {
-  it('is an empty route table in the scaffold state', () => {
-    expect(routes).toEqual([]);
+  it('defines exactly the six auth routes plus the shell group and the catch-all', () => {
+    expect(routes.map((route) => route.path)).toEqual([
+      'login',
+      'register',
+      'forgot-password',
+      'reset-password',
+      'auth/callback',
+      'change-password',
+      '',
+      '**',
+    ]);
+  });
+
+  it('guards the public auth forms with publicGuard', () => {
+    for (const path of ['login', 'register', 'forgot-password', 'reset-password']) {
+      const route = routes.find((candidate) => candidate.path === path);
+      expect(route?.canActivate).toBeDefined();
+    }
+  });
+
+  it('leaves the OIDC redirect-uri route unguarded', () => {
+    const callback = routes.find((candidate) => candidate.path === 'auth/callback');
+    expect(callback?.canActivate).toBeUndefined();
+  });
+
+  it('guards the forced credential change with authGuard', () => {
+    const change = routes.find((candidate) => candidate.path === 'change-password');
+    expect(change?.canActivate).toBeDefined();
+  });
+
+  it('wraps the authenticated feature routes in the shell behind authGuard', () => {
+    const shell = routes.find((candidate) => candidate.path === '');
+    expect(shell?.component).toBe(AppShell);
+    expect(shell?.canActivate).toBeDefined();
+
+    const children = shell?.children ?? [];
+    expect(children.map((child) => child.path)).toEqual([
+      'inbox',
+      'conversations/:id',
+      'routing-rules',
+      'users',
+      'integrations/irc-profiles',
+      'audit-logs',
+      '',
+    ]);
+    expect(children[0]?.component).toBe(Inbox);
+    // ANG-008: the conversation detail row under the shell group.
+    expect(children[1]?.component).toBe(Conversation);
+    // ANG-010: the routing-rules row — ADMIN-gated via roleGuard (React
+    // `ProtectedRoute requiredRole="ADMIN"` parity).
+    expect(children[2]?.component).toBe(RoutingRules);
+    expect(children[2]?.canActivate).toBeDefined();
+    // ANG-011: the users row — SUPER_ADMIN-gated via roleGuard (React
+    // `ProtectedRoute requiredRole="SUPER_ADMIN"` parity).
+    expect(children[3]?.component).toBe(Users);
+    expect(children[3]?.canActivate).toBeDefined();
+    // ANG-012: the IRC-profiles row — ADMIN-gated via roleGuard (React
+    // `ProtectedRoute requiredRole="ADMIN"` parity; super_admin mutation
+    // gating is in-component per endpoint RBAC).
+    expect(children[4]?.component).toBe(IrcProfiles);
+    expect(children[4]?.canActivate).toBeDefined();
+    // ANG-013: the audit-logs row — MANAGER-gated via roleGuard (React
+    // `ProtectedRoute requiredRole="MANAGER"` parity; hierarchy semantics
+    // let SUPER_ADMIN/ADMIN pass; the export endpoint is API-only
+    // parity, U4).
+    expect(children[5]?.component).toBe(AuditLogs);
+    expect(children[5]?.canActivate).toBeDefined();
+    // The empty child redirects to /inbox (React `/` → inbox parity).
+    expect(children[6]?.redirectTo).toBe('inbox');
+  });
+
+  it('redirects unknown paths to /inbox (React `path="*"` parity)', () => {
+    const catchAll = routes.find((candidate) => candidate.path === '**');
+    expect(catchAll?.redirectTo).toBe('inbox');
   });
 });

@@ -1,0 +1,70 @@
+<div class="px-4 py-4 flex flex-col flex-1" data-testid="notes-section">
+  <div class="flex items-center justify-between mb-3">
+    <label class="text-sm font-semibold text-base-content/80">Notes</label>
+    <span class="badge badge-sm">{{ notes.length }}</span>
+  </div>
+
+  <!-- Add note form -->
+  <div class="mb-4 space-y-2" data-testid="add-note-form">
+    <div class="relative">
+      <textarea
+        [value]="noteBody()"
+        (input)="onBodyInput($event)"
+        placeholder="Add a note... (use @username to mention team members)"
+        class="textarea textarea-sm textarea-bordered w-full resize-none h-20"
+        [disabled]="savingNote()"
+        data-testid="note-input"
+      ></textarea>
+    </div>
+
+    <button
+      type="button"
+      (click)="addNote()"
+      [disabled]="noteBody().trim().length === 0 || savingNote()"
+      class="btn btn-sm btn-primary w-full"
+      data-testid="save-note-button"
+    >
+      {{ savingNote() ? 'Saving...' : 'Add Note' }}
+    </button>
+  </div>
+
+  <!-- Notes list -->
+  <div class="flex-1 overflow-y-auto space-y-3">
+    @if (isLoading) {
+      <div class="flex justify-center py-4">
+        <div class="loading loading-spinner loading-sm"></div>
+      </div>
+    } @else if (notes.length === 0) {
+      <div class="text-center text-sm text-base-content/50 py-4" data-testid="no-notes-message">
+        No notes yet
+      </div>
+    } @else {
+      @for (note of notes; track note.id) {
+        <div
+          class="bg-base-200/50 rounded-lg p-3 text-xs space-y-1"
+          [attr.data-testid]="'note-item-' + note.id"
+        >
+          <div class="flex items-center justify-between">
+            <span class="font-semibold">{{ note.authorId }}</span>
+            <span class="text-base-content/50">{{ formatDate(note.createdAt) }}</span>
+          </div>
+          <p class="text-base-content/80 whitespace-pre-wrap">{{ note.body }}</p>
+
+          <!-- Render mentions -->
+          @if (note.mentions.length > 0) {
+            <div class="flex flex-wrap gap-1 pt-1">
+              @for (mention of note.mentions; track mention) {
+                <span
+                  class="badge badge-sm badge-primary/20 text-primary text-xs"
+                  [attr.data-testid]="'note-mention-' + mention"
+                >
+                  &#64;{{ mention }}
+                </span>
+              }
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
+</div>

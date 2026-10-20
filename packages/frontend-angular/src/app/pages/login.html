@@ -1,0 +1,100 @@
+<div class="min-h-screen bg-base-200 flex">
+  <div class="flex-1 flex items-center justify-center p-8">
+    <div class="w-full max-w-md">
+      <div class="mb-8 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+            <span class="text-primary-content font-bold text-xl">Y</span>
+          </div>
+          <span class="text-xl font-bold">YACC</span>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 shadow-xl">
+        <div class="card-body p-8">
+          <div class="mb-8">
+            <h1 class="text-2xl font-bold text-base-content">Welcome Back!</h1>
+            <p class="text-base-content/70 text-sm mt-2">
+              Sign in to continue your omni-channel experience
+            </p>
+          </div>
+
+          @if (auth.error()) {
+            <div class="alert alert-error mb-6" role="alert">
+              <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{{ auth.error() }}</span>
+            </div>
+          }
+
+          <form (ngSubmit)="submit()" class="space-y-5">
+            <div class="space-y-2">
+              <label for="email" class="block text-sm font-medium text-base-content">Email Address</label>
+              <input
+                id="email"
+                type="email"
+                placeholder="Email Address"
+                class="input input-bordered w-full"
+                name="email"
+                [(ngModel)]="email"
+                required
+                [disabled]="auth.isLoading()"
+                data-testid="login-email"
+              />
+            </div>
+
+            <div class="space-y-2">
+              <label for="password" class="block text-sm font-medium text-base-content">Password</label>
+              <div class="relative">
+                <input
+                  id="password"
+                  [type]="showPassword ? 'text' : 'password'"
+                  placeholder="Password"
+                  class="input input-bordered w-full pr-10"
+                  name="password"
+                  [(ngModel)]="password"
+                  required
+                  [disabled]="auth.isLoading()"
+                  data-testid="login-password"
+                />
+                <button
+                  type="button"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/50 hover:text-base-content"
+                  (click)="showPassword = !showPassword"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+              </div>
+              <div class="text-right">
+                <a routerLink="/forgot-password" class="text-sm link link-hover text-primary">Forgot Password?</a>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-full" [disabled]="auth.isLoading()" data-testid="login-submit">
+              @if (auth.isLoading()) {
+                <span class="loading loading-spinner"></span>
+                Signing in...
+              } @else {
+                Sign In
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              }
+            </button>
+          </form>
+
+          <div class="text-center mt-8">
+            <p class="text-sm text-base-content/70">
+              Don't have an account?
+              <a routerLink="/register" class="link link-primary font-medium">Create One</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
