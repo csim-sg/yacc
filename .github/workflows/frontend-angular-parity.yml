@@ -9,8 +9,10 @@ name: Frontend Angular Parity Gates
 #                          non-zero below target — never lowered).
 #   parity                 PB-2 E2E parity gate: boots the Java backend of record
 #                          in the S1 (#423) fail-closed E2E fixture posture
-#                          (PostgreSQL ONLY — the Java service has no Redis,
-#                          ADR-028; the issue body's "postgres+redis" wording is
+#                          (PostgreSQL ONLY among data stores — the Java service
+#                          has no Redis, ADR-028 — plus a Mailhog SMTP sink on
+#                          :1025 for the synchronous sign-up email path;
+#                          the issue body's "postgres+redis" wording is
 #                          superseded by the tech-lead reconciliation on #385),
 #                          runs the framework-agnostic Playwright suite in the
 #                          U10 gate scope against the Angular dev server, then
@@ -27,7 +29,10 @@ name: Frontend Angular Parity Gates
 #                          rows are surfaced in the job summary — never hidden.
 #   react-baseline-capture CP-3: automated React-on-Java baseline capture
 #                          (workflow_dispatch only — a full-suite 3-browser run).
-#                          Boots the same Java posture, runs the REACT harness,
+#                          Boots the same Java posture (+ the same Mailhog SMTP
+#                          sink, and BASE_URL pinned to the React origin :5173
+#                          so capture conditions match the anchor), runs the
+#                          REACT harness,
 #                          derives the per-case TSV + env versions, and uploads
 #                          everything as workflow artifacts. Non-gating evidence;
 #                          archiving a new anchor into the repo is a separate
@@ -118,9 +123,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 350
     services:
-      # Postgres ONLY: the Java backend of record has no Redis (ADR-028 —
-      # Quartz + PostgreSQL DB DLQ). Loopback :5432 satisfies the S1 seed's
-      # non-production datasource guard.
+      # Postgres ONLY among data stores: the Java backend of record has no
+      # Redis (ADR-028 — Quartz + PostgreSQL DB DLQ). Loopback :5432
+      # satisfies the S1 seed's non-production datasource guard.
       postgres:
         image: postgres:15-alpine
         env:
@@ -134,11 +139,39 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
+      # SMTP sink (H4, tech-lead triage #6290500131): auth-email delivery is
+      # SYNCHRONOUS inside the sign-up request (register -> issue -> deliver
+      # with retry/backoff), so without a listener on :1025 the Tier-1
+      # "sign-up responds within 500ms" rows cannot meet the budget. Same
+      # image/port as docker-compose (project-archived upstream; v1.0.1 is
+      # the final release). Port 8025 (web UI) is not needed in CI.
+      mailhog:
+        image: mailhog/mailhog:v1.0.1
+        ports:
+          - 1025:1025
     env:
       # E2E posture (identical to the S2 anchor capture env, runbook §7)
       YACC_API_PROXY_TARGET: http://localhost:8080
       API_URL: http://localhost:8080/api
       PLAYWRIGHT_TEST_API_BASE_URL: http://localhost:8080
+      # H1: the gate-scoped suite resolves the frontend origin as
+      # `process.env.BASE_URL || 'http://localhost:5173'`; without this the
+      # harness origin is the dead React port and every such page.goto fails
+      # with ERR_CONNECTION_REFUSED. The Angular dev server is :4200.
+      BASE_URL: http://localhost:4200
+      # H3: the Java realtime endpoint allowlist defaults to the React origin
+      # (application.yml); the Angular harness page origin is :4200, so the
+      # handshake is otherwise rejected and R1/shell WS rows never leave
+      # `reconnecting`. Explicit localhost origin — never a wildcard, never a
+      # production-config change. Also carried inside boot-java.sh below so
+      # the W19 in-spec restart re-applies it.
+      YACC_REALTIME_WS_ALLOWED_ORIGINS: http://localhost:4200
+      # H4: SMTP sink coordinates for the synchronous sign-up email path
+      # (spring.mail binds YACC_SMTP_HOST/YACC_SMTP_PORT; defaults already
+      # target localhost:1025 — explicit here for parity with the capture job
+      # and so the boot script below is self-contained).
+      YACC_SMTP_HOST: 127.0.0.1
+      YACC_SMTP_PORT: '1025'
       # W19 restart handles required by tests/realtime-rawws-r1.spec.ts
       # (real SIGTERM + real restart of the S1-posture service — never a
       # fabricated disconnect).
@@ -188,6 +221,18 @@ jobs:
       - name: Baseline pre-flight (fail-closed anchor validation)
         run: node packages/frontend-angular/parity/compare-baseline.mjs check
 
+      - name: Wait for SMTP sink readiness (Mailhog :1025, fail-closed)
+        run: |
+          for i in $(seq 1 30); do
+            if (exec 3<>/dev/tcp/127.0.0.1/1025) 2>/dev/null; then
+              echo "SMTP sink ready on 127.0.0.1:1025 (attempt $i)."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::SMTP sink not reachable on 127.0.0.1:1025 within 60s (fail-closed — the synchronous sign-up email path requires it)"
+          exit 1
+
       - name: Build Java bootJar (backend of record)
         working-directory: services/backend-java
         run: ./gradlew --no-daemon bootJar
@@ -227,6 +272,8 @@ jobs:
             YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL=admin123 \\
             YACC_AUTH_TOKEN_SIGNING_KEY="\$SIGNING_KEY" \\
             YACC_INTEGRATION_ENCRYPTION_MASTER_KEY="\$MASTER_KEY" \\
+            YACC_SMTP_HOST=127.0.0.1 YACC_SMTP_PORT=1025 \\
+            YACC_REALTIME_WS_ALLOWED_ORIGINS=http://localhost:4200 \\
             nohup java ${LOADER_ARGS[*]+"${LOADER_ARGS[*]}"} -cp "$JAR" org.springframework.boot.loader.launch.PropertiesLauncher >> /tmp/opencode/java-service.log 2>&1 &
           echo \$! > /tmp/opencode/java-service.pid
           SCRIPT
@@ -314,12 +361,29 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
+      # SMTP sink so capture conditions match the anchor environment (the S2
+      # anchor captured locally with docker-compose Mailhog on :1025).
+      mailhog:
+        image: mailhog/mailhog:v1.0.1
+        ports:
+          - 1025:1025
     env:
-      # React anchor env (runbook §7.4): same-origin Vite proxy -> Java :8080
+      # React anchor env (runbook §7.4): same-origin Vite proxy -> Java :8080.
+      # BASE_URL pinned explicitly to the React origin so the gate-scoped
+      # suite (`process.env.BASE_URL || 'http://localhost:5173'`) always
+      # targets the Vite dev server, matching the anchor's capture
+      # conditions (the :4200 override is the ANGULAR parity job's alone).
+      BASE_URL: http://localhost:5173
       VITE_API_BASE_URL: ''
       VITE_API_URL: http://localhost:8080
       API_URL: http://localhost:8080/api
       PLAYWRIGHT_TEST_API_BASE_URL: http://localhost:8080
+      # SMTP sink coordinates (H4) — the capture must exercise the same
+      # synchronous sign-up email path the anchor captured. The realtime
+      # allowed-origin is left at the Java default (the React origin
+      # :5173), which already matches this harness.
+      YACC_SMTP_HOST: 127.0.0.1
+      YACC_SMTP_PORT: '1025'
       # W19 restart handles required by tests/realtime-rawws-r1.spec.ts
       YACC_JAVA_PID_FILE: /tmp/opencode/java-service.pid
       YACC_JAVA_RESTART_CMD: bash /tmp/opencode/boot-java.sh
@@ -353,6 +417,18 @@ jobs:
 
       - name: Baseline pre-flight (validate the committed anchor this capture would succeed)
         run: node packages/frontend-angular/parity/compare-baseline.mjs check
+
+      - name: Wait for SMTP sink readiness (Mailhog :1025, fail-closed)
+        run: |
+          for i in $(seq 1 30); do
+            if (exec 3<>/dev/tcp/127.0.0.1/1025) 2>/dev/null; then
+              echo "SMTP sink ready on 127.0.0.1:1025 (attempt $i)."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::SMTP sink not reachable on 127.0.0.1:1025 within 60s (fail-closed — the synchronous sign-up email path requires it)"
+          exit 1
 
       - name: Build Java bootJar (backend of record)
         working-directory: services/backend-java
@@ -388,6 +464,7 @@ jobs:
             YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL=admin123 \\
             YACC_AUTH_TOKEN_SIGNING_KEY="\$SIGNING_KEY" \\
             YACC_INTEGRATION_ENCRYPTION_MASTER_KEY="\$MASTER_KEY" \\
+            YACC_SMTP_HOST=127.0.0.1 YACC_SMTP_PORT=1025 \\
             nohup java ${LOADER_ARGS[*]+"${LOADER_ARGS[*]}"} -cp "$JAR" org.springframework.boot.loader.launch.PropertiesLauncher >> /tmp/opencode/java-service.log 2>&1 &
           echo \$! > /tmp/opencode/java-service.pid
           SCRIPT

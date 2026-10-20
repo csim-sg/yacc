@@ -219,8 +219,24 @@ rebase/force). **0 spec-file edits vs `dev`** by this capture.
    `GET /api/users` (user 403 / admin 403 / super_admin 200), fixture world (`total: 107`
    conversations), UI real-login probe through Vite (:5173 same-origin proxy → :8080), then the
    Tier-1 canary `tests/backend-auth.spec.ts` × chromium (36/36 expected).
-4. Frontend env for the run: `VITE_API_BASE_URL=` (empty → same-origin), `VITE_API_URL=http://localhost:8080`,
-   `API_URL=http://localhost:8080/api`, `PLAYWRIGHT_TEST_API_BASE_URL=http://localhost:8080`.
+4. Frontend + service env for the run (corrected 2026-10-20 — parity H1–H4 wiring, tech-lead
+   triage [#6290500131](https://github.com/csim-sg/yacc/issues/385#issuecomment-6290500131)):
+   `BASE_URL=http://localhost:5173` (explicit React-origin pin — the gate-scoped specs resolve
+   `process.env.BASE_URL \|\| 'http://localhost:5173'`; only the **Angular** parity job overrides
+   it, to `http://localhost:4200`), `VITE_API_BASE_URL=` (empty → same-origin),
+   `VITE_API_URL=http://localhost:8080`, `API_URL=http://localhost:8080/api`,
+   `PLAYWRIGHT_TEST_API_BASE_URL=http://localhost:8080`, plus the environment the synchronous
+   sign-up email path and the raw-WS rows depend on:
+   - **Mailhog SMTP sink on `127.0.0.1:1025`** (`YACC_SMTP_HOST=127.0.0.1 YACC_SMTP_PORT=1025`;
+     docker-compose `mailhog` service): auth-email delivery is **synchronous inside the sign-up
+     request** (retry/backoff up to 2 × 500 ms), so the Tier-1 `sign-up endpoint should respond
+     within 500ms` rows cannot meet their budget without a listener (parity root cause H4).
+   - **`YACC_REALTIME_WS_ALLOWED_ORIGINS=http://localhost:5173`** for the capture's raw-WS rows
+     (this is the Java default; the Angular parity job instead allows `http://localhost:4200`,
+     its own harness origin — explicit localhost allowlist values only, never a wildcard, never
+     a production-config change; parity root cause H3).
+   - **No Redis anywhere in the capture posture** (ADR-028): PostgreSQL only — the S1 seed's
+     loopback datasource guard is satisfied by `localhost:5432` as in step 1.
 5. Full capture: same command shape as §4 (HTML+JSON reporters, `--retries=2`).
 
 **Outcome (2026-10-18):** 1395 cases / 35 files × 3 browsers in 2 h 16 m — **503 passed / 664
@@ -255,3 +271,15 @@ deliberate act — a reviewed register (§1) + `parity/gate-scope.json` anchor-b
 (SHA-256s, declared counts). The same workflow's `parity` job enforces PB-2 against the
 committed anchor (fail-closed comparator); §2–§5 above remain the historical Node-era
 procedure.
+
+**Status 2026-10-20 (H1–H4 wiring):** the CI capture job now carries the same corrected
+environment as §7.4 — `BASE_URL=http://localhost:5173` pinned explicitly, the Mailhog
+SMTP sink (`mailhog/mailhog:v1.0.1`, port 1025) with a fail-closed readiness gate, and
+the SMTP env for the synchronous sign-up path (realtime allowed-origin left at the Java
+default `:5173`, which matches this harness). The first `workflow_dispatch` CP-3 run is
+**deliberately pending** until the `parity` job has validated the H1–H4 environment
+repairs (ANG-015 review loop 2) — dispatch it only after that, and archive the artifacts
+with the exact SHA. The dispatch is evidence for AC-ANG-015-3 only: **no new anchor
+substitution** — `ae42c67-on-java` stays the comparison anchor and no
+`gate-scope.json` anchor hash is refreshed from the capture (a new anchor would be a
+separate, deliberate register/gate-scope decision).

@@ -61,6 +61,33 @@ Zero spec files were edited by S1 (`AC-ANG-003-1` verified over
 `packages/frontend/tests/**/*.spec.ts`); the helper adaptation is a **recorded** permitted
 change, not a spec-file edit.
 
+## 2b. Permitted test wiring/environment adaptations (recorded, never silent)
+
+Registered by ANG-015 after review-loop 1 (tech-lead triage
+[#6290500131](https://github.com/csim-sg/yacc/issues/385#issuecomment-6290500131), H1–H4
+root-cause analysis; strategist scope co-sign on #439). Both entries are **permitted
+adaptations** to test wiring/environment — explicitly **not expected-red class entries**
+(classes A–E in §3 are unchanged), **not** registrations of any genuinely failing
+anchor-green behavior row, and **no test file was skipped, weakened, renamed, or
+assertion-reduced**. They land via separate reviewed PRs merged to `dev` (the #385
+branch integrates them by merging `origin/dev` — no rebase, no force), and this §385
+register records them before the corrected parity rerun. PB-2 discipline is unchanged:
+an anchor-green row that still fails on Angular after these environment repairs is a
+real regression routed to its owning port issue.
+
+| # | Entry | Class | Provenance / run record |
+|---|---|---|---|
+| 2.2 | **#439 `PREREQ-ANG-015-W1` — p0 FE_BASE honours `BASE_URL`** (PR #440, merged `b3a71ff` 2026-10-20): one line in `packages/frontend/tests/acceptance/phase1/p0-frontend-option2.spec.ts:23` — `const FE_BASE = 'http://localhost:5173';` → `const FE_BASE = process.env.BASE_URL \|\| 'http://localhost:5173';`. Test-target wiring only (same convention as the sibling gate-scoped specs); restores **measurability** of the 18 anchor-green p0 rows under the Angular harness (`BASE_URL=:4200`) — in the React anchor the hardcoded literal was correct, and in parity run 1 the rows died on `ERR_CONNECTION_REFUSED :5173` before any DOM assertion executed (root cause H2: environment defect, not behavior evidence). The `:5173` fallback literal is **preserved** (unset-`BASE_URL` runs unchanged) and `API_BASE = 'http://localhost:3000/api'` (line 22, anchor-red class A) is **byte-identical**. | Permitted wiring adaptation — **not expected-red** | Assertion-neutral verified in PR #440: 28 `test(` / 21 `expect(` counts identical, `data-testid` md5 unchanged (`16ba24847843b68832e9ccb117fe0827`), 0 `skip/only/fixme` added, 0 title lines in the diff, 1 changed file. |
+| 2.3 | **#377 R1 — browser-exact outside-click + history-unwind Tier-0 rows** (PR #441, merged `8caae49` 2026-10-20; commit `3e6433f`): additive adaptation confined to #377's own Tier-0 spec `packages/frontend/tests/inbox-shell-ang007.spec.ts` (+64/−3). (a) `ANG007-NOTIF-1`: the outside press targets the deterministic `heading "YACC Inbox"` element instead of a fixed `(640, 400)` coordinate — in the unstyled shell the press could land inside the full-width notification host (0.97 px from webkit's band boundary; CI reconnect banner shifts it), where not closing is correct React-parity behavior; mechanism reproduced 3× on chromium + webkit pre-fix. (b) `ANG007-INBOX-1`: the final Back-#2 assertion is browser-neutral with **equal regression power** — exit to `about:blank` (chromium/webkit) **or** stays on the clean `/inbox` with **unchanged `history.length` AND unchanged router `navigationId`** — because Firefox's initial `page.goto` replaces the initial `about:blank` entry (browser artifact; instrumentation refuted both hypothesized app defects: the guard bounce `replaceState`s and the component performs no post-bounce URL write). | Permitted test-environment adaptation — **not expected-red** | Commit `3e6433f`, base `f9436c6`, head `3e6433f`; run record (real app + real Java S1 service, no mocks): inbox-shell spec **12/12 expected, 0 unexpected, 0 flaky** × chromium/firefox/webkit incl. `ANG007-WS-1` re-evidenced against a valid `:4200` realtime origin; `frontend-login.spec.ts` 27/27 × 3 browsers; unit 444/444; coverage gate exit 0 (96.08/88.39/95.17/96.26); PB-1 build exit 0; artifact SHA-256: per-case JSON `579f585f…`, login per-case JSON `164fe6bd…`, HTML zip `570ed62f…`, login HTML zip `5363db45…` (local `/tmp/opencode/ang007-r1/evidence/`). App-side history contract (one Back unwinds the whole filter session; no extra pushed entry) holds on all three browsers. |
+
+**Explicit non-entries (PB-2):** no genuine failing anchor-green row is registered by §2b.
+The parity gate remains **failed** as recorded for run 1; only the corrected rerun (after
+H1 `BASE_URL`, H3 WS allowed-origin, H4 Mailhog sink, plus 2.2/2.3) may change the
+verdict, and any surviving anchor-green → red row stays a regression routed to
+#374–#383 — including the CI-only `ANG011-CRUD-1` and `HP-AUTH-006` hypotheses, which
+remain unresolved evidence, not dispositions.
+
+
 ## 3. Anchor-red classes A–E (expected-red rows, pre-registered)
 
 Every anchor-red row belongs to exactly one class below (file→class mapping enforced
