@@ -1,10 +1,10 @@
 # MIG-073 — Java/Spring Security Threat Model
 
 **Issue**: csim-sg/yacc#367 (MIG-073) · **Spec**: SPEC-002 (AC-03, AC-04, AC-09) · **Milestone**: #3
-**Date**: 2026-10-20 (re-assessment; initial review 2026-10-18/19 at `1300436`) · **Author**: builder (managed do-tasks pass) · **Method owner**: `security-review` skill
-**Reviewed revision**: `origin/dev` @ `f9436c610ff2ec2ffe1bb8d0a9b20db6480bfec6` (PR #438 merge). Branch merge commit `e88d159`.
-**Revision validity**: `services/backend-java`, `deploy`, `.docs/migration` and `.github` are **byte-identical** between the revision-1 anchor `13004361ffb278f865182b4e515f38e02158bc97` and `f9436c6` — `git diff 1300436 f9436c6 -- services deploy .docs/migration .github` is empty (verified in this re-assessment). Every revision-1 code/config/contract anchor therefore remains valid unchanged; this re-assessment is a revision bump plus policy-baseline correction, not a re-review of changed code.
-**Companion artifact**: [MIG-073-findings-ledger.md](MIG-073-findings-ledger.md) (finding → remediation ledger + dated finding report, ledger revision 4)
+**Date**: 2026-10-20 (final re-assessment after the authorized TM-011 remediation merged; initial review 2026-10-18/19 at `1300436`) · **Author**: builder (managed do-tasks pass) · **Method owner**: `security-review` skill
+**Reviewed revision**: `origin/dev` @ `f83863ffa5d06521bcd0d68f5d49876151a9e235` (PR #443 merge — the #442 TM-011 remediation). Branch merge commit `7c074049452a30b60192234fffc091ad0208e8da`.
+**Revision validity**: the delta between the revision-4 anchor `f9436c610ff2ec2ffe1bb8d0a9b20db6480bfec6` and `f83863f` is **exactly the five authorized #442 remediation files** (+146/−7: `api/message/MessageController.java`, `MessageApiIntegrationTest.java`, frozen `openapi.yaml` + byte-identical test copy, `ledger-mig-003-reconciled.md`) — `git diff f9436c6 f83863f` touches nothing else (verified in this re-assessment). Every earlier code/config/contract anchor outside those files therefore remains valid unchanged; the `MessageController` line anchors were re-verified at `f83863f`. MIG-073 itself changed no code, config, or contract byte — the remediation was implemented and merged in #442/PR #443 only.
+**Companion artifact**: [MIG-073-findings-ledger.md](MIG-073-findings-ledger.md) (finding → remediation ledger + dated finding report, ledger revision 5)
 
 ---
 
@@ -16,9 +16,12 @@ authoring half of AC-MIG-073-1 (every named surface documented by concrete artif
 Sev-1/Sev-2 severity definitions that scope AC-MIG-073-2 for **threat-model findings**.
 
 Findings, severities, statuses, and the dated finding report live in the companion ledger
-(revision 4). The review outcome is **not** a passing zero-open-Sev-1/2 state and **not** declared
-either way by the builder: at this revision the ledger records one `open` Sev-2 finding
-(TM-011 send authorization); **TM-012 and TM-015 were adjudicated
+(revision 5). The review outcome is **not** declared a passing zero-open-Sev-1/2 state, in either
+direction, by the builder: at this revision the ledger records the authorized TM-011 remediation
+as **`remediated (proposed)`** — implemented, independently reviewed, and merged in #442/PR #443
+(`dev` @ `f83863f`), with the guard/test/contract evidence cited there — **pending validation by
+the fresh independent reviewer assessment at this issue's exact head**; **TM-012 and TM-015 were
+adjudicated
 not a finding** by tech-lead (2026-10-20) on the accepted records (ledger §2; TM-015 per
 adjudication #367 comment `6291375868`); two
 `resolved-policy (candidate)` dispositions — TM-001, **narrowed in revision 4** to the
@@ -26,7 +29,7 @@ founder-named content classes the conversation room carries, and TM-002 (REST re
 effect on AC-MIG-073-2
 is expressly reserved to the fresh independent reviewer assessment and tech-lead decision. No
 waiver was granted, no severity was reclassified, and no remediation was performed inside MIG-073
-(fixes are separate issues by scope).
+(fixes are separate issues by scope; the TM-011 remediation lived in #442).
 
 ### 1.1 Reviewed policy baseline (accepted records, merged before this re-assessment)
 
@@ -49,10 +52,10 @@ waiver was granted, no severity was reclassified, and no remediation was perform
 
 ## 2. Scope of review (issue Scope, verified against merged code)
 
-| # | Scope item (issue #367) | Verdict against `dev` @ `f9436c6` |
+| # | Scope item (issue #367) | Verdict against `dev` @ `f83863f` |
 |---|---|---|
 | 1 | Dual-role OIDC (RP + embedded AS, Spring Authorization Server) | Implemented — §4 S2, S3 |
-| 2 | Four-role RBAC + status enforcement | Implemented — §4 S1; **open finding TM-011**; TM-012/TM-015 adjudicated not-a-finding; reads policy-open (TM-002 `resolved-policy` candidate) |
+| 2 | Four-role RBAC + status enforcement | Implemented — §4 S1; TM-011 remediation merged from #442/PR #443 (recorded `remediated (proposed)`, pending independent validation); TM-012/TM-015 adjudicated not-a-finding; reads policy-open (TM-002 `resolved-policy` candidate) |
 | 3 | Token/refresh lifecycle | Implemented — §4 S1, S3 |
 | 4 | Key rotation (JWKS) | Implemented — §4 S3.4 |
 | 5 | Consent/claims/scopes | Implemented — §4 S3 |
@@ -112,20 +115,25 @@ is bounded by the single-instance envelope (ADR-024/ADR-029) and is not a trust 
 
 ### 3.3 Reproducible inventory commands
 
-Recorded per the issue Verification section (re-run at the re-assessment worktree, branch merge
-commit `e88d159`, `dev` @ `f9436c6`):
+Recorded per the issue Verification section (re-run at the final re-assessment worktree, branch merge
+commit `7c07404`, `dev` @ `f83863f`):
 
 ```bash
-git rev-parse origin/dev                                  # f9436c610ff2ec2ffe1bb8d0a9b20db6480bfec6
-git diff 1300436 f9436c6 -- services deploy .docs/migration .github
-                                                          # empty ⇒ rev-1 anchors remain valid
-git ls-tree -r f9436c6 --name-only services/backend-java/src/main/java/com/yacc | grep -c '\.java$'
+git rev-parse origin/dev                                  # f83863ffa5d06521bcd0d68f5d49876151a9e235
+git diff f9436c6 f83863f --name-only                      # exactly the five #442 remediation files
+                                                          # (MessageController, MessageApiIntegrationTest,
+                                                          # openapi.yaml + test copy, ledger-mig-003)
+git ls-tree -r f83863f --name-only services/backend-java/src/main/java/com/yacc | grep -c '\.java$'
                                                           # 349 Java files (§4 inventory source;
-                                                          # identical at 1300436 — rev-1 report said
-                                                          # 341, corrected here)
-git grep -c "@PreAuthorize" f9436c6 -- 'services/backend-java/src/main/java' \
+                                                          # identical at 1300436/f9436c6 — rev-1 report said
+                                                          # 341, corrected at revision 2)
+git grep -c "@PreAuthorize" f83863f -- 'services/backend-java/src/main/java' \
       | awk -F: '{s+=$NF} END {print s}'                  # 42 RBAC gates (§4 S1.2; identical at
-                                                          # 1300436 — rev-1 report said 43, corrected)
+                                                          # 1300436/f9436c6 — rev-1 report said 43, corrected)
+diff -q .docs/migration/openapi.yaml \
+      services/backend-java/src/test/resources/contract/openapi.yaml
+                                                          # identical — the authorized frozen reconciliation
+                                                          # is mirrored byte-for-byte into the test copy
 grep -rnE "@(Request|Get|Post|Put|Patch|Delete)Mapping" services/backend-java/src/main/java \
       --include='*Controller.java'                        # full route map (§4 S1.3)
 grep -rn "permitAll" services/backend-java/src/main/java/com/yacc/api/auth/AuthSecurityConfig.java
@@ -173,14 +181,18 @@ Every entry names its artifact(s). Route = frozen wire path; key = config key / 
   ConversationAccessService.java:31-42`: privileged roles all-access, `user` only when assigned,
   fail-closed for unknown roles) is the **write-scope** contract on the paths that apply it:
   `ConversationTagController.addTag/removeTag` and `MessageController.retry` (which additionally
-  gates on `isAssignedTo`, `MessageController.java:86-88`). **View separation (accepted policy,
+  gates on `isAssignedTo`, `MessageController.java:97-100`). **View separation (accepted policy,
   §1.1): conversation-content reads — conversations list/detail, message list/status, notes list —
   carry no resource check by policy: the founder's shared-view decision approves universal viewing
   of messages, status and notes for every active authenticated identity, so their absence of a
   resource check matches the accepted records (TM-002 `resolved-policy` candidate).** The
   **write** surfaces the view policy does not settle are assessed on their own evidence:
-  `POST /api/conversations/{id}/messages` enforces no role/assignment check at all while the
-  accepted records keep `USER` reply assignment-bound (**TM-011**, open), and
+  `POST /api/conversations/{id}/messages` — the accepted records keep `USER` reply assignment-bound
+  (**TM-011**, Sev-2): the founder-authorized remediation merged from #442/PR #443 and the send
+  path now enforces the bound at the controller — `exists` → 404 first (every role), then
+  `USER && !isAssignedTo` → 403, both before any persistence/dispatch
+  (`MessageController.java:79-86`) — recorded `remediated (proposed)` in the ledger, pending the
+  fresh independent reviewer validation (the AC-2 outcome is not the builder's to declare); and
   `POST /api/conversations/{id}/notes` enforces no resource check, which **matches** the accepted
   records (frozen `createConversationNote` "any authenticated user", no 403; GOV-021 all-roles
   notes-create; product record `User … create notes`; founder bound "notes-creation semantics
@@ -226,11 +238,11 @@ Every entry names its artifact(s). Route = frozen wire path; key = config key / 
 | STRIDE | Disposition |
 |---|---|
 | Spoofing | **M** — signature + issuer allow-list + expiry enforced by `JwtTokenService` decoder on every request; DB-resolved authorities (role claim never authoritative). Registration cannot mint privileged roles (S1.1). |
-| Tampering | **F-TM-011** (outbound send on unassigned conversations — no role/assignment check; external dispatch via the connector gateway); **M** otherwise — token integrity by RS256; grant rows opaque random, server-side only; bcrypt digests for reset/verify tokens. |
+| Tampering | **F-TM-011** — remediation merged from #442/PR #443, recorded `remediated (proposed)` pending independent validation: the send guard denies an unassigned `USER` 403 (404 on missing conversation) **before** persistence/dispatch (`MessageController.java:79-86`); **M** otherwise — token integrity by RS256; grant rows opaque random, server-side only; bcrypt digests for reset/verify tokens. |
 | Repudiation | **M** — login failure/reset issuance/rotation audited (S10); `SecurityAuditEventListener` records Spring auth events; `note.created` audited with the true author. |
 | Info disclosure | Content reads policy-open per the accepted records (TM-002 `resolved-policy` candidate); **M** otherwise — error bodies are the frozen generic 401/403 JSON (`RestAuthenticationEntryPoint`/`RestAccessDeniedHandler`); anti-enumeration constant answers (S1.7). |
 | DoS | **F-TM-010** (rate limiter topology caveat); **M** otherwise — bcrypt cost bounds brute force; stateless verification is O(1). |
-| Elevation | **F-TM-011** (an authenticated `USER` can post outbound messages to conversations it is not assigned to — accepted records bound reply to assigned); **M** otherwise — `@PreAuthorize` matrix + USER-only registration + in-code USER deny on retry/assignment paths; SUPER_ADMIN provisioning only via bootstrap/recovery (S4). |
+| Elevation | **F-TM-011** — an authenticated `USER` could post outbound messages to conversations it was not assigned to (accepted records bound reply to assigned); remediation merged from #442/PR #443 (`remediated (proposed)` — the guard now enforces the bound before dispatch, pending independent validation); **M** otherwise — `@PreAuthorize` matrix + USER-only registration + in-code USER deny on retry/assignment paths; SUPER_ADMIN provisioning only via bootstrap/recovery (S4). |
 
 ### S2 — OIDC relying party (MIG-032)
 
@@ -639,52 +651,68 @@ MIG-091's (#366, AC-MIG-091-4) — no duplicate taxonomy is created (stop E7).
 - **Sev-4** — Hardening opportunity or documented-by-design posture with no plausible
   confidentiality/integrity impact under the stated deployment envelope.
 
-## 6. Outcome (re-assessment, 2026-10-20)
+## 6. Outcome (final re-assessment, 2026-10-20)
 
-- Findings at this revision: **15 ledger rows / 13 findings** in ledger revision 4 — **0 × Sev-1**,
-  **1 × Sev-2 open (TM-011 outbound-send authorization)**, 5 × Sev-3 (TM-003…TM-006, TM-013),
+- Findings at this revision: **15 ledger rows / 13 findings** in ledger revision 5 — **0 × Sev-1**,
+  **1 × Sev-2 (TM-011 outbound-send authorization, `remediated (proposed)`)**, 5 × Sev-3
+  (TM-003…TM-006, TM-013),
   5 × Sev-4 (TM-007…TM-010, TM-014), **2 × `resolved-policy (candidate)`** (TM-001 WS room-join
   receive path, narrowed in revision 4 to the founder-named content classes; TM-002 content reads),
   and **2 × `not-a-finding (adjudicated)`** (TM-012 notes-create and TM-015 typing receipt —
   adjudicated by tech-lead 2026-10-20, excluded from finding totals).
   Details, evidence, and routing:
   [MIG-073-findings-ledger.md](MIG-073-findings-ledger.md).
+- **TM-011 remediation of record (proposed, not adjudicated here).** The founder authorized
+  **Option A "fix + reconcile"** (2026-10-20, #367 comment `6292298750`); tech-lead created
+  [#442](https://github.com/csim-sg/yacc/issues/442); the remediation was implemented, independently
+  reviewed there, and merged via **PR #443** to `dev` @ `f83863f` (2026-10-20; #442 Done). Merged
+  evidence: the `MessageController.send` guard (`:79-86` — existence 404 first for every role, then
+  `USER && !isAssignedTo` → 403, both before persistence/dispatch), the four-group integration test
+  `MessageApiIntegrationTest#sendRequiresAssignmentForUserRole` (incl. the row-count no-side-effect
+  proof), and the minimal authorized frozen reconciliation (`sendConversationMessage` summary/403/
+  provenance; byte-identical test copy; `REST-MSG-002` cells + amendment front matter). The ledger
+  records TM-011 **`remediated (proposed)`**: this document does not adjudicate the remediation —
+  the fresh independent reviewer assessment at this issue's exact head must validate or reject the
+  evidence, and the AC-MIG-073-2 outcome is the reviewer/tech-lead decision. The PR #443
+  formal-approval waiver (founder, pre-merge, head-bound) is an approval-gate action only — not a
+  security waiver, with no AC-2 or cutover effect.
 - **Adjudication provenance.** TM-012 `not-a-finding (adjudicated)` and TM-011 retained open
-  Sev-2 were recorded by the tech-lead adjudication of 2026-10-20 — #367 comment `6291002089`
+  Sev-2 (its state at that time) were recorded by the tech-lead adjudication of 2026-10-20 — #367
+  comment `6291002089`
   ([#6291002089](https://github.com/csim-sg/yacc/issues/367#issuecomment-6291002089)) and
   PR #426 comment `6291005155`; TM-001 narrowed, TM-015 `not-a-finding (adjudicated)`, and the
   TM-014 widening to typing **and global presence** identity were recorded by the review-loop-3
   adjudication of 2026-10-20 — #367 comment `6291375868`
   ([#6291375868](https://github.com/csim-sg/yacc/issues/367#issuecomment-6291375868)) and
   PR #426 comment `6291380078`; no waiver, no reclassification, no residual acceptance.
-- **AC-MIG-073-2 is not declared by the builder.** On the ledger's face one Sev-2 row (TM-011) is
-  `open`,
-  so the gate cannot be asserted met at this revision; equally, the two `resolved-policy`
-  dispositions are **candidate** outcomes whose effect on the open
-  count is a decision, not an observation. Per the re-assessment activation guardrail (#367 body
-  §4): whether a policy-resolved disposition satisfies AC-MIG-073-2, or requires a founder-amended
+- **AC-MIG-073-2 is not declared by the builder — in either direction.** This document does not
+  assert the gate met: the `remediated` status is a proposal awaiting independent validation, and
+  the two `resolved-policy` dispositions are **candidate** outcomes whose effect on the open
+  count is a decision, not an observation. It equally does not declare the gate failed at this
+  revision: the merged remediation evidence may satisfy it. Per the re-assessment activation
+  guardrail (#367 body §4): whether TM-011's remediation plus the policy-resolved dispositions
+  satisfy AC-MIG-073-2, or require a founder-amended
   acceptance path (E1), is the **fresh independent reviewer assessment's and tech-lead's** decision
   recorded at the exact updated head. The AC-MIG-073-2 checkbox remains unchecked on #367.
 - **No waiver was granted.** No finding was waived and no severity was reclassified to pass AC-2.
   The founder's shared-view decision (§1.1) is a product-policy correction merged via #437 — it is
   not a waiver, not residual-risk acceptance, and does not by itself close any finding; the
   dispositions above are decided on evidence and marked candidate where adjudication remains.
-- **No remediation was performed inside MIG-073** (out of scope; stops E1/E5). TM-011 is recorded
-  `open` (TM-012 and TM-015 are adjudicated not-a-finding); its remediation is owned and tracked
-  outside this issue — the founder authorized **Option A "fix + reconcile"** (2026-10-20) and
-  tech-lead created [#442](https://github.com/csim-sg/yacc/issues/442) (assignment-bound `USER`
-  send guard plus a minimal frozen `sendConversationMessage`/`REST-MSG-002` reconciliation;
-  implementation and independent review **pending**; `#367 blockedBy #442`). With one open Sev-2
-  row the outcome is
-  recorded as **blocking for MIG-072 cutover** until #442 is merged and independently reviewed,
-  unless and until the reviewer/tech-lead adjudication
-  changes the ledger state and AC-2 is satisfied through a decision this document does not make.
+- **No remediation was performed inside MIG-073** (out of scope; stops E1/E5). The authorized
+  TM-011 remediation was implemented, reviewed, and merged in **#442/PR #443** and is recorded here
+  only as `remediated (proposed)` (TM-012 and TM-015 are adjudicated not-a-finding). Until the
+  fresh independent reviewer validates the remediation and tech-lead records the AC-MIG-073-2
+  outcome, this document makes **no cutover claim**: the MIG-072 gate state is neither lifted nor
+  confirmed here — at the last independently validated revision (4) the outcome was
+  **blocking for MIG-072 cutover**.
 - Configured-but-unused surfaces (R2; the dead connector/env secret mounts) are documented as such
   with negative evidence (§4 S9; TM-004) — not modeled as integrations.
 - Runtime/environment claims: none. Items requiring a live environment are marked `unverified`/
-  `deferred` in the ledger (E6).
+  `deferred` in the ledger (E6); the #442/#443 verification records are cited as evidence of record
+  from those issues, not re-run by this docs-only change.
 - Residual-risk acceptance is founder-only (E4); no finding in this ledger is marked
   `accepted-residual`, and none may be without founder action.
-- Inventory correction recorded: the reproducible counts at both `1300436` and `f9436c6` are
+- Inventory correction recorded: the reproducible counts at all anchors (`1300436`, `f9436c6`,
+  `f83863f`) are
   **349** Java files and **42** `@PreAuthorize` gates (§3.3); the revision-1 report's 341/43 was a
-  counting error, corrected here — no severity or disposition depends on it.
+  counting error, corrected at revision 2 — no severity or disposition depends on it.
