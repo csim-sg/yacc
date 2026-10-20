@@ -7,6 +7,12 @@ task: "https://github.com/csim-sg/yacc/issues/338"
 baseline_revision: 98db628d78c79578dd11eb0476fab812d81fed32
 baseline_branch: dev
 canonicalized_at: 2026-09-26
+amended_at: 2026-10-20
+amendments:
+  - date: 2026-10-20
+    authority: "Founder decision 2026-10-20 — MIG-073 finding TM-011, Option A (issue #442; bounded assignment-bound USER send fix + minimal frozen reconciliation; no AC-MIG-073-2 waiver, no cutover authorization)"
+    rows: [REST-MSG-002]
+    change: "REST-MSG-002 Route/Behavior and Required-target-behavior cells now record the assignment-bound user-role send rule (403 when unassigned — assignment-bound reply policy) and the Evidence location cites MessageApiIntegrationTest#sendRequiresAssignmentForUserRole; no other row, version, or row_count changed."
 supersedes:
   - LEDGER-MIG-001-REST v1.0.0 (.docs/migration/ledger-mig-001-rest.md — capture provenance)
   - LEDGER-MIG-002-REALTIME v1.0.0 (.docs/migration/ledger-mig-002-realtime.md — capture provenance)
@@ -123,7 +129,7 @@ Canonicalization resolutions applied to deferred rows (summary — full rational
 | ID | Route / Behavior | Baseline source @98db628 | Required target behavior (Java/Spring) | OpenAPI | Evidence location | Result | Rev |
 |---|---|---|---|---|---|---|---|
 | REST-MSG-001 | `GET /api/conversations/:conversationId/messages` — page/limit (defaults 1/50); custom shape `{messages,total,page,limit}` (not BaseListResponse) | `controllers/message.controller.ts:74` | `@RestController` GET preserving the custom (non-envelope) response shape | `openapi.yaml` op `getConversationMessages` | MIG-041 contract test `getConversationMessages` | blocked | 2026-09-26 |
-| REST-MSG-002 | `POST /api/conversations/:conversationId/messages` — body `{body(1..10000), attachmentIds?}`; 201; roles user/manager/admin/super_admin | `controllers/message.controller.ts:146` | `@RestController` POST, identical validation, role matrix, 201 | `openapi.yaml` op `sendConversationMessage` | MIG-041 contract test `sendConversationMessage`; RBAC evidence | blocked | 2026-09-26 |
+| REST-MSG-002 | `POST /api/conversations/:conversationId/messages` — body `{body(1..10000), attachmentIds?}`; 201; roles user (if assigned to the conversation)/manager/admin/super_admin | `controllers/message.controller.ts:146` | `@RestController` POST, identical validation, role matrix, 201; `user`-role send requires conversation assignment (403 when unassigned — assignment-bound reply policy) | `openapi.yaml` op `sendConversationMessage` | MIG-041 contract test `sendConversationMessage`; RBAC evidence; `MessageApiIntegrationTest#sendRequiresAssignmentForUserRole` | blocked | 2026-09-26 |
 | REST-MSG-003 | `POST /api/conversations/:conversationId/messages/:messageId/retry` — manual retry exactly once per message; any role if assigned; 200 | `controllers/message.controller.ts:278` | `@RestController` POST preserving once-only retry semantics and assignment-based authorization | `openapi.yaml` op `retryConversationMessage` | MIG-041 contract test `retryConversationMessage` | blocked | 2026-09-26 |
 | REST-MSG-004 | `GET /api/conversations/:conversationId/messages/:messageId/status` — message status lookup | `controllers/message.controller.ts:418` | `@RestController` GET, identical status payload | `openapi.yaml` op `getConversationMessageStatus` | MIG-041 contract test `getConversationMessageStatus` | blocked | 2026-09-26 |
 
