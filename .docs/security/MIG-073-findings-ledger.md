@@ -29,7 +29,7 @@ guardrail; escalation stops E1/E5).
 | TM-008 | S3.5 — public-client refresh/revoke authenticates by client id | S | Sev-4 | open (documented design posture) | none proposed — founder visibility at AC-MIG-073-3 if residual risk is to be accepted (E4) | `AsPublicClientAuthenticationProvider.java` (compensating controls: PKCE S256 `AsClientPolicy.java:92-94`, rotation `reuseRefreshTokens=false`, `AsRefreshTokenSerializationFilter.java`, status seam `AsStatusEnforcingAuthorizationService.java`) |
 | TM-009 | S10 — audit persistence is best-effort | R | Sev-4 | open | routing note to #366 (MIG-091 QA/ledger closure, E7 — kept here, `#366` untouched) | `JpaAuditPersistence.java:41-59` (swallow + non-UUID drop; baseline parity per javadoc) |
 | TM-010 | S1.7 — reset rate limiter keyed on `RemoteAddr`, in-memory | D | Sev-4 | open | note for MIG-070 ingress topology decision (single-instance envelope, ADR-029) | `PasswordResetRateLimitFilter.java:64-95` |
-| TM-011 | S1 REST — outbound send (`POST /api/conversations/{conversationId}/messages`): `USER` reply assignment-bound not enforced | T, E | **Sev-2** | **open** | tech-lead → founder contract-authorization decision pending (frozen `sendConversationMessage`/`REST-MSG-002` record the role-only target; contrast tags/retry); no remediation issue created until authorized (E2: cite-only, never edit; the policy side is already fixed by the accepted records) | `MessageController.send` (`api/message/MessageController.java:70-79`, no role/assignment check), `MessageService.send` (`api/message/MessageService.java:78-91`, `requireConversation` only) + `MessageCreatedEvent` → `GatewayExchange` external dispatch; contrast `MessageController.retry:86-88` (`ConversationAccessService.isAssignedTo`); accepted records `.docs/01-product-specification.md:466` + `.docs/05-quick-reference.md` (Reply: `USER` ✅ *(if assigned)*); frozen `openapi.yaml:881-901` (all four roles, 403 only "Role not allowed") |
+| TM-011 | S1 REST — outbound send (`POST /api/conversations/{conversationId}/messages`): `USER` reply assignment-bound not enforced | T, E | **Sev-2** | **open** | remediation authorized — founder selected **Option A "fix + reconcile"** (2026-10-20, #367 comment `6292298750`) → bounded remediation issue [#442](https://github.com/csim-sg/yacc/issues/442) created by tech-lead; implementation and independent review **pending** (`#367 blockedBy #442`); TM-011 stays `open` Sev-2 until #442 merges and is independently reviewed (E2: the authorized frozen `sendConversationMessage`/`REST-MSG-002` reconciliation is performed in #442 only — cite-only here; the policy side is already fixed by the accepted records) | `MessageController.send` (`api/message/MessageController.java:70-79`, no role/assignment check), `MessageService.send` (`api/message/MessageService.java:78-91`, `requireConversation` only) + `MessageCreatedEvent` → `GatewayExchange` external dispatch; contrast `MessageController.retry:86-88` (`ConversationAccessService.isAssignedTo`); accepted records `.docs/01-product-specification.md:466` + `.docs/05-quick-reference.md` (Reply: `USER` ✅ *(if assigned)*); frozen `openapi.yaml:881-901` (all four roles, 403 only "Role not allowed") |
 | TM-012 | S1 REST — notes creation (`POST /api/conversations/{conversationId}/notes`) resource authorization | T | — (adjudicated not a finding) | **not-a-finding (adjudicated)** | none — capability as accepted: frozen openapi "any authenticated user" (no 403) vs tags "with conversation access" (403); GOV-021 all-roles notes-create; product record User "create notes"; founder bound "notes-creation semantics unchanged"; contrary reading recorded as caveat (§2) | `NotesController.create` (`api/note/NotesController.java:51-57`), `NoteService.create` (`api/note/NoteService.java:64-83`, `conversations.exists` only); records: frozen `openapi.yaml:965-987` ("any authenticated user", responses 400/404 only), `ledger-mig-003-reconciled.md` REST-NOTE-002 (binding; no RBAC/resource cell; baseline provenance `ledger-mig-001-rest.md:101` REST-NOTE-002 likewise), `GOV-021-phase2-architecture-decisions.md:53` ("Notes: create (internal)" all four roles ✅, no resource qualifier); founder bound "notes-creation semantics unchanged"; contrast tags `REST-TAG-003/004` (explicit resource check, enforced at `ConversationTagController.requireAccess`) |
 | TM-013 | S5/S6 — connector relay/subscribe caller authorization (any authenticated WS session) | S, T | **Sev-3** | **open** | tech-lead → caller-role gating decision (E2: frozen `WS-OP-CONN-001/002/005/006` declare no caller role — cite-only) | `YaccWebSocketHandler.java:131-138` (relay ops from any authenticated session), `:205-215` (`connectorSubscribe` joins `connector:{platform}`, no role gate); `ConnectorRelayService.java:57-132` (client-supplied `body`/`senderId`/`senderName` → `conversation:{id}` rooms; `connector.status` `publishToAll` at `:90`); no first-party client emits these ops (grep over `packages/frontend/src` + `packages/frontend-angular/src`: 0 matches) |
 | TM-014 | S5 — ephemeral presence/typing fan-out identity binding | S | **Sev-4** | **open** | tech-lead → hardening backlog (server-side identity binding at fan-out) | `WebSocketTypingService.java:44-88` (client-supplied `conversationId`/`userId`/`name` fanned out; sender exclusion by session id only; handshake identity `RealtimeSession` unused in the payload), `WebSocketPresenceService.java:58-88,130-146` (client-declared presence/status broadcast via `publishToAll`); frozen `WS-OP-TYPE-001..004` + `WS-OP-PRES-001..004` (client-declared identity payloads); spoofing scope only — receipt is TM-015 |
@@ -164,13 +164,24 @@ Remediated: 0. Accepted-residual: 0. Not-a-finding (adjudicated): 2 (TM-012, TM-
   id}/messages` → 201/PENDING → gateway dispatch delivers the message to the customer thread of an
   unassigned conversation.
 - **Evidence.** Revision `f9436c6` (byte-identical to `1300436`); files cited above.
-- **Routing.** E1 → tech-lead. The policy side is already fixed (accepted records); the remediation
-  container and any frozen-contract reconciliation for a code fix are tech-lead/founder decisions:
-  a **founder contract-authorization decision is pending** — the frozen
-  `sendConversationMessage`/`REST-MSG-002` record a role-only target (contrast the frozen tags ops
-  "with conversation access" + 403 and retry "all roles if assigned"), so a code fix changes
-  documented target behavior and frozen reconciliation needs explicit founder authorization
-  (ADR-023 / E2); no remediation issue is created until authorized.
+- **Routing (updated 2026-10-20 — authorization granted).** E1 → tech-lead, and the decision is
+  now taken: the founder selected **Option A "fix + reconcile"** from the A/B/C set presented in
+  #367 comment `6291002089` §2 (authorization recorded in #367 comment `6292298750`), and tech-lead
+  created the bounded remediation issue
+  [#442](https://github.com/csim-sg/yacc/issues/442) — enforce assignment-bound `USER` message send
+  on `POST /api/conversations/{conversationId}/messages` plus a minimal, explicitly scoped frozen
+  `sendConversationMessage`/`REST-MSG-002` reconciliation. **Implementation and independent review
+  are pending**; the native dependency `#367 blockedBy #442` makes this issue's final assessment
+  wait until #442 merges with reviewer approval. Until then TM-011 stays `open` Sev-2, and the
+  frozen set remains cite-only in MIG-073 (E2) — the authorized reconciliation is performed in
+  #442 only, never here (E5).
+  - *Historical decision context (rationale for the founder choice; "pending" state superseded
+    above):* the frozen `sendConversationMessage`/`REST-MSG-002` record a role-only target
+    (contrast the frozen tags ops "with conversation access" + 403 and retry "all roles if
+    assigned"), so a code fix changes documented target behavior and the frozen reconciliation
+    required explicit founder authorization (ADR-023 / E2) — hence the A/B/C set: A fix +
+    reconcile (authorized), B code-only while frozen prose stays stale, C no fix with explicit
+    residual acceptance.
   **Blocks MIG-072 cutover while open.**
 
 ### TM-012 — `POST /api/conversations/{id}/notes`: notes-creation resource authorization — adjudicated **not a finding** (tech-lead, 2026-10-20)
@@ -505,9 +516,14 @@ totals (**15 ledger rows**).
   The adjudicated non-findings (TM-012, TM-015) are evidence-based dispositions, not waivers.
   The founder's shared-view decision is a product-policy correction (#437), not a waiver, not
   residual-risk acceptance, and it does not by itself close any finding. No remediation was
-  performed inside MIG-073 (out of scope; stops E1/E5). With one open Sev-2 row (TM-011) the outcome stands
-  recorded as **blocking for MIG-072 cutover** unless and until reviewer/tech-lead adjudication
-  changes the ledger state through a decision this document does not make.
+  performed inside MIG-073 (out of scope; stops E1/E5): for the one open Sev-2 row the founder has
+  since authorized **Option A "fix + reconcile"** (2026-10-20) and tech-lead created the bounded
+  remediation issue [#442](https://github.com/csim-sg/yacc/issues/442) — the fix and the authorized
+  frozen `sendConversationMessage`/`REST-MSG-002` reconciliation will be implemented and
+  independently reviewed there, not in MIG-073, and are **pending** as of this report. TM-011 remains recorded
+  `open` Sev-2 and the outcome stands recorded as **blocking for MIG-072 cutover** until #442 is
+  merged and independently reviewed (`#367 blockedBy #442`), unless and until reviewer/tech-lead
+  adjudication changes the ledger state through a decision this document does not make.
 - **No residual risk was accepted here.** `accepted-residual` is founder-only (guardrail 3 / stop
   E4); the count is zero. TM-008 and TM-007 are recorded `open` with founder-visibility notes.
 - **Evidence honesty.** Findings are grounded in merged source/config/contract artifacts at the

@@ -670,9 +670,14 @@ MIG-091's (#366, AC-MIG-091-4) — no duplicate taxonomy is created (stop E7).
   not a waiver, not residual-risk acceptance, and does not by itself close any finding; the
   dispositions above are decided on evidence and marked candidate where adjudication remains.
 - **No remediation was performed inside MIG-073** (out of scope; stops E1/E5). TM-011 is recorded
-  `open` (TM-012 and TM-015 are adjudicated not-a-finding) with owned routing to tech-lead; with one open Sev-2
+  `open` (TM-012 and TM-015 are adjudicated not-a-finding); its remediation is owned and tracked
+  outside this issue — the founder authorized **Option A "fix + reconcile"** (2026-10-20) and
+  tech-lead created [#442](https://github.com/csim-sg/yacc/issues/442) (assignment-bound `USER`
+  send guard plus a minimal frozen `sendConversationMessage`/`REST-MSG-002` reconciliation;
+  implementation and independent review **pending**; `#367 blockedBy #442`). With one open Sev-2
   row the outcome is
-  recorded as **blocking for MIG-072 cutover** unless and until the reviewer/tech-lead adjudication
+  recorded as **blocking for MIG-072 cutover** until #442 is merged and independently reviewed,
+  unless and until the reviewer/tech-lead adjudication
   changes the ledger state and AC-2 is satisfied through a decision this document does not make.
 - Configured-but-unused surfaces (R2; the dead connector/env secret mounts) are documented as such
   with negative evidence (§4 S9; TM-004) — not modeled as integrations.
