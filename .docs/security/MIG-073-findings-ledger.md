@@ -1,14 +1,15 @@
 # MIG-073 — Findings & Remediation Ledger
 
 **Issue**: csim-sg/yacc#367 (MIG-073) · **Date**: 2026-10-20 (re-assessment; initial review 2026-10-19)
-**Ledger revision**: 2 (re-assessment at the merged founder shared-view policy baseline; revision 1 = 2026-10-19 @ `1300436`)
+**Ledger revision**: 3 (2026-10-20 adjudication: TM-012 resolved as not-a-finding on accepted records; TM-011 remains open; no waiver; revision 2 = 2026-10-20 re-assessment at the merged founder shared-view policy baseline; revision 1 = 2026-10-19 @ `1300436`)
 **Reviewed revision**: `origin/dev` @ `f9436c610ff2ec2ffe1bb8d0a9b20db6480bfec6` (PR #438 merge; branch merge commit `e88d159`)
 **Revision note (re-anchor)**: `services/backend-java`, `deploy`, `.docs/migration` and `.github` are **byte-identical** between the revision-1 anchor `13004361ffb278f865182b4e515f38e02158bc97` and `f9436c6` — `git diff 1300436 f9436c6 -- services deploy .docs/migration .github` is empty (verified in this re-assessment). Every revision-1 evidence anchor therefore remains valid unchanged; the intervening commits touch only the frontend/SPEC-003 surfaces and the two corrected product-record files. This is a recorded revision bump plus policy-baseline correction, not a re-review of changed code.
 **Threat model**: [MIG-073-threat-model.md](MIG-073-threat-model.md) (method, trust boundaries,
 surface inventory, severity definitions — §5 there scopes every severity below to threat-model
 findings; §1.1 there records the reviewed policy baseline)
 **Policy baseline (accepted records)**: founder decision 2026-10-18 (#367 comment `6268859088`), merged into the product records by #437 (`csim-sg/yacc#438` → `dev` @ `f9436c6`; `Antpolis/documentation#19` → vault `master`): **all active authenticated identities (all roles, incl. self-registered/OIDC-first-login `USER`) may view all conversation content — messages, status, notes — of every conversation** (assigned, unassigned, other-assignee); `USER` **reply/retry remain assignment-bound** (`.docs/01-product-specification.md` L466–467, L469; `.docs/05-quick-reference.md` Reply/Retry rows); assignment/status/priority/tags/notes-creation/notification semantics unchanged; `inactive`/`suspended` denial unchanged. **Not a waiver, not residual-risk acceptance, not an AC change, not cutover approval.**
-**Statuses**: `open` · `resolved-policy (candidate)` · `remediated` · `accepted-residual` (founder-only, E4).
+**Statuses**: `open` · `resolved-policy (candidate)` · `not-a-finding (adjudicated)` · `remediated` · `accepted-residual` (founder-only, E4).
+`not-a-finding (adjudicated)` = an adjudicated disposition that no accepted record is crossed — not a waiver, not a severity reclassification, excluded from finding counts.
 `resolved-policy (candidate)` = a re-assessment disposition under which the documented boundary a finding depended on was changed by the accepted founder policy above, so the observed behavior no longer crosses an accepted-record boundary. It is **not** remediation (no code changed), **not** a waiver, and **not** an accepted residual. Whether such a disposition satisfies AC-MIG-073-2 is expressly reserved to the fresh independent reviewer assessment and tech-lead decision — the builder does not self-declare the AC-2 outcome.
 **No waiver has been granted for any finding in this ledger. No severity has been reclassified.
 No remediation was performed inside MIG-073** (fixes are separate issues per the issue's out-of-scope
@@ -28,13 +29,13 @@ guardrail; escalation stops E1/E5).
 | TM-008 | S3.5 — public-client refresh/revoke authenticates by client id | S | Sev-4 | open (documented design posture) | none proposed — founder visibility at AC-MIG-073-3 if residual risk is to be accepted (E4) | `AsPublicClientAuthenticationProvider.java` (compensating controls: PKCE S256 `AsClientPolicy.java:92-94`, rotation `reuseRefreshTokens=false`, `AsRefreshTokenSerializationFilter.java`, status seam `AsStatusEnforcingAuthorizationService.java`) |
 | TM-009 | S10 — audit persistence is best-effort | R | Sev-4 | open | routing note to #366 (MIG-091 QA/ledger closure, E7 — kept here, `#366` untouched) | `JpaAuditPersistence.java:41-59` (swallow + non-UUID drop; baseline parity per javadoc) |
 | TM-010 | S1.7 — reset rate limiter keyed on `RemoteAddr`, in-memory | D | Sev-4 | open | note for MIG-070 ingress topology decision (single-instance envelope, ADR-029) | `PasswordResetRateLimitFilter.java:64-95` |
-| TM-011 | S1 REST — outbound send (`POST /api/conversations/{conversationId}/messages`): `USER` reply assignment-bound not enforced | T, E | **Sev-2** | **open** | tech-lead → bounded remediation decision (E2: frozen `REST-MSG-002`/`openapi.yaml` `sendConversationMessage` document the open behavior — cite-only, never edit; the policy side is already fixed by the accepted records) | `MessageController.send` (`api/message/MessageController.java:70-79`, no role/assignment check), `MessageService.send` (`api/message/MessageService.java:78-91`, `requireConversation` only) + `MessageCreatedEvent` → `GatewayExchange` external dispatch; contrast `MessageController.retry:86-88` (`ConversationAccessService.isAssignedTo`); accepted records `.docs/01-product-specification.md:466` + `.docs/05-quick-reference.md` (Reply: `USER` ✅ *(if assigned)*); frozen `openapi.yaml:881-901` (all four roles, 403 only "Role not allowed") |
-| TM-012 | S1 REST — notes creation (`POST /api/conversations/{conversationId}/notes`) resource authorization | T | **Sev-2 (conditional — see §2)** | **open (adjudication pending)** | reviewer/tech-lead adjudication between the two recorded readings (§2); if remediation is required, tech-lead bounded issue (E2: frozen `openapi.yaml` `createConversationNote` declares "any authenticated user" with no 403 — cite-only) | `NotesController.create` (`api/note/NotesController.java:51-57`), `NoteService.create` (`api/note/NoteService.java:64-83`, `conversations.exists` only); records: frozen `openapi.yaml:965-987` ("any authenticated user", responses 400/404 only), `ledger-mig-001-rest.md` REST-NOTE-002 (no RBAC/resource cell), `GOV-021-phase2-architecture-decisions.md:53` ("Notes: create (internal)" all four roles ✅, no resource qualifier); founder bound "notes-creation semantics unchanged"; contrast tags `REST-TAG-003/004` (explicit resource check, enforced at `ConversationTagController.requireAccess`) |
+| TM-011 | S1 REST — outbound send (`POST /api/conversations/{conversationId}/messages`): `USER` reply assignment-bound not enforced | T, E | **Sev-2** | **open** | tech-lead → founder contract-authorization decision pending (frozen `sendConversationMessage`/`REST-MSG-002` record the role-only target; contrast tags/retry); no remediation issue created until authorized (E2: cite-only, never edit; the policy side is already fixed by the accepted records) | `MessageController.send` (`api/message/MessageController.java:70-79`, no role/assignment check), `MessageService.send` (`api/message/MessageService.java:78-91`, `requireConversation` only) + `MessageCreatedEvent` → `GatewayExchange` external dispatch; contrast `MessageController.retry:86-88` (`ConversationAccessService.isAssignedTo`); accepted records `.docs/01-product-specification.md:466` + `.docs/05-quick-reference.md` (Reply: `USER` ✅ *(if assigned)*); frozen `openapi.yaml:881-901` (all four roles, 403 only "Role not allowed") |
+| TM-012 | S1 REST — notes creation (`POST /api/conversations/{conversationId}/notes`) resource authorization | T | — (adjudicated not a finding) | **not-a-finding (adjudicated)** | none — capability as accepted: frozen openapi "any authenticated user" (no 403) vs tags "with conversation access" (403); GOV-021 all-roles notes-create; product record User "create notes"; founder bound "notes-creation semantics unchanged"; contrary reading recorded as caveat (§2) | `NotesController.create` (`api/note/NotesController.java:51-57`), `NoteService.create` (`api/note/NoteService.java:64-83`, `conversations.exists` only); records: frozen `openapi.yaml:965-987` ("any authenticated user", responses 400/404 only), `ledger-mig-003-reconciled.md` REST-NOTE-002 (binding; no RBAC/resource cell; baseline provenance `ledger-mig-001-rest.md:101` REST-NOTE-002 likewise), `GOV-021-phase2-architecture-decisions.md:53` ("Notes: create (internal)" all four roles ✅, no resource qualifier); founder bound "notes-creation semantics unchanged"; contrast tags `REST-TAG-003/004` (explicit resource check, enforced at `ConversationTagController.requireAccess`) |
 | TM-013 | S5/S6 — connector relay/subscribe caller authorization (any authenticated WS session) | S, T | **Sev-3** | **open** | tech-lead → caller-role gating decision (E2: frozen `WS-OP-CONN-001/002/005/006` declare no caller role — cite-only) | `YaccWebSocketHandler.java:131-138` (relay ops from any authenticated session), `:205-215` (`connectorSubscribe` joins `connector:{platform}`, no role gate); `ConnectorRelayService.java:57-132` (client-supplied `body`/`senderId`/`senderName` → `conversation:{id}` rooms; `connector.status` `publishToAll` at `:90`); no first-party client emits these ops (grep over `packages/frontend/src` + `packages/frontend-angular/src`: 0 matches) |
 | TM-014 | S5 — typing fan-out identity binding | S | **Sev-4** | **open** | tech-lead → hardening backlog (server-side identity binding at fan-out) | `WebSocketTypingService.java:44-88` (client-supplied `conversationId`/`userId`/`name` fanned out; sender exclusion by session id only; handshake identity `RealtimeSession` unused in the payload); frozen `WS-OP-TYPE-001..004` (client-declared identity payloads) |
 
-Counts (ledger revision 2): **14 findings — Sev-1: 0, Sev-2: 2 open (TM-011; TM-012 conditional pending adjudication), Sev-3: 5 open (TM-003…TM-006, TM-013; TM-005 capture half `unverified`), Sev-4: 5 open (TM-007…TM-010, TM-014); resolved-policy (candidate): 2 (TM-001, TM-002).
-Remediated: 0. Accepted-residual: 0.**
+Counts (ledger revision 3): **14 ledger rows → 13 findings — Sev-1: 0, Sev-2: 1 open (TM-011), Sev-3: 5 open (TM-003…TM-006, TM-013; TM-005 capture half `unverified`), Sev-4: 5 open (TM-007…TM-010, TM-014); resolved-policy (candidate): 2 (TM-001, TM-002).
+Remediated: 0. Accepted-residual: 0. Not-a-finding (adjudicated): 1 (TM-012) — excluded from finding totals.**
 
 ## 2. Finding details
 
@@ -60,9 +61,11 @@ Remediated: 0. Accepted-residual: 0.**
   (2026-10-18, #367 comment `6268859088`) and the corrected product records merged by #437
   (`.docs/01-product-specification.md` L465/L469; `.docs/05-quick-reference.md` View row) approve
   **all** active authenticated identities to **view** all conversation content — messages, status,
-  notes — on every conversation. The data classes the room carries map onto exactly those approved
-  view classes: message bodies (`message.received`), message delivery status (`message.error`,
-  `message.ack`), and conversation-scoped ephemeral typing presence; the id-discovery path
+  notes — on every conversation. The content classes the room carries — message bodies
+  (`message.received`) and message delivery status (`message.error`, `message.ack`) — are the
+  policy's named view classes; conversation-scoped ephemeral typing presence is **not** expressly
+  among the policy's named view classes (messages, status, notes) and is assessed separately
+  (**TM-014** stands independently); the id-discovery path
   (`MESSAGE_SENT` broadcast) reveals only ids of conversations the identity may already view. The
   realtime room is the push-delivery channel of the approved universal view, so the receive path no
   longer crosses an accepted-record boundary. **Disposition: no longer a finding because the
@@ -70,7 +73,9 @@ Remediated: 0. Accepted-residual: 0.**
 - **What this disposition does not cover.** (a) The **publish/inject** side of the same rooms — any
   authenticated session can emit the `connector.*` relay ops into them — is a write/spoofing surface
   the view policy does not settle: **TM-013** (open). (b) The typing identity spoofing carried on
-  the fan-out: **TM-014** (open). (c) The AC-2 effect of a policy-resolved disposition is not
+  the fan-out: **TM-014** (open) — the policy's named view classes are **messages, status, notes**;
+  typing/presence is **not** among them, so TM-014 stands independently of this disposition (no
+  verdict change). (c) The AC-2 effect of a policy-resolved disposition is not
   declared by the builder (ledger header; threat-model §6).
 - **Evidence.** Revision `f9436c6` (byte-identical to `1300436` for all cited files); accepted
   records cited above. No code change, no waiver, no reclassification.
@@ -101,7 +106,8 @@ Remediated: 0. Accepted-residual: 0.**
   on has changed — recorded as `resolved-policy (candidate)`.**
 - **Split (per the re-assessment activation record).** Revision-1 TM-002 bundled the notes **create**
   path (`POST …/notes`) with the reads. A view-policy change cannot settle a write path: the
-  notes-create path is now assessed on its own evidence as **TM-012** (open, adjudication pending).
+  notes-create path was assessed on its own evidence as **TM-012** — adjudicated **not-a-finding**
+  (tech-lead, 2026-10-20; see §2 below).
 - **What this disposition does not cover.** The write surfaces (`POST …/messages` → TM-011;
   `POST …/notes` → TM-012) and the AC-2 effect of the disposition itself (not declared by the
   builder).
@@ -146,53 +152,64 @@ Remediated: 0. Accepted-residual: 0.**
   unassigned conversation.
 - **Evidence.** Revision `f9436c6` (byte-identical to `1300436`); files cited above.
 - **Routing.** E1 → tech-lead. The policy side is already fixed (accepted records); the remediation
-  container and any frozen-contract reconciliation for a code fix are tech-lead/founder decisions.
+  container and any frozen-contract reconciliation for a code fix are tech-lead/founder decisions:
+  a **founder contract-authorization decision is pending** — the frozen
+  `sendConversationMessage`/`REST-MSG-002` record a role-only target (contrast the frozen tags ops
+  "with conversation access" + 403 and retry "all roles if assigned"), so a code fix changes
+  documented target behavior and frozen reconciliation needs explicit founder authorization
+  (ADR-023 / E2); no remediation issue is created until authorized.
   **Blocks MIG-072 cutover while open.**
 
-### TM-012 — `POST /api/conversations/{id}/notes`: notes-creation resource authorization (Sev-2 conditional, open — adjudication pending; new in revision 2)
+### TM-012 — `POST /api/conversations/{id}/notes`: notes-creation resource authorization — adjudicated **not a finding** (tech-lead, 2026-10-20)
 
 - **Surface / artifacts.** §4 S1. `NotesController.create` (`NotesController.java:51-57`) accepts
   any authenticated principal; `NoteService.create` (`NoteService.java:64-83`) applies
   `requireConversation` (`conversations.exists(...)` only — `:117-121`); the note is persisted with
   the authenticated author, @mentions resolved into notifications, and a `note.created` audit event.
-- **Observed check/absence.** Absent: no resource-level (assignment/access) check on any role. A
-  `USER` can create an internal note on any existing conversation, assigned or not.
-- **Applicable approved records (both readings recorded — the builder does not adjudicate between
-  them).**
-  - **Reading (i) — literal records (candidate disposition: not a finding).** The frozen contract
-    documents notes-create as unscoped: `openapi.yaml` op `createConversationNote` (`:965-987`) —
-    summary "Create note with mention parsing (**any authenticated user**)", responses 400/404 only
-    (no 403 declared); ledger `REST-NOTE-002` carries no RBAC/resource cell (while the neighboring
-    tag rows `REST-TAG-003/004` explicitly declare "resource-level conversation access check" — the
-    asymmetry is in the frozen contract itself, and the code implements exactly that asymmetry:
-    tags resource-checked at `ConversationTagController.requireAccess`, notes not). `GOV-021`
-    (Architect + PO approved, unchanged by #437) grants "Notes: create (internal)" to **all four
-    roles** with no resource qualifier (`GOV-021-phase2-architecture-decisions.md:53`). The founder
-    decision explicitly left **"notes-creation semantics unchanged"** — and under reading (i) the
-    pre-existing semantics are GOV-021's all-roles capability on the frozen-documented unscoped
-    path. Under this reading the code matches every accepted record and TM-012 is not a finding.
-  - **Reading (ii) — resource-scoped capability (candidate disposition: finding).** The earlier
-    strategist reconciliation read GOV-021's capability ✅ as applying *within resource
-    authorization* (notes/tags usable on accessible conversations). Under that reading,
-    "notes-creation semantics unchanged" preserves an assignment-scoped create for `USER`, the
-    absent check is an assignment-bound write bypass with integrity impact on platform data, and
-    the row is Sev-2 class (authenticated assignment bypass; internal-only data, audited authorship,
-    never outbound — impact bounded but real).
-- **Disposition.** **Open, adjudication pending.** The view policy does not settle a write path, and
-  the accepted records are ambiguous between the readings above; closing TM-012 would require
-  choosing reading (i), which is the fresh independent reviewer assessment's and tech-lead's
-  decision (with founder clarification if they find the records irreconcilable). The builder
-  records both readings with their supporting evidence and does not self-close.
-- **Severity rationale.** The row carries **Sev-2 (conditional)**: under reading (ii) this is an
-  authenticated assignment bypass with integrity impact (Sev-2's first clause); under reading (i)
-  there is no finding at all. The conservative value is recorded so that adjudicating reading (i)
-  can only *reduce* the open-Sev-2 count, never inflate a pass. The severity is **not** a
-  reclassification of any revision-1 finding (revision-1 TM-002 bundled this path without a split).
+- **Adjudication (tech-lead, 2026-10-20; #367 comment `6291002089`).** **Not a finding**: the
+  accepted records reconcile on the all-roles authenticated notes-create reading (formerly reading
+  (i) below), and the code matches every accepted record. Evidence, verified directly:
+  1. **The frozen contract deliberately records the absence of a resource qualifier.**
+     `openapi.yaml:965-987` op `createConversationNote` — summary "Create note with mention parsing
+     (**any authenticated user**)", responses 400/404 only, **no 403**, no access qualifier. The
+     frozen contract is *not* silent because it lacks vocabulary: the tag ops
+     (`addTagToConversation` `:1033-1055`, `removeTagFromConversation` `:1056-…`) say "*with
+     conversation access*; GOV-021" and declare `403: No conversation access`. The notes/tags
+     asymmetry is a deliberate frozen capture, not an omission.
+  2. **Binding ledger asymmetry.** `ledger-mig-003-reconciled.md` `REST-NOTE-002` carries no
+     RBAC/resource cell (baseline provenance `ledger-mig-001-rest.md:101` likewise), while
+     `REST-TAG-003/004` explicitly declare a resource-level conversation access check.
+  3. **`GOV-021` gives the capability to all four roles with no resource qualifier.**
+     `GOV-021-phase2-architecture-decisions.md:53`: "Notes: create (internal)" ✅
+     Super Admin/Admin/Manager/User; "Notes: view" ✅ all four.
+  4. **The product record names notes-create as an explicit `User` capability, unscoped.**
+     `.docs/01-product-specification.md:43` — `User`: "View all conversations, reply/retry on
+     assigned conversations, use tags, **create notes**". Story 3.1 states internal-note ACs with
+     no role or resource restriction; the only restriction on that role row is reply/retry.
+  5. **The founder expressly preserved this.** Decision bound "**notes-creation semantics
+     unchanged**" (#367 comment `6268859088`); #437 amended the founder-approved **view** wording
+     only — nothing touched note creation.
+  6. **The code matches every accepted record.** Authenticated-only controller, existence-only
+     service check — exactly the frozen-contract surface. No accepted-record boundary is crossed,
+     and no plausible attack path crosses one: the write is internal-only (never outbound),
+     authorship is audited (`note.created` with the true author).
+- **Contrary reading (recorded caveat, not a finding).** The earlier strategist reconciliation read
+  `GOV-021`'s capability ✅ as applying *within resource authorization* (formerly reading (ii)):
+  notes/tags usable on accessible conversations, preserving an assignment-scoped create for `USER`.
+  The founder instead chose universal viewing, and **no approved record resource-qualifies
+  notes-create**; the frozen contract's tags/notes asymmetry shows the restriction would have been
+  recorded had it existed. If the founder later wants notes-create resource-scoped, that is a
+  **new product decision**, not a live finding, and it must not be smuggled in through this ledger.
+- **Disposition.** **`not-a-finding (adjudicated)`** — TM-012 leaves the finding set. This is
+  **not** a waiver (nothing was granted), **not** a severity reclassification (no finding remains —
+  and this is not a reclassification of any revision-1 finding; revision-1 TM-002 bundled this path
+  without a split), and **not** an accepted residual (E4 untouched). The row is retained for ID
+  stability (TM-013/TM-014 ids and all published cross-references stay unchanged) and is **excluded
+  from finding counts**. **No gate effect**: AC-MIG-073-2 is unaffected by this adjudication and
+  remains unmet because TM-011 is open. No code change, no waiver, and no residual acceptance is
+  involved.
 - **Evidence.** Revision `f9436c6` (byte-identical to `1300436`); files/records cited above;
   frozen rows cited read-only (E2).
-- **Routing.** Reviewer/tech-lead adjudication at the exact head; if remediation is required, E1 →
-  tech-lead bounded issue (E2: frozen `openapi.yaml` documents the open behavior). Counts as open
-  Sev-2 in the dated report until adjudicated. **Blocks MIG-072 cutover while open.**
 
 ### TM-013 — Connector relay/subscribe ops accept any authenticated session (Sev-3, open — new in revision 2)
 
@@ -380,28 +397,32 @@ Remediated: 0. Accepted-residual: 0.**
 
 **Report date**: 2026-10-20 · **Revision of record**: `origin/dev` @
 `f9436c610ff2ec2ffe1bb8d0a9b20db6480bfec6` (services/deploy/`.docs/migration`/`.github`
-byte-identical to revision-1 anchor `1300436`) · **Ledger revision**: 2 (re-assessment at the merged
-founder shared-view policy baseline; revision 1 = 2026-10-19 @ `1300436`)
+byte-identical to revision-1 anchor `1300436`) · **Ledger revision**: 3 (2026-10-20 adjudication:
+TM-012 not-a-finding; revision 2 = re-assessment at the merged founder shared-view policy baseline;
+revision 1 = 2026-10-19 @ `1300436`)
 
 | Severity | Open | Remediated | Accepted-residual | Resolved-policy (candidate) | Total |
 |---|---|---|---|---|---|
 | Sev-1 | **0** | 0 | 0 | 0 | 0 |
-| Sev-2 | **2** (TM-011; TM-012 conditional) | 0 | 0 | 2 (TM-001, TM-002) | 4 |
+| Sev-2 | **1** (TM-011) | 0 | 0 | 2 (TM-001, TM-002) | 3 |
 | Sev-3 | 5 (TM-003…TM-006, TM-013; TM-005 capture half `unverified`) | 0 | 0 | 0 | 5 |
 | Sev-4 | 5 (TM-007…TM-010, TM-014) | 0 | 0 | 0 | 5 |
-| **Total** | **12** | **0** | **0** | **2** | **14** |
+| **Total** | **11** | **0** | **0** | **2** | **13** |
+
+Not-a-finding (adjudicated): **1 (TM-012)** — retained for ID stability, excluded from totals
+(**14 ledger rows**).
 
 - **Statement of outcome.** At this revision the review records **zero open Sev-1 findings** and
-  **two open Sev-2 rows** (TM-011 outbound-send authorization; TM-012 notes-create, which carries a
-  recorded candidate not-a-finding disposition under reading (i) of §2 and is counted open
-  conservatively pending adjudication). Two revision-1 findings (TM-001, TM-002) are re-dispositioned
+  **one open Sev-2 row (TM-011 outbound-send authorization)**; TM-012 is adjudicated
+  not-a-finding. Two revision-1 findings (TM-001, TM-002) are re-dispositioned
   `resolved-policy (candidate)` on evidence — the documented boundaries they depended on were
   changed by the founder's shared-view decision merged via #437 — and two new findings (TM-013,
   TM-014) plus the TM-011/TM-012 split complete the assessment of the surfaces the view policy does
   not settle.
-- **AC-MIG-073-2 is not declared by the builder.** On the ledger's face two Sev-2 rows are open, so
-  the gate cannot be asserted met; equally, the two `resolved-policy` dispositions and TM-012's
-  conditional reading are candidate outcomes whose effect on the open count is a decision, not an
+- **AC-MIG-073-2 is not declared by the builder.** On the ledger's face one Sev-2 row (TM-011) is
+  open, so
+  the gate cannot be asserted met; equally, the two `resolved-policy` dispositions
+  are candidate outcomes whose effect on the open count is a decision, not an
   observation. Per the re-assessment activation guardrail (#367 body §4), whether a policy-resolved
   disposition satisfies AC-MIG-073-2 — or a founder-amended acceptance path (E1) is required — is
   the **fresh independent reviewer assessment's and tech-lead's** decision recorded at the exact
@@ -410,7 +431,7 @@ founder shared-view policy baseline; revision 1 = 2026-10-19 @ `1300436`)
 - **No waiver was granted.** No finding was waived and no severity was reclassified to pass AC-2.
   The founder's shared-view decision is a product-policy correction (#437), not a waiver, not
   residual-risk acceptance, and it does not by itself close any finding. No remediation was
-  performed inside MIG-073 (out of scope; stops E1/E5). With two open Sev-2 rows the outcome stands
+  performed inside MIG-073 (out of scope; stops E1/E5). With one open Sev-2 row (TM-011) the outcome stands
   recorded as **blocking for MIG-072 cutover** unless and until reviewer/tech-lead adjudication
   changes the ledger state through a decision this document does not make.
 - **No residual risk was accepted here.** `accepted-residual` is founder-only (guardrail 3 / stop
@@ -425,7 +446,8 @@ founder shared-view policy baseline; revision 1 = 2026-10-19 @ `1300436`)
   341/43 was a counting error, corrected here — no severity or disposition depends on it.
 - **Severity scope.** Sev-1/Sev-2 definitions are the threat-model document's §5, scoped to
   threat-model findings; the phase/test-wide taxonomy and the ledger-wide zero-open report remain
-  MIG-091's (#366, AC-MIG-091-4/5). Findings TM-001/TM-002/TM-011/TM-012 are **not** asserted to be
+  MIG-091's (#366, AC-MIG-091-4/5). Findings TM-001/TM-002/TM-011 and the adjudicated TM-012 row
+  are **not** asserted to be
   MIG-091 ledger rows; TM-009 carries only an E7 routing note.
 - **Re-review note (from the issue's dependency-semantics record).** If the MIG-071 drill (#362)
   later changes a reviewed control, a targeted re-review of that surface is required against

@@ -4,7 +4,7 @@
 **Date**: 2026-10-20 (re-assessment; initial review 2026-10-18/19 at `1300436`) · **Author**: builder (managed do-tasks pass) · **Method owner**: `security-review` skill
 **Reviewed revision**: `origin/dev` @ `f9436c610ff2ec2ffe1bb8d0a9b20db6480bfec6` (PR #438 merge). Branch merge commit `e88d159`.
 **Revision validity**: `services/backend-java`, `deploy`, `.docs/migration` and `.github` are **byte-identical** between the revision-1 anchor `13004361ffb278f865182b4e515f38e02158bc97` and `f9436c6` — `git diff 1300436 f9436c6 -- services deploy .docs/migration .github` is empty (verified in this re-assessment). Every revision-1 code/config/contract anchor therefore remains valid unchanged; this re-assessment is a revision bump plus policy-baseline correction, not a re-review of changed code.
-**Companion artifact**: [MIG-073-findings-ledger.md](MIG-073-findings-ledger.md) (finding → remediation ledger + dated finding report, ledger revision 2)
+**Companion artifact**: [MIG-073-findings-ledger.md](MIG-073-findings-ledger.md) (finding → remediation ledger + dated finding report, ledger revision 3)
 
 ---
 
@@ -16,9 +16,10 @@ authoring half of AC-MIG-073-1 (every named surface documented by concrete artif
 Sev-1/Sev-2 severity definitions that scope AC-MIG-073-2 for **threat-model findings**.
 
 Findings, severities, statuses, and the dated finding report live in the companion ledger
-(revision 2). The review outcome is **not** a passing zero-open-Sev-1/2 state and **not** declared
-either way by the builder: at this revision the ledger records two `open` Sev-2 findings
-(TM-011 send authorization; TM-012 notes-create, conditional pending adjudication), two
+(revision 3). The review outcome is **not** a passing zero-open-Sev-1/2 state and **not** declared
+either way by the builder: at this revision the ledger records one `open` Sev-2 finding
+(TM-011 send authorization); **TM-012 was adjudicated
+not a finding** by tech-lead (2026-10-20) on the accepted records (§ ledger §2); two
 `resolved-policy (candidate)` dispositions (TM-001, TM-002 read paths) whose effect on AC-MIG-073-2
 is expressly reserved to the fresh independent reviewer assessment and tech-lead decision. No
 waiver was granted, no severity was reclassified, and no remediation was performed inside MIG-073
@@ -48,7 +49,7 @@ waiver was granted, no severity was reclassified, and no remediation was perform
 | # | Scope item (issue #367) | Verdict against `dev` @ `f9436c6` |
 |---|---|---|
 | 1 | Dual-role OIDC (RP + embedded AS, Spring Authorization Server) | Implemented — §4 S2, S3 |
-| 2 | Four-role RBAC + status enforcement | Implemented — §4 S1; open findings TM-011/TM-012; reads policy-open (TM-002 `resolved-policy` candidate) |
+| 2 | Four-role RBAC + status enforcement | Implemented — §4 S1; **open finding TM-011**; TM-012 adjudicated not-a-finding; reads policy-open (TM-002 `resolved-policy` candidate) |
 | 3 | Token/refresh lifecycle | Implemented — §4 S1, S3 |
 | 4 | Key rotation (JWKS) | Implemented — §4 S3.4 |
 | 5 | Consent/claims/scopes | Implemented — §4 S3 |
@@ -177,8 +178,10 @@ Every entry names its artifact(s). Route = frozen wire path; key = config key / 
   **write** surfaces the view policy does not settle are assessed on their own evidence:
   `POST /api/conversations/{id}/messages` enforces no role/assignment check at all while the
   accepted records keep `USER` reply assignment-bound (**TM-011**, open), and
-  `POST /api/conversations/{id}/notes` enforces no resource check (**TM-012**, open pending
-  adjudication between the recorded readings). `GET /api/users/roles`
+  `POST /api/conversations/{id}/notes` enforces no resource check, which **matches** the accepted
+  records (frozen `createConversationNote` "any authenticated user", no 403; GOV-021 all-roles
+  notes-create; product record `User … create notes`; founder bound "notes-creation semantics
+  unchanged") — **TM-012 adjudicated not a finding** (tech-lead 2026-10-20). `GET /api/users/roles`
   (`UsersController.java:93`) has no `@PreAuthorize` and returns static role labels only
   (`RolesResponse.defaults()`) — no identity data; documented, no finding.
 - **S1.3 Public wire surface (permitAll, `AuthSecurityConfig.authorizeHttpRequests`).**
@@ -220,7 +223,7 @@ Every entry names its artifact(s). Route = frozen wire path; key = config key / 
 | STRIDE | Disposition |
 |---|---|
 | Spoofing | **M** — signature + issuer allow-list + expiry enforced by `JwtTokenService` decoder on every request; DB-resolved authorities (role claim never authoritative). Registration cannot mint privileged roles (S1.1). |
-| Tampering | **F-TM-011** (outbound send on unassigned conversations — no role/assignment check; external dispatch via the connector gateway); **F-TM-012** (notes-create resource check pending adjudication); **M** otherwise — token integrity by RS256; grant rows opaque random, server-side only; bcrypt digests for reset/verify tokens. |
+| Tampering | **F-TM-011** (outbound send on unassigned conversations — no role/assignment check; external dispatch via the connector gateway); **M** otherwise — token integrity by RS256; grant rows opaque random, server-side only; bcrypt digests for reset/verify tokens. |
 | Repudiation | **M** — login failure/reset issuance/rotation audited (S10); `SecurityAuditEventListener` records Spring auth events; `note.created` audited with the true author. |
 | Info disclosure | Content reads policy-open per the accepted records (TM-002 `resolved-policy` candidate); **M** otherwise — error bodies are the frozen generic 401/403 JSON (`RestAuthenticationEntryPoint`/`RestAccessDeniedHandler`); anti-enumeration constant answers (S1.7). |
 | DoS | **F-TM-010** (rate limiter topology caveat); **M** otherwise — bcrypt cost bounds brute force; stateless verification is O(1). |
@@ -383,9 +386,11 @@ finding recorded that `subscribe.conversation` joins `conversation:{id}`
 (`ConnectorRelayService` conversation-room publishes at `:65/:113/:129`), and typing events
 (`WebSocketTypingService.java:52/:65/:82`); `MESSAGE_SENT` is broadcast to all sessions
 (`GatewayExchange.java:335`), making conversation ids discoverable. Under the accepted shared-view
-policy (§1.1) the data classes those rooms carry — message bodies, message delivery status, and
-conversation-scoped ephemeral typing presence — are the same classes the founder approved every
-active authenticated identity to **view** on every conversation; the realtime room is the push
+policy (§1.1) the content classes those rooms carry — message bodies and message delivery status —
+are named view classes the founder approved every
+active authenticated identity to **view** on every conversation; conversation-scoped ephemeral
+typing presence is **not** expressly named by the policy and is assessed separately (**TM-014**
+stands independently of this disposition). The realtime room is the push
 channel of the approved universal view, so the receive path no longer crosses the boundary the
 revision-1 finding cited (the assignment-bounded view contract that no longer exists). The
 disposition is recorded as `resolved-policy (candidate)` — its AC-2 effect is the reviewer/tech-lead
@@ -411,7 +416,7 @@ ledger (`unverified` for the log-capture half, E6). Backlog replay is per-user (
 | Spoofing | **M** for the transport — authenticated upgrade only (401 otherwise); identity attached server-side at handshake; unregistered sessions denied at the frame layer. **F-TM-013** (any authenticated session can inject connector-relay content attributed to platform senders) and **F-TM-014** (client-declared typing identity) remain open on the frame-content plane. |
 | Tampering | **F-TM-013** (client-supplied relay payloads published into conversation rooms); **M** otherwise — frames are JSON-parsed server-side; ops are a closed enum; platform allow-list on connector ops. |
 | Repudiation | **M** — ingestion audited (`message.ingested`, S10); frame errors surfaced to the sender. |
-| Info disclosure | Room-join receive path re-dispositioned `resolved-policy (candidate)` (TM-001 — the carried data classes are the approved universal view); **F-TM-005** (token in query). Backlog, presence are per-user/room-scoped as designed. |
+| Info disclosure | Room-join receive path re-dispositioned `resolved-policy (candidate)` (TM-001 — message/status content classes are the approved universal view; typing presence is assessed separately by TM-014); **F-TM-005** (token in query). Backlog, presence are per-user/room-scoped as designed. |
 | DoS | **M** — bounded registry, idempotent unregister; per-frame parse errors answered, connection-level faults closed (`handleTransportError`); in-memory state matches the single-instance envelope. |
 | Elevation | **F-TM-013** (connector relay/subscribe ops assume the TB5 connector role but are reachable from any TB3 session, with no role gate); the room-join elevation claim of revision 1 is re-dispositioned with TM-001 (approved view scope). |
 
@@ -622,15 +627,21 @@ MIG-091's (#366, AC-MIG-091-4) — no duplicate taxonomy is created (stop E7).
 
 ## 6. Outcome (re-assessment, 2026-10-20)
 
-- Findings at this revision: **14** recorded in ledger revision 2 — **0 × Sev-1**, **2 × Sev-2
-  open** (TM-011 outbound-send authorization; TM-012 notes-create, conditional pending
-  adjudication), 5 × Sev-3 (TM-003…TM-006, TM-013), 5 × Sev-4 (TM-007…TM-010, TM-014), and
-  **2 × `resolved-policy (candidate)`** (TM-001 WS room-join receive path; TM-002 content reads).
+- Findings at this revision: **14 ledger rows / 13 findings** in ledger revision 3 — **0 × Sev-1**,
+  **1 × Sev-2 open (TM-011 outbound-send authorization)**, 5 × Sev-3 (TM-003…TM-006, TM-013),
+  5 × Sev-4 (TM-007…TM-010, TM-014), **2 × `resolved-policy (candidate)`** (TM-001 WS room-join
+  receive path; TM-002 content reads), and **1 × `not-a-finding (adjudicated)`** (TM-012
+  notes-create — adjudicated by tech-lead 2026-10-20, excluded from finding totals).
   Details, evidence, and routing:
   [MIG-073-findings-ledger.md](MIG-073-findings-ledger.md).
-- **AC-MIG-073-2 is not declared by the builder.** On the ledger's face two Sev-2 rows are `open`,
+- **Adjudication provenance.** TM-012 `not-a-finding (adjudicated)` and TM-011 retained open
+  Sev-2 were recorded by the tech-lead adjudication of 2026-10-20 — #367 comment `6291002089`
+  ([#6291002089](https://github.com/csim-sg/yacc/issues/367#issuecomment-6291002089)) and
+  PR #426 comment `6291005155`; no waiver, no reclassification, no residual acceptance.
+- **AC-MIG-073-2 is not declared by the builder.** On the ledger's face one Sev-2 row (TM-011) is
+  `open`,
   so the gate cannot be asserted met at this revision; equally, the two `resolved-policy`
-  dispositions and TM-012's conditional reading are **candidate** outcomes whose effect on the open
+  dispositions are **candidate** outcomes whose effect on the open
   count is a decision, not an observation. Per the re-assessment activation guardrail (#367 body
   §4): whether a policy-resolved disposition satisfies AC-MIG-073-2, or requires a founder-amended
   acceptance path (E1), is the **fresh independent reviewer assessment's and tech-lead's** decision
@@ -639,8 +650,9 @@ MIG-091's (#366, AC-MIG-091-4) — no duplicate taxonomy is created (stop E7).
   The founder's shared-view decision (§1.1) is a product-policy correction merged via #437 — it is
   not a waiver, not residual-risk acceptance, and does not by itself close any finding; the
   dispositions above are decided on evidence and marked candidate where adjudication remains.
-- **No remediation was performed inside MIG-073** (out of scope; stops E1/E5). TM-011 and TM-012
-  are recorded `open` with owned routing to tech-lead; with two open Sev-2 rows the outcome is
+- **No remediation was performed inside MIG-073** (out of scope; stops E1/E5). TM-011 is recorded
+  `open` (TM-012 is adjudicated not-a-finding) with owned routing to tech-lead; with one open Sev-2
+  row the outcome is
   recorded as **blocking for MIG-072 cutover** unless and until the reviewer/tech-lead adjudication
   changes the ledger state and AC-2 is satisfied through a decision this document does not make.
 - Configured-but-unused surfaces (R2; the dead connector/env secret mounts) are documented as such
