@@ -41,6 +41,22 @@ import { expect, test, type Page } from '@playwright/test';
  *   Bell interactions below use real DOM events on the element
  *   (`dispatchEvent`) instead of pointer targeting; this is a styling
  *   limitation, not a structural or behavioral mock.
+ * - Recorded adaptation (ANG-015 #385 parity root cause, 20 Oct 2026 —
+ *   permitted edit inside this #377-owned additive spec only, recorded
+ *   for the #385 register with file+SHA provenance): NOTIF-1's outside
+ *   press targets the deterministic inbox heading instead of the fixed
+ *   (640, 400) viewport point — in the unstyled shell the host is a
+ *   full-width block whose band shifts with font metrics and with the
+ *   CI realtime-origin reconnect banner (~77 px), so the fixed point
+ *   landed inside the host and the press (correctly) did not close the
+ *   panel; INBOX-1's final Back exit assertion is browser-neutral
+ *   (about:blank where the browser kept the pre-app entry, else a no-op
+ *   with unchanged history length + router navigationId) — Firefox's
+ *   initial `page.goto` REPLACES the initial `about:blank` entry, and an
+ *   instrumented history log proved the guard bounce already
+ *   `replaceState`s (no extra pushed entry) and the app performs no
+ *   post-bounce URL write. Both rows keep their original intent and
+ *   regression power; no assertion was weakened, skipped or removed.
  * - ANG007-WS-1 (AC-ANG-007-8) reads the ANG-006 dev-only observation seam
  *   `window.__yaccRealtimeDevtools` (read-only client snapshot; dev builds
  *   only — `ng serve` webServer) and observes the app's real raw-WS
@@ -151,9 +167,41 @@ test.describe('ANG-007 shell + inbox + notifications (real backend)', () => {
     await expect(page.locator('[data-testid="conversation-card"]')).toHaveCount(unfilteredCount);
 
     // The filter session created exactly ONE in-app entry: the next Back
-    // exits the app instead of surfacing another filter state.
+    // must leave the app — or, when the browser kept no pre-app entry, be
+    // a no-op that triggers NO further in-app navigation. Root-caused with
+    // an instrumented history log (ANG-015 #385 parity failure, fixed
+    // here): the public-guard bounce performs `history.replaceState` (no
+    // pushed entry) and the reused Inbox component performs no URL write
+    // after the bounce — the app-side session depth is exactly one Back on
+    // every browser, React parity. The ORIGINAL exit assertion
+    // (`toHaveURL(/about:blank/)`) pinned a browser artifact instead:
+    // chromium/webkit keep the initial `about:blank` entry behind the app
+    // (Back #2 exits), while Firefox's initial `page.goto` REPLACED that
+    // entry, so Back #2 is a no-op on the last (clean) entry. The
+    // app-owned contract is pinned browser-neutrally below: after Back #2
+    // the session either exited to `about:blank` (chromium/webkit) or
+    // stayed on the clean `/inbox` with UNCHANGED history length and
+    // UNCHANGED router navigationId — a pushed bounce entry (the defect
+    // class this row guards) would pop to `/login`, bounce again, and
+    // advance both.
+    const inAppNavIdAfterBounce = await page.evaluate(
+      () => (history.state as { navigationId?: number } | null)?.navigationId ?? null,
+    );
+    const historyLengthAfterBounce = await page.evaluate(() => history.length);
     await page.goBack();
-    await expect(page).toHaveURL(/about:blank/);
+    await expect(page).toHaveURL(
+      (url) => url.href === 'about:blank' || (url.pathname === '/inbox' && !url.search),
+    );
+    const afterSecondBack = await page.evaluate(() => ({
+      href: location.href,
+      length: history.length,
+      navigationId: (history.state as { navigationId?: number } | null)?.navigationId ?? null,
+    }));
+    if (afterSecondBack.href !== 'about:blank') {
+      // No-exit browsers (Firefox): the no-op must not have navigated.
+      expect(afterSecondBack.length).toBe(historyLengthAfterBounce);
+      expect(afterSecondBack.navigationId).toBe(inAppNavIdAfterBounce);
+    }
   });
 
   test('ANG007-WS-1: a real sign-in connects the raw-WS client without a reload; sign-out disconnects (AC-ANG-007-8)', async ({
@@ -234,7 +282,20 @@ test.describe('ANG-007 shell + inbox + notifications (real backend)', () => {
     await expect(panel).toContainText('No notifications yet');
 
     // A real outside mousedown closes the panel (document listener parity).
-    await page.mouse.click(640, 400);
+    // The press targets a DETERMINISTIC element that is outside the
+    // notification host by DOM structure (the inbox page heading in
+    // `main`, not inside `app-notification-center`), never a fixed
+    // viewport coordinate: the daisyUI-less shell renders the host as a
+    // full-width block whose on-screen band moves with environment layout
+    // metrics (font availability; the CI realtime-origin reconnect banner
+    // adds ~77 px above the shell), and the fixed point this row used
+    // before the ANG-015 parity failure (640, 400) landed INSIDE the host
+    // in that shifted layout — an in-host press must not close the panel
+    // (React listener parity; reproduced 3× on chromium/webkit, measured
+    // host band chromium y 321–393 vs webkit y 329–401 vs CI ~398–470).
+    // The assertion's intent is unchanged: aria-expanded becomes false
+    // after an outside mousedown.
+    await page.getByRole('heading', { name: 'YACC Inbox' }).click();
     await expect(bell).toHaveAttribute('aria-expanded', 'false');
   });
 });
