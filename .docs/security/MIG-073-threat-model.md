@@ -1,9 +1,10 @@
 # MIG-073 — Java/Spring Security Threat Model
 
 **Issue**: csim-sg/yacc#367 (MIG-073) · **Spec**: SPEC-002 (AC-03, AC-04, AC-09) · **Milestone**: #3
-**Date**: 2026-10-19 (review performed 2026-10-18/19) · **Author**: builder (managed do-tasks pass) · **Method owner**: `security-review` skill
-**Reviewed revision**: `origin/dev` @ `13004361ffb278f865182b4e515f38e02158bc97` (PR #407 merge; local `dev` identical)
-**Companion artifact**: [MIG-073-findings-ledger.md](MIG-073-findings-ledger.md) (finding → remediation ledger + dated finding report)
+**Date**: 2026-10-20 (re-assessment; initial review 2026-10-18/19 at `1300436`) · **Author**: builder (managed do-tasks pass) · **Method owner**: `security-review` skill
+**Reviewed revision**: `origin/dev` @ `f9436c610ff2ec2ffe1bb8d0a9b20db6480bfec6` (PR #438 merge). Branch merge commit `e88d159`.
+**Revision validity**: `services/backend-java`, `deploy`, `.docs/migration` and `.github` are **byte-identical** between the revision-1 anchor `13004361ffb278f865182b4e515f38e02158bc97` and `f9436c6` — `git diff 1300436 f9436c6 -- services deploy .docs/migration .github` is empty (verified in this re-assessment). Every revision-1 code/config/contract anchor therefore remains valid unchanged; this re-assessment is a revision bump plus policy-baseline correction, not a re-review of changed code.
+**Companion artifact**: [MIG-073-findings-ledger.md](MIG-073-findings-ledger.md) (finding → remediation ledger + dated finding report, ledger revision 2)
 
 ---
 
@@ -14,24 +15,47 @@ This document is the STRIDE threat model of the complete merged Java/Spring secu
 authoring half of AC-MIG-073-1 (every named surface documented by concrete artifact) and states the
 Sev-1/Sev-2 severity definitions that scope AC-MIG-073-2 for **threat-model findings**.
 
-Findings, severities, statuses, and the dated finding report live in the companion ledger. The review
-outcome is **not** a zero-open-Sev-1/2 state at this revision: two Sev-2 findings are recorded
-`open` and route to tech-lead under escalation stop E1. No waiver was granted, no severity was
-reclassified, and no remediation was performed inside MIG-073 (fixes are separate issues by scope).
+Findings, severities, statuses, and the dated finding report live in the companion ledger
+(revision 2). The review outcome is **not** a passing zero-open-Sev-1/2 state and **not** declared
+either way by the builder: at this revision the ledger records two `open` Sev-2 findings
+(TM-011 send authorization; TM-012 notes-create, conditional pending adjudication), two
+`resolved-policy (candidate)` dispositions (TM-001, TM-002 read paths) whose effect on AC-MIG-073-2
+is expressly reserved to the fresh independent reviewer assessment and tech-lead decision. No
+waiver was granted, no severity was reclassified, and no remediation was performed inside MIG-073
+(fixes are separate issues by scope).
+
+### 1.1 Reviewed policy baseline (accepted records, merged before this re-assessment)
+
+- **Founder decision (2026-10-18)**, recorded in #367 comment `6268859088` and merged into the
+  product records by #437 (PR `csim-sg/yacc#438` → `dev` @ `f9436c6`; PR
+  `Antpolis/documentation#19` → vault `master`): **shared-inbox viewing** — all active
+  authenticated identities (all four roles, including self-registered/OIDC-first-login `USER`) may
+  **view** all conversation content — messages, status, and notes — of every conversation
+  (assigned, unassigned, or assigned to another user). Recorded in
+  `.docs/01-product-specification.md` (§2 role table, §3 P0 Locked Defaults, Story 1.3 + Locked P0
+  Role Matrix note at L469) and `.docs/05-quick-reference.md` §P0 Role Matrix.
+- **Bounds the decision leaves unchanged**: `USER` **reply/retry remain assignment-bound**
+  (`.docs/01-product-specification.md` L466–467 "✅ (if assigned)"; `.docs/05-quick-reference.md`
+  Reply/Retry rows); assignment/status/priority/tags/notes-creation/notification semantics are
+  unchanged; `inactive`/`suspended` denial is unchanged.
+- **What the decision is not**: not a waiver, not residual-risk acceptance, not a change to
+  `AC-MIG-073-2`, not cutover approval. It resolves the read-scope interpretation only; no finding
+  is closed by the decision alone — each affected disposition below is decided on evidence and
+  marked `candidate` where its AC-2 effect is for the reviewer/tech-lead to settle.
 
 ## 2. Scope of review (issue Scope, verified against merged code)
 
-| # | Scope item (issue #367) | Verdict against `dev` @ `1300436` |
+| # | Scope item (issue #367) | Verdict against `dev` @ `f9436c6` |
 |---|---|---|
 | 1 | Dual-role OIDC (RP + embedded AS, Spring Authorization Server) | Implemented — §4 S2, S3 |
-| 2 | Four-role RBAC + status enforcement | Implemented — §4 S1; findings TM-001/TM-002 |
+| 2 | Four-role RBAC + status enforcement | Implemented — §4 S1; open findings TM-011/TM-012; reads policy-open (TM-002 `resolved-policy` candidate) |
 | 3 | Token/refresh lifecycle | Implemented — §4 S1, S3 |
 | 4 | Key rotation (JWKS) | Implemented — §4 S3.4 |
 | 5 | Consent/claims/scopes | Implemented — §4 S3 |
 | 6 | Deterministic first-run bootstrap + founder-controlled recovery | Implemented — §4 S4 |
 | 7 | Secrets handling | Implemented — §4 S7; findings TM-003/TM-004 |
-| 8 | Telegram/IRC connector credential handling | Implemented — §4 S6; findings TM-004/TM-006 |
-| 9 | Raw WebSocket auth | Implemented — §4 S5; findings TM-001/TM-005 |
+| 8 | Telegram/IRC connector credential handling | Implemented — §4 S6; findings TM-004/TM-006; TM-013 (relay caller authorization) |
+| 9 | Raw WebSocket auth | Implemented — §4 S5; TM-001 `resolved-policy` candidate; findings TM-005/TM-013/TM-014 |
 | 10 | Cloudflare R2 | **Configured-but-unused** — §4 S9 (E3 documentation, no inferred integration) |
 | 11 | SMTP/SendGrid integration | Implemented (live) — §4 S8 |
 | 12 | Audit coverage | Implemented — §4 S10; finding TM-009 |
@@ -71,7 +95,7 @@ claimed (the Java staging deploy job reports `success` with all deploy steps ski
 │  │  TB6: egress             ── SMTP / SendGrid HTTPS ──▶ auth email flows             │  │
 │  └─────────────────────────────────────────────────────────────────────────────────┘  │
 │   env: K8s Secrets (bootstrap/recovery/token/encryption/email [+ R2, unused])          │
-└───────────────────────────────────────────────────────────────────────────────────────┐
+└───────────────────────────────────────────────────────────────────────────────────────┘
         ▼ JDBC (PostgreSQL 15; Flyway schema; AES-256-GCM credential columns)
    PostgreSQL (trust boundary TB7: DB compromise ⇒ credential ciphertext + hashes, no keys)
 ```
@@ -84,12 +108,20 @@ is bounded by the single-instance envelope (ADR-024/ADR-029) and is not a trust 
 
 ### 3.3 Reproducible inventory commands
 
-Recorded per the issue Verification section (run at the review worktree, `dev` @ `1300436`):
+Recorded per the issue Verification section (re-run at the re-assessment worktree, branch merge
+commit `e88d159`, `dev` @ `f9436c6`):
 
 ```bash
-git rev-parse origin/dev                                  # 13004361ffb278f865182b4e515f38e02158bc97
-find services/backend-java/src/main/java/com/yacc -name '*.java' | sort      # 341 files, §4 inventory source
-grep -rn "@PreAuthorize" services/backend-java/src/main/java --include='*.java'   # 43 RBAC gates (§4 S1.2)
+git rev-parse origin/dev                                  # f9436c610ff2ec2ffe1bb8d0a9b20db6480bfec6
+git diff 1300436 f9436c6 -- services deploy .docs/migration .github
+                                                          # empty ⇒ rev-1 anchors remain valid
+git ls-tree -r f9436c6 --name-only services/backend-java/src/main/java/com/yacc | grep -c '\.java$'
+                                                          # 349 Java files (§4 inventory source;
+                                                          # identical at 1300436 — rev-1 report said
+                                                          # 341, corrected here)
+git grep -c "@PreAuthorize" f9436c6 -- 'services/backend-java/src/main/java' \
+      | awk -F: '{s+=$NF} END {print s}'                  # 42 RBAC gates (§4 S1.2; identical at
+                                                          # 1300436 — rev-1 report said 43, corrected)
 grep -rnE "@(Request|Get|Post|Put|Patch|Delete)Mapping" services/backend-java/src/main/java \
       --include='*Controller.java'                        # full route map (§4 S1.3)
 grep -rn "permitAll" services/backend-java/src/main/java/com/yacc/api/auth/AuthSecurityConfig.java
@@ -121,20 +153,34 @@ Every entry names its artifact(s). Route = frozen wire path; key = config key / 
 
 - **S1.1 Credential sign-in / registration.** Routes `POST /api/auth/sign-in/email`,
   `POST /api/auth/sign-up/email` (both in the permitAll set). `AuthenticationService.signUp`
-  hard-assigns `UserRole.USER` (`AuthenticationService.java:130-136`) — no self-elevation at
-  registration. BCrypt hashing (`AuthSecurityConfig.passwordEncoder`, `$2a/$2b` compatible).
-- **S1.2 RBAC matrix.** `entity/UserRole.java` defines exactly `SUPER_ADMIN`, `ADMIN`, `MANAGER`,
-  `USER` (PG enum `user_role`); no role inheritance. Method security (`@EnableMethodSecurity`) with
-  43 `@PreAuthorize` gates across `UsersController` (all 4 mutations SUPER_ADMIN-only),
+  hard-assigns `UserRole.USER` (`AuthenticationService.java:130-136`; `OidcIdentityService.java`
+  provisions USER-only as well) — no self-elevation at registration. BCrypt hashing
+  (`AuthSecurityConfig.passwordEncoder`, `$2a/$2b` compatible). Consequence carried into the
+  re-assessment: the default self-registered/OIDC identity is a `USER`-role principal, so every
+  authorization observation below applies to it.
+- **S1.2 RBAC matrix — view vs write (corrected narrative under the accepted policy).**
+  `entity/UserRole.java` defines exactly `SUPER_ADMIN`, `ADMIN`, `MANAGER`, `USER` (PG enum
+  `user_role`); no role inheritance. Method security (`@EnableMethodSecurity`) with
+  42 `@PreAuthorize` gates across `UsersController` (all 4 mutations SUPER_ADMIN-only),
   `AuditLogsQueryController`, `ConversationAuditController`, `ConversationsController`,
   `BulkActionController`, `AssignmentController` (in-code USER deny), `QueueController`,
   `DlqController`, `RoutingRulesController`, `IrcProfileController`, `IrcIntegrationController`.
-  Resource-level check `ConversationAccessService.canAccess` (user ⇒ assigned-only, fail-closed for
-  unknown roles) is applied at `ConversationTagController.addTag/removeTag` and
-  `MessageController.retry`. **Finding TM-002**: the conversation-content read paths (list/detail,
-  message list/status, notes) are authenticated-only and do not apply the resource check — ledger.
-  `GET /api/users/roles` (`UsersController.java:93`) has no `@PreAuthorize` and returns static role
-  labels only (`RolesResponse.defaults()`) — no identity data; documented, no finding.
+  The resource-level check `ConversationAccessService.canAccess` (`api/conversation/
+  ConversationAccessService.java:31-42`: privileged roles all-access, `user` only when assigned,
+  fail-closed for unknown roles) is the **write-scope** contract on the paths that apply it:
+  `ConversationTagController.addTag/removeTag` and `MessageController.retry` (which additionally
+  gates on `isAssignedTo`, `MessageController.java:86-88`). **View separation (accepted policy,
+  §1.1): conversation-content reads — conversations list/detail, message list/status, notes list —
+  carry no resource check by policy: the founder's shared-view decision approves universal viewing
+  of messages, status and notes for every active authenticated identity, so their absence of a
+  resource check matches the accepted records (TM-002 `resolved-policy` candidate).** The
+  **write** surfaces the view policy does not settle are assessed on their own evidence:
+  `POST /api/conversations/{id}/messages` enforces no role/assignment check at all while the
+  accepted records keep `USER` reply assignment-bound (**TM-011**, open), and
+  `POST /api/conversations/{id}/notes` enforces no resource check (**TM-012**, open pending
+  adjudication between the recorded readings). `GET /api/users/roles`
+  (`UsersController.java:93`) has no `@PreAuthorize` and returns static role labels only
+  (`RolesResponse.defaults()`) — no identity data; documented, no finding.
 - **S1.3 Public wire surface (permitAll, `AuthSecurityConfig.authorizeHttpRequests`).**
   Exactly: `/health`, `/health/**`, `/actuator/health/**`, `/actuator/prometheus`, `/error`,
   `realtimeProperties.websocket().path()` (`/ws`), `/api/auth/sign-in/email`,
@@ -174,11 +220,11 @@ Every entry names its artifact(s). Route = frozen wire path; key = config key / 
 | STRIDE | Disposition |
 |---|---|
 | Spoofing | **M** — signature + issuer allow-list + expiry enforced by `JwtTokenService` decoder on every request; DB-resolved authorities (role claim never authoritative). Registration cannot mint privileged roles (S1.1). |
-| Tampering | **M** — token integrity by RS256; grant rows opaque random, server-side only; bcrypt digests for reset/verify tokens. |
-| Repudiation | **M** — login failure/reset issuance/rotation audited (S10); `SecurityAuditEventListener` records Spring auth events. |
-| Info disclosure | **F-TM-002** (read paths without resource check); **M** otherwise — error bodies are the frozen generic 401/403 JSON (`RestAuthenticationEntryPoint`/`RestAccessDeniedHandler`); anti-enumeration constant answers (S1.7). |
+| Tampering | **F-TM-011** (outbound send on unassigned conversations — no role/assignment check; external dispatch via the connector gateway); **F-TM-012** (notes-create resource check pending adjudication); **M** otherwise — token integrity by RS256; grant rows opaque random, server-side only; bcrypt digests for reset/verify tokens. |
+| Repudiation | **M** — login failure/reset issuance/rotation audited (S10); `SecurityAuditEventListener` records Spring auth events; `note.created` audited with the true author. |
+| Info disclosure | Content reads policy-open per the accepted records (TM-002 `resolved-policy` candidate); **M** otherwise — error bodies are the frozen generic 401/403 JSON (`RestAuthenticationEntryPoint`/`RestAccessDeniedHandler`); anti-enumeration constant answers (S1.7). |
 | DoS | **F-TM-010** (rate limiter topology caveat); **M** otherwise — bcrypt cost bounds brute force; stateless verification is O(1). |
-| Elevation | **M** — `@PreAuthorize` matrix + USER-only registration + in-code USER denies; SUPER_ADMIN provisioning only via bootstrap/recovery (S4). |
+| Elevation | **F-TM-011** (an authenticated `USER` can post outbound messages to conversations it is not assigned to — accepted records bound reply to assigned); **M** otherwise — `@PreAuthorize` matrix + USER-only registration + in-code USER deny on retry/assignment paths; SUPER_ADMIN provisioning only via bootstrap/recovery (S4). |
 
 ### S2 — OIDC relying party (MIG-032)
 
@@ -327,23 +373,47 @@ the personal room `user:{userId}`, and demuxes the frozen inbound ops; malformed
 `system.error` (`bad_frame`/`unknown_event`/`transport_error`); `connector.*` relay payloads are
 platform-validated (`platformOf` allows exactly `telegram|irc`). Room namespaces are
 `user:{userId}`, `conversation:{conversationId}`, `connector:{platform}` (`RealtimeRooms`).
-**Finding TM-001**: `subscribe.conversation` joins the conversation room with no resource-level
-authorization while those rooms carry content-bearing events (full inbound message bodies via
-`GatewayExchange.publishMessageReceived` — `MessageReceivedPayload` includes `event.body()` — plus
-`ConnectorRelayService` conversation-room publishes and typing events); `MESSAGE_SENT` is
-broadcast to all sessions (`publishToAll`), making conversation IDs discoverable to every connected
-identity. **Finding TM-005**: the token-in-query transport can leak bearer tokens into ingress
-access logs — ledger (`unverified` for the log-capture half, E6). Backlog replay is per-user
-(1h window, `user:{userId}`-keyed stores) — no cross-user replay found.
+
+**Room-join receive path — re-dispositioned under the accepted policy (TM-001).** The revision-1
+finding recorded that `subscribe.conversation` joins `conversation:{id}`
+(`YaccWebSocketHandler.subscribeConversation`, `YaccWebSocketHandler.java:177-188`; room join at
+`:184`) with no resource-level authorization while those rooms carry message content
+(`GatewayExchange.publishMessageReceived` — `GatewayExchange.java:226-233` — publishes
+`MessageReceivedPayload` including `event.body()`), delivery-status events
+(`ConnectorRelayService` conversation-room publishes at `:65/:113/:129`), and typing events
+(`WebSocketTypingService.java:52/:65/:82`); `MESSAGE_SENT` is broadcast to all sessions
+(`GatewayExchange.java:335`), making conversation ids discoverable. Under the accepted shared-view
+policy (§1.1) the data classes those rooms carry — message bodies, message delivery status, and
+conversation-scoped ephemeral typing presence — are the same classes the founder approved every
+active authenticated identity to **view** on every conversation; the realtime room is the push
+channel of the approved universal view, so the receive path no longer crosses the boundary the
+revision-1 finding cited (the assignment-bounded view contract that no longer exists). The
+disposition is recorded as `resolved-policy (candidate)` — its AC-2 effect is the reviewer/tech-lead
+decision, not the builder's.
+
+**What the view policy does not settle on this plane (new findings).** **TM-013**: the four
+`connector.*` relay ops (`connector.message.received|status.changed|message.error|message.ack`,
+`YaccWebSocketHandler.java:131-138`) are accepted from **any** authenticated session — not only the
+platform connectors (TB5) — and `ConnectorRelayService` publishes the client-supplied payloads
+(incl. `body`, `senderId`, `senderName`) into `conversation:{id}` rooms and broadcasts
+`connector.status` to **all** sessions (`ConnectorRelayService.java:90`); `connector.subscribe`
+joins `connector:{platform}` with no role gate (`YaccWebSocketHandler.java:205-215`). No first-party
+client emits these ops (grep over `packages/frontend/src` and `packages/frontend-angular/src`: no
+matches). **TM-014**: `WebSocketTypingService` fans out client-supplied `conversationId/userId/name`
+(`WebSocketTypingService.java:44-88`) without binding them to the authenticated handshake identity
+(`RealtimeSession` carries the verified identity; sender exclusion is by session id only).
+**Finding TM-005**: the token-in-query transport can leak bearer tokens into ingress access logs —
+ledger (`unverified` for the log-capture half, E6). Backlog replay is per-user (1h window,
+`user:{userId}`-keyed stores) — no cross-user replay found.
 
 | STRIDE | Disposition |
 |---|---|
-| Spoofing | **M** — authenticated upgrade only (401 otherwise); identity attached server-side at handshake; unregistered sessions denied at the frame layer. |
-| Tampering | **M** — frames are JSON-parsed server-side; ops are a closed enum; platform allow-list on connector ops. |
+| Spoofing | **M** for the transport — authenticated upgrade only (401 otherwise); identity attached server-side at handshake; unregistered sessions denied at the frame layer. **F-TM-013** (any authenticated session can inject connector-relay content attributed to platform senders) and **F-TM-014** (client-declared typing identity) remain open on the frame-content plane. |
+| Tampering | **F-TM-013** (client-supplied relay payloads published into conversation rooms); **M** otherwise — frames are JSON-parsed server-side; ops are a closed enum; platform allow-list on connector ops. |
 | Repudiation | **M** — ingestion audited (`message.ingested`, S10); frame errors surfaced to the sender. |
-| Info disclosure | **F-TM-001** (room join without resource check); **F-TM-005** (token in query). Backlog, presence, typing are otherwise per-user/room-scoped as designed. |
+| Info disclosure | Room-join receive path re-dispositioned `resolved-policy (candidate)` (TM-001 — the carried data classes are the approved universal view); **F-TM-005** (token in query). Backlog, presence are per-user/room-scoped as designed. |
 | DoS | **M** — bounded registry, idempotent unregister; per-frame parse errors answered, connection-level faults closed (`handleTransportError`); in-memory state matches the single-instance envelope. |
-| Elevation | **F-TM-001** (see above — an authenticated `user`-role session can receive conversation content beyond its assignment boundary). |
+| Elevation | **F-TM-013** (connector relay/subscribe ops assume the TB5 connector role but are reachable from any TB3 session, with no role gate); the room-join elevation claim of revision 1 is re-dispositioned with TM-001 (approved view scope). |
 
 ### S6 — Telegram/IRC connectors + integration administration (MIG-060/MIG-061/MIG-062)
 
@@ -371,19 +441,22 @@ fail-closed on absent/tampered/malformed material (connector refuses to connect;
 id + reason only — never secret material). Profile administration: 0..10 IRC profiles per tenant,
 single active, disable-clears-active, no secrets in responses (`ProfileResponse`), side-effect-free
 stored-credential tests, every mutation audited. Egress: Telegram over HTTPS (Bot API origin,
-config-overridable for tests). **Finding TM-006**: `IrcProtocolClient` uses a plain `Socket` — no
-TLS support — so IRC credentials and message traffic transit in cleartext against plaintext
-endpoints (baseline-inherited; operator can point the profile at a TLS-terminating endpoint, but
-the client itself cannot negotiate TLS) — ledger.
+config-overridable for tests). The ingest/dispatch direction of this surface is normally
+TB5-reached (`GatewayExchange.ingest` — persisted, audited); the frozen inbound WS relay ops that
+mirror ingest-side events are reachable from any authenticated WS session instead — caller
+authorization assessed as **TM-013** (S5). **Finding TM-006**: `IrcProtocolClient` uses a plain
+`Socket` — no TLS support — so IRC credentials and message traffic transit in cleartext against
+plaintext endpoints (baseline-inherited; operator can point the profile at a TLS-terminating
+endpoint, but the client itself cannot negotiate TLS) — ledger.
 
 | STRIDE | Disposition |
 |---|---|
-| Spoofing | **M** — platform identity is the configured credential; inbound events validated fail-closed (`GatewayExchange.validateInbound`); no trust in inbound `senderName`. |
+| Spoofing | **M** for platform ingress — platform identity is the configured credential; inbound events validated fail-closed (`GatewayExchange.validateInbound`); no trust in inbound `senderName`. **F-TM-013** for the WS relay path (caller role unverified on the relay ops). |
 | Tampering | **M** — credentials ciphertext-authenticated (GCM); tampered ⇒ refuse connect; DLQ preserves failed ingests. |
 | Repudiation | **M** — ingest/delivery audited; DLQ + retry ledger retained (ADR-028). |
 | Info disclosure | **F-TM-006** (plaintext IRC transport); **M** otherwise (no secret in logs/responses; error messages carry no material). |
 | DoS | **M** — circuit breaker per platform (fail-fast), bounded reconnect backoff (1s→60s, max 5), connect deadline 30s. |
-| Elevation | **M** — administration is SUPER_ADMIN-only (S1.2); connector runtime holds no privileged YACC authority beyond ingest/dispatch. |
+| Elevation | **M** — administration is SUPER_ADMIN-only (S1.2); connector runtime holds no privileged YACC authority beyond ingest/dispatch (relay caller authorization: TM-013). |
 
 ### S7 — Secrets, crypto, and configuration material
 
@@ -473,7 +546,8 @@ events → audit); `api/audit/AuditLogsQueryController.java` (`GET /api/audit-lo
 SUPER_ADMIN/ADMIN only), `ConversationAuditController.java` (`GET
 /api/conversations/{conversationId}/audit-logs`), `AuditRecord.java`, `AuditExportRow.java`,
 `AuditFilters.java`, `Export*.java`; `entity/AuditLog.java`; producers: recovery/bootstrap
-(S4), OIDC identity resolution (S2), password-reset/verification (S1.7), ingestion/delivery (S6).
+(S4), OIDC identity resolution (S2), password-reset/verification (S1.7), ingestion/delivery (S6),
+notes (`note.created`, S1.2).
 
 **Flows and properties.** Records persist to `audit_logs` (UUID entity ids, JSON metadata);
 query/export are RBAC-gated (S1.2); auth-event listeners make deny≠login truthful. **Finding
@@ -546,19 +620,35 @@ MIG-091's (#366, AC-MIG-091-4) — no duplicate taxonomy is created (stop E7).
 - **Sev-4** — Hardening opportunity or documented-by-design posture with no plausible
   confidentiality/integrity impact under the stated deployment envelope.
 
-## 6. Outcome
+## 6. Outcome (re-assessment, 2026-10-20)
 
-- Findings: **10** (0 × Sev-1, **2 × Sev-2 open**, 4 × Sev-3, 4 × Sev-4 — none remediated, none
-  accepted-residual at this revision). Details, evidence, and routing:
+- Findings at this revision: **14** recorded in ledger revision 2 — **0 × Sev-1**, **2 × Sev-2
+  open** (TM-011 outbound-send authorization; TM-012 notes-create, conditional pending
+  adjudication), 5 × Sev-3 (TM-003…TM-006, TM-013), 5 × Sev-4 (TM-007…TM-010, TM-014), and
+  **2 × `resolved-policy (candidate)`** (TM-001 WS room-join receive path; TM-002 content reads).
+  Details, evidence, and routing:
   [MIG-073-findings-ledger.md](MIG-073-findings-ledger.md).
-- **AC-MIG-073-2 is not met at this revision** (two open Sev-2 findings). Per escalation stop E1:
-  the findings are recorded `open`, no waiver was granted, no severity was reclassified, no
-  remediation was performed in MIG-073; the outcome routes to tech-lead (remediation issue and/or
-  amended acceptance path is a tech-lead/founder decision) and is recorded as **blocking for
-  MIG-072 cutover** until resolved and re-reviewed to `pass`.
+- **AC-MIG-073-2 is not declared by the builder.** On the ledger's face two Sev-2 rows are `open`,
+  so the gate cannot be asserted met at this revision; equally, the two `resolved-policy`
+  dispositions and TM-012's conditional reading are **candidate** outcomes whose effect on the open
+  count is a decision, not an observation. Per the re-assessment activation guardrail (#367 body
+  §4): whether a policy-resolved disposition satisfies AC-MIG-073-2, or requires a founder-amended
+  acceptance path (E1), is the **fresh independent reviewer assessment's and tech-lead's** decision
+  recorded at the exact updated head. The AC-MIG-073-2 checkbox remains unchecked on #367.
+- **No waiver was granted.** No finding was waived and no severity was reclassified to pass AC-2.
+  The founder's shared-view decision (§1.1) is a product-policy correction merged via #437 — it is
+  not a waiver, not residual-risk acceptance, and does not by itself close any finding; the
+  dispositions above are decided on evidence and marked candidate where adjudication remains.
+- **No remediation was performed inside MIG-073** (out of scope; stops E1/E5). TM-011 and TM-012
+  are recorded `open` with owned routing to tech-lead; with two open Sev-2 rows the outcome is
+  recorded as **blocking for MIG-072 cutover** unless and until the reviewer/tech-lead adjudication
+  changes the ledger state and AC-2 is satisfied through a decision this document does not make.
 - Configured-but-unused surfaces (R2; the dead connector/env secret mounts) are documented as such
   with negative evidence (§4 S9; TM-004) — not modeled as integrations.
 - Runtime/environment claims: none. Items requiring a live environment are marked `unverified`/
   `deferred` in the ledger (E6).
 - Residual-risk acceptance is founder-only (E4); no finding in this ledger is marked
   `accepted-residual`, and none may be without founder action.
+- Inventory correction recorded: the reproducible counts at both `1300436` and `f9436c6` are
+  **349** Java files and **42** `@PreAuthorize` gates (§3.3); the revision-1 report's 341/43 was a
+  counting error, corrected here — no severity or disposition depends on it.
