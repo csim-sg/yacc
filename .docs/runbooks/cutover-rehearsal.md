@@ -22,6 +22,7 @@
 | P5 | Chart + images pinned | Chart at a pinned commit (`<artifact link>`); candidate image tag pinned (`<image-tag>`, never `latest`) **and a distinct forward-fix image** (`<forward-fix-image-tag>` — an immutable tag or digest, **different from `<image-tag>`**, provenance recorded as `<artifact link>`). Step 7 fails closed if the two are not distinct. | Ops |
 | P6 | Candidate database | A reachable PostgreSQL instance with the schema migrated, plus a **separate candidate database** `<candidate-database>` (host `<candidate-db-host>`) for the restore test (see [backup-restore.md](backup-restore.md)). The candidate release's `DATABASE_URL` must reference **only** the candidate database — verified by name (never the value) in the Step-1 guards. | Ops |
 | P7 | Rehearsal window + stop authority | Window agreed; stop-authority contact named — `<founder to name>` — and reachable for the drill. (Backup/restore consistency does **not** depend on this window — see [backup-restore.md](backup-restore.md) §3.2.) | Founder |
+| P8 | Operator tooling | `kubectl`, `helm` ≥ 3.1 (`helm template --show-only`), `base64`, and **`python3` (standard library only)** — python3 powers the Step-1 G4 `DATABASE_URL` parse guard; the URL value is parsed in-process and never printed. | Ops |
 
 **Stop** if any row is unmet. Record the abort per §4 and in the §3 evidence template, and halt.
 
@@ -38,7 +39,7 @@ Every step records one row in the §3 evidence template.
 
 ### Step 1 — Candidate deploy (provably isolated)
 
-The rehearsal installs **its own uniquely named release in a dedicated candidate namespace** (P3). It never upgrades an existing release: `helm install` (not `upgrade --install`) is used deliberately — Helm refuses to create a release whose name is already in use, so this step **cannot modify an active deployment**. All release-scoped resources are named after `<candidate-release>` by the chart (`fullname` template), e.g. `deployment/<candidate-release>`, `svc/<candidate-release>` — nothing collides with the live `yacc-backend` release.
+The rehearsal installs **its own uniquely named release in a dedicated candidate namespace** (P3). It never upgrades an existing release: `helm install` (not `upgrade --install`) is used deliberately — Helm refuses to create a release whose name is already in use, so this step **cannot modify an active deployment**. The chart names its Deployment/Service with the `yacc-backend.fullname` helper (`deploy/helm/yacc-backend/templates/_helpers.tpl`): **`<candidate-release>-yacc-backend` — unless the release name itself already contains `yacc-backend`**, in which case the release name is used as-is. The exact names are therefore **derived from the rendered chart (guard G5), never assumed**; combined with G2 the candidate cannot collide with the live `yacc-backend` release.
 
 Run every guard first. **Any guard failure aborts the rehearsal (§4)** — never "work around" a guard by picking a different context/namespace/release:
 
@@ -59,22 +60,57 @@ test "<candidate-release>" != "yacc-backend" \
 helm status <candidate-release> -n <candidate-namespace> >/dev/null 2>&1 \
   && { echo "ABORT: candidate release name already in use"; exit 1; }
 
-# G4 — candidate release points at the candidate database (names only; the value is never printed or recorded)
+# G4 — candidate release points at the candidate database (fail closed; names only).
+# The DATABASE_URL value is parsed in-process by python3 (stdlib only — see P8) and is
+# never printed, logged, stored, or passed to grep/sed — only the pass/fail outcome is
+# emitted. Do NOT run this block under `set -x` / `bash -x`: xtrace echoes the value.
 CAND_DB_URL="$(kubectl get secret yacc-backend-secrets -n <candidate-namespace> \
   -o jsonpath='{.data.DATABASE_URL}' | base64 -d)"
-printf '%s' "$CAND_DB_URL" | grep -Eq '^(jdbc:)?postgresql://<candidate-db-host>(:[0-9]+)?/<candidate-database>' \
-  || { echo "ABORT: candidate DATABASE_URL must target the candidate database <candidate-database>"; exit 1; }
+CAND_DB_URL="$CAND_DB_URL" EXPECTED_DB_HOST='<candidate-db-host>' EXPECTED_DB='<candidate-database>' \
+  python3 - <<'PY' || { echo "ABORT: candidate DATABASE_URL must target candidate DB '<candidate-database>' on host '<candidate-db-host>' (the value itself is never printed)"; exit 1; }
+import os, sys
+from urllib.parse import urlsplit, unquote
+
+raw = os.environ.get("CAND_DB_URL", "").strip()   # never echoed
+if raw.startswith("jdbc:"):                       # JDBC form "jdbc:postgresql://..." is accepted
+    raw = raw[len("jdbc:"):]
+try:
+    parts = urlsplit(raw)                         # handles "postgresql://user:password@host:port/db"
+    host = (parts.hostname or "").lower()         # hostname() lowercases; empty when absent
+    db = unquote(parts.path).lstrip("/")          # database = path segment; query string excluded
+except ValueError:                                # unparseable URL => fail closed
+    sys.exit(1)
+sys.exit(0 if (host == os.environ["EXPECTED_DB_HOST"].lower()
+               and db == os.environ["EXPECTED_DB"]) else 1)
+PY
 unset CAND_DB_URL
+
+# G5 — derive the exact resource fullname from the rendered chart and require it free (fail closed).
+# Per templates/_helpers.tpl the chart names resources `<release>-yacc-backend` UNLESS the
+# release name already contains "yacc-backend" — so the name is derived, never assumed.
+# (Verified against the chart templates; requires helm >= 3.1 for --show-only — see P8.)
+CAND_FULLNAME="$(helm template <candidate-release> ./deploy/helm/yacc-backend \
+  -f deploy/helm/yacc-backend/values-staging.yaml --show-only templates/service.yaml \
+  | awk '/^  name: /{print $2; exit}')"
+test -n "$CAND_FULLNAME" \
+  || { echo "ABORT: could not derive the resource fullname from the rendered chart"; exit 1; }
+kubectl get deployment "$CAND_FULLNAME" -n <candidate-namespace> >/dev/null 2>&1 \
+  && { echo "ABORT: deployment $CAND_FULLNAME already exists in <candidate-namespace>"; exit 1; }
+kubectl get service "$CAND_FULLNAME" -n <candidate-namespace> >/dev/null 2>&1 \
+  && { echo "ABORT: service $CAND_FULLNAME already exists in <candidate-namespace>"; exit 1; }
 ```
 
-Only when **all four guards pass**:
+Only when **all five guards pass**:
 
 ```bash
 helm install <candidate-release> ./deploy/helm/yacc-backend \
   -n <candidate-namespace> \
   -f deploy/helm/yacc-backend/values-staging.yaml \
   --set image.tag=<image-tag>
-kubectl rollout status deployment/<candidate-release> -n <candidate-namespace> --timeout=2m
+# Readiness + resource identity use the DERIVED fullname ($CAND_FULLNAME), not the release name:
+kubectl rollout status "deployment/$CAND_FULLNAME" -n <candidate-namespace> --timeout=2m
+kubectl get "deployment/$CAND_FULLNAME" "service/$CAND_FULLNAME" -n <candidate-namespace> >/dev/null \
+  || { echo "ABORT: candidate resources missing under the derived fullname $CAND_FULLNAME"; exit 1; }
 ```
 
 (Using `-f deploy/helm/yacc-backend/values-staging.yaml` follows the documented staging values convention — see `.docs/DEPLOYMENT-GUIDE-MVP.md`; candidate-specific overrides are set explicitly, e.g. the candidate image pin above.)
@@ -84,7 +120,13 @@ kubectl rollout status deployment/<candidate-release> -n <candidate-namespace> -
 The frozen actuator wire paths are `/health/live` and `/health/ready` (ADR-029):
 
 ```bash
-kubectl port-forward -n <candidate-namespace> svc/<candidate-release> 8080:8080 &
+# Re-derive the resource fullname (same command as Step-1 guard G5) so this step is
+# executable in a fresh shell; it is a pure function of the release name + chart:
+CAND_FULLNAME="$(helm template <candidate-release> ./deploy/helm/yacc-backend \
+  -f deploy/helm/yacc-backend/values-staging.yaml --show-only templates/service.yaml \
+  | awk '/^  name: /{print $2; exit}')"
+
+kubectl port-forward -n <candidate-namespace> "svc/$CAND_FULLNAME" 8080:8080 &
 sleep 2
 curl -i http://localhost:8080/health/live   # expect 200
 curl -i http://localhost:8080/health/ready  # expect 200
@@ -133,15 +175,21 @@ Validate the documented incident path end-to-end (forward fix, **not** `helm rol
 test "<forward-fix-image-tag>" != "<image-tag>" \
   || { echo "ABORT: forward-fix image must differ from the candidate image"; exit 1; }
 
+# Re-derive the resource fullname (same command as Step-1 guard G5) so this step is
+# executable in a fresh shell; it is a pure function of the release name + chart:
+CAND_FULLNAME="$(helm template <candidate-release> ./deploy/helm/yacc-backend \
+  -f deploy/helm/yacc-backend/values-staging.yaml --show-only templates/service.yaml \
+  | awk '/^  name: /{print $2; exit}')"
+
 helm history <candidate-release> -n <candidate-namespace>      # audit trail present
 helm upgrade <candidate-release> ./deploy/helm/yacc-backend \
   -n <candidate-namespace> \
   -f deploy/helm/yacc-backend/values-staging.yaml \
   --set image.tag=<forward-fix-image-tag>                      # forward fix = new image, rehearsal-owned release only
-kubectl rollout status deployment/<candidate-release> -n <candidate-namespace> --timeout=2m
+kubectl rollout status "deployment/$CAND_FULLNAME" -n <candidate-namespace> --timeout=2m
 ```
 
-`helm upgrade` here targets **only the rehearsal's own candidate release** (created in Step 1 under the G1–G4 guards) — it can never touch a live release, which does not exist in `<candidate-namespace>` by construction.
+`helm upgrade` here targets **only the rehearsal's own candidate release** (created in Step 1 under the G1–G5 guards) — it can never touch a live release, which does not exist in `<candidate-namespace>` by construction.
 
 Re-run the §Step-2 health gates. **Gate**: both 200; `helm history` shows a **new revision whose recorded image is `<forward-fix-image-tag>`** — the check passes only if a distinct image was rolled forward and is healthy.
 
@@ -170,7 +218,7 @@ Rules: timestamps in UTC; deviations recorded, never silently normalized; secret
 Abort the rehearsal immediately if any of these occurs, record the rows filled so far, and halt:
 
 - Any §1 precondition is unmet or lapses mid-rehearsal (especially: stop-authority contact unreachable).
-- Any Step-1 guard fails: wrong cluster context, a live `yacc-backend` release/deployment present in the target namespace, a release-name collision, or the candidate `DATABASE_URL` not targeting `<candidate-database>`.
+- Any Step-1 guard fails: wrong cluster context, a live `yacc-backend` release/deployment present in the target namespace, a release-name collision, the candidate `DATABASE_URL` not targeting `<candidate-database>` on `<candidate-db-host>`, or the derived resource fullname already existing in the namespace (G5).
 - §Step-2 health gates are red after the candidate deploy or the roll-forward check.
 - The backup fails, or cannot be stored/retrieved in the `<environment>` storage location.
 - Any §Step-5 integrity check does not match the same-snapshot source capture.
@@ -202,4 +250,4 @@ On abort: do not attempt in-place repairs beyond restoring the candidate environ
 
 ---
 
-**Last Updated**: 2026-10-21 (authored by MIG-070b #447; review rework same day — procedure only; no execution claimed)
+**Last Updated**: 2026-10-21 (authored by MIG-070b #447; review rework ×2 same day — procedure only; no execution claimed)
