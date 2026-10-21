@@ -114,6 +114,19 @@ class RealtimeTransportContractAlignmentTest {
             "connector.message.error", "connector.message.ack",
             "connector.status", "status.updated", "message.error", "message.ack");
 
+    /**
+     * MIG-091a inbound application-operation channels and their raw emissions
+     * (frozen {@code asyncapi.yaml} channels; ledger WS-OP-CONV-003,
+     * WS-OP-MSG-001..004, WS-OP-REACT-001..004, WS-RAW-004/005/014/015/016).
+     * {@code conversation.updated}, {@code message.sent} and
+     * {@code message.failed} are already members of FROZEN_23.
+     */
+    private static final List<String> MIG_091_CHANNELS = List.of(
+            "message.retry", "message.received.ack",
+            "reaction.added", "reaction.removed", "reaction.list", "reaction.count",
+            "message.retry.acknowledged", "message.retry.started",
+            "reaction.added.ack", "reaction.removed.ack", "reaction.list.ack");
+
     /** MIG-050-owned ledger row IDs (scope ceiling: the transport core). */
     private static final List<String> MIG_050_LEDGER_ROWS = List.of(
             "WS-BHV-001", "WS-OP-CONV-004", "WS-OP-CONV-005",
@@ -166,7 +179,7 @@ class RealtimeTransportContractAlignmentTest {
 
         assertThat(declared).containsExactlyInAnyOrderElementsOf(concat(
                 FROZEN_23, ACK_CHANNELS, INBOUND_CHANNELS, MIG_051_CHANNELS,
-                MIG_062_CHANNELS));
+                MIG_062_CHANNELS, MIG_091_CHANNELS));
 
         assertThat(channelsOf(asyncapi).keySet()).containsAll(declared);
     }
@@ -214,13 +227,15 @@ class RealtimeTransportContractAlignmentTest {
     void roomAcksEmittedByTheHandlerMatchTheFrozenChannelPayloadShapes()
             throws Exception {
         WebSocketSessionRegistry registry = new WebSocketSessionRegistry();
+        WebSocketEventPublisher publisher = new WebSocketEventPublisher(registry,
+                org.mockito.Mockito.mock(WebSocketBacklogService.class), mapper);
         YaccWebSocketHandler handler = new YaccWebSocketHandler(registry,
-                new WebSocketEventPublisher(registry,
-                        org.mockito.Mockito.mock(WebSocketBacklogService.class), mapper),
+                publisher,
                 org.mockito.Mockito.mock(WebSocketPresenceService.class),
                 org.mockito.Mockito.mock(WebSocketTypingService.class),
                 org.mockito.Mockito.mock(WebSocketReconnectService.class),
                 org.mockito.Mockito.mock(ConnectorRelayService.class),
+                new ApplicationEventRelayService(publisher, mapper),
                 mapper);
 
         Map<String, Object> attributes = new HashMap<>();
@@ -269,6 +284,44 @@ class RealtimeTransportContractAlignmentTest {
                 "platform", "timestamp");
         assertThat(registry.channelsInRoom(RealtimeRooms.connector("telegram")))
                 .isEmpty();
+
+        // MIG-091a sender-directed acks (the room fan-outs exclude the sender,
+        // so each inbound frame below produces exactly the ack frame here).
+        sent.clear();
+        handler.handleTextMessage(session, new TextMessage(
+                "{\"event\":\"message.retry\",\"data\":{"
+                        + "\"messageId\":\"00000000-0000-4000-8000-0000000000m1\","
+                        + "\"conversationId\":\"00000000-0000-4000-8000-0000000000c1\"}}"));
+        assertAckMatchesContract(soleFrame(sent), "message.retry.acknowledged",
+                "messageId", "timestamp");
+
+        sent.clear();
+        handler.handleTextMessage(session, new TextMessage(
+                "{\"event\":\"reaction.added\",\"data\":{"
+                        + "\"messageId\":\"00000000-0000-4000-8000-0000000000m1\","
+                        + "\"conversationId\":\"00000000-0000-4000-8000-0000000000c1\","
+                        + "\"emoji\":\"👍\","
+                        + "\"userId\":\"00000000-0000-4000-8000-0000000000u1\","
+                        + "\"name\":\"Fixture user-1\"}}"));
+        assertAckMatchesContract(soleFrame(sent), "reaction.added.ack",
+                "messageId", "emoji", "timestamp");
+
+        sent.clear();
+        handler.handleTextMessage(session, new TextMessage(
+                "{\"event\":\"reaction.removed\",\"data\":{"
+                        + "\"messageId\":\"00000000-0000-4000-8000-0000000000m1\","
+                        + "\"conversationId\":\"00000000-0000-4000-8000-0000000000c1\","
+                        + "\"emoji\":\"👍\","
+                        + "\"userId\":\"00000000-0000-4000-8000-0000000000u1\"}}"));
+        assertAckMatchesContract(soleFrame(sent), "reaction.removed.ack",
+                "messageId", "emoji", "timestamp");
+
+        sent.clear();
+        handler.handleTextMessage(session, new TextMessage(
+                "{\"event\":\"reaction.list\",\"data\":{"
+                        + "\"messageId\":\"00000000-0000-4000-8000-0000000000m1\"}}"));
+        assertAckMatchesContract(soleFrame(sent), "reaction.list.ack",
+                "messageId", "reactions", "timestamp");
     }
 
     /** Asserts one enveloped ack frame whose bare {@code data} payload matches

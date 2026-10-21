@@ -84,6 +84,26 @@ public class WebSocketEventPublisher {
     }
 
     /**
+     * Emits one enveloped event to every live channel in the room except the
+     * given session — <em>without</em> any backlog store (MIG-091a; ledger
+     * WS-BHV-009 boundary): the baseline inbound application handlers emitted
+     * with {@code socket.to(room).emit(...)} directly, bypassing the gateway,
+     * so their fan-outs were never stored for replay. Using the
+     * backlog-eligible {@code publishToRoom} overloads here would invent
+     * replay entries the baseline never had.
+     *
+     * @param room             room name (frozen namespace)
+     * @param excludeSessionId transport session id to exclude (the sender)
+     * @param envelope         the enveloped event
+     */
+    public void fanOutToRoom(String room, String excludeSessionId, WebSocketEnvelope envelope) {
+        Collection<WebSocketSession> channels = registry.channelsInRoom(room).stream()
+                .filter(channel -> !channel.getId().equals(excludeSessionId))
+                .toList();
+        publish(channels, envelope);
+    }
+
+    /**
      * Emits one enveloped event to every connected session (baseline
      * {@code emitGlobally}, WS-BHV-002 — queue-event broadcasts) and stores
      * it for every connected user (backlog-eligible events only).
