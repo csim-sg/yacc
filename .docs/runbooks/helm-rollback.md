@@ -8,7 +8,7 @@
 
 > **Why this file keeps its name**: `deploy/helm/yacc-backend/README.md` links to `.docs/runbooks/helm-rollback.md` by path. The **procedure** below is roll-forward: `helm rollback` is not the primary recovery path. The historical rollback runbook was retired with the migration posture (ARCH-004 §1; ADR-030 Decision 6).
 >
-> **Rehearsal status**: the rehearsal-evidenced incident/stop-authority procedure is **AC-MIG-070-2 (#361)**. Everything marked **[pending MIG-070]** below must be treated as documented intent until that rehearsal evidences it.
+> **Rehearsal status**: the rehearsal-evidenced incident/stop-authority procedure is **AC-MIG-070-2 (#361)**. The documented procedures to execute are [cutover-rehearsal.md](cutover-rehearsal.md) (with [backup-restore.md](backup-restore.md)); until that rehearsal evidences them, the content below is documented intent.
 
 ---
 
@@ -126,7 +126,7 @@ kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
 # PostgreSQL down → restore the database, not the app
 kubectl get pods -n yacc-staging -l app=postgres
 kubectl rollout restart statefulset/postgres -n yacc-staging   # if restart helps
-# Restore from backup if data is corrupted [restore tooling: pending MIG-070]
+# Restore from backup if data is corrupted — see .docs/runbooks/backup-restore.md
 
 # Secret invalid → fix the Secret, then bounce the workload
 kubectl patch secret yacc-backend-secrets -p '{"data":{...}}' -n yacc-staging
