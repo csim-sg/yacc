@@ -16,10 +16,11 @@
 - **App DB connection**: Secret `yacc-backend-secrets`, key `DATABASE_URL` (the deployment contract wired by `deploy/helm/yacc-backend`).
 - **Database credential**: Secret `postgresql-credentials` (`existingSecret` in the chart values).
 - **PostgreSQL service name**: `postgresql` (the chart's documented `postgresql.host` value) in `<environment>`.
+- **`<environment>` placeholder**: the Kubernetes namespace holding the target database's secrets and its `postgresql` service. For the MIG-070 rehearsal it is **specifically the dedicated candidate namespace `<candidate-namespace>`** ([cutover-rehearsal.md](cutover-rehearsal.md) §1 P3): a rehearsal backup/restore reads and writes only candidate-namespace resources — never a namespace hosting a live `yacc-backend` release, and never production.
 - **Schema state**: `flyway_schema_history` (Flyway-managed; ADR-027).
 - **Storage location / retention**: `<environment>`-owned — `<founder to name>` decides location and retention period; recorded on #361, not in this document.
 
-**Never** print, log, or copy credential values into evidence artifacts. Reference secret names/keys only. Connection credentials are parsed **in-process** into a mode-`0600` temporary libpq **service file** (§3.2, §4.1) that `psql`/`pg_dump`/`pg_restore` reference by `servicefile=` + `service=` name — the credential value never appears in a shell variable, a command argument (`ps`-visible), an environment entry, or `set -x` trace output, and the file is removed by a trap on exit. Every percent-**decoded** component (database, username, password, each query value) is checked for ASCII control characters before it is written, so an encoded `%0A`/`%0D` can never create a service-file line, and query parameters are allowlisted (§3.2) so a copied URL cannot override the parsed target or credentials.
+**Never** print, log, or copy credential values into evidence artifacts. Reference secret names/keys only. Connection credentials are parsed **in-process** into a mode-`0600` temporary libpq **service file** (§3.2, §4.1) that `psql`/`pg_dump`/`pg_restore` reference by `servicefile=` + `service=` name — the credential value never appears in a shell variable, a command argument (`ps`-visible), an environment entry, or `set -x` trace output, and the file is removed by a trap on exit. §4.1's operator-typed connection string additionally requires the no-swap/no-history editor invocation specified there — editor-internal copies (swap/viminfo/backup) sit outside every trap. Every percent-**decoded** component (database, username, password, each query value) is checked for ASCII control characters before it is written, so an encoded `%0A`/`%0D` can never create a service-file line, and query parameters are allowlisted (§3.2) so a copied URL cannot override the parsed target or credentials.
 
 ---
 
@@ -72,6 +73,9 @@ trap 'rm -f -- "$SVC_FILE"; exit 130' INT TERM   # Ctrl-C/TERM abort: clean up, 
   set -o pipefail   # every stage must succeed — Bash-only option (§3.1). The `||` list
                     # exempts the subshell from errexit; its nonzero pipeline status
                     # reaches the handler with or without `set -e`.
+  # Rehearsal use: <environment> = the dedicated candidate namespace <candidate-namespace>
+  # (see §1) — a rehearsal backup reads the candidate namespace's secret, never a
+  # live/production namespace's.
   kubectl get secret yacc-backend-secrets -n <environment> \
     -o jsonpath='{.data.DATABASE_URL}' \
   | base64 -d \
@@ -216,14 +220,18 @@ pg_dump --format=custom --no-owner --no-privileges \
 
 ### 4.1 Candidate connection setup
 
-Same credential-safe mechanism as §3.2: the admin connection string exists ONLY inside mode-0600 temporary files removed by the trap (exit/abort/Ctrl-C — an interrupt cleans up and stops with exit 130). It is typed into the editor — never pasted as a shell argument, never exported, never echoed — so it cannot leak via history, argv, the environment, or `set -x`. The embedded converter is the **same program** as §3.2 (only the service name and stdin source differ): it rejects decoded control characters and applies the same query-param allowlist, so a mistyped or hostile candidate URL fails closed identically. Requires bash (pipefail), python3 (§3.1) and `$EDITOR` set.
+Same credential-safe mechanism as §3.2, with one operator-typed difference: the admin connection string is entered **inside the editor** into a mode-`0600` temporary file (mktemp + trap on exit/abort/Ctrl-C — an interrupt cleans up and stops with exit 130) — never pasted as a shell argument, never exported, never echoed — so it cannot leak via history, argv, the environment, or `set -x`. **The trap cannot reach editor-internal copies**: an editor that keeps a swap file, undo history, viminfo, or backup copies leaves credential-bearing files the trap never removes, so the ONLY-inside-temporary-files property of §3.2 holds here **only** under a no-swap/no-history editor invocation — e.g. `EDITOR='vim -n -i NONE'` (no swap file, no viminfo; vim keeps backups off by default — do not use an editor environment that enables swap/backup/undo persistence, or disable it for this invocation). Run this step only in a controlled, single-user local workspace; if the editor's file behavior cannot be verified, treat the connection string as having left additional local copies on that workstation and remove them deliberately afterwards. Never log or paste the value into evidence artifacts. The embedded converter is the **same program** as §3.2 (only the service name and stdin source differ): it rejects decoded control characters and applies the same query-param allowlist, so a mistyped or hostile candidate URL fails closed identically. Requires bash (pipefail), python3 (§3.1) and `$EDITOR` set to such a no-swap/no-history editor invocation.
 
 ```bash
 CAND_URL_FILE="$(mktemp)"
 CAND_SVC_FILE="$(mktemp)"
 trap 'rm -f -- "$CAND_URL_FILE" "$CAND_SVC_FILE"' EXIT
 trap 'rm -f -- "$CAND_URL_FILE" "$CAND_SVC_FILE"; exit 130' INT TERM   # Ctrl-C/TERM abort: clean up, then stop
-"$EDITOR" "$CAND_URL_FILE"        # paste <postgres-admin-connection-with-candidate-database>, save, quit
+# The editor invocation must leave no swap/history/backup copies — those would
+# outlive the trap (see the editor-copies note above), e.g. EDITOR='vim -n -i NONE'.
+# $EDITOR is deliberately UNQUOTED so it may carry editor flags; it holds no
+# credential material itself.
+$EDITOR "$CAND_URL_FILE"          # paste <postgres-admin-connection-with-candidate-database>, save, quit
 chmod 600 "$CAND_URL_FILE"        # re-assert in case the editor rewrote the file
 
 (
@@ -365,4 +373,4 @@ Record actual backup and restore durations in the evidence template each time th
 
 ---
 
-**Last Updated**: 2026-10-21 (authored by MIG-070b #447; review rework same day — procedure only; no execution claimed)
+**Last Updated**: 2026-10-21 (authored by MIG-070b #447; review rework ×4 same day — procedure only; no execution claimed)

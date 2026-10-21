@@ -16,7 +16,7 @@
 | # | Item | Requirement | Owner |
 | - | ---- | ----------- | ----- |
 | P1 | Cutover/reset owner | **Named** — `<founder to name>`. The rehearsal does not start without a name recorded on #361 (forward-risk guardrail). | Founder |
-| P2 | Three named developers | For AC-MIG-070-3/4 attributable records — `<founder to name>` ×3, with repo + `<environment>` access. | Founder |
+| P2 | Three named developers | For AC-MIG-070-3/4 attributable records — `<founder to name>` ×3, with repo + rehearsal-environment access (the dedicated candidate namespace `<candidate-namespace>`, P3). | Founder |
 | P3 | Candidate environment | A **dedicated candidate namespace** `<candidate-namespace>` on kube context `<candidate-context>`, reserved for rehearsal use — **never** a namespace that hosts a live `yacc-backend` release, not production, no shared production credentials. The Step-1 guards fail closed unless the resolved context/namespace/release state is clean. | Ops |
 | P4 | Secret material present | Secret *objects* exist in `<candidate-namespace>` (names only; values are never copied into runbooks or evidence): `yacc-backend-secrets` (`DATABASE_URL`), `yacc-auth-secrets` (bootstrap/recovery keys), `yacc-email-secrets`, `yacc-integration-secrets`, `postgresql-credentials` (database credential). | Founder/Ops |
 | P5 | Chart + images pinned | Chart at a pinned commit (`<artifact link>`); candidate image tag pinned (`<image-tag>`, never `latest`) **and a distinct forward-fix image** (`<forward-fix-image-tag>` — an immutable tag or digest, **different from `<image-tag>`**, provenance recorded as `<artifact link>`). Step 7 fails closed if the two are not distinct. | Ops |
@@ -181,7 +181,7 @@ kill %1
 
 Execute the backup per [backup-restore.md](backup-restore.md) §3 (snapshot-consistent baseline capture + `pg_dump` custom format). Record the dump artifact as `<artifact link>`.
 
-**Gate**: backup completes and its artifact is storable/retrievable in the `<environment>` storage location.
+**Gate**: backup completes and its artifact is storable/retrievable in the rehearsal environment's storage location — `<environment>` in the linked procedure is the dedicated candidate namespace `<candidate-namespace>` (P3).
 
 ### Step 4 — Restore into a candidate database
 
@@ -223,17 +223,34 @@ CAND_FULLNAME="$(helm template <candidate-release> ./deploy/helm/yacc-backend \
   -f deploy/helm/yacc-backend/values-staging.yaml --show-only templates/service.yaml \
   | awk '/^  name: /{print $2; exit}')"
 
-helm history <candidate-release> -n <candidate-namespace>      # audit trail present
+helm history <candidate-release> -n <candidate-namespace>   # revision audit trail ONLY — helm history records no image
 helm upgrade <candidate-release> ./deploy/helm/yacc-backend \
   -n <candidate-namespace> \
   -f deploy/helm/yacc-backend/values-staging.yaml \
   --set image.tag=<forward-fix-image-tag>                      # forward fix = new image, rehearsal-owned release only
 kubectl rollout status "deployment/$CAND_FULLNAME" -n <candidate-namespace> --timeout=2m
+
+# Evidence the rolled-forward image from the DEPLOYED pod template, not from
+# `helm history` (its columns are REVISION/UPDATED/STATUS/CHART/APP VERSION/
+# DESCRIPTION — there is no image column). The chart's Deployment runs exactly one
+# container, named after the chart (`yacc-backend`; templates/deployment.yaml), and
+# the `yacc-backend.image` helper renders the image as `[registry/]repository:tag`
+# with the tag from `--set image.tag` — so the deployed spec must end in the exact
+# distinct forward-fix tag. Fail closed: a kubectl failure aborts, and any image
+# that does not end in the distinct tag aborts.
+ROLLED_IMAGE="$(kubectl get deployment "$CAND_FULLNAME" -n <candidate-namespace> \
+  -o jsonpath='{.spec.template.spec.containers[?(@.name=="yacc-backend")].image}')" || {
+  echo "ABORT: could not read the candidate deployment's container image"; exit 1;
+}
+case "$ROLLED_IMAGE" in
+  *:"<forward-fix-image-tag>") ;;   # the distinct forward-fix image is what is deployed
+  *) echo "ABORT: candidate deployment is not running <forward-fix-image-tag> (roll-forward not evidenced)"; exit 1 ;;
+esac
 ```
 
 `helm upgrade` here targets **only the rehearsal's own candidate release** (created in Step 1 under the G1–G5 guards) — it can never touch a live release, which does not exist in `<candidate-namespace>` by construction.
 
-Re-run the §Step-2 health gates. **Gate**: both 200; `helm history` shows a **new revision whose recorded image is `<forward-fix-image-tag>`** — the check passes only if a distinct image was rolled forward and is healthy.
+Re-run the §Step-2 health gates. **Gate**: both 200 **and** the image check above passes — the candidate deployment's `yacc-backend` container must be running **exactly the distinct `<forward-fix-image-tag>`** (asserted from the Deployment's pod template, the deployed truth, because `helm history` records no image). The check passes only if a distinct image was rolled forward, is provably the image deployed, and is healthy.
 
 ---
 
@@ -263,7 +280,7 @@ Abort the rehearsal immediately if any of these occurs, record the rows filled s
 - Any Step-1 guard fails: wrong cluster context, a live `yacc-backend` release/deployment present in the target namespace, a release-name collision, the candidate `DATABASE_URL` not targeting `<candidate-database>` on `<candidate-db-host>` (G4 aborts on a mismatch **or** on any failed pipeline stage while retrieving it — `set -o pipefail` requires kubectl, base64 and python3 all to succeed), or the derived resource fullname already existing in the namespace (G5).
 - Any guard check that cannot verify cluster state aborts — a `helm`/`kubectl` failure other than an explicit not-found response (Forbidden/RBAC denial, unreachable API, timeout, invalid context) is treated as a failure, never as absence.
 - §Step-2 health gates are red after the candidate deploy or the roll-forward check.
-- The backup fails, or cannot be stored/retrieved in the `<environment>` storage location.
+- The backup fails, or cannot be stored/retrieved in the rehearsal environment's storage location (the dedicated candidate namespace `<candidate-namespace>`, P3).
 - Any §Step-5 integrity check does not match the same-snapshot source capture.
 - The roll-forward check cannot use a forward-fix image distinct from `<image-tag>`.
 - Any operation would touch resources outside the rehearsal's candidate scope (wrong namespace, wrong database, production-carrying cluster credentials).
@@ -293,4 +310,4 @@ On abort: do not attempt in-place repairs beyond restoring the candidate environ
 
 ---
 
-**Last Updated**: 2026-10-21 (authored by MIG-070b #447; review rework ×4 same day — procedure only; no execution claimed)
+**Last Updated**: 2026-10-21 (authored by MIG-070b #447; review rework ×5 same day — procedure only; no execution claimed)
