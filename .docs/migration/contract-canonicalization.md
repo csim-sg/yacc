@@ -1,6 +1,6 @@
 ---
 doc_id: CONTRACT-CANONICALIZATION
-version: 1.1.0 # 1.1.0: §4.6 inbound-demux clarification (MIG-050, PR #402 tech-lead decision)
+version: 1.2.0 # 1.2.0: §4.7 reaction.count inbound publish capture correction (founder decision 2026-10-21)
 spec: "https://github.com/Antpolis/documentation/blob/master/02-Architecture-Landscape/projects/yacc/spec/SPEC-002-java-spring-backend-migration.md"
 milestone: "https://github.com/csim-sg/yacc/milestone/3"
 task: "https://github.com/csim-sg/yacc/issues/338"
@@ -239,6 +239,39 @@ bare `publish` payload; inbound frames carry no `timestamp` (§4.1). Clarificati
 expansion: no new channel, no new payload, no ledger row. Recorded in `asyncapi.yaml`
 `info.description` canonical wire rules; asserted by the MIG-050 transport
 contract-alignment test.
+
+### 4.7 reaction.count inbound publish capture correction (founder decision 2026-10-21)
+
+**Capture defect (evidence, verified at `dev d7f1f21`).** `asyncapi.yaml` bound the
+inbound `reaction.count` publish message to `#/components/messages/ReactionCountPayload`
+— the **outbound** room fan-out payload (required
+`[messageId, emoji, count, timestamp]`, no `conversationId`, baseline emit at
+`reaction.controller.ts:155 @98db628`) — while the wired baseline handler
+(`packages/backend/src/socket-controllers/reaction.controller.ts:135-160 @98db628`)
+accepts `{messageId, conversationId, emoji, count}` (no client timestamp) and routes on
+`conversationId`. A minimal schema-valid inbound frame therefore lacked routing data,
+and the valid baseline request failed the frozen schema (direction-confused capture).
+
+**Founder authorization.** On 2026-10-21 the founder answered "Authorize this
+correction" to the #366 decision comment `6310022755` (ADR-023: tech-lead is technical
+author, founder is decision authority). This is a bounded capture correction only —
+not a waiver of #444 AC-6, not acceptance of any other contract change, and not
+cutover authorization.
+
+**Exact amendment.** `channels.reaction.count.publish.message` is now inline with
+required `[messageId, conversationId, emoji, count]` (string/string/string/integer; no
+required inbound timestamp; extra members still tolerated, no
+`additionalProperties: false`), with `x-baseline-source` pointing at the inbound
+handler line (`reaction.controller.ts:138 @98db628`).
+`components.messages.ReactionCountPayload` (outbound) stays byte-identical; the
+classpath test mirror (`services/backend-java/src/test/resources/contract/asyncapi.yaml`)
+is a byte-identical copy.
+
+**Not changed:** the channel set (no new channel, no channel key), no `subscribe:`
+operation for `reaction.count`, no schema file (`schemas/*.json`), no ledger row and
+no row cell (the `WS-OP-REACT-004` Route/Behavior, target-behaviour, evidence, result
+and rev cells are byte-unchanged), no `info.version` / `asyncapi` version change, and
+no production/runtime behaviour change.
 
 ---
 
