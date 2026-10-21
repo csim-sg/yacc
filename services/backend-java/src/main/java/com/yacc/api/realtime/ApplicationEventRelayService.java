@@ -43,8 +43,12 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  *
  * <p>A malformed payload throws {@link IllegalArgumentException} naming the
  * member — the handler maps it to the existing {@code system.error} path
- * (never a silent drop, guardrail G4). {@code timestamp} members on acks and
- * regenerated payloads are server-generated at emit time (baseline
+ * (never a silent drop, guardrail G4). Validation follows the frozen payload
+ * schemas: required members, the frozen member types (JSON string, object,
+ * integer) and the frozen string formats ({@code format: uuid},
+ * {@code format: date-time}); Jackson numeric/boolean coercion into strings
+ * is rejected. {@code timestamp} members on acks and regenerated payloads
+ * are server-generated at emit time (baseline
  * {@code new Date().toISOString()} parity, RFC 3339).</p>
  */
 @Service
@@ -71,31 +75,31 @@ public class ApplicationEventRelayService {
 
     /** {@code conversation.updated} → room fan-out except sender (verbatim). */
     public void relayConversationUpdated(WebSocketSession session, JsonNode payload) {
-        requireText(payload, "conversationId");
+        requireUuid(payload, "conversationId");
         requireObject(payload, "updatedFields");
-        requireText(payload, "changedBy");
-        requireText(payload, "changedAt");
+        requireUuid(payload, "changedBy");
+        requireDateTime(payload, "changedAt");
         fanOut(session, payload.get("conversationId").asText(),
                 RealtimeEvents.CONVERSATION_UPDATED, payload);
     }
 
     /** {@code message.sent} → room fan-out except sender (verbatim). */
     public void relayMessageSent(WebSocketSession session, JsonNode payload) {
-        requireText(payload, "messageId");
-        requireText(payload, "conversationId");
+        requireUuid(payload, "messageId");
+        requireUuid(payload, "conversationId");
         requireStatus(payload, STATUS_SENT);
-        requireText(payload, "sentAt");
+        requireDateTime(payload, "sentAt");
         fanOut(session, payload.get("conversationId").asText(),
                 RealtimeEvents.MESSAGE_SENT, payload);
     }
 
     /** {@code message.failed} → room fan-out except sender (verbatim). */
     public void relayMessageFailed(WebSocketSession session, JsonNode payload) {
-        requireText(payload, "messageId");
-        requireText(payload, "conversationId");
+        requireUuid(payload, "messageId");
+        requireUuid(payload, "conversationId");
         requireStatus(payload, STATUS_FAILED);
         requireText(payload, "error");
-        requireText(payload, "retryAt");
+        requireDateTime(payload, "retryAt");
         requireAttempt(payload);
         fanOut(session, payload.get("conversationId").asText(),
                 RealtimeEvents.MESSAGE_FAILED, payload);
@@ -141,10 +145,10 @@ public class ApplicationEventRelayService {
 
     /** {@code reaction.added} → room fan-out except sender + sender ack. */
     public void relayReactionAdded(WebSocketSession session, JsonNode payload) {
-        requireText(payload, "messageId");
-        requireText(payload, "conversationId");
+        requireUuid(payload, "messageId");
+        requireUuid(payload, "conversationId");
         requireText(payload, "emoji");
-        requireText(payload, "userId");
+        requireUuid(payload, "userId");
         requireText(payload, "name");
         fanOut(session, payload.get("conversationId").asText(),
                 RealtimeEvents.REACTION_ADDED, payload);
@@ -158,10 +162,10 @@ public class ApplicationEventRelayService {
 
     /** {@code reaction.removed} → room fan-out except sender + sender ack. */
     public void relayReactionRemoved(WebSocketSession session, JsonNode payload) {
-        requireText(payload, "messageId");
-        requireText(payload, "conversationId");
+        requireUuid(payload, "messageId");
+        requireUuid(payload, "conversationId");
         requireText(payload, "emoji");
-        requireText(payload, "userId");
+        requireUuid(payload, "userId");
         fanOut(session, payload.get("conversationId").asText(),
                 RealtimeEvents.REACTION_REMOVED, payload);
         ObjectNode ack = mapper.createObjectNode()
@@ -218,11 +222,40 @@ public class ApplicationEventRelayService {
     }
 
     // --- frozen bare-payload validation (G4; member-naming errors) ---
+    //
+    // Types and string formats follow the frozen payload schemas
+    // (.docs/migration/schemas/*.schema.json and the inline asyncapi.yaml
+    // payloads): schema `format: uuid` members must be canonical UUID
+    // strings, `format: date-time` members must parse as RFC 3339, and JSON
+    // string members must actually be strings — Jackson's asText() coercion
+    // of numbers/booleans/objects is rejected, not silently accepted.
+
+    private static final java.util.regex.Pattern UUID_FORMAT =
+            java.util.regex.Pattern.compile(
+                    "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
     private static void requireText(JsonNode payload, String member) {
-        if (payload == null || !payload.hasNonNull(member)
-                || payload.get(member).asText().isBlank()) {
+        if (payload == null || !payload.hasNonNull(member)) {
             throw new IllegalArgumentException(member + " is required");
+        }
+        if (!payload.get(member).isTextual() || payload.get(member).asText().isBlank()) {
+            throw new IllegalArgumentException(member + " must be a non-empty string");
+        }
+    }
+
+    private static void requireUuid(JsonNode payload, String member) {
+        requireText(payload, member);
+        if (!UUID_FORMAT.matcher(payload.get(member).asText()).matches()) {
+            throw new IllegalArgumentException(member + " must be a UUID string");
+        }
+    }
+
+    private static void requireDateTime(JsonNode payload, String member) {
+        requireText(payload, member);
+        try {
+            java.time.OffsetDateTime.parse(payload.get(member).asText());
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new IllegalArgumentException(member + " must be an RFC 3339 date-time");
         }
     }
 

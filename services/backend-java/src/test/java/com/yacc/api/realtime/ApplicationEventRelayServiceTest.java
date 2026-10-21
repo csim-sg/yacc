@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -39,6 +40,16 @@ class ApplicationEventRelayServiceTest {
 
     private static final String CONVERSATION_ID =
             "00000000-0000-4000-8000-0000000000c1";
+
+    // Canonical UUID fixtures for the members whose frozen payload schemas
+    // declare `format: uuid` (message-sent/message-failed/reaction-added/
+    // reaction-removed schema files). message.retry / reaction.list /
+    // reaction.count declare plain strings, so their fixtures stay "m-1".
+    private static final String MESSAGE_ID =
+            "00000000-0000-4000-8000-0000000000d1";
+
+    private static final String USER_ID =
+            "00000000-0000-4000-8000-0000000000a1";
 
     private WebSocketEventPublisher publisher;
 
@@ -317,6 +328,143 @@ class ApplicationEventRelayServiceTest {
                 .hasMessageContaining("userId");
     }
 
+    // --- frozen types and string formats (review loop 1: no Jackson
+    // asText() coercion of numbers/booleans/objects; uuid/date-time formats
+    // enforced exactly where the frozen schemas declare them) ---
+
+    @Test
+    void messageSentRejectsNumericIdsAndTimestampsWithoutAnyFanOut() {
+        // The reviewer example: numeric messageId / conversationId / sentAt
+        // coerced cleanly through asText() before the fix.
+        ObjectNode numericIds = messageSentPayload();
+        numericIds.put("messageId", 42).put("conversationId", 43).put("sentAt", 1739990000);
+        assertThatThrownBy(() -> relay.relayMessageSent(sender, numericIds))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("messageId");
+        verifyNoPublisherInteractions();
+
+        ObjectNode numericConversation = messageSentPayload();
+        numericConversation.put("conversationId", 43);
+        assertThatThrownBy(() -> relay.relayMessageSent(sender, numericConversation))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("conversationId");
+
+        ObjectNode numericSentAt = messageSentPayload();
+        numericSentAt.put("sentAt", 1739990000);
+        assertThatThrownBy(() -> relay.relayMessageSent(sender, numericSentAt))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("sentAt");
+
+        ObjectNode booleanSentAt = messageSentPayload();
+        booleanSentAt.put("sentAt", true);
+        assertThatThrownBy(() -> relay.relayMessageSent(sender, booleanSentAt))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("sentAt");
+
+        verifyNoPublisherInteractions();
+    }
+
+    @Test
+    void conversationUpdatedRejectsObjectIdsAndMalformedUuidAndDateTimeFormats() {
+        ObjectNode objectId = conversationUpdatedPayload();
+        objectId.putObject("conversationId");
+        assertThatThrownBy(() -> relay.relayConversationUpdated(sender, objectId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("conversationId");
+
+        ObjectNode malformedChangedBy = conversationUpdatedPayload();
+        malformedChangedBy.put("changedBy", "not-a-uuid");
+        assertThatThrownBy(() -> relay.relayConversationUpdated(sender, malformedChangedBy))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("changedBy");
+
+        ObjectNode malformedChangedAt = conversationUpdatedPayload();
+        malformedChangedAt.put("changedAt", "21.10.2026 08:00");
+        assertThatThrownBy(() -> relay.relayConversationUpdated(sender, malformedChangedAt))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("changedAt");
+
+        ObjectNode numericChangedAt = conversationUpdatedPayload();
+        numericChangedAt.put("changedAt", 1739990000);
+        assertThatThrownBy(() -> relay.relayConversationUpdated(sender, numericChangedAt))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("changedAt");
+
+        verifyNoPublisherInteractions();
+    }
+
+    @Test
+    void messageFailedRejectsMalformedUuidAndTimestampFormats() {
+        ObjectNode malformedMessageId = messageFailedPayload();
+        malformedMessageId.put("messageId", "00000000-0000-4000-8000-0000000000zz");
+        assertThatThrownBy(() -> relay.relayMessageFailed(sender, malformedMessageId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("messageId");
+
+        ObjectNode numericRetryAt = messageFailedPayload();
+        numericRetryAt.put("retryAt", 1739990000);
+        assertThatThrownBy(() -> relay.relayMessageFailed(sender, numericRetryAt))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("retryAt");
+
+        ObjectNode malformedRetryAt = messageFailedPayload();
+        malformedRetryAt.put("retryAt", "2026-13-45T99:99:99Z");
+        assertThatThrownBy(() -> relay.relayMessageFailed(sender, malformedRetryAt))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("retryAt");
+
+        ObjectNode booleanError = messageFailedPayload();
+        booleanError.put("error", true);
+        assertThatThrownBy(() -> relay.relayMessageFailed(sender, booleanError))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("error");
+
+        verifyNoPublisherInteractions();
+    }
+
+    @Test
+    void reactionPayloadsRejectNonTextualMembersAndMalformedUuids() {
+        ObjectNode numericUser = reactionAddedPayload();
+        numericUser.put("userId", 7);
+        assertThatThrownBy(() -> relay.relayReactionAdded(sender, numericUser))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("userId");
+
+        ObjectNode malformedMessage = reactionAddedPayload();
+        malformedMessage.put("messageId", "m-1");
+        assertThatThrownBy(() -> relay.relayReactionAdded(sender, malformedMessage))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("messageId");
+
+        ObjectNode malformedUser = reactionRemovedPayload();
+        malformedUser.put("userId", "00000000-0000-4000-8000-0000000000u1");
+        assertThatThrownBy(() -> relay.relayReactionRemoved(sender, malformedUser))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("userId");
+
+        ObjectNode numericMessage = reactionRemovedPayload();
+        numericMessage.put("messageId", 99);
+        assertThatThrownBy(() -> relay.relayReactionRemoved(sender, numericMessage))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("messageId");
+
+        verifyNoPublisherInteractions();
+    }
+
+    @Test
+    void plainStringRetryAndListIdsRemainContractValid() {
+        // message.retry and reaction.list declare plain string ids in the
+        // frozen contract (no uuid format) — non-UUID ids must stay valid
+        // there; only message.sent/message.failed/reaction.* schemas demand
+        // the uuid/date-time formats.
+        relay.relayMessageRetry(sender, retryPayload());
+        verify(publisher).publishToSession(any(), any());
+        verify(publisher).fanOutToRoom(anyString(), anyString(), any());
+
+        relay.relayReactionList(sender, mapper.createObjectNode().put("messageId", "m-1"));
+        verify(publisher, times(2)).publishToSession(any(), any());
+    }
+
     // --- G3: the no-backlog fan-out primitive end to end ---
 
     @Test
@@ -376,7 +524,7 @@ class ApplicationEventRelayServiceTest {
     private ObjectNode conversationUpdatedPayload() {
         ObjectNode payload = mapper.createObjectNode()
                 .put("conversationId", CONVERSATION_ID)
-                .put("changedBy", "00000000-0000-4000-8000-0000000000u1")
+                .put("changedBy", USER_ID)
                 .put("changedAt", "2026-10-21T08:00:00.000Z");
         payload.putObject("updatedFields").put("status", "open");
         return payload;
@@ -384,7 +532,7 @@ class ApplicationEventRelayServiceTest {
 
     private ObjectNode messageSentPayload() {
         return mapper.createObjectNode()
-                .put("messageId", "m-1")
+                .put("messageId", MESSAGE_ID)
                 .put("conversationId", CONVERSATION_ID)
                 .put("status", "sent")
                 .put("sentAt", "2026-10-21T08:00:01.000Z");
@@ -392,7 +540,7 @@ class ApplicationEventRelayServiceTest {
 
     private ObjectNode messageFailedPayload() {
         return mapper.createObjectNode()
-                .put("messageId", "m-1")
+                .put("messageId", MESSAGE_ID)
                 .put("conversationId", CONVERSATION_ID)
                 .put("status", "failed")
                 .put("error", "NETWORK_ERROR")
@@ -408,19 +556,19 @@ class ApplicationEventRelayServiceTest {
 
     private ObjectNode reactionAddedPayload() {
         return mapper.createObjectNode()
-                .put("messageId", "m-1")
+                .put("messageId", MESSAGE_ID)
                 .put("conversationId", CONVERSATION_ID)
                 .put("emoji", "👍")
-                .put("userId", "00000000-0000-4000-8000-0000000000u1")
+                .put("userId", USER_ID)
                 .put("name", "Fixture user-1");
     }
 
     private ObjectNode reactionRemovedPayload() {
         return mapper.createObjectNode()
-                .put("messageId", "m-1")
+                .put("messageId", MESSAGE_ID)
                 .put("conversationId", CONVERSATION_ID)
                 .put("emoji", "👍")
-                .put("userId", "00000000-0000-4000-8000-0000000000u1");
+                .put("userId", USER_ID);
     }
 
     private ObjectNode reactionCountPayload(String timestamp) {

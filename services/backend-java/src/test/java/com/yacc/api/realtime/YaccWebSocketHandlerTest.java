@@ -230,15 +230,15 @@ class YaccWebSocketHandlerTest {
         inbound("{\"event\":\"conversation.updated\",\"data\":{"
                 + "\"conversationId\":\"00000000-0000-4000-8000-0000000000c1\","
                 + "\"updatedFields\":{\"status\":\"open\"},"
-                + "\"changedBy\":\"00000000-0000-4000-8000-0000000000u1\","
+                + "\"changedBy\":\"00000000-0000-4000-8000-0000000000a1\","
                 + "\"changedAt\":\"2026-10-21T08:00:00.000Z\"}}");
         inbound("{\"event\":\"message.sent\",\"data\":{"
-                + "\"messageId\":\"00000000-0000-4000-8000-0000000000m1\","
+                + "\"messageId\":\"00000000-0000-4000-8000-0000000000d1\","
                 + "\"conversationId\":\"00000000-0000-4000-8000-0000000000c1\","
                 + "\"status\":\"sent\","
                 + "\"sentAt\":\"2026-10-21T08:00:01.000Z\"}}");
         inbound("{\"event\":\"message.failed\",\"data\":{"
-                + "\"messageId\":\"00000000-0000-4000-8000-0000000000m2\","
+                + "\"messageId\":\"00000000-0000-4000-8000-0000000000d2\","
                 + "\"conversationId\":\"00000000-0000-4000-8000-0000000000c1\","
                 + "\"status\":\"failed\","
                 + "\"error\":\"NETWORK_ERROR\","
@@ -312,16 +312,16 @@ class YaccWebSocketHandlerTest {
         sent.clear();
 
         inbound("{\"event\":\"reaction.added\",\"data\":{"
-                + "\"messageId\":\"00000000-0000-4000-8000-0000000000m1\","
+                + "\"messageId\":\"00000000-0000-4000-8000-0000000000d1\","
                 + "\"conversationId\":\"00000000-0000-4000-8000-0000000000c1\","
                 + "\"emoji\":\"👍\","
-                + "\"userId\":\"00000000-0000-4000-8000-0000000000u1\","
+                + "\"userId\":\"00000000-0000-4000-8000-0000000000a1\","
                 + "\"name\":\"Fixture user-1\"}}");
         inbound("{\"event\":\"reaction.removed\",\"data\":{"
-                + "\"messageId\":\"00000000-0000-4000-8000-0000000000m1\","
+                + "\"messageId\":\"00000000-0000-4000-8000-0000000000d1\","
                 + "\"conversationId\":\"00000000-0000-4000-8000-0000000000c1\","
                 + "\"emoji\":\"👍\","
-                + "\"userId\":\"00000000-0000-4000-8000-0000000000u1\"}}");
+                + "\"userId\":\"00000000-0000-4000-8000-0000000000a1\"}}");
 
         List<JsonNode> peerEnvelopes = envelopesOf(peerSent);
         assertThat(peerEnvelopes).hasSize(2);
@@ -405,9 +405,13 @@ class YaccWebSocketHandlerTest {
         inbound("{\"event\":\"reaction.count\",\"data\":{"
                 + "\"messageId\":\"m1\",\"conversationId\":\"c1\","
                 + "\"emoji\":\"👍\",\"count\":1.5}}");
+        inbound("{\"event\":\"message.sent\",\"data\":{"
+                + "\"messageId\":\"00000000-0000-4000-8000-0000000000d1\","
+                + "\"conversationId\":\"00000000-0000-4000-8000-0000000000c1\","
+                + "\"status\":\"sent\",\"sentAt\":1739990000}}");
 
         List<JsonNode> nodes = envelopes();
-        assertThat(nodes).hasSize(8);
+        assertThat(nodes).hasSize(9);
         for (JsonNode node : nodes) {
             assertThat(node.get("event").asText()).isEqualTo(RealtimeEvents.SYSTEM_ERROR);
             assertThat(node.get("data").get("error").get("code").asText())

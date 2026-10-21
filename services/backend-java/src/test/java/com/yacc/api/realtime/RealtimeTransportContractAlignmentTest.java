@@ -298,10 +298,10 @@ class RealtimeTransportContractAlignmentTest {
         sent.clear();
         handler.handleTextMessage(session, new TextMessage(
                 "{\"event\":\"reaction.added\",\"data\":{"
-                        + "\"messageId\":\"00000000-0000-4000-8000-0000000000m1\","
+                        + "\"messageId\":\"00000000-0000-4000-8000-0000000000d1\","
                         + "\"conversationId\":\"00000000-0000-4000-8000-0000000000c1\","
                         + "\"emoji\":\"👍\","
-                        + "\"userId\":\"00000000-0000-4000-8000-0000000000u1\","
+                        + "\"userId\":\"00000000-0000-4000-8000-0000000000a1\","
                         + "\"name\":\"Fixture user-1\"}}"));
         assertAckMatchesContract(soleFrame(sent), "reaction.added.ack",
                 "messageId", "emoji", "timestamp");
@@ -309,10 +309,10 @@ class RealtimeTransportContractAlignmentTest {
         sent.clear();
         handler.handleTextMessage(session, new TextMessage(
                 "{\"event\":\"reaction.removed\",\"data\":{"
-                        + "\"messageId\":\"00000000-0000-4000-8000-0000000000m1\","
+                        + "\"messageId\":\"00000000-0000-4000-8000-0000000000d1\","
                         + "\"conversationId\":\"00000000-0000-4000-8000-0000000000c1\","
                         + "\"emoji\":\"👍\","
-                        + "\"userId\":\"00000000-0000-4000-8000-0000000000u1\"}}"));
+                        + "\"userId\":\"00000000-0000-4000-8000-0000000000a1\"}}"));
         assertAckMatchesContract(soleFrame(sent), "reaction.removed.ack",
                 "messageId", "emoji", "timestamp");
 
