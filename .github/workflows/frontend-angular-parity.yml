@@ -7,36 +7,58 @@ name: Frontend Angular Parity Gates
 #   unit-coverage          PB-3 merge gate: Angular unit suite + coverage
 #                          thresholds >=85/85/85/80 (angular.json; the run exits
 #                          non-zero below target — never lowered).
-#   parity                 PB-2 E2E parity gate: boots the Java backend of record
-#                          in the S1 (#423) fail-closed E2E fixture posture
-#                          (PostgreSQL ONLY among data stores — the Java service
-#                          has no Redis, ADR-028 — plus a Mailhog SMTP sink on
-#                          :1025 for the synchronous sign-up email path;
-#                          the issue body's "postgres+redis" wording is
+#   parity (matrix)        PB-2 E2E parity EVIDENCE: boots the Java backend of
+#                          record in the S1 (#423) fail-closed E2E fixture
+#                          posture (PostgreSQL ONLY among data stores — the Java
+#                          service has no Redis, ADR-028 — plus a Mailhog SMTP
+#                          sink on :1025 for the synchronous sign-up email
+#                          path; the issue body's "postgres+redis" wording is
 #                          superseded by the tech-lead reconciliation on #385),
-#                          runs the framework-agnostic Playwright suite in the
-#                          U10 gate scope against the Angular dev server, then
-#                          compares every case against the archived React-on-Java
-#                          anchor (AD-1, S2 #373) with parity/compare-baseline.mjs.
-#                          The comparator is the single gate decision: it fails
-#                          the job on regressions (anchor-green rows red on
-#                          Angular — routed to the owning port issue, never a
-#                          register entry), skipped/weakened rows, scope leaks,
-#                          register gaps, and missing results, and it fails
-#                          closed on a missing/bad/mismatched baseline
-#                          (declared row counts + SHA-256 provenance). Expected
-#                          red, unanchored red/green, improvements and flaky
-#                          rows are surfaced in the job summary — never hidden.
+#                          and runs the framework-agnostic Playwright suite in
+#                          the U10 gate scope against the Angular dev server
+#                          ONCE PER BROWSER (chromium / firefox / webkit — one
+#                          full-suite job each; identical posture, BASE_URL,
+#                          WS origin and assertions in every leg). Each job
+#                          uploads its raw machine-readable JSON report plus a
+#                          SHA-256 sidecar. A browser job never passes/fails
+#                          the gate itself: anchor-red rows are expected red,
+#                          and the report is the evidence.
+#   parity-compare         PB-2 gate decision: downloads all three per-browser
+#                          reports and FAILS CLOSED if any browser job or
+#                          report is absent, empty, hash-mismatched, mis-scoped
+#                          (foreign project) or covers a different case set —
+#                          every browser must have run the identical full
+#                          suite. It then validates the committed anchor
+#                          (declared row counts + SHA-256 provenance — the
+#                          unchanged `compare-baseline.mjs check`), merges the
+#                          reports into the complete 3-browser report
+#                          (`parity/merge-browser-reports.mjs`), and invokes
+#                          the unchanged comparator
+#                          (`parity/compare-baseline.mjs compare`) as the
+#                          single gate decision: it fails the job on
+#                          regressions (anchor-green rows red on Angular —
+#                          routed to the owning port issue, never a register
+#                          entry), skipped/weakened rows, scope leaks, register
+#                          gaps, and missing results. Expected red, unanchored
+#                          red/green, improvements and flaky rows are surfaced
+#                          in the job summary — never hidden.
 #   react-baseline-capture CP-3: automated React-on-Java baseline capture
-#                          (workflow_dispatch only — a full-suite 3-browser run).
-#                          Boots the same Java posture (+ the same Mailhog SMTP
-#                          sink, and BASE_URL pinned to the React origin :5173
-#                          so capture conditions match the anchor), runs the
-#                          REACT harness,
-#                          derives the per-case TSV + env versions, and uploads
-#                          everything as workflow artifacts. Non-gating evidence;
+#                          (workflow_dispatch only — a full-suite 3-browser
+#                          run). Boots the same Java posture (+ the same
+#                          Mailhog SMTP sink, and BASE_URL pinned to the React
+#                          origin :5173 so capture conditions match the
+#                          anchor), runs the REACT harness, derives the
+#                          per-case TSV + env versions, and uploads everything
+#                          as workflow artifacts. Non-gating evidence;
 #                          archiving a new anchor into the repo is a separate
 #                          deliberate register/gate-scope update.
+#
+# Why per-browser jobs: the full U10-scope suite (1767 cases x 3 browsers,
+# retries=2, 1 CI worker) no longer fits a single GitHub-hosted job — parity
+# run 39440888894 was cancelled at the 350-minute cap without a verdict. This
+# split changes ONLY the execution topology: same cases, same browsers, same
+# assertions, same comparator, same anchor. Nothing is dropped or weakened;
+# a missing/truncated browser run fails the aggregation instead of hiding it.
 #
 # Safety posture: no AWS/deploy credentials, no `environment:`, no access to
 # any deployed system — the Java service is a throwaway boot against an
@@ -45,10 +67,11 @@ name: Frontend Angular Parity Gates
 # partial seed, no super_admin row, ADR-025). This workflow never re-points the
 # production `deploy` job (ANG-014/ANG-016 own deploy enablement/cutover).
 #
-# Spec-file integrity is enforced per PR: modified/renamed/deleted files under
-# packages/frontend/tests|e2e fail the parity job (spec files are never edited
-# to make Angular pass; additive specs are visible to review and must be
-# registered in parity/gate-scope.json — unknown files fail the comparator).
+# Spec-file integrity is enforced per PR (in every browser job): modified/
+# renamed/deleted files under packages/frontend/tests|e2e fail the parity job
+# (spec files are never edited to make Angular pass; additive specs are visible
+# to review and must be registered in parity/gate-scope.json — unknown files
+# fail the comparator).
 
 on:
   push:
@@ -116,12 +139,25 @@ jobs:
           if-no-files-found: warn
 
   # ------------------------------------------------------------------
-  # PB-2 — E2E parity gate vs the archived React-on-Java anchor (AC-ANG-015-1)
+  # PB-2 — E2E parity evidence: one FULL U10-suite run per browser.
+  # The gate decision lives in `parity-compare` below (single decision
+  # point over the complete merged 3-browser report).
   # ------------------------------------------------------------------
   parity:
-    name: parity (PB-2 vs ae42c67 anchor)
+    name: parity (PB-2 evidence — ${{ matrix.project }})
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    # One browser's full-suite run incl. setup (~2x the observed per-browser
+    # duration; the previous single-job cap of 350 min covered all 3 browsers
+    # serially and was exceeded by run 39440888894). Well under the 6 h
+    # GitHub-hosted ceiling; a leg that cannot finish fails the aggregation.
+    timeout-minutes: 240
+    strategy:
+      # Never cancel the remaining browser legs when one fails: every leg's
+      # evidence is uploaded `if: always()` and the gate decision needs all
+      # three (it fails closed on any missing leg).
+      fail-fast: false
+      matrix:
+        project: [chromium, firefox, webkit]
     services:
       # Postgres ONLY among data stores: the Java backend of record has no
       # Redis (ADR-028 — Quartz + PostgreSQL DB DLQ). Loopback :5432
@@ -174,7 +210,7 @@ jobs:
       YACC_SMTP_PORT: '1025'
       # W19 restart handles required by tests/realtime-rawws-r1.spec.ts
       # (real SIGTERM + real restart of the S1-posture service — never a
-      # fabricated disconnect).
+      # fabricated disconnect). Each matrix leg restarts its OWN service.
       YACC_JAVA_PID_FILE: /tmp/opencode/java-service.pid
       YACC_JAVA_RESTART_CMD: bash /tmp/opencode/boot-java.sh
       CI: 'true'
@@ -294,26 +330,135 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter @yacc/frontend-angular exec playwright install --with-deps chromium firefox webkit
 
-      - name: Run parity suite (U10 gate scope, 3 browsers)
+      - name: Run parity suite (${{ matrix.project }} — full U10 gate scope)
         id: run_parity
         run: |
           set -o pipefail
           mkdir -p /tmp/opencode/parity
           export PLAYWRIGHT_JSON_OUTPUT_DIR=/tmp/opencode/parity
           export PLAYWRIGHT_JSON_OUTPUT_NAME=parity-run.json
-          # The comparator owns the gate decision: the suite's own exit code is
-          # expected to be non-zero while anchor-red rows stay red. A crash
-          # that produces no report still fails the gate (comparator is
-          # fail-closed on a missing run report).
+          # This leg's exit code is expected to be non-zero while anchor-red
+          # rows stay red — the report is the evidence, the gate decision is
+          # `parity-compare`. A crash that produces no report still fails the
+          # gate (report-presence check below + fail-closed aggregation).
           pnpm --filter @yacc/frontend-angular exec playwright test \
+            --project=${{ matrix.project }} \
             --reporter=html,json 2>&1 | tee /tmp/opencode/parity/run-output.log
           code=$?
           echo "playwright_exit=$code" >> "$GITHUB_OUTPUT"
-          echo "Playwright exited $code (anchor-red rows are expected red; the comparator decides the gate)."
+          echo "Playwright (${{ matrix.project }}) exited $code (anchor-red rows are expected red; the comparator decides the gate)."
           exit 0
 
-      - name: Compare against the anchor (single gate decision)
+      - name: Report presence + SHA-256 manifest (fail-closed evidence check)
+        run: |
+          set -euo pipefail
+          if [ ! -s /tmp/opencode/parity/parity-run.json ]; then
+            echo "::error::${{ matrix.project }} produced no JSON report — the parity-compare job will fail closed (no partial-parity verdicts)."
+            exit 1
+          fi
+          (cd /tmp/opencode/parity && sha256sum parity-run.json > parity-run.json.sha256)
+          cat /tmp/opencode/parity/parity-run.json.sha256
+
+      - name: Upload per-browser JSON report (machine-readable evidence)
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-json-${{ matrix.project }}
+          path: |
+            /tmp/opencode/parity/parity-run.json
+            /tmp/opencode/parity/parity-run.json.sha256
+            /tmp/opencode/parity/run-output.log
+            /tmp/opencode/java-service.log
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload per-browser HTML report (browser evidence)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-html-${{ matrix.project }}
+          path: packages/frontend-angular/playwright-report/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # ------------------------------------------------------------------
+  # PB-2 — the gate decision over the COMPLETE merged 3-browser report.
+  # Runs even when a browser leg failed, so a missing/absent leg becomes an
+  # explicit fail-closed gate failure instead of a silent partial verdict.
+  # ------------------------------------------------------------------
+  parity-compare:
+    name: parity-compare (PB-2 gate decision vs ae42c67 anchor)
+    needs: [parity]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (the gate scripts are zero-dependency)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Download per-browser reports (fail-closed)
+        # A missing artifact (browser leg never uploaded) fails its step and
+        # therefore this job — the aggregation never invents a verdict.
+        uses: actions/download-artifact@v4
+        with:
+          name: parity-json-chromium
+          path: _parity/chromium
+
+      - name: Download per-browser reports (fail-closed)
+        uses: actions/download-artifact@v4
+        with:
+          name: parity-json-firefox
+          path: _parity/firefox
+
+      - name: Download per-browser reports (fail-closed)
+        uses: actions/download-artifact@v4
+        with:
+          name: parity-json-webkit
+          path: _parity/webkit
+
+      - name: Aggregation pre-flight (all 3 browsers must have delivered a report)
+        run: |
+          set -euo pipefail
+          failed=0
+          for p in chromium firefox webkit; do
+            if [ ! -s "_parity/$p/parity-run.json" ]; then
+              echo "::error::parity report for browser '$p' is absent or empty — the aggregated parity gate FAILS CLOSED (no partial-parity verdicts; every browser must run the full U10 suite)."
+              failed=1
+            fi
+          done
+          [ "$failed" -eq 0 ] || exit 1
+
+      - name: Verify report integrity (SHA-256 sidecars from the browser jobs)
+        run: |
+          set -euo pipefail
+          for p in chromium firefox webkit; do
+            (cd "_parity/$p" && sha256sum -c parity-run.json.sha256)
+          done
+
+      - name: Baseline pre-flight (fail-closed anchor validation — unchanged checks)
+        run: node packages/frontend-angular/parity/compare-baseline.mjs check
+
+      - name: Merge per-browser reports (fail-closed exact-coverage validation)
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/opencode/parity
+          # Validates: exactly the gate-scope-declared browsers, one report
+          # each; per-report project purity; identical case sets across all
+          # browsers; no duplicate rows; non-empty reports. Writes the merged
+          # 3-browser report + a provenance block (per-source SHA-256).
+          node packages/frontend-angular/parity/merge-browser-reports.mjs \
+            --project chromium=_parity/chromium/parity-run.json \
+            --project firefox=_parity/firefox/parity-run.json \
+            --project webkit=_parity/webkit/parity-run.json \
+            --out /tmp/opencode/parity/parity-run.json \
+            | tee /tmp/opencode/parity/merge-summary.txt
+
+      - name: Compare against the anchor (single gate decision)
         run: |
           set -o pipefail
           node packages/frontend-angular/parity/compare-baseline.mjs compare \
@@ -329,11 +474,12 @@ jobs:
           name: parity-evidence
           path: |
             /tmp/opencode/parity/parity-run.json
+            /tmp/opencode/parity/merge-summary.txt
             /tmp/opencode/parity/comparison-report.json
             /tmp/opencode/parity/comparison-summary.md
-            /tmp/opencode/parity/run-output.log
-            /tmp/opencode/java-service.log
-            packages/frontend-angular/playwright-report/
+            _parity/chromium/parity-run.json
+            _parity/firefox/parity-run.json
+            _parity/webkit/parity-run.json
           retention-days: 14
           if-no-files-found: warn
 

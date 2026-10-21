@@ -170,7 +170,7 @@ expansion); registering it here + in `gate-scope.json` is a deliberate, review-v
 | Gate | CI job (`.github/workflows/frontend-angular-parity.yml`) | Enforcement |
 |---|---|---|
 | **PB-1** build | `build-angular` in `frontend-deploy.yml` (pre-existing, unchanged) | `ng build` green |
-| **PB-2** E2E parity | `parity` job | Spec-edit integrity gate (no modified/renamed/deleted suite files per PR); anchor pre-flight (`compare-baseline.mjs check` — fail-closed on missing/bad/mismatched baseline incl. SHA-256); Java service in the S1 e2e posture; full U10-scope Playwright run ×3 browsers; `compare-baseline.mjs compare` — fails on regressions, weakenings, scope leaks, register gaps, missing results; summary surfaces every bucket (expected red, unanchored red/green, improvements, flaky) |
+| **PB-2** E2E parity | `parity` matrix jobs (chromium/firefox/webkit — one FULL U10-suite run per browser, evidence only) + `parity-compare` gate job | Spec-edit integrity gate (no modified/renamed/deleted suite files per PR — in every browser job); anchor pre-flight (`compare-baseline.mjs check` — fail-closed on missing/bad/mismatched baseline incl. SHA-256 — in every browser job and again in `parity-compare`); Java service in the S1 e2e posture per browser job; full U10-scope Playwright run ×3 browsers (one browser per job — a leg that cannot finish never produces a verdict); `parity-compare` downloads all three raw JSON reports and fails closed if any browser job/report is absent, empty, hash-mismatched, mis-scoped (foreign project) or covers a different case set, merges them into the complete 3-browser report (`parity/merge-browser-reports.mjs`), then `compare-baseline.mjs compare` — fails on regressions, weakenings, scope leaks, register gaps, missing results; summary surfaces every bucket (expected red, unanchored red/green, improvements, flaky) |
 | **PB-3** unit + coverage | `unit-coverage` job | `test:unit:coverage` with thresholds **≥85 lines / ≥85 statements / ≥85 functions / ≥80 branches** (angular.json; exit non-zero below target; never lowered) |
 | **CP-3** baseline capture | `react-baseline-capture` job (`workflow_dispatch` only) | Boots the same Java posture, runs the **React** harness at the current SHA, derives the per-case TSV + env versions + JSON + HTML report, uploads them as workflow artifacts (full provenance: `github.sha`, tool versions). Archiving a new anchor into the repo is a separate deliberate act (register + `gate-scope.json` update) |
 | Tier-1 backend | `backend-java-ci.yml` (pre-existing, unchanged) | JUnit + Testcontainers + JaCoCo ≥85% + contract tests |
@@ -193,10 +193,23 @@ expansion); registering it here + in `gate-scope.json` is a deliberate, review-v
   `/.well-known` → `:8080`; `proxy.conf.js` re-points them via `YACC_API_PROXY_TARGET`) — the
   Spring service has no CORS and none is added. The `globalSetup` health check fails the run
   if the Java service is not up (fail-closed).
-- **Failure surfacing:** the comparator writes `comparison-report.json` + a markdown summary
-  to `$GITHUB_STEP_SUMMARY`; the Playwright HTML/JSON reports and the run log are uploaded as
-  artifacts on every outcome (`if: always()`). Expected red is **surfaced, never hidden**:
-  the summary lists every bucket with counts and row detail.
+- **Failure surfacing:** `parity-compare` writes `comparison-report.json` + a markdown
+  summary to `$GITHUB_STEP_SUMMARY`; every browser job uploads its raw machine-readable
+  JSON report + SHA-256 sidecar + run log + Java log as `parity-json-<browser>`, and its
+  HTML report as `parity-html-<browser>`, always (`if: always()`); `parity-compare`
+  uploads the merged 3-browser report (with a per-source provenance block), the merge
+  summary and the comparison artifacts as `parity-evidence`. Expected red is **surfaced,
+  never hidden**: the summary lists every bucket with counts and row detail.
+
+**Execution-topology record (21 Oct 2026):** parity run 39440888894 was cancelled at the
+single-job 350-minute cap without a verdict (1767 cases × 3 browsers no longer fit one
+GitHub-hosted job). The gate was re-plumbed into per-browser matrix legs + a fail-closed
+`parity-compare` decision job (240 min/browser — same cases, browsers, assertions,
+posture, comparator, anchor; nothing dropped or weakened; a missing/short browser run
+fails the aggregation instead of hiding it). Recorded here as gate WIRING, not a
+disposition: no expected-red class touched, no register entry, no gate semantics changed;
+the merge is validated by `parity/validate-merge-browser-reports.mjs` (incl. a
+round-trip + comparator-verdict-identity check against a real 3-browser report).
 
 ## 9. Registration discipline
 

@@ -165,11 +165,13 @@ machine-readable scope this harness and the CI comparator both read). Summary:
   double-run).
 - **Excluded:** the 9 assertion-free debug/inspector specs (T4 §2) via `testIgnore`.
 - **CI** (`.github/workflows/frontend-angular-parity.yml`): `unit-coverage` job (PB-3
-  thresholds ≥85/85/85/80), `parity` job (PB-2 vs the archived React-on-Java anchor —
-  fail-closed baseline validation incl. SHA-256, zero-regression comparison, no-silent-
-  regression buckets surfaced in the job summary), `react-baseline-capture` dispatch job
-  (CP-3 evidence, archived as workflow artifacts). PB-1 remains the `build-angular` job in
-  `frontend-deploy.yml`; Tier-1 remains `backend-java-ci.yml`.
+  thresholds ≥85/85/85/80), `parity` per-browser matrix jobs + the `parity-compare` gate
+  job (PB-2 vs the archived React-on-Java anchor — one full U10-suite run per browser
+  with raw JSON evidence; the compare job fails closed on any absent/short/mis-scoped
+  browser report, validates identical per-browser case coverage, merges the reports and
+  runs the unchanged comparator as the single gate decision), `react-baseline-capture`
+  dispatch job (CP-3 evidence, archived as workflow artifacts). PB-1 remains the
+  `build-angular` job in `frontend-deploy.yml`; Tier-1 remains `backend-java-ci.yml`.
 - **E2E environment of record:** Java service in the S1 fail-closed fixture posture,
   PostgreSQL only (no Redis, ADR-028); same-origin dev-server relay (`proxy.conf.js`);
   §3's Node-era environment note above is superseded (dated correction in place).
