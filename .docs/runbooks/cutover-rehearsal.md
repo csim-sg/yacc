@@ -22,7 +22,7 @@
 | P5 | Chart + images pinned | Chart at a pinned commit (`<artifact link>`); candidate image tag pinned (`<image-tag>`, never `latest`) **and a distinct forward-fix image** (`<forward-fix-image-tag>` — an immutable tag or digest, **different from `<image-tag>`**, provenance recorded as `<artifact link>`). Step 7 fails closed if the two are not distinct. | Ops |
 | P6 | Candidate database | A reachable PostgreSQL instance with the schema migrated, plus a **separate candidate database** `<candidate-database>` (host `<candidate-db-host>`) for the restore test (see [backup-restore.md](backup-restore.md)). The candidate release's `DATABASE_URL` must reference **only** the candidate database — verified by name (never the value) in the Step-1 guards. | Ops |
 | P7 | Rehearsal window + stop authority | Window agreed; stop-authority contact named — `<founder to name>` — and reachable for the drill. (Backup/restore consistency does **not** depend on this window — see [backup-restore.md](backup-restore.md) §3.2.) | Founder |
-| P8 | Operator tooling | `kubectl`, `helm` ≥ 3.1 (`helm template --show-only`), `base64`, and **`python3` (standard library only)** — python3 powers the Step-1 G4 `DATABASE_URL` parse guard; the URL value is parsed in-process and never printed. | Ops |
+| P8 | Operator tooling | `kubectl`, `helm` ≥ 3.1 (`helm template --show-only`), `base64`, and **`python3` (standard library only)** — python3 powers the Step-1 G4 `DATABASE_URL` parse guard; the URL value is parsed in-process, never stored in a shell variable (the guard is xtrace-safe: it cannot be echoed by `set -x`), and never printed. | Ops |
 
 **Stop** if any row is unmet. Record the abort per §4 and in the §3 evidence template, and halt.
 
@@ -41,49 +41,83 @@ Every step records one row in the §3 evidence template.
 
 The rehearsal installs **its own uniquely named release in a dedicated candidate namespace** (P3). It never upgrades an existing release: `helm install` (not `upgrade --install`) is used deliberately — Helm refuses to create a release whose name is already in use, so this step **cannot modify an active deployment**. The chart names its Deployment/Service with the `yacc-backend.fullname` helper (`deploy/helm/yacc-backend/templates/_helpers.tpl`): **`<candidate-release>-yacc-backend` — unless the release name itself already contains `yacc-backend`**, in which case the release name is used as-is. The exact names are therefore **derived from the rendered chart (guard G5), never assumed**; combined with G2 the candidate cannot collide with the live `yacc-backend` release.
 
-Run every guard first. **Any guard failure aborts the rehearsal (§4)** — never "work around" a guard by picking a different context/namespace/release:
+Run every guard first. **Any guard failure aborts the rehearsal (§4)** — never "work around" a guard by picking a different context/namespace/release. Absence checks are fail closed: a release/resource counts as absent **only** on the tool's explicit not-found response (`release: not found` for Helm, `NotFound` for Kubernetes); every other failure — Forbidden/RBAC denial, unreachable API, timeout, invalid context — aborts the rehearsal, because an unverifiable cluster state is never treated as a free one:
 
 ```bash
+# Fail-closed absence helpers — a release/resource is treated as absent ONLY when
+# the tool explicitly reports not-found. A present resource aborts; every other
+# failure (Forbidden/RBAC, unreachable API, timeout, invalid context) also aborts.
+require_absent_helm() {  # <release> <namespace> <label>
+  local out rc=0
+  out="$(helm status "$1" -n "$2" 2>&1)" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "ABORT: $3 — Helm release '$1' already exists in namespace '$2'"
+    exit 1
+  fi
+  case "$out" in
+    *"release: not found"*) return 0 ;;  # Helm's canonical not-found response
+    *)
+      echo "ABORT: $3 — helm status '$1' failed (exit $rc); only 'release: not found' proves absence" >&2
+      printf '%s\n' "$out" >&2
+      exit 1 ;;
+  esac
+}
+require_absent_k8s() {   # <type> <name> <namespace> <label>
+  local out rc=0
+  out="$(kubectl get "$1" "$2" -n "$3" 2>&1)" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "ABORT: $4 — $1 '$2' already exists in namespace '$3'"
+    exit 1
+  fi
+  case "$out" in
+    *"NotFound"*) return 0 ;;  # explicit Kubernetes NotFound
+    *)
+      echo "ABORT: $4 — kubectl get $1 '$2' failed (exit $rc); only NotFound proves absence" >&2
+      printf '%s\n' "$out" >&2
+      exit 1 ;;
+  esac
+}
+
 # G1 — expected cluster context (fail closed)
 test "$(kubectl config current-context)" = "<candidate-context>" \
   || { echo "ABORT: wrong cluster context — refusing to deploy"; exit 1; }
 
 # G2 — no live release/deployment in the candidate namespace (fail closed)
-helm status yacc-backend -n <candidate-namespace> >/dev/null 2>&1 \
-  && { echo "ABORT: live release 'yacc-backend' present in <candidate-namespace>"; exit 1; }
-kubectl get deployment yacc-backend -n <candidate-namespace> >/dev/null 2>&1 \
-  && { echo "ABORT: live deployment 'yacc-backend' present in <candidate-namespace>"; exit 1; }
+require_absent_helm yacc-backend <candidate-namespace> "live release check"
+require_absent_k8s deployment yacc-backend <candidate-namespace> "live deployment check"
 
 # G3 — candidate release name is unique and is not the live release name (fail closed)
 test "<candidate-release>" != "yacc-backend" \
   || { echo "ABORT: candidate release name must differ from the live release"; exit 1; }
-helm status <candidate-release> -n <candidate-namespace> >/dev/null 2>&1 \
-  && { echo "ABORT: candidate release name already in use"; exit 1; }
+require_absent_helm <candidate-release> <candidate-namespace> "release-name uniqueness check"
 
 # G4 — candidate release points at the candidate database (fail closed; names only).
-# The DATABASE_URL value is parsed in-process by python3 (stdlib only — see P8) and is
-# never printed, logged, stored, or passed to grep/sed — only the pass/fail outcome is
-# emitted. Do NOT run this block under `set -x` / `bash -x`: xtrace echoes the value.
-CAND_DB_URL="$(kubectl get secret yacc-backend-secrets -n <candidate-namespace> \
-  -o jsonpath='{.data.DATABASE_URL}' | base64 -d)"
-CAND_DB_URL="$CAND_DB_URL" EXPECTED_DB_HOST='<candidate-db-host>' EXPECTED_DB='<candidate-database>' \
-  python3 - <<'PY' || { echo "ABORT: candidate DATABASE_URL must target candidate DB '<candidate-database>' on host '<candidate-db-host>' (the value itself is never printed)"; exit 1; }
+# Xtrace-safe by construction: the DATABASE_URL value is never assigned to a shell
+# variable and never appears in any command argument or environment assignment — it
+# flows only through the pipe into python3's stdin — so `set -x` / `bash -x` cannot
+# echo it and it never reaches a process argv or environ. Parsed in-process by
+# python3 (stdlib only — see P8); only the pass/fail outcome is emitted. A retrieval
+# failure (secret missing, RBAC denial, API error) yields empty input and fails the
+# comparison below, so it aborts rather than passing.
+kubectl get secret yacc-backend-secrets -n <candidate-namespace> \
+  -o jsonpath='{.data.DATABASE_URL}' | base64 -d \
+| EXPECTED_DB_HOST='<candidate-db-host>' EXPECTED_DB='<candidate-database>' \
+  python3 -c '
 import os, sys
 from urllib.parse import urlsplit, unquote
 
-raw = os.environ.get("CAND_DB_URL", "").strip()   # never echoed
-if raw.startswith("jdbc:"):                       # JDBC form "jdbc:postgresql://..." is accepted
+raw = sys.stdin.read().strip()      # credential URL — never echoed
+if raw.startswith("jdbc:"):         # JDBC form "jdbc:postgresql://..." is accepted
     raw = raw[len("jdbc:"):]
 try:
-    parts = urlsplit(raw)                         # handles "postgresql://user:password@host:port/db"
-    host = (parts.hostname or "").lower()         # hostname() lowercases; empty when absent
-    db = unquote(parts.path).lstrip("/")          # database = path segment; query string excluded
-except ValueError:                                # unparseable URL => fail closed
+    parts = urlsplit(raw)                       # handles "postgresql://user:password@host:port/db"
+    host = (parts.hostname or "").lower()       # hostname() lowercases; empty when absent
+    db = unquote(parts.path).lstrip("/")        # database = path segment; query string excluded
+except ValueError:                              # unparseable URL => fail closed
     sys.exit(1)
 sys.exit(0 if (host == os.environ["EXPECTED_DB_HOST"].lower()
                and db == os.environ["EXPECTED_DB"]) else 1)
-PY
-unset CAND_DB_URL
+' || { echo "ABORT: candidate DATABASE_URL must target candidate DB '<candidate-database>' on host '<candidate-db-host>' (retrieval failure or mismatch — the value itself is never printed)"; exit 1; }
 
 # G5 — derive the exact resource fullname from the rendered chart and require it free (fail closed).
 # Per templates/_helpers.tpl the chart names resources `<release>-yacc-backend` UNLESS the
@@ -94,10 +128,8 @@ CAND_FULLNAME="$(helm template <candidate-release> ./deploy/helm/yacc-backend \
   | awk '/^  name: /{print $2; exit}')"
 test -n "$CAND_FULLNAME" \
   || { echo "ABORT: could not derive the resource fullname from the rendered chart"; exit 1; }
-kubectl get deployment "$CAND_FULLNAME" -n <candidate-namespace> >/dev/null 2>&1 \
-  && { echo "ABORT: deployment $CAND_FULLNAME already exists in <candidate-namespace>"; exit 1; }
-kubectl get service "$CAND_FULLNAME" -n <candidate-namespace> >/dev/null 2>&1 \
-  && { echo "ABORT: service $CAND_FULLNAME already exists in <candidate-namespace>"; exit 1; }
+require_absent_k8s deployment "$CAND_FULLNAME" <candidate-namespace> "fullname collision check"
+require_absent_k8s service "$CAND_FULLNAME" <candidate-namespace> "fullname collision check"
 ```
 
 Only when **all five guards pass**:
@@ -219,6 +251,7 @@ Abort the rehearsal immediately if any of these occurs, record the rows filled s
 
 - Any §1 precondition is unmet or lapses mid-rehearsal (especially: stop-authority contact unreachable).
 - Any Step-1 guard fails: wrong cluster context, a live `yacc-backend` release/deployment present in the target namespace, a release-name collision, the candidate `DATABASE_URL` not targeting `<candidate-database>` on `<candidate-db-host>`, or the derived resource fullname already existing in the namespace (G5).
+- Any guard check that cannot verify cluster state aborts — a `helm`/`kubectl` failure other than an explicit not-found response (Forbidden/RBAC denial, unreachable API, timeout, invalid context) is treated as a failure, never as absence.
 - §Step-2 health gates are red after the candidate deploy or the roll-forward check.
 - The backup fails, or cannot be stored/retrieved in the `<environment>` storage location.
 - Any §Step-5 integrity check does not match the same-snapshot source capture.
@@ -250,4 +283,4 @@ On abort: do not attempt in-place repairs beyond restoring the candidate environ
 
 ---
 
-**Last Updated**: 2026-10-21 (authored by MIG-070b #447; review rework ×2 same day — procedure only; no execution claimed)
+**Last Updated**: 2026-10-21 (authored by MIG-070b #447; review rework ×3 same day — procedure only; no execution claimed)
