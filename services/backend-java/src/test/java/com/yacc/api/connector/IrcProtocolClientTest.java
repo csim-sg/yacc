@@ -250,6 +250,10 @@ class IrcProtocolClientTest {
         server.autoRegister();
         client = newClient();
         client.register("yaccbot", null, 2_000);
+        // register() returns on the 001 the server replies to NICK with;
+        // the server thread may not have read the final USER line yet.
+        // Observe the full registration burst before snapshotting.
+        assertThat(server.awaitLineContaining("USER ", WAIT)).isTrue();
         int linesBefore = server.receivedLines().size();
 
         assertThatThrownBy(() -> client.join(List.of("#test\r\nPRIVMSG #evil :x")))
@@ -266,6 +270,10 @@ class IrcProtocolClientTest {
         server.autoRegister();
         client = newClient();
         client.register("yaccbot", null, 2_000);
+        // register() returns on the 001 the server replies to NICK with;
+        // the server thread may not have read the final USER line yet.
+        // Observe the full registration burst before snapshotting.
+        assertThat(server.awaitLineContaining("USER ", WAIT)).isTrue();
         int linesBefore = server.receivedLines().size();
 
         assertThatThrownBy(() -> client.privmsg("#test\r\nPRIVMSG #evil :x", "hi"))
@@ -437,6 +445,10 @@ class IrcProtocolClientTest {
         server.autoRegister();
         client = newClient();
         client.register("yaccbot", null, 2_000);
+        // register() returns on the 001 the server replies to NICK with;
+        // the server thread may not have read the final USER line yet.
+        // Observe the full registration burst before snapshotting.
+        assertThat(server.awaitLineContaining("USER ", WAIT)).isTrue();
         int linesBefore = server.receivedLines().size();
 
         // The trailing message text is deliberately not field-validated
