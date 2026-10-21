@@ -35,11 +35,20 @@
 ### 3.1 Pre-backup checks
 
 - [ ] `/health/live` and `/health/ready` return 200 (see [cutover-rehearsal.md](cutover-rehearsal.md) Step 2) — back up a healthy service.
+- [ ] PostgreSQL client tools ≥ 12 (`psql`/`pg_dump --version`) — `pg_export_snapshot()` and `pg_dump --snapshot` require them (the service runs on PostgreSQL 15).
 - [ ] Target database is the intended one (check the current `DATABASE_URL` **host/database portion only**, without printing credentials).
 - [ ] Storage location for `<artifact link>` is reachable and has space.
 - [ ] Actor and UTC timestamp noted for the evidence record.
 
-### 3.2 Capture the source state (for later comparison)
+### 3.2 Capture a consistent source baseline (one snapshot for counts and dump)
+
+`pg_dump` always reads through a single MVCC snapshot, so a dump is internally consistent by construction. The **comparison baseline must come from that same snapshot** — counts collected in separate live queries before or after the dump are not comparable: a write landing between capture and dump makes a correct backup look corrupt (or hides real corruption). This procedure therefore exports **one** snapshot, captures the counts through it, and dumps through the same snapshot.
+
+**Expected write posture**: writes on the source may continue throughout — consistency comes from MVCC, not from quiescing the service. No maintenance window or downtime is required. (If snapshot export is unavailable in the target environment, an approved maintenance/read-only window with explicit stop authority is the alternative — counts must then be captured inside the window, before the dump.)
+
+**Prerequisites**: two connections to the **same** source database, authenticated as the **same database role** (same `DATABASE_URL` — PostgreSQL only allows a snapshot to be reused by the exporting role); the exporting session stays open until the dump finishes.
+
+Resolve the source connection first:
 
 ```bash
 export YACC_DB_URL="$(kubectl get secret yacc-backend-secrets -n <environment> \
@@ -49,25 +58,46 @@ case "$YACC_DB_URL" in
   jdbc:*) export PGURL="postgresql://${YACC_DB_URL#jdbc:postgresql://}" ;;
   *)      export PGURL="$YACC_DB_URL" ;;
 esac
-
-# Schema state (versions + success flags)
-psql "$PGURL" -c "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;" \
-  > <artifact-link>/source-flyway-history.txt
-
-# Row-count baseline (estimates; exact counts for key tables below)
-psql "$PGURL" -c "SELECT relname AS table_name, n_live_tup FROM pg_stat_user_tables ORDER BY relname;" \
-  > <artifact-link>/source-row-counts.txt
-psql "$PGURL" -Atc "SELECT 'users', count(*) FROM users UNION ALL SELECT 'conversations', count(*) FROM conversations UNION ALL SELECT 'messages', count(*) FROM messages;" \
-  > <artifact-link>/source-exact-counts.txt
 ```
 
-### 3.3 Backup (custom format)
+**Terminal 1 — open the snapshot session; keep it open until §3.3 finishes:**
+
+```
+psql "$PGURL"
+BEGIN ISOLATION LEVEL REPEATABLE READ;
+SELECT pg_export_snapshot();   -- record the returned id in <artifact-link>/source-snapshot-id.txt
+-- leave this session OPEN — do NOT exit — until the §3.3 dump has completed
+```
+
+**Terminal 2 — run the §3.3 dump through that snapshot id.**
+
+**Terminal 1 — after the dump completes, capture the baseline from the same snapshot, then close the session:**
+
+```
+-- Schema state (versions + success flags)
+\o <artifact-link>/source-flyway-history.txt
+SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;
+\o
+-- Row-count baseline: exact counts of the key tables, from the same snapshot as the dump
+\o <artifact-link>/source-exact-counts.txt
+SELECT 'users', count(*) FROM users UNION ALL SELECT 'conversations', count(*) FROM conversations UNION ALL SELECT 'messages', count(*) FROM messages;
+\o
+COMMIT;
+\q
+```
+
+Capture order matters: `pg_export_snapshot()` first (it fixes the transaction snapshot), the dump while the session is still open, the counts last — all three then observe the identical data state. Approximate planner statistics (`pg_stat_user_tables`) are **not** captured and are **not** a verification gate (§5); only exact counts are.
+
+### 3.3 Backup (custom format, through the §3.2 snapshot)
 
 ```bash
 pg_dump --format=custom --no-owner --no-privileges \
+  --snapshot="$(cat <artifact-link>/source-snapshot-id.txt)" \
   --file=<artifact-link>/yacc-db-$(date -u +%Y%m%dT%H%M%SZ).dump "$PGURL"
 ```
 
+- Run while the Terminal-1 session from §3.2 is still open — the exported snapshot exists only until that transaction ends.
+- `--snapshot` makes the dump read through the exact snapshot the §3.2 counts were taken from, so baseline and dump are provably the same data state.
 - Custom format (`.dump`) supports `pg_restore` selective/parallel restore and compressed storage.
 - `--no-owner --no-privileges` so the restore does not depend on matching role names.
 - Record the dump file as `<artifact link>`; store it in the `<environment>` storage location with the agreed retention.
@@ -101,23 +131,28 @@ pg_restore --dbname="$CAND_URL" --no-owner --no-privileges --exit-on-error \
 
 ## 5. Post-restore verification (read-only)
 
-Run against the **candidate** connection and compare with the §3.2 captures:
+Run against the **candidate** connection and compare with the §3.2 snapshot captures:
 
 ```bash
-# Schema version state must match the source exactly (ADR-027)
-psql "$CAND_URL" -c "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;"
+# Schema version state must match the source baseline exactly (ADR-027)
+psql "$CAND_URL" -c "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;" \
+  > <artifact-link>/restored-flyway-history.txt
 
-# Row-count comparison: estimates for shape, exact counts for key tables
-psql "$CAND_URL" -c "SELECT relname AS table_name, n_live_tup FROM pg_stat_user_tables ORDER BY relname;"
-psql "$CAND_URL" -Atc "SELECT 'users', count(*) FROM users UNION ALL SELECT 'conversations', count(*) FROM conversations UNION ALL SELECT 'messages', count(*) FROM messages;"
+# Exact counts of the key tables in the restored database
+psql "$CAND_URL" -Atc "SELECT 'users', count(*) FROM users UNION ALL SELECT 'conversations', count(*) FROM conversations UNION ALL SELECT 'messages', count(*) FROM messages;" \
+  > <artifact-link>/restored-exact-counts.txt
+
+diff <artifact-link>/source-flyway-history.txt <artifact-link>/restored-flyway-history.txt
+diff <artifact-link>/source-exact-counts.txt   <artifact-link>/restored-exact-counts.txt
 ```
 
 Verification gate (all must hold):
 
 - [ ] `flyway_schema_history` rows identical to `source-flyway-history.txt` (same versions, all `success`).
-- [ ] Exact counts match `source-exact-counts.txt`.
-- [ ] `pg_stat_user_tables` shape matches `source-row-counts.txt` (estimates may differ slightly; investigate large deltas).
+- [ ] Exact counts identical to `source-exact-counts.txt` — both files were captured from the same MVCC snapshot as the dump (§3.2), so an exact match proves the restore faithfully reproduced the dumped state.
 - [ ] No rows were modified during verification (all queries read-only).
+
+Writes that hit the source **after** the §3.2 snapshot are expected and are **not** a failure — the comparison validates restore fidelity against the dumped state, not live-source equality. Approximate statistics (`pg_stat_user_tables`) are not a gate and are not consulted.
 
 Any mismatch ⇒ **fail**: do not proceed; abort per [cutover-rehearsal.md](cutover-rehearsal.md) §4 and keep the dump artifact for diagnosis.
 
@@ -131,4 +166,4 @@ Record actual backup and restore durations in the evidence template each time th
 
 ---
 
-**Last Updated**: 2026-10-21 (authored by MIG-070b #447 — procedure only; no execution claimed)
+**Last Updated**: 2026-10-21 (authored by MIG-070b #447; review rework same day — procedure only; no execution claimed)
