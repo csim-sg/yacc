@@ -22,7 +22,7 @@
 | P5 | Chart + images pinned | Chart at a pinned commit (`<artifact link>`); candidate image tag pinned (`<image-tag>`, never `latest`) **and a distinct forward-fix image** (`<forward-fix-image-tag>` — an immutable tag or digest, **different from `<image-tag>`**, provenance recorded as `<artifact link>`). Step 7 fails closed if the two are not distinct. | Ops |
 | P6 | Candidate database | A reachable PostgreSQL instance with the schema migrated, plus a **separate candidate database** `<candidate-database>` (host `<candidate-db-host>`) for the restore test (see [backup-restore.md](backup-restore.md)). The candidate release's `DATABASE_URL` must reference **only** the candidate database — verified by name (never the value) in the Step-1 guards. | Ops |
 | P7 | Rehearsal window + stop authority | Window agreed; stop-authority contact named — `<founder to name>` — and reachable for the drill. (Backup/restore consistency does **not** depend on this window — see [backup-restore.md](backup-restore.md) §3.2.) | Founder |
-| P8 | Operator tooling | `kubectl`, `helm` ≥ 3.1 (`helm template --show-only`), `base64`, and **`python3` (standard library only)** — python3 powers the Step-1 G4 `DATABASE_URL` parse guard; the URL value is parsed in-process, never stored in a shell variable (the guard is xtrace-safe: it cannot be echoed by `set -x`), and never printed. | Ops |
+| P8 | Operator tooling | **`bash`** — the Step-1 guard block uses Bash-only features (`set -o pipefail` in G4): run it under `bash`, not a POSIX `sh`/dash. Plus `kubectl`, `helm` ≥ 3.1 (`helm template --show-only`), `base64`, and **`python3` (standard library only)** — python3 powers the Step-1 G4 `DATABASE_URL` parse guard; the URL value is parsed in-process, never stored in a shell variable (the guard is xtrace-safe: it cannot be echoed by `set -x`), and never printed. | Ops |
 
 **Stop** if any row is unmet. Record the abort per §4 and in the §3 evidence template, and halt.
 
@@ -96,13 +96,22 @@ require_absent_helm <candidate-release> <candidate-namespace> "release-name uniq
 # variable and never appears in any command argument or environment assignment — it
 # flows only through the pipe into python3's stdin — so `set -x` / `bash -x` cannot
 # echo it and it never reaches a process argv or environ. Parsed in-process by
-# python3 (stdlib only — see P8); only the pass/fail outcome is emitted. A retrieval
-# failure (secret missing, RBAC denial, API error) yields empty input and fails the
-# comparison below, so it aborts rather than passing.
-kubectl get secret yacc-backend-secrets -n <candidate-namespace> \
-  -o jsonpath='{.data.DATABASE_URL}' | base64 -d \
-| EXPECTED_DB_HOST='<candidate-db-host>' EXPECTED_DB='<candidate-database>' \
-  python3 -c '
+# python3 (stdlib only — see P8); only the pass/fail outcome is emitted.
+# Fail-closed on every pipeline stage: the guarded pipeline runs in a subshell with
+# `set -o pipefail`, so it succeeds ONLY when kubectl, base64 AND python3 all exit 0 —
+# a kubectl/base64 failure aborts even when python3 would succeed (e.g. a truncated
+# response that still emitted usable encoded output). A missing secret, RBAC denial
+# or API error therefore aborts directly; an empty value (secret present, key absent)
+# still fails the comparison below as a second layer. Requires Bash: `pipefail` is
+# not POSIX `sh` (see P8). `set -e` changes nothing: the `||` list exempts the
+# subshell from errexit, and the subshell's nonzero pipeline status reaches the
+# handler either way.
+(
+  set -o pipefail   # every stage's success is required — Bash-only option (P8)
+  kubectl get secret yacc-backend-secrets -n <candidate-namespace> \
+    -o jsonpath='{.data.DATABASE_URL}' | base64 -d \
+  | EXPECTED_DB_HOST='<candidate-db-host>' EXPECTED_DB='<candidate-database>' \
+    python3 -c '
 import os, sys
 from urllib.parse import urlsplit, unquote
 
@@ -117,7 +126,8 @@ except ValueError:                              # unparseable URL => fail closed
     sys.exit(1)
 sys.exit(0 if (host == os.environ["EXPECTED_DB_HOST"].lower()
                and db == os.environ["EXPECTED_DB"]) else 1)
-' || { echo "ABORT: candidate DATABASE_URL must target candidate DB '<candidate-database>' on host '<candidate-db-host>' (retrieval failure or mismatch — the value itself is never printed)"; exit 1; }
+'
+) || { echo "ABORT: candidate DATABASE_URL must target candidate DB '<candidate-database>' on host '<candidate-db-host>' (retrieval failure or mismatch — the value itself is never printed)"; exit 1; }
 
 # G5 — derive the exact resource fullname from the rendered chart and require it free (fail closed).
 # Per templates/_helpers.tpl the chart names resources `<release>-yacc-backend` UNLESS the
@@ -250,7 +260,7 @@ Rules: timestamps in UTC; deviations recorded, never silently normalized; secret
 Abort the rehearsal immediately if any of these occurs, record the rows filled so far, and halt:
 
 - Any §1 precondition is unmet or lapses mid-rehearsal (especially: stop-authority contact unreachable).
-- Any Step-1 guard fails: wrong cluster context, a live `yacc-backend` release/deployment present in the target namespace, a release-name collision, the candidate `DATABASE_URL` not targeting `<candidate-database>` on `<candidate-db-host>`, or the derived resource fullname already existing in the namespace (G5).
+- Any Step-1 guard fails: wrong cluster context, a live `yacc-backend` release/deployment present in the target namespace, a release-name collision, the candidate `DATABASE_URL` not targeting `<candidate-database>` on `<candidate-db-host>` (G4 aborts on a mismatch **or** on any failed pipeline stage while retrieving it — `set -o pipefail` requires kubectl, base64 and python3 all to succeed), or the derived resource fullname already existing in the namespace (G5).
 - Any guard check that cannot verify cluster state aborts — a `helm`/`kubectl` failure other than an explicit not-found response (Forbidden/RBAC denial, unreachable API, timeout, invalid context) is treated as a failure, never as absence.
 - §Step-2 health gates are red after the candidate deploy or the roll-forward check.
 - The backup fails, or cannot be stored/retrieved in the `<environment>` storage location.
@@ -283,4 +293,4 @@ On abort: do not attempt in-place repairs beyond restoring the candidate environ
 
 ---
 
-**Last Updated**: 2026-10-21 (authored by MIG-070b #447; review rework ×3 same day — procedure only; no execution claimed)
+**Last Updated**: 2026-10-21 (authored by MIG-070b #447; review rework ×4 same day — procedure only; no execution claimed)
