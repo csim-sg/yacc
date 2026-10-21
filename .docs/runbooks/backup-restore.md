@@ -19,7 +19,7 @@
 - **Schema state**: `flyway_schema_history` (Flyway-managed; ADR-027).
 - **Storage location / retention**: `<environment>`-owned — `<founder to name>` decides location and retention period; recorded on #361, not in this document.
 
-**Never** print, log, or copy credential values into evidence artifacts. Reference secret names/keys only. Connection credentials are parsed **in-process** into a mode-`0600` temporary libpq **service file** (§3.2, §4.1) that `psql`/`pg_dump`/`pg_restore` reference by `servicefile=` + `service=` name — the credential value never appears in a shell variable, a command argument (`ps`-visible), an environment entry, or `set -x` trace output, and the file is removed by a trap on exit.
+**Never** print, log, or copy credential values into evidence artifacts. Reference secret names/keys only. Connection credentials are parsed **in-process** into a mode-`0600` temporary libpq **service file** (§3.2, §4.1) that `psql`/`pg_dump`/`pg_restore` reference by `servicefile=` + `service=` name — the credential value never appears in a shell variable, a command argument (`ps`-visible), an environment entry, or `set -x` trace output, and the file is removed by a trap on exit. Every percent-**decoded** component (database, username, password, each query value) is checked for ASCII control characters before it is written, so an encoded `%0A`/`%0D` can never create a service-file line, and query parameters are allowlisted (§3.2) so a copied URL cannot override the parsed target or credentials.
 
 ---
 
@@ -56,7 +56,7 @@ Run the connection-setup block below **in Terminal 1's shell** (the shell that w
 
 - The connection URL exists **only** inside the pipeline and the mode-`0600` file. It is never assigned to a shell variable, never passed as a command argument, never exported into the environment, and never echoed — so nothing can leak via `ps`, child-process environments, shell history, or `set -x` trace output (the setup block performs **no credential-bearing assignment or command substitution**, so xtrace cannot expand it; `set -x` may be on and no credential byte is traced).
 - `mktemp` creates the file with mode `0600`; the trap removes it on normal exit, abort, or Ctrl-C (`EXIT`/`INT`/`TERM` — an interrupt cleans up and stops the procedure with exit 130). Do not remove the trap. Never `cat`, `echo`, edit, or copy the service file (including into evidence artifacts) — reference it by path only.
-- The pipeline is **fail-closed on every stage** (`set -o pipefail`): a `kubectl`/`base64` failure aborts even when python3 would succeed, and an empty value (secret present, key absent) is caught by the size check as a second layer. The converter parses in-process (strips a `jdbc:` prefix, percent-decodes, validates host/database/port), emits the stanza only to the `0600` file, prints nothing else, and exits non-zero on empty, multi-line, or unparseable input. Abort messages never contain credential material.
+- The pipeline is **fail-closed on every stage** (`set -o pipefail`): a `kubectl`/`base64` failure aborts even when python3 would succeed, and an empty value (secret present, key absent) is caught by the size check as a second layer. The converter parses in-process (strips a `jdbc:` prefix, percent-decodes, validates host/database/port), emits the stanza only to the `0600` file, prints nothing else, and exits non-zero on empty, control-character-bearing, or unparseable input. Because libpq reads the service file **line by line**, every **decoded** component — database, username, password, and each query value — is rejected when it contains an ASCII control character (NUL/TAB/LF/CR/DEL/…): percent-encoded `%0A`/`%0D` therefore cannot split a value into extra service-file lines or directives. Query parameters are **allowlisted** to `sslmode` (value-validated), `connect_timeout`, and `application_name`; any other key — `host`, `hostaddr`, `port`, `dbname`, `user`, `password`, `service`, `servicefile`, `ssl`, or anything unknown — is rejected, as are duplicate or keyless pairs, so a copied URL can never override the parsed target/credentials or inject a nested service. Abort messages never contain credential material.
 - The file is read by libpq **at connect time**: an open session keeps working if the file is later removed, but new connections fail after the setup shell exits — if that happens early, re-run the setup block (it prints a fresh path).
 
 ```bash
@@ -81,35 +81,56 @@ from urllib.parse import urlsplit, unquote
 
 SERVICE = sys.argv[1]                     # static section name — not a credential
 raw = sys.stdin.read().strip()            # credential URL — never echoed
-if not raw or not re.fullmatch(r"[A-Za-z0-9_]+", SERVICE) or any(c in raw for c in "\r\n"):
-    sys.exit(2)                           # empty, multi-line, or bad service name => fail closed
+
+def has_ctrl(value):                      # any ASCII control char (NUL/TAB/LF/CR/DEL/...)?
+    return any(ord(c) <= 31 or ord(c) == 127 for c in value)
+
+if not raw or not re.fullmatch(r"[A-Za-z0-9_]+", SERVICE) or has_ctrl(raw):
+    sys.exit(2)                           # empty, control chars, or bad service name => fail closed
 if raw.startswith("jdbc:"):               # JDBC form "jdbc:postgresql://..." accepted
     raw = raw[len("jdbc:"):]
 if not raw.startswith(("postgresql://", "postgres://")):
     sys.exit(2)
+
+# Query params are allowlisted to connection-quality options only. Every other key —
+# host, hostaddr, port, dbname, user, password, service, servicefile, ssl, or an
+# unknown name — is rejected, so a copied URL can never override the target host,
+# port, database or credentials parsed from the authority/path, or reach a nested
+# service definition. Values are re-checked after percent-decoding.
+SAFE_QUERY = {"sslmode", "connect_timeout", "application_name"}
+SSLMODES = ("disable", "allow", "prefer", "require", "verify-ca", "verify-full")
+
 try:
     u = urlsplit(raw)
     host = (u.hostname or "").lower()     # hostname() unbrackets IPv6 + lowercases; "" when absent
-    if not host or u.path.count("/") != 1:
+    if not host or has_ctrl(host) or u.path.count("/") != 1:
         sys.exit(2)
     db = unquote(u.path[1:])              # database = the single path segment (percent-decoded)
-    if not db:
+    if not db or has_ctrl(db):            # a decoded %0A/%0D must never reach the service file
         sys.exit(2)
     port = u.port                         # None when absent; raises ValueError when non-numeric
     if port is not None and not (0 < port <= 65535):
         sys.exit(2)
     user = unquote(u.username) if u.username is not None else None
     password = unquote(u.password) if u.password is not None else None
-    params = []                           # URI query params map 1:1 to libpq conninfo keywords
+    if (user is not None and has_ctrl(user)) or (password is not None and has_ctrl(password)):
+        sys.exit(2)                       # decoded control char in a credential => fail closed
+    params = []                           # safe, decoded, duplicate-free allowlisted params
     if u.query:
         for kv in u.query.split("&"):
             if not kv:
                 sys.exit(2)
             key, sep, value = kv.partition("=")
-            if not sep or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key) \
-               or any(key.lower() == done.lower() for done, _ in params):
+            if not sep or key not in SAFE_QUERY or any(key == done for done, _ in params):
+                sys.exit(2)               # unknown/overriding/conflicting/duplicate key => fail closed
+            value = unquote(value)
+            if key == "sslmode" and value not in SSLMODES:
                 sys.exit(2)
-            params.append((key, unquote(value)))
+            if key == "connect_timeout" and not re.fullmatch(r"[0-9]{1,5}", value):
+                sys.exit(2)
+            if has_ctrl(value):           # decoded %0A/%0D in a query value => fail closed
+                sys.exit(2)
+            params.append((key, value))
 except ValueError:                        # unparseable URL or port => fail closed
     sys.exit(2)
 
@@ -195,7 +216,7 @@ pg_dump --format=custom --no-owner --no-privileges \
 
 ### 4.1 Candidate connection setup
 
-Same credential-safe mechanism as §3.2: the admin connection string exists ONLY inside mode-0600 temporary files removed by the trap (exit/abort/Ctrl-C — an interrupt cleans up and stops with exit 130). It is typed into the editor — never pasted as a shell argument, never exported, never echoed — so it cannot leak via history, argv, the environment, or `set -x`. Requires bash (pipefail), python3 (§3.1) and `$EDITOR` set.
+Same credential-safe mechanism as §3.2: the admin connection string exists ONLY inside mode-0600 temporary files removed by the trap (exit/abort/Ctrl-C — an interrupt cleans up and stops with exit 130). It is typed into the editor — never pasted as a shell argument, never exported, never echoed — so it cannot leak via history, argv, the environment, or `set -x`. The embedded converter is the **same program** as §3.2 (only the service name and stdin source differ): it rejects decoded control characters and applies the same query-param allowlist, so a mistyped or hostile candidate URL fails closed identically. Requires bash (pipefail), python3 (§3.1) and `$EDITOR` set.
 
 ```bash
 CAND_URL_FILE="$(mktemp)"
@@ -213,35 +234,56 @@ from urllib.parse import urlsplit, unquote
 
 SERVICE = sys.argv[1]                     # static section name — not a credential
 raw = sys.stdin.read().strip()            # credential URL — never echoed
-if not raw or not re.fullmatch(r"[A-Za-z0-9_]+", SERVICE) or any(c in raw for c in "\r\n"):
-    sys.exit(2)                           # empty, multi-line, or bad service name => fail closed
+
+def has_ctrl(value):                      # any ASCII control char (NUL/TAB/LF/CR/DEL/...)?
+    return any(ord(c) <= 31 or ord(c) == 127 for c in value)
+
+if not raw or not re.fullmatch(r"[A-Za-z0-9_]+", SERVICE) or has_ctrl(raw):
+    sys.exit(2)                           # empty, control chars, or bad service name => fail closed
 if raw.startswith("jdbc:"):               # JDBC form "jdbc:postgresql://..." accepted
     raw = raw[len("jdbc:"):]
 if not raw.startswith(("postgresql://", "postgres://")):
     sys.exit(2)
+
+# Query params are allowlisted to connection-quality options only. Every other key —
+# host, hostaddr, port, dbname, user, password, service, servicefile, ssl, or an
+# unknown name — is rejected, so a copied URL can never override the target host,
+# port, database or credentials parsed from the authority/path, or reach a nested
+# service definition. Values are re-checked after percent-decoding.
+SAFE_QUERY = {"sslmode", "connect_timeout", "application_name"}
+SSLMODES = ("disable", "allow", "prefer", "require", "verify-ca", "verify-full")
+
 try:
     u = urlsplit(raw)
     host = (u.hostname or "").lower()     # hostname() unbrackets IPv6 + lowercases; "" when absent
-    if not host or u.path.count("/") != 1:
+    if not host or has_ctrl(host) or u.path.count("/") != 1:
         sys.exit(2)
     db = unquote(u.path[1:])              # database = the single path segment (percent-decoded)
-    if not db:
+    if not db or has_ctrl(db):            # a decoded %0A/%0D must never reach the service file
         sys.exit(2)
     port = u.port                         # None when absent; raises ValueError when non-numeric
     if port is not None and not (0 < port <= 65535):
         sys.exit(2)
     user = unquote(u.username) if u.username is not None else None
     password = unquote(u.password) if u.password is not None else None
-    params = []                           # URI query params map 1:1 to libpq conninfo keywords
+    if (user is not None and has_ctrl(user)) or (password is not None and has_ctrl(password)):
+        sys.exit(2)                       # decoded control char in a credential => fail closed
+    params = []                           # safe, decoded, duplicate-free allowlisted params
     if u.query:
         for kv in u.query.split("&"):
             if not kv:
                 sys.exit(2)
             key, sep, value = kv.partition("=")
-            if not sep or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key) \
-               or any(key.lower() == done.lower() for done, _ in params):
+            if not sep or key not in SAFE_QUERY or any(key == done for done, _ in params):
+                sys.exit(2)               # unknown/overriding/conflicting/duplicate key => fail closed
+            value = unquote(value)
+            if key == "sslmode" and value not in SSLMODES:
                 sys.exit(2)
-            params.append((key, unquote(value)))
+            if key == "connect_timeout" and not re.fullmatch(r"[0-9]{1,5}", value):
+                sys.exit(2)
+            if has_ctrl(value):           # decoded %0A/%0D in a query value => fail closed
+                sys.exit(2)
+            params.append((key, value))
 except ValueError:                        # unparseable URL or port => fail closed
     sys.exit(2)
 
