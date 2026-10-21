@@ -86,6 +86,11 @@ describe('ResetPassword page', () => {
     create({ token: 'the-token' });
     await fixture.whenStable();
     fixture.detectChanges();
+    // Deterministic precondition: other spec files share the worker's jsdom
+    // localStorage (app-shell/header seed `yacc_token`); this assertion is
+    // "the reset flow issues no session" — anchor it by starting from a clean
+    // storage instead of depending on cross-file execution order.
+    localStorage.removeItem('yacc_token');
     vi.useFakeTimers();
 
     setInput('[data-testid="reset-password-input"]', 'new-secret-1');
@@ -102,7 +107,9 @@ describe('ResetPassword page', () => {
       'Password reset successful! Redirecting to login...'
     );
 
-    vi.advanceTimersByTime(2000);
+    // Async advance drains the microtasks chained after the redirect timer
+    // (the sync variant leaves promise continuations unrun under CI load).
+    await vi.advanceTimersByTimeAsync(2000);
     await fixture.whenStable();
     fixture.detectChanges();
     expect(router.navigateByUrl).toHaveBeenCalledWith('/login');
