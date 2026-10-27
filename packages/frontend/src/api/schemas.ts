@@ -5,7 +5,7 @@
  * types in `../api/contract/rest-api.gen.ts` (generated from the frozen
  * `.docs/migration/openapi.yaml`). The generated types are the single
  * contract source — this module adds runtime validation only and re-derives
- * no shape of its own, so wire-shape drift fails `pnpm type-check`.
+ * no shape of its own, so wire-shape drift fails `npm run type-check`.
  *
  * ADR-023 supersedes ADR-020: `@yacc/common` Zod is never imported here and
  * no hand-declared interface backs these schemas.

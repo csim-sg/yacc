@@ -14,7 +14,7 @@ const outFile = path.join(distDir, 'index.js');
 async function main(): Promise<void> {
   if (!fs.existsSync(distTmpEntry)) {
     throw new Error(
-      `Expected compiled entry at ${distTmpEntry}. Run "pnpm run build:tsc" first.`,
+      `Expected compiled entry at ${distTmpEntry}. Run "npm run build:tsc" first.`,
     );
   }
 

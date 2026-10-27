@@ -191,13 +191,13 @@ start_dev_server() {
     
     if [ ! -d "node_modules" ]; then
         print_warning "node_modules not found in backend - installing..."
-        pnpm install
+        npm install
     fi
     
     # Check if TypeScript is built
     if [ ! -d "dist" ]; then
         print_info "Building TypeScript..."
-        pnpm build
+        npm run build
     fi
     
     print_info "Starting dev server on port $PORT..."
@@ -208,7 +208,7 @@ start_dev_server() {
     export PORT="$PORT"
     
     # Use ts-node for development (faster than build + run)
-    pnpm dev
+    npm run dev
 }
 
 # ============================================================================

@@ -106,7 +106,6 @@ export default [
               'playwright.config.ts',
               'drizzle.config.ts',
               'eslint.config.js',
-              'turbo.json',
               '.eslintignore',
               'tsconfig.json',
               'jest.config.ts',

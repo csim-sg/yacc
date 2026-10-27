@@ -9,7 +9,7 @@ on:
       - '.github/workflows/lint.yml'
       - '.github/workflows/tests.yml'
       - 'eslint.config.js'
-      - 'pnpm-lock.yaml'
+      - 'package-lock.json'
   pull_request:
     branches: [dev, master]
     paths:
@@ -18,7 +18,7 @@ on:
       - '.github/workflows/lint.yml'
       - '.github/workflows/tests.yml'
       - 'eslint.config.js'
-      - 'pnpm-lock.yaml'
+      - 'package-lock.json'
 
 jobs:
   # Compute changed files in packages/backend for linting
@@ -73,19 +73,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9.0.0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Lint changed backend files
         if: needs.changed-files.outputs.backend-files != ''
@@ -133,22 +128,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9.0.0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Run backend unit tests (curated stable subset)
-        run: pnpm --filter @yacc/backend test src/services/__tests__/irc-ingestion.service.test.ts
+        run: npm run test -w @yacc/backend -- src/services/__tests__/irc-ingestion.service.test.ts
         env:
           DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
           REDIS_HOST: localhost
@@ -191,22 +181,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9.0.0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Run backend smoke tests (integration test with Supertest against in-process backend)
-        run: pnpm --filter @yacc/backend test tests/QA-001-integration.spec.ts
+        run: npm run test -w @yacc/backend -- tests/QA-001-integration.spec.ts
         env:
           DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
           REDIS_HOST: localhost
@@ -252,23 +237,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9.0.0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Run full backend test suite
         continue-on-error: true
-        run: pnpm --filter @yacc/backend test
+        run: npm run test -w @yacc/backend
         env:
           DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
           REDIS_HOST: localhost

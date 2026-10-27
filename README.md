@@ -1,356 +1,97 @@
-# YACC - Yet Another Chat Client
+# YACC — Yet Another Chat Client
 
-A single-tenant, cloud-hosted omni-channel social inbox that unifies Telegram, IRC, and other social platforms into one workflow. The MVP focuses on unified inbox operations, role-based access, and extensible connector integrations built with React + TanStack Start + Express.
+**One shared inbox for customer conversations, wherever they start.**
 
-**Status**: ✅ Monorepo setup complete | 🚀 Ready for Phase 1 implementation
+YACC is a self-hosted customer support platform for organisations that want to bring messages from different channels into one place. It aims to help a team manage conversations together, track customer requests as tickets, and connect support work with customer information.
 
----
+## Who is YACC for?
 
-## 🚀 Quick Start (5 minutes)
+YACC is intended for organisations and support teams that receive customer messages across multiple channels and want a shared way to manage them. It is designed to be hosted by the organisation or its chosen operator, rather than requiring a hosted service. Hosting also means the operator is responsible for deployment, maintenance, backups, security, and any channel-provider accounts or fees.
 
-### Prerequisites
+## What YACC aims to provide
 
-```bash
-# Node.js v20+ (required for tooling; lint, test, build)
-# v18 may work for runtime but v20+ recommended for CI/CD
-node --version
+- **A shared inbox:** bring customer conversations together so a team can see and respond to messages without managing each channel separately.
+- **Channel choice:** target IRC, webchat, WhatsApp, social chat, and Telegram. Specific social platforms and provider requirements have not been defined here.
+- **Ticket management:** track customer requests through a support workflow, in the spirit of a help desk such as Zendesk.
+- **Customer context:** integrate with an organisation’s internal customer relationship management (CRM) system, with a simple built-in CRM also envisioned.
+- **Team coordination:** use assignments, routing rules, notifications, search, and role-based access to organise support work.
+- **Accountability:** retain an audit trail of relevant activity.
 
-# pnpm v9 (if not installed: npm install -g pnpm@9)
-pnpm --version
+For example, a customer might contact a team through webchat; the team would handle the conversation in the shared inbox, track the request as a ticket, and use customer context to help with follow-up. This is an illustration of the intended workflow, not a statement that the complete workflow is available today.
 
-# Docker (for local database/services)
-docker --version
-```
+## Before evaluating or deploying
 
-### Installation & Setup
+The capabilities and channels above describe the **product direction**, not a guarantee of availability or production readiness. CRM integration, the built-in CRM, ticketing details, and individual channel support need to be confirmed against the current implementation before planning a deployment. See the [execution status index](.docs/plans/00-INDEX.md) and [product specification](.docs/01-product-specification.md); the specification may not yet reflect the complete direction described here.
 
-```bash
-# 1. Clone repository
-git clone https://github.com/antpolis/yacc-client.git
-cd yacc-client
+## For developers and operators
 
-# 2. Install dependencies (all workspaces)
-pnpm install
+### Target technology
 
-# 3. Start local services (PostgreSQL, Redis, Mailhog)
-docker-compose up -d
+- **Frontend:** Angular 21, standalone components, Signals, Angular Router, HttpClient, RxJS, Tailwind CSS and daisyUI. The accepted frontend design specifies a single Socket.io client service for real-time events; see the [frontend architecture](.docs/architecture/005-angular-target-frontend-architecture.md).
+- **Backend:** Java 25 LTS and Spring Boot, Spring Security and embedded authorization server, PostgreSQL with Spring Data JPA and Flyway, Quartz and a database-backed dead-letter queue. Real-time transport is raw Spring WebSocket; see the [backend guardrails](.docs/architecture/004-java-backend-guardrails.md).
+- **Contracts:** [OpenAPI, AsyncAPI and schemas](.docs/migration/) define the backend wire contracts. The Angular app maintains its own local typed contracts.
+- **Deployment:** Docker Compose is the intended deployment approach. The existing [Compose configuration](docker-compose.yml) provides local supporting services; a complete application deployment configuration is not yet established here.
 
-# 4. Setup environment files
-cp packages/backend/.env.example packages/backend/.env
-cp packages/frontend/.env.example packages/frontend/.env
+**Real-time integration constraint:** the accepted frontend architecture specifies Socket.io, whereas the backend architecture specifies raw WebSocket. These protocols are not interchangeable. Do not assume end-to-end real-time compatibility without an explicit resolution and verification.
 
-# 5. Start development servers (all packages)
-pnpm dev
+### Project layout
 
-# 6. Open in browser
-# Frontend: http://localhost:5173
-# Backend:  http://localhost:3000/api
-# Mailhog:  http://localhost:1025 (email testing)
-```
+- [`packages/frontend-angular/`](packages/frontend-angular/) — Angular frontend and [frontend-specific commands](packages/frontend-angular/README.md).
+- [`services/backend-java/`](services/backend-java/) — Spring Boot backend.
+- [`docker-compose.yml`](docker-compose.yml) — local supporting services; Docker Compose is the intended deployment approach.
+- [`.docs/`](.docs/) — product, architecture, contracts, testing and operational documentation.
 
-### Package Manager: pnpm
+## Development
 
-This project uses **pnpm** for monorepo management with workspaces. pnpm offers:
-
-- ✅ **Faster**: 2-3x faster than npm
-- ✅ **Disk efficient**: Content-addressable storage (symlinks)
-- ✅ **Strict mode**: Prevents phantom dependencies
-- ✅ **Monorepo support**: Native workspace integration
-
-All commands in this README use `pnpm`. If you don't have it:
+Target prerequisites: Node.js 24 LTS with npm, Java 25 LTS, and Docker with Compose. Runtime compatibility with these targets must be verified against the build configuration and CI.
 
 ```bash
-npm install -g pnpm@9
+git clone https://github.com/csim-sg/yacc.git
+cd yacc
+npm install
+docker compose up -d
+npm run dev --workspace @yacc/frontend-angular  # http://localhost:4200
 ```
 
----
+Compose starts PostgreSQL (`yacc_inbox`, port 5432) and Mailhog (SMTP port 1025, web UI <http://localhost:8025>). Configure the frontend's API and real-time endpoints as described in its [README](packages/frontend-angular/README.md).
 
-## 📦 Project Structure
+### Backend startup
 
-```
-yacc-client/
-├── packages/
-│   ├── common/          # Shared types, schemas, constants, utils
-│   ├── backend/         # Express API server
-│   │   ├── src/
-│   │   │   ├── api/            (controllers, routes)
-│   │   │   ├── domain/         (services, business logic)
-│   │   │   ├── connectors/     (Telegram, IRC)
-│   │   │   ├── infrastructure/ (database, queue, storage)
-│   │   │   └── config/
-│   │   └── Dockerfile
-│   │
-│   └── frontend/        # React SPA
-│       ├── src/
-│       │   ├── components/
-│       │   ├── pages/
-│       │   ├── stores/      (Zustand state)
-│       │   ├── services/    (API clients)
-│       │   └── hooks/
-│       ├── public/
-│       └── vite.config.ts
-│
-├── .github/
-│   └── workflows/       # CI/CD (GitHub Actions)
-│       ├── lint.yml
-│       ├── tests.yml
-│       ├── backend-deploy.yml
-│       └── frontend-deploy.yml
-│
-├── .docs/              # Product specs & detailed docs
-├── docker-compose.yml  # Local dev environment
-├── turbo.json          # Monorepo task orchestration
-└── pnpm-workspace.yaml # Workspace configuration
-```
+The backend defaults to PostgreSQL at `localhost:5432/yacc_inbox`; Flyway manages the schema. Supply the authentication signing key, integration encryption key and first-run bootstrap credentials described in [`application.yml`](services/backend-java/src/main/resources/application.yml). Keep credentials out of version control.
 
----
-
-## 💡 Common Commands
-
-### Development
-```bash
-pnpm dev              # Start all servers (frontend + backend)
-pnpm dev --filter @yacc/backend   # Backend only
-pnpm dev --filter @yacc/frontend  # Frontend only
-```
-
-### Building
-```bash
-pnpm build            # Build all packages
-pnpm build --filter @yacc/frontend  # Frontend only
-```
-
-### Testing & Quality
-```bash
-pnpm test             # Run all tests
-pnpm test --filter @yacc/frontend   # Frontend E2E tests
-pnpm lint             # Lint code
-pnpm type-check       # TypeScript type checking
-```
-
-### Database
-```bash
-pnpm db:migrate       # Run migrations
-pnpm db:seed          # Add test data
-```
-
-### Cleanup
-```bash
-pnpm clean            # Remove build artifacts
-```
-
----
-
-## 📝 Before Committing
-
-**Checklist:**
-```bash
-pnpm lint:fix         # Fix linting issues
-pnpm type-check       # Check TypeScript
-pnpm test:unit        # Run tests
-git add .
-git commit -m "feat(backend): add new endpoint"
-```
-
-**Commit Format:**
-```
-feat(backend):      new feature
-fix(frontend):      bug fix
-docs:               documentation
-refactor(backend):  code cleanup
-test(frontend):     add tests
-```
-
----
-
-## 🔍 Debugging
-
-### Backend
-```bash
-NODE_OPTIONS=--inspect pnpm dev --filter @yacc/backend
-# Then open chrome://inspect in Chrome
-```
-
-### Frontend
-```bash
-pnpm dev --filter @yacc/frontend
-# Use browser DevTools (F12 → Sources)
-```
-
-### Database
-```bash
-psql -U yacc_user -d yacc_db -h localhost
-docker-compose logs -f postgres
-```
-
----
-
-## 📊 Useful Links
-
-| Resource | URL |
-|----------|-----|
-| **Frontend** | http://localhost:5173 |
-| **Backend API** | http://localhost:3000/api |
-| **Email UI (Mailhog)** | http://localhost:8025 |
-
----
-
-## ❓ Troubleshooting
-
-### Port 3000/5173 already in use
-```bash
-lsof -i :3000
-kill -9 <PID>
-```
-
-### PostgreSQL won't connect
-```bash
-docker-compose ps
-docker-compose restart postgres
-docker-compose logs -f postgres
-```
-
-### "Cannot find module" error
-```bash
-pnpm install
-pnpm store prune
-```
-
-### TypeScript errors in IDE
-```
-Ctrl+Shift+P → "Developer: Reload Window" (in VSCode)
-```
-
----
-
-## 🛠️ pnpm Monorepo Commands
+The PostgreSQL JDBC driver is currently declared as a test-only runtime dependency in [`build.gradle.kts`](services/backend-java/build.gradle.kts), so plain `bootRun` may fail without a driver on the runtime classpath. The [baseline runbook](.docs/runbooks/react-e2e-baseline-capture.md) records a local boot method and the necessary configuration. Once those prerequisites are supplied:
 
 ```bash
-# Install dependencies (all packages)
-pnpm install
-
-# Add package to root (dev dependency)
-pnpm add -w -D eslint
-
-# Add package to specific package
-pnpm add axios --filter=backend
-
-# Run script in specific package
-pnpm -F backend test
-
-# Run script in all packages
-pnpm -r test
-
-# List all workspaces
-pnpm ls --depth=-1
+cd services/backend-java
+./gradlew --no-daemon bootRun  # default port 8080
 ```
 
----
+## Build and test
 
-## 🚀 Deployment
-
-### Backend to VPS
 ```bash
-# Automatic on push to main
-# Uses .github/workflows/backend-deploy.yml
-# Builds Docker image → Pushes to registry → SSH deploy to VPS
+npm run build --workspace @yacc/frontend-angular
+npm run test:unit --workspace @yacc/frontend-angular
+npm run test:e2e --workspace @yacc/frontend-angular
+
+cd services/backend-java
+./gradlew --no-daemon test
+./gradlew --no-daemon contractTest
+./gradlew --no-daemon check
 ```
 
-### Frontend to AWS S3
-```bash
-# Automatic on push to main
-# Uses .github/workflows/frontend-deploy.yml
-# Builds React app → Uploads to S3 → Invalidates CloudFront
-```
+Java integration tests may require Docker. Frontend E2E tests require a configured test environment; see the [frontend parity guide](packages/frontend-angular/PARITY.md) and [testing strategy](.docs/04-qa-and-testing.md).
 
-**Required GitHub Secrets** (in Settings → Secrets):
-- Backend: `DOCKER_REGISTRY`, `DOCKER_USERNAME`, `DOCKER_PASSWORD`, `VPS_SSH_HOST`, `VPS_SSH_USER`, `VPS_SSH_KEY`
-- Frontend: `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_CLOUDFRONT_DISTRIBUTION_ID`
+## Documentation and contribution
 
----
+- [Agent context and guardrails](AGENTS.md)
+- [Product specification](.docs/01-product-specification.md)
+- [Angular frontend architecture](.docs/architecture/005-angular-target-frontend-architecture.md)
+- [Java backend guardrails](.docs/architecture/004-java-backend-guardrails.md)
+- [Architecture decisions](.docs/adr/)
+- [Testing strategy](.docs/04-qa-and-testing.md)
 
-## 💡 Tips & Tricks
+Follow the applicable architecture guardrails, add tests for changes, and update relevant documentation. Pull requests target `dev`; see [AGENTS.md](AGENTS.md) for the delivery workflow.
 
-1. **Faster builds:** Turborepo caches results. Unchanged packages don't rebuild.
-2. **IDE autocomplete:** Make sure TypeScript is selected as language in VSCode.
-3. **Hot reload:** Both backend and frontend support hot reloading.
-4. **Parallel execution:** Turbo runs tasks in parallel when possible.
-5. **Dry run:** `pnpm dev --dry` shows what Turbo will execute without running.
+## License
 
----
-
-## 📚 Documentation
-
-### Quick Start
-- **This file (README.md)** - Getting started guide
-- **AGENTS.md** - Team roles and responsibilities
-
-### Architecture & Design
-- **ARCHITECTURE_AND_IMPLEMENTATION.md** - System architecture, technical decisions, and data flows
-- **DEVELOPMENT.md** - Detailed local setup guide
-
-### Product & API
-- **.docs/01-product-specification.md** - Features, user stories, acceptance criteria
-- **.docs/02-api-and-data-model.md** - API contract and database schema
-- **.docs/04-qa-and-testing.md** - Testing strategy and test cases
-- **.docs/05-quick-reference.md** - One-page MVP summary
-
----
-
-## 🤝 Contributing
-
-### Development Workflow
-1. Clone the repository
-2. Run `pnpm install`
-3. Create a feature branch: `git checkout -b feature/your-feature`
-4. Make changes and commit: `git commit -m "feat: description"`
-5. Push to your fork and create a Pull Request
-
-### Code Standards
-- Use TypeScript for all new code
-- Follow the monorepo structure (common for shared code)
-- Run `pnpm lint` before committing
-- Add tests for new features
-- Update documentation as needed
-
-### Setting Up Local Development
-```bash
-# Start all services
-docker-compose up -d
-
-# Start development
-pnpm dev
-```
-
-See [AGENTS.md](./AGENTS.md) for role-specific guidelines.
-
----
-
-## 📋 Tech Stack
-
-### Frontend
-- **Framework**: React 18 + TanStack Start (SPA)
-- **State**: Zustand + TanStack Query
-- **Real-time**: Socket.io client
-- **Styling**: Tailwind CSS
-- **Deployment**: AWS S3 + CloudFront
-
-### Backend
-- **Runtime**: Node.js 20+ (for tooling: linting, testing, building; v18 may work for production)
-- **Framework**: Express
-- **Auth**: BetterAuth
-- **Database**: PostgreSQL + Drizzle ORM
-- **Real-time**: Socket.io
-- **Queue**: Redis + BullMQ (message retry)
-- **Storage**: AWS S3 / Cloudflare R2
-- **Testing**: Jest + Playwright
-
-### Local Development
-- **Package Manager**: pnpm
-- **Build Tool**: Turborepo
-- **Containerization**: Docker + Docker Compose
-
----
-
-## 📄 License
-MIT — see `LICENSE`
+MIT — see [LICENSE](LICENSE).
