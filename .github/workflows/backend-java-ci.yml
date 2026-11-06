@@ -170,8 +170,57 @@ jobs:
             --values "$CHART_PATH/values-staging.yaml" \
             --set image.registry="$REGISTRY" \
             --set image.repository="$IMAGE_NAME" \
-            --set image.tag="$IMAGE_TAG" > /dev/null
+            --set image.tag="$IMAGE_TAG" > "$RUNNER_TEMP/rendered.yaml"
+
+          # TM-003 (#446): the rendered environment must match the exact env
+          # names the Spring service reads (application.yml). Secret-sourced
+          # names appear as Deployment `env:` entries; ConfigMap-sourced names
+          # appear as `envFrom` data keys. Matching anchors the full name
+          # (line end / colon) so a YACC_-prefixed name can never satisfy a
+          # legacy check or vice versa. Offline and deterministic: grep over
+          # this single rendered stream — no cluster, no network, no secrets.
+          RENDER="$RUNNER_TEMP/rendered.yaml"
+          REQUIRED_ENV_NAMES=(
+            DATABASE_URL
+            YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL
+            YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL
+            RECOVERY_MODE
+            RECOVERY_KEY
+            YACC_RECOVERY_KEY_HASH
+            YACC_AUTH_TOKEN_SIGNING_KEY
+            YACC_INTEGRATION_ENCRYPTION_MASTER_KEY
+            YACC_AUTH_AS_ISSUER
+            YACC_AUTH_EMAIL_PROVIDER
+            YACC_AUTH_EMAIL_FROM
+            YACC_AUTH_EMAIL_SENDGRID_API_KEY
+            YACC_AUTH_EMAIL_BASE_URL
+            YACC_REALTIME_WS_ALLOWED_ORIGINS
+          )
+          LEGACY_ENV_NAMES=(
+            BOOTSTRAP_SUPER_ADMIN_EMAIL
+            BOOTSTRAP_SUPER_ADMIN_PASSWORD
+            SENDGRID_API_KEY
+          )
+          gate_failed=0
+          for name in "${REQUIRED_ENV_NAMES[@]}"; do
+            if ! grep -Eq "^[[:space:]]*- name: ${name}[[:space:]]*$" "$RENDER" \
+              && ! grep -Eq "^[[:space:]]*${name}:" "$RENDER"; then
+              echo "::error::rendered chart is missing required env name: ${name}"
+              gate_failed=1
+            fi
+          done
+          for name in "${LEGACY_ENV_NAMES[@]}"; do
+            if grep -Eq "^[[:space:]]*- name: ${name}[[:space:]]*$" "$RENDER" \
+              || grep -Eq "^[[:space:]]*${name}:" "$RENDER"; then
+              echo "::error::legacy mismatched env name present in rendered chart: ${name}"
+              gate_failed=1
+            fi
+          done
+          if [ "$gate_failed" -ne 0 ]; then
+            exit 1
+          fi
           echo "Helm chart lint + template OK (image ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG})"
+          echo "Rendered env contract OK: ${#REQUIRED_ENV_NAMES[@]} required env names present, no legacy names."
 
   # ------------------------------------------------------------------
   # Deploy: Helm upgrade to the K3s staging cluster (ADR-019) on dev.

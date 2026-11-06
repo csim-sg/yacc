@@ -47,13 +47,16 @@ spec:
                   key: DATABASE_URL
             # Spring auth + recovery secrets (ADR-025 bootstrap/recovery; ADR-029).
             # POC JWT_SECRET / BETTER_AUTH_SECRET / REDIS_URL are decommissioned.
-            - name: BOOTSTRAP_SUPER_ADMIN_EMAIL
+            # Env names are the exact keys application.yml reads (TM-003, #446) —
+            # BOOTSTRAP_SUPER_ADMIN_EMAIL / BOOTSTRAP_SUPER_ADMIN_PASSWORD /
+            # SENDGRID_API_KEY were legacy names Spring never read (fail-closed).
+            - name: YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.bootstrap.existingSecret }}
                   key: {{ .Values.secrets.bootstrap.superAdminEmailKey }}
                   optional: true
-            - name: BOOTSTRAP_SUPER_ADMIN_PASSWORD
+            - name: YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.bootstrap.existingSecret }}
@@ -70,6 +73,29 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.recovery.existingSecret }}
                   key: {{ .Values.secrets.recovery.keyKey }}
+                  optional: true
+            - name: YACC_RECOVERY_KEY_HASH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.recovery.existingSecret }}
+                  key: {{ .Values.secrets.recovery.keyHashKey }}
+                  optional: true
+            # RS256 token signing key — one source for the embedded OIDC AS and
+            # the resource server (MIG-030/MIG-033, ADR-025). JwtTokenService
+            # fails startup when absent, so a missing secret fails closed.
+            - name: YACC_AUTH_TOKEN_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.auth.existingSecret }}
+                  key: {{ .Values.secrets.auth.signingKeyKey }}
+                  optional: true
+            # AES-256-GCM integration credential master key (ADR-027).
+            # EncryptionService fails startup when absent — fail-closed.
+            - name: YACC_INTEGRATION_ENCRYPTION_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.integrations.existingSecret }}
+                  key: {{ .Values.secrets.integrations.encryptionMasterKeyKey }}
                   optional: true
             - name: CLOUDFLARE_R2_ENDPOINT
               valueFrom:
@@ -95,11 +121,13 @@ spec:
                   name: yacc-backend-secrets
                   key: R2_BUCKET_NAME
                   optional: true
-            - name: SENDGRID_API_KEY
+            # SendGrid auth-email API key (MIG-031); read only when the provider
+            # is sendgrid (YACC_AUTH_EMAIL_PROVIDER from the ConfigMap).
+            - name: YACC_AUTH_EMAIL_SENDGRID_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: yacc-backend-secrets
-                  key: SENDGRID_API_KEY
+                  name: {{ .Values.secrets.email.existingSecret }}
+                  key: {{ .Values.secrets.email.sendgridApiKeyKey }}
                   optional: true
             - name: TELEGRAM_BOT_TOKEN
               valueFrom:
