@@ -221,13 +221,18 @@ class ConversationListQueryApiIntegrationTest extends AbstractApiIntegrationTest
         // Combined AND logic on contract-conformant filters (TC-003-005 /
         // HP-INBOX-006 / SMOKE-008) and the three-filter channel + assignee +
         // status intersection → total 0 (EDGE-INBOX-001). Status and assignee
-        // are load-bearing in that combination: dropping status or assignee
-        // each yields exactly 1 row, the full combination yields 0 (the
+        // are load-bearing in that combination: dropping status yields the
+        // pending telegram row and dropping assignee yields the open telegram
+        // row (each exactly 1), while the full combination yields 0 (the
         // channel member's load-bearing behavior is asserted by the two
         // channel-only queries above).
         assertThat(listedIds("?channel=telegram&assignedUserId=" + OTHER_MANAGER_ID, SUPER))
                 .containsExactly(tgPending);
         assertThat(listedIds("?channel=telegram&assignedUserId=" + MANAGER_ID, SUPER))
+                .containsExactly(tgOpenHighManager.getId().toString());
+        // Dropping the assignee member instead: the channel + status pair
+        // (lowercase label) proves the positive channel + status intersection.
+        assertThat(listedIds("?channel=telegram&status=open", SUPER))
                 .containsExactly(tgOpenHighManager.getId().toString());
         mockMvc.perform(get("/api/conversations?channel=telegram&assignedUserId="
                         + OTHER_MANAGER_ID + "&status=open")
