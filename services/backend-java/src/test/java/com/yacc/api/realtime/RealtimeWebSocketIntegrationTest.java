@@ -50,6 +50,11 @@ class RealtimeWebSocketIntegrationTest extends AbstractPostgresIntegrationTest {
 
     private static final String ACTIVE_USER_ID = "00000000-0000-0000-0000-00000000c050";
     private static final String INACTIVE_USER_ID = "00000000-0000-0000-0000-00000000c051";
+    private static final String SUSPENDED_USER_ID = "00000000-0000-0000-0000-00000000c052";
+    private static final String ROLE_SUPER_ID = "00000000-0000-0000-0000-00000000c060";
+    private static final String ROLE_ADMIN_ID = "00000000-0000-0000-0000-00000000c061";
+    private static final String ROLE_MANAGER_ID = "00000000-0000-0000-0000-00000000c062";
+    private static final String ROLE_USER_ID = "00000000-0000-0000-0000-00000000c063";
 
     @org.springframework.boot.test.web.server.LocalServerPort
     private int port;
@@ -64,8 +69,8 @@ class RealtimeWebSocketIntegrationTest extends AbstractPostgresIntegrationTest {
     private ObjectMapper mapper;
 
     /**
-     * Removes exactly the two smoke identities this class commits directly
-     * (see class javadoc — deliberately not {@code @Transactional}), so the
+     * Removes exactly the smoke identities this class commits directly (see
+     * class javadoc — deliberately not {@code @Transactional}), so the
      * shared test database does not carry this class's rows after it runs.
      * {@code DeterministicSeedIntegrationTest} asserts an exact
      * {@code hasSize(4)} against the same shared container; the order
@@ -76,7 +81,9 @@ class RealtimeWebSocketIntegrationTest extends AbstractPostgresIntegrationTest {
     @org.junit.jupiter.api.AfterAll
     static void removeCommittedSmokeIdentities(
             @org.springframework.beans.factory.annotation.Autowired com.yacc.repository.UserRepository users) {
-        users.deleteAllById(java.util.List.of(ACTIVE_USER_ID, INACTIVE_USER_ID));
+        users.deleteAllById(java.util.List.of(ACTIVE_USER_ID, INACTIVE_USER_ID,
+                SUSPENDED_USER_ID, ROLE_SUPER_ID, ROLE_ADMIN_ID, ROLE_MANAGER_ID,
+                ROLE_USER_ID));
     }
 
     @Test
@@ -123,6 +130,48 @@ class RealtimeWebSocketIntegrationTest extends AbstractPostgresIntegrationTest {
 
         assertThatThrownBy(() -> connect(new CollectingHandler(), token))
                 .isInstanceOf(Exception.class);
+    }
+
+    /**
+     * AC-11 status axis (issue #457): the suspended-identity counterpart of
+     * the inactive refusal, through the same full upgrade path — the
+     * handshake seam refuses the session before any WS op can be issued
+     * (WS-BHV-016).
+     */
+    @Test
+    void upgradeWithSuspendedIdentityTokenIsRefused() {
+        seedUser(SUSPENDED_USER_ID, UserStatus.SUSPENDED);
+        String token = accessToken(SUSPENDED_USER_ID);
+
+        assertThatThrownBy(() -> connect(new CollectingHandler(), token))
+                .isInstanceOf(Exception.class);
+    }
+
+    /**
+     * AC-11 role axis of the WS surface (issue #457): every active role is
+     * admitted by the handshake and reaches the established frame — the
+     * accepted model gates WS ops on authentication+status only, with no
+     * per-op role gate (matrix §4).
+     */
+    @Test
+    void upgradeAdmitsEveryActiveRole() throws Exception {
+        java.util.List<String> ids = java.util.List.of(ROLE_SUPER_ID, ROLE_ADMIN_ID,
+                ROLE_MANAGER_ID, ROLE_USER_ID);
+        java.util.List<UserRole> roles = java.util.List.of(UserRole.SUPER_ADMIN,
+                UserRole.ADMIN, UserRole.MANAGER, UserRole.USER);
+        for (int i = 0; i < ids.size(); i++) {
+            String id = ids.get(i);
+            users.save(new User(id, "ws-smoke-" + id + "@fixture.yacc.local",
+                    "WS Role " + roles.get(i).getLabel(), "smoke-has-no-login",
+                    roles.get(i), UserStatus.ACTIVE, false));
+        }
+        for (String id : ids) {
+            CollectingHandler handler = new CollectingHandler();
+            WebSocketSession session = connect(handler, accessToken(id));
+            assertThat(handler.nextFrame().get("event").asText())
+                    .isEqualTo("system.connection.established");
+            session.close();
+        }
     }
 
     private void seedUser(String id, UserStatus status) {
