@@ -231,8 +231,8 @@ jobs:
   # the sha-<sha> image is guaranteed published to ghcr.
   # Skips with a visible warning while KUBE_CONFIG_STAGING is not
   # configured, so CI stays green until ops wires cluster access; the
-  # deploy then runs and gates automatically. No rollback is automated
-  # (manual `helm rollback` per .docs/runbooks/helm-rollback.md).
+  # deploy then runs and gates automatically. No rollback is automated:
+  # recovery is roll-forward only (.docs/runbooks/helm-rollback.md).
   # ------------------------------------------------------------------
   deploy:
     name: deploy (Helm -> K3s staging)
@@ -333,6 +333,31 @@ jobs:
           echo "Liveness probe FAILED"
           exit 1
 
+      # Readiness gate, same bounded-retry shape as the liveness step above.
+      # /health/ready asserts application readiness ONLY (the ready group is
+      # readinessState-only, application.yml) — it is not a DB/dependency
+      # proof; the authenticated data-path evidence is pinned in
+      # .docs/runbooks/staging-api-evidence.md.
+      - name: Smoke health check (/health/ready)
+        if: steps.kube.outputs.configured == 'true'
+        run: |
+          # The liveness step leaves its port-forward bound to local 8080;
+          # free it so this step owns its own tunnel (no-op when none runs).
+          pkill -f "kubectl port-forward" || true
+          sleep 1
+          kubectl port-forward -n "$NAMESPACE" "svc/$RELEASE_NAME" 8080:8080 &
+          sleep 3
+          for i in {1..10}; do
+            if curl -sf http://localhost:8080/health/ready; then
+              echo "Readiness probe PASSED"
+              exit 0
+            fi
+            echo "Attempt $i/10 - waiting for readiness endpoint..."
+            sleep 3
+          done
+          echo "Readiness probe FAILED"
+          exit 1
+
       - name: Deploy summary
         if: steps.kube.outputs.configured == 'true'
         run: |
@@ -342,5 +367,5 @@ jobs:
             echo "- Release: \`$RELEASE_NAME\` in \`$NAMESPACE\`"
             echo "- Image: \`$REGISTRY/$IMAGE_NAME:$IMAGE_TAG\`"
             echo "- Commit: ${{ github.sha }}"
-            echo "- Rollback: manual \`helm rollback $RELEASE_NAME -n $NAMESPACE\` (.docs/runbooks/helm-rollback.md)"
+            echo "- Recovery: roll-forward only — see \`.docs/runbooks/helm-rollback.md\` (no rollback path; the Flyway schema is forward-only)"
           } >> "$GITHUB_STEP_SUMMARY"
