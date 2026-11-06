@@ -36,7 +36,7 @@
 ### 3.1 Pre-backup checks
 
 - [ ] `/health/live` and `/health/ready` return 200 (see [cutover-rehearsal.md](cutover-rehearsal.md) Step 2) — back up a healthy service.
-- [ ] PostgreSQL client tools at the **source server's major version or newer** — for this service that means `pg_dump`/`pg_restore`/`psql` **≥ 15** (preflight: `pg_dump --version`, `pg_restore --version`): `pg_dump` cannot dump from a server **newer** than its own major version (it refuses to even try), so 12–14 clients cannot dump from this service's PostgreSQL 15 source. `pg_export_snapshot()`, `pg_dump --snapshot`, and the `servicefile` connection parameter require these modern clients too.
+- [ ] PostgreSQL client tools pinned to the **source server's major version** — for this service `pg_dump`/`pg_restore`/`psql` **major 15** (preflight: `pg_dump --version`, `pg_restore --version`; record both and confirm major 15). PostgreSQL documents dump output as expected to load into servers of the **same or newer** major than the `pg_dump` tool and **not guaranteed** to load into an **older** major, so a tool **newer** than the source could produce an archive the §4.2 restore target — pinned to the same major as this source — is not guaranteed to load; "exactly the source major" removes that unsupported pair. In the other direction, `pg_dump` cannot dump from a server **newer** than its own major version (it refuses to even try), so pre-15 clients cannot dump from this service's PostgreSQL 15 source. `pg_export_snapshot()`, `pg_dump --snapshot`, and the `servicefile` connection parameter require these modern clients too.
 - [ ] Operator shell for the §3.2/§4.1 setup blocks is **`bash`** — the fail-closed retrieval pipelines use `set -o pipefail`, which POSIX `sh`/dash rejects (same requirement as P8 in [cutover-rehearsal.md](cutover-rehearsal.md)).
 - [ ] **`python3`** available (standard library only) — powers the §3.2/§4.1 in-process credential conversion (same tooling as P8 in [cutover-rehearsal.md](cutover-rehearsal.md)).
 - [ ] Target database is the intended one (check the current `DATABASE_URL` **host/database portion only**, without printing credentials).
@@ -326,13 +326,19 @@ sys.stdout.write("\n".join(lines) + "\n")  # the stanza goes ONLY to the 0600 fi
 Run in the **same shell** as §4.1 — `$CAND_SVC_FILE` and its cleanup trap are live there.
 
 ```bash
+# Version preflight — run BEFORE the restore; record the value with the evidence.
+# Must report major 15 (e.g. "15.13"): the same major as the source and the §3.1 tools.
+psql "servicefile='$CAND_SVC_FILE' service=yacc_restore_cand" -Atc "SHOW server_version;"
+```
+
+```bash
 pg_restore --dbname="servicefile='$CAND_SVC_FILE' service=yacc_restore_cand" \
   --no-owner --no-privileges --exit-on-error \
   <artifact-link>/yacc-db-<timestamp>.dump
 ```
 
 - `--exit-on-error` stops on the first error so a failed restore is never mistaken for a complete one.
-- **Version compatibility**: the candidate database must run PostgreSQL **≥ 15** — a dump is **not guaranteed to load into a server older** than the major version it was dumped from (PostgreSQL 15 here) — and the restore tooling must meet the §3.1 ≥ 15 floor.
+- **Version compatibility**: the candidate database must run PostgreSQL **major 15** — the **same major** as the source and the §3.1-pinned tools; abort the restore if the preflight above reports anything else. PostgreSQL documents dump output as expected to load into servers of the **same or newer** major than the `pg_dump` tool and **not guaranteed** to load into an **older** major, so a newer dump tool against a PG15 target would be an unsupported pair — pinning source, tools, and target to one major (15) is the only configuration where every pairing in this procedure is documented-supported. This is a restore-fidelity rule for the documented PG15 datastore, not a database upgrade policy: a restore into any other major is not a configuration this procedure validates.
 - §4.1 setup failure (empty or unparseable connection string) ⇒ abort with a generic message; the `trap` has already removed both temporary files. Fix the cause and re-run §4.1.
 - If the candidate database must be recreated first: drop/recreate it via the `<environment>` admin path, then re-run `pg_restore`.
 - **Failure handling**: any `pg_restore` error ⇒ drop the candidate database, fix the cause, restart from §3 (a clean re-restore from a verified dump; never patch a half-restored database by hand).
@@ -381,4 +387,4 @@ Record actual backup and restore durations in the evidence template each time th
 
 ---
 
-**Last Updated**: 2026-11-06 (authored by MIG-070b #447; review rework ×4 on 2026-10-21 and ×2 on 2026-11-06 — restore-verification capture formats aligned; client-tool floor tied to the source-server major, restore target pinned ≥ source major; procedure only; no execution claimed)
+**Last Updated**: 2026-11-06 (authored by MIG-070b #447; review rework ×4 on 2026-10-21 and ×3 on 2026-11-06 — restore-verification capture formats aligned; source server, client tools, and restore target pinned to one major (15): dump output is only documented to load same-or-newer major, never guaranteed older; procedure only; no execution claimed)
