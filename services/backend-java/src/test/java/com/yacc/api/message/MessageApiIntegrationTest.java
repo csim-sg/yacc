@@ -258,4 +258,123 @@ class MessageApiIntegrationTest extends AbstractApiIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Conversation not found"));
     }
+
+    /**
+     * MIG-091d offline QA-parity gap closure (#456) — QA-001 TC-008-002,
+     * QA-004 SMOKE-007: message listing paginates with page offsets and
+     * stays in strict ascending createdAt order across pages (frozen custom
+     * shape; REST-MSG-001).
+     */
+    @Test
+    void messageListPaginatesInChronologicalOrderAcrossPages() throws Exception {
+        seedActors();
+        Conversation conversation = conversations.save(new Conversation(UUID.randomUUID(),
+                ChannelType.TELEGRAM, "chat-page"));
+        for (int i = 0; i < 7; i++) {
+            seedMessage(conversation.getId(), MessageStatus.SENT);
+        }
+        String auth = bearer(SUPER);
+
+        java.util.List<java.time.LocalDateTime> seen = new java.util.ArrayList<>();
+        for (int page = 1; page <= 3; page++) {
+            String body = mockMvc.perform(get("/api/conversations/"
+                            + conversation.getId() + "/messages?limit=3&page=" + page)
+                            .header("Authorization", auth))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.total").value(7))
+                    .andExpect(jsonPath("$.limit").value(3))
+                    .andExpect(jsonPath("$.page").value(page))
+                    .andReturn().getResponse().getContentAsString();
+            var items = mapper.readTree(body).get("messages");
+            if (page < 3) {
+                assertThat(items.size()).isEqualTo(3);
+            } else {
+                assertThat(items.size()).isEqualTo(1);
+            }
+            for (var item : items) {
+                seen.add(java.time.LocalDateTime.parse(item.get("createdAt").asText()
+                        .replace("Z", "")));
+            }
+        }
+        // Pages continue the strict chronological (ascending) order with no
+        // overlap or gaps.
+        for (int i = 1; i < seen.size(); i++) {
+            assertThat(seen.get(i)).isAfter(seen.get(i - 1));
+        }
+    }
+
+    /**
+     * MIG-091d offline QA-parity gap closure (#456) — QA-004 EDGE-MSG-002
+     * (blank body → 400) and QA-001 TC-009-002: the sent message surfaces on
+     * the conversation list (Java target surface: the list item's
+     * {@code latestMessagePreview}/@code latestMessageAt} reflect the new
+     * outbound message; the {@code conversations.last_activity_at} column is
+     * inbound/assignment-driven by POC parity).
+     */
+    @Test
+    void sendRejectsBlankBodyAndUpdatesTheConversationLatestMessageSurface() throws Exception {
+        seedActors();
+        Conversation conversation = conversations.save(new Conversation(UUID.randomUUID(),
+                ChannelType.TELEGRAM, "chat-surface"));
+        String auth = bearer(SUPER);
+
+        // Blank body → 400 (EDGE-MSG-002; @NotBlank on SendMessageBody).
+        mockMvc.perform(post("/api/conversations/" + conversation.getId() + "/messages")
+                        .header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.createObjectNode().put("body", "").toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").isNotEmpty());
+
+        // Accepted send → 201 pending; the conversation list now carries the
+        // message as the latest-activity surface (TC-009-002).
+        mockMvc.perform(post("/api/conversations/" + conversation.getId() + "/messages")
+                        .header("Authorization", auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.createObjectNode()
+                                .put("body", "surface update check").toString()))
+                .andExpect(status().isCreated());
+
+        String list = mockMvc.perform(get("/api/conversations")
+                        .header("Authorization", auth))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        var item = mapper.readTree(list).get("data");
+        var match = new com.fasterxml.jackson.databind.JsonNode[1];
+        for (var entry : item) {
+            if (conversation.getId().toString().equals(entry.get("id").asText())) {
+                match[0] = entry;
+            }
+        }
+        assertThat(match[0]).isNotNull();
+        assertThat(match[0].get("latestMessagePreview").asText())
+                .isEqualTo("surface update check");
+        assertThat(match[0].get("latestMessageAt").isNull()).isFalse();
+    }
+
+    /**
+     * MIG-091d offline QA-parity gap closure (#456) — QA-004 EDGE-QUEUE-005:
+     * the manual retry of a missing message is a 404 with the frozen error
+     * body (and a missing conversation still 404s first).
+     */
+    @Test
+    void manualRetryOfAMissingMessageReturns404() throws Exception {
+        seedActors();
+        Conversation conversation = conversations.save(new Conversation(UUID.randomUUID(),
+                ChannelType.IRC, "#retry-404"));
+        String auth = bearer(SUPER);
+        UUID missing = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/conversations/" + conversation.getId()
+                        + "/messages/" + missing + "/retry")
+                        .header("Authorization", auth))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Message not found"));
+
+        mockMvc.perform(post("/api/conversations/" + UUID.randomUUID()
+                        + "/messages/" + missing + "/retry")
+                        .header("Authorization", auth))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Conversation not found"));
+    }
 }
