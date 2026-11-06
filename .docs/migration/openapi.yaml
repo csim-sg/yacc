@@ -1088,7 +1088,7 @@ paths:
     get:
       tags: [routing-rules]
       operationId: listRoutingRules
-      summary: List routing rules (manager+) — BaseListResponse without pagination (total as limit)
+      summary: List routing rules (super admin only) — BaseListResponse without pagination (total as limit)
       x-baseline-source: packages/backend/src/controllers/routing-rules.controller.ts:47 @98db628
       responses:
         '200':
@@ -1103,11 +1103,11 @@ paths:
                       data:
                         type: array
                         items: {$ref: '#/components/schemas/RoutingRule'}
-        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only super admin, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
     post:
       tags: [routing-rules]
       operationId: createRoutingRule
-      summary: Create routing rule (admin+)
+      summary: Create routing rule (super admin only)
       x-baseline-source: packages/backend/src/controllers/routing-rules.controller.ts:102 @98db628
       requestBody:
         required: true
@@ -1124,12 +1124,12 @@ paths:
                 properties:
                   data: {$ref: '#/components/schemas/RoutingRule'}
         '400': {description: Validation error, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
-        '403': {description: Only admin+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only super admin, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
   /api/routing-rules/{id}:
     patch:
       tags: [routing-rules]
       operationId: updateRoutingRule
-      summary: Update routing rule (admin+)
+      summary: Update routing rule (super admin only)
       x-baseline-source: packages/backend/src/controllers/routing-rules.controller.ts:152 @98db628
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -1148,12 +1148,12 @@ paths:
                 properties:
                   data: {$ref: '#/components/schemas/RoutingRule'}
         '400': {description: Validation error, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
-        '403': {description: Only admin+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only super admin, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
         '404': {description: Rule not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
     delete:
       tags: [routing-rules]
       operationId: deleteRoutingRule
-      summary: Delete routing rule (admin+)
+      summary: Delete routing rule (super admin only)
       x-baseline-source: packages/backend/src/controllers/routing-rules.controller.ts:208 @98db628
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -1166,13 +1166,13 @@ paths:
                 type: object
                 properties:
                   data: {$ref: '#/components/schemas/RoutingRule'}
-        '403': {description: Only admin+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only super admin, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
         '404': {description: Rule not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
   /api/routing-rules/{id}/executions:
     get:
       tags: [routing-rules]
       operationId: getRoutingRuleExecutions
-      summary: Query rule execution logs (manager+)
+      summary: Query rule execution logs (super admin only)
       x-baseline-source: packages/backend/src/controllers/routing-rules.controller.ts:263 @98db628
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -1182,7 +1182,7 @@ paths:
           content:
             application/json:
               schema: {type: object, additionalProperties: true}
-        '403': {description: Only manager+, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Only super admin, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
         '404': {description: Rule not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
 
   # =====================================================================
