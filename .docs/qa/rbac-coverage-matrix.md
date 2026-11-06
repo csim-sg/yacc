@@ -43,15 +43,32 @@ The accepted permission model, in precedence order:
    may view all conversation content. `USER` reply/retry stay assignment-bound.
    `inactive`/`suspended` accounts are denied everywhere (ADR-025).
 3. **Product spec §2 + Story 1.3 and GOV-021 §2** name the same baseline for inbox,
-   reply/retry, tags, notes, assignment, bulk actions, routing rules, notifications.
+   reply/retry, tags, notes, assignment, bulk actions, notifications — with one
+   exception: routing rules, where these sources conflict with the frozen ledger
+   (open dispute recorded below).
 
-**Precedence note (routing-rules wording).** GOV-021 §2 words routing-rule CRUD as
-"Super Admin only". The binding frozen ledger rows `REST-RULES-001..005` (captured at
-baseline `98db628` per MIG-003, the scope ceiling per SPEC-002 AC-01/ADR-023) record
-`manager+` reads and `admin+` writes, and the Java implementation matches that. The
-GOV-021 wording predates the frozen capture and is superseded by it for the migration;
-this is a **documented precedence resolution, not a behaviour mismatch** — no
-stop-and-report condition (see §8).
+**Open conflict (routing-rules access — disputed, pending founder decision).** Two
+approved sources disagree on routing-rule access, and no recorded adjudication
+resolves the conflict:
+
+- **Option A — keep the frozen ledger (current implementation):** the binding ledger
+  rows `REST-RULES-001..005` (captured at baseline `98db628` per MIG-003, the scope
+  ceiling per SPEC-002 AC-01/ADR-023) record `manager+` reads and `admin+` writes, and
+  the Java implementation matches that. Adopting this reading as the accepted model
+  would override the product/governance records below (a product-record amendment).
+- **Option B — follow the product record and GOV-021:** the product spec §2 role
+  table, §7.6 and Stories 7.1–7.2, and GOV-021 §2 (with GOV-034) specify routing-rule
+  CRUD as **Super Admin only**. Adopting this reading would override a frozen
+  target-behaviour cell (a founder-authorized ADR-023 amendment to
+  `REST-RULES-001..005` plus a bounded authorization change).
+
+Tech-lead has adjudicated this as a genuine conflict between approved records that
+neither builder nor tech-lead may settle, and has requested the founder decision
+(#457 comment `6678930687`, 2026-11-06). The five `REST-RULES-001..005` rows (§3.8,
+rows 37–41) are marked **disputed — pending founder decision**, with both readings
+displayed there. This matrix records the conflict without resolving it: no permission
+behaviour, test expectation, frozen file, or AC text changes while the decision is
+pending (see §8).
 
 **Role naming.** The wire enum is lowercase (`super_admin|admin|manager|user`,
 canonicalization §1.1); matrix columns use the Spring authority names
@@ -194,15 +211,38 @@ the row) · `—` = no identity involved (public probe) · Evidence cites
 | 35 | `POST /api/conversations/{id}/tags` (`addTagToConversation`) | A | A | A | A* (resource access: privileged always, USER if assigned) | 401 | 401 | `TagApiIntegrationTest#createListAndLinkUnlinkWithTagAccessControl` (USER assigned/unassigned variants); `RbacMatrixApiIntegrationTest#privilegedRolesPassTheReplyAndRetryGates` **(new)** (privileged cells) |
 | 36 | `DELETE /api/conversations/{id}/tags/{tagId}` (`removeTagFromConversation`) | A | A | A | A* (same resource rule) | 401 | 401 | `TagApiIntegrationTest#createListAndLinkUnlinkWithTagAccessControl`; `RbacMatrixApiIntegrationTest#privilegedRolesPassTheReplyAndRetryGates` **(new)** |
 
-### 3.8 Routing rules — manager+ reads, admin+ writes (ledger `REST-RULES-001..005`)
+### 3.8 Routing rules — disputed — pending founder decision (ledger `REST-RULES-001..005`)
 
-| # | Operation | SUPER_ADMIN | ADMIN | MANAGER | USER | anonymous | inactive/suspended | Evidence |
-|---|---|---|---|---|---|---|---|---|
-| 37 | `GET /api/routing-rules` (`listRoutingRules`) | A | A | A | 403 | 401 | 401 | `RoutingRulesApiIntegrationTest#crudLifecycleWithRbacAndLenientJson` (MANAGER allow); `RbacMatrixApiIntegrationTest#routingRulesAreManagerReadAdminWrite` **(new)** |
-| 38 | `POST /api/routing-rules` (`createRoutingRule`) | A | A | 403 | 403 | 401 | 401 | `RoutingRulesApiIntegrationTest#crudLifecycleWithRbacAndLenientJson` (ADMIN allow, MANAGER deny); `RbacMatrixApiIntegrationTest#routingRulesAreManagerReadAdminWrite` **(new)** |
-| 39 | `PATCH /api/routing-rules/{id}` (`updateRoutingRule`) | A | A | 403 | 403 | 401 | 401 | `RoutingRulesApiIntegrationTest#crudLifecycleWithRbacAndLenientJson` (ADMIN allow); `RbacMatrixApiIntegrationTest#routingRulesAreManagerReadAdminWrite` **(new)** |
-| 40 | `DELETE /api/routing-rules/{id}` (`deleteRoutingRule`) | A | A | 403 | 403 | 401 | 401 | `RoutingRulesApiIntegrationTest#crudLifecycleWithRbacAndLenientJson` (ADMIN allow); `RbacMatrixApiIntegrationTest#routingRulesAreManagerReadAdminWrite` **(new)** |
-| 41 | `GET /api/routing-rules/{id}/executions` (`getRoutingRuleExecutions`) | A | A | A | 403 | 401 | 401 | `RoutingRulesApiIntegrationTest#crudLifecycleWithRbacAndLenientJson` (MANAGER allow); `RbacMatrixApiIntegrationTest#routingRulesAreManagerReadAdminWrite` **(new)** |
+**Status: all five rows `disputed — pending founder decision`** (#457 decision request,
+comment `6678930687`, 2026-11-06 — open conflict between the frozen ledger and the
+product/governance records, §1). The role cells below are the **current implementation
+behaviour**, which matches the frozen ledger's reading (Option A); the alternative
+reading (Option B — Super Admin only) is displayed in the table beneath so both
+readings stay visible. This matrix changes no permission.
+
+| # | Operation | SUPER_ADMIN | ADMIN | MANAGER | USER | anonymous | inactive/suspended | Evidence | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| 37 | `GET /api/routing-rules` (`listRoutingRules`) | A | A | A | 403 | 401 | 401 | `RoutingRulesApiIntegrationTest#crudLifecycleWithRbacAndLenientJson` (MANAGER allow); `RbacMatrixApiIntegrationTest#routingRulesAreManagerReadAdminWrite` **(new)** | disputed — pending founder decision |
+| 38 | `POST /api/routing-rules` (`createRoutingRule`) | A | A | 403 | 403 | 401 | 401 | `RoutingRulesApiIntegrationTest#crudLifecycleWithRbacAndLenientJson` (ADMIN allow, MANAGER deny); `RbacMatrixApiIntegrationTest#routingRulesAreManagerReadAdminWrite` **(new)** | disputed — pending founder decision |
+| 39 | `PATCH /api/routing-rules/{id}` (`updateRoutingRule`) | A | A | 403 | 403 | 401 | 401 | `RoutingRulesApiIntegrationTest#crudLifecycleWithRbacAndLenientJson` (ADMIN allow); `RbacMatrixApiIntegrationTest#routingRulesAreManagerReadAdminWrite` **(new)** | disputed — pending founder decision |
+| 40 | `DELETE /api/routing-rules/{id}` (`deleteRoutingRule`) | A | A | 403 | 403 | 401 | 401 | `RoutingRulesApiIntegrationTest#crudLifecycleWithRbacAndLenientJson` (ADMIN allow); `RbacMatrixApiIntegrationTest#routingRulesAreManagerReadAdminWrite` **(new)** | disputed — pending founder decision |
+| 41 | `GET /api/routing-rules/{id}/executions` (`getRoutingRuleExecutions`) | A | A | A | 403 | 401 | 401 | `RoutingRulesApiIntegrationTest#crudLifecycleWithRbacAndLenientJson` (MANAGER allow); `RbacMatrixApiIntegrationTest#routingRulesAreManagerReadAdminWrite` **(new)** | disputed — pending founder decision |
+
+**Both readings (rows 37–41).** `SUPER_ADMIN = A` and `USER = 403` are common to both
+readings; the anonymous and inactive/suspended cells are unchanged by both; the
+readings differ only on the ADMIN/MANAGER cells:
+
+| # | Operation | Option A — frozen ledger `REST-RULES-001..005` (current implementation; cells above) | Option B — product spec §2/§7.6 + Stories 7.1–7.2 + GOV-021 §2 (`Super Admin only`) |
+|---|---|---|---|
+| 37 | `GET /api/routing-rules` | manager+ read — ADMIN `A`, MANAGER `A` | ADMIN `403`, MANAGER `403` |
+| 38 | `POST /api/routing-rules` | admin+ write — ADMIN `A`, MANAGER `403` | ADMIN `403`, MANAGER `403` |
+| 39 | `PATCH /api/routing-rules/{id}` | admin+ write — ADMIN `A`, MANAGER `403` | ADMIN `403`, MANAGER `403` |
+| 40 | `DELETE /api/routing-rules/{id}` | admin+ write — ADMIN `A`, MANAGER `403` | ADMIN `403`, MANAGER `403` |
+| 41 | `GET /api/routing-rules/{id}/executions` | manager+ read — ADMIN `A`, MANAGER `A` | ADMIN `403`, MANAGER `403` |
+
+This matrix adopts neither reading; the founder decision (#457 comment `6678930687`)
+will select one. AC-MIG-091-2 coverage stays unproven for these five rows until the
+decision lands.
 
 ### 3.9 Notifications — every role, own scope (ledger `REST-NOTIF-001..004`)
 
@@ -390,16 +430,25 @@ Evidence: `RbacStatusDenialIntegrationTest` **(new)** (active-USER 200 on the vi
 against `MessageApiIntegrationTest#sendRequiresAssignmentForUserRole` (assignment-bound
 writes still enforced for the same identity).
 
-## 8. Matrix ↔ implementation cross-check (stop-and-report finding = none)
+## 8. Matrix ↔ implementation cross-check (one open dispute — routing rules)
 
 Derivation order: frozen `openapi.yaml` (row set + anonymous/bearer) → frozen ledger
 target behavior (role gates) → model docs (§1). Each row's accepted cells were checked
 against the implementation (`@PreAuthorize` annotations, in-code role guards,
 `AuthSecurityConfig` permit-all list, `WebSocketHandshakeAuthInterceptor`,
-`YaccWebSocketHandler` switch). **Every row matches; zero discrepancies found; nothing to
-stop-and-report.** The single inter-document tension (GOV-021 routing-rules wording vs
-the binding ledger) is resolved by documented precedence in §1 — the implementation
-follows the binding source.
+`YaccWebSocketHandler` switch).
+
+**Stop-and-report status: one open item — the routing-rules source conflict (§1, §3.8).**
+Rows 37–41 match the Java implementation and their binding frozen source
+(`REST-RULES-001..005`) exactly, but the accepted product/governance records (product
+spec §2 role table, §7.6, Stories 7.1–7.2, GOV-021 §2, GOV-034) specify **Super Admin
+only**, and no recorded adjudication resolves which approved source controls. That is
+an **open inter-document conflict, not a matrix↔implementation mismatch** — the
+implementation matches its frozen source; the conflict is over which source is
+authoritative. Per tech-lead's adjudication, the five `REST-RULES-001..005` rows are
+**disputed — pending founder decision** (#457 comment `6678930687`, 2026-11-06) and
+AC-MIG-091-2 coverage stays unproven for them until the decision lands. **All other
+rows: zero discrepancies found.**
 
 ## 9. Coverage self-check and counts
 
@@ -418,9 +467,12 @@ follows the binding source.
   shared handshake gate, not per-op. Anonymous cells: REST — 73 (11 allow, 62 deny-401);
   WS — 27 refused at the handshake. Inactive/suspended cells: deny on every
   authenticated surface (§2.2/§6).
-- **Unproven cells: 0.** Every cell is either directly asserted by a cited test method
+- **Unproven cells: 0** — every cell is either directly asserted by a cited test method
   or is a mechanical consequence of a shared, directly-asserted seam (§2.1/§2.2/§4) —
-  no cell is deferred.
+  with one scoped exception: the five **disputed** routing-rule rows (37–41, §3.8).
+  Their cells are asserted against the frozen-ledger reading (Option A), but which
+  reading is the accepted target behaviour is **pending the founder decision**, so
+  AC-MIG-091-2 coverage stays unproven for those five rows until it lands.
 - Every previously-uncited gap closed by this task: IRC deny cells (62–73
   non-super cells), ADMIN/MANAGER user-administration denials (15–18), routing-rule
   SUPER/USER cells (37–41), audit SUPER/USER cells (46–49), DLQ/queue ADMIN/USER cells
@@ -435,6 +487,10 @@ follows the binding source.
 - No production (`src/main`) change, no permission-model change, no `.docs/migration/**`
   edit (frozen contract cited read-only), no frontend/E2E work (#461), no severity
   taxonomy (#458), no ledger attribution (#459/#460).
+- Routing-rule access (rows 37–41 / `REST-RULES-001..005`) is **disputed — pending
+  founder decision** (#457 comment `6678930687`): this matrix records the open conflict
+  (§1/§3.8/§8), adopts neither reading, and changes no permission, test expectation,
+  frozen file, or AC text.
 - This matrix documents offline permission-test coverage; it is **not** deployment
   evidence and makes no staging/API-reachability claim (#361).
 - Force-password-change (bootstrap/recovery lock) is recorded as an orthogonal gate
