@@ -409,40 +409,42 @@ class RbacMatrixApiIntegrationTest extends AbstractApiIntegrationTest {
     }
 
     // ------------------------------------------------------------------
-    // Routing rules rows 37–41 — manager+ reads, admin+ writes
+    // Routing rules rows 37–41 — Super Admin only (founder decision B,
+    // #457 comment 6685079503; implemented by #467 / PR #468)
     // ------------------------------------------------------------------
 
     @Test
-    void routingRulesAreManagerReadAdminWrite() throws Exception {
+    void routingRulesAreSuperAdminOnly() throws Exception {
         seedRoles();
         Tag tag = tags.save(new Tag("matrix-rules-tag", "#654321", SUPER_ID));
 
         for (UserRole role : allRoles()) {
-            expect(role, "GET", "/api/routing-rules", null,
-                    role == UserRole.USER ? 403 : 200);
-            expect(role, "POST", "/api/routing-rules", routingRuleBody(tag),
-                    role == UserRole.MANAGER || role == UserRole.USER ? 403 : 201);
+            int readExpected = role == UserRole.SUPER_ADMIN ? 200 : 403;
+            expect(role, "GET", "/api/routing-rules", null, readExpected);
+
+            int createExpected = role == UserRole.SUPER_ADMIN ? 201 : 403;
+            expect(role, "POST", "/api/routing-rules", routingRuleBody(tag), createExpected);
         }
 
-        // Mutations on a fresh rule per role (admin-created fixture).
+        // Mutations on a fresh rule per role (super-admin-created fixture).
         for (UserRole role : allRoles()) {
             String created = mockMvc.perform(post("/api/routing-rules")
-                            .header("Authorization", bearer(ADMIN))
+                            .header("Authorization", bearer(SUPER))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(routingRuleBody(tag)))
                     .andExpect(status(201))
                     .andReturn().getResponse().getContentAsString();
             String ruleId = mapper.readTree(created).get("data").get("id").asText();
 
-            int writeExpected = role == UserRole.MANAGER || role == UserRole.USER ? 403 : 200;
+            int writeExpected = role == UserRole.SUPER_ADMIN ? 200 : 403;
             expect(role, "PATCH", "/api/routing-rules/" + ruleId,
                     mapper.createObjectNode().put("priority", 55).toString(), writeExpected);
             expect(role, "DELETE", "/api/routing-rules/" + ruleId, null, writeExpected);
         }
 
-        // Executions read (manager+); empty log list is fine.
+        // Executions read (Super Admin only); empty log list is fine.
         String rule = mockMvc.perform(post("/api/routing-rules")
-                        .header("Authorization", bearer(ADMIN))
+                        .header("Authorization", bearer(SUPER))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(routingRuleBody(tag)))
                 .andExpect(status(201))
@@ -450,7 +452,7 @@ class RbacMatrixApiIntegrationTest extends AbstractApiIntegrationTest {
         String ruleId = mapper.readTree(rule).get("data").get("id").asText();
         for (UserRole role : allRoles()) {
             expect(role, "GET", "/api/routing-rules/" + ruleId + "/executions", null,
-                    role == UserRole.USER ? 403 : 200);
+                    role == UserRole.SUPER_ADMIN ? 200 : 403);
         }
     }
 
