@@ -96,6 +96,22 @@ public final class RealtimeEvents {
     public static final String MESSAGE_ERROR = "message.error";
     public static final String MESSAGE_ACK = "message.ack";
 
+    // --- MIG-091a inbound application-operation channels (frozen AsyncAPI
+    // channels; ledger WS-OP-CONV-003, WS-OP-MSG-001..004, WS-OP-REACT-001..004)
+    // and their raw emissions (WS-RAW-004/005/014/015/016). conversation.updated,
+    // message.sent and message.failed reuse the contract constants above. ---
+    public static final String MESSAGE_RETRY = "message.retry";
+    public static final String MESSAGE_RECEIVED_ACK = "message.received.ack";
+    public static final String REACTION_ADDED = "reaction.added";
+    public static final String REACTION_REMOVED = "reaction.removed";
+    public static final String REACTION_LIST = "reaction.list";
+    public static final String REACTION_COUNT = "reaction.count";
+    public static final String MESSAGE_RETRY_ACKNOWLEDGED = "message.retry.acknowledged";
+    public static final String MESSAGE_RETRY_STARTED = "message.retry.started";
+    public static final String REACTION_ADDED_ACK = "reaction.added.ack";
+    public static final String REACTION_REMOVED_ACK = "reaction.removed.ack";
+    public static final String REACTION_LIST_ACK = "reaction.list.ack";
+
     private RealtimeEvents() {
         // Constants only.
     }

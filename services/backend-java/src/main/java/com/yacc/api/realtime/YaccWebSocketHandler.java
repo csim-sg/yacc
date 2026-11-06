@@ -40,6 +40,11 @@ import com.yacc.api.realtime.WebSocketInboundFrame;
  *       {@code connector.status.changed}, {@code connector.message.error},
  *       {@code connector.message.ack} — routed to
  *       {@link ConnectorRelayService} (ledger WS-OP-CONN-001/002/005/006);</li>
+ *   <li>the MIG-091a inbound application ops — {@code conversation.updated},
+ *       {@code message.sent}, {@code message.failed}, {@code message.retry},
+ *       {@code message.received.ack}, {@code reaction.added|removed|list|count}
+ *       — routed to {@link ApplicationEventRelayService} (ledger
+ *       WS-OP-CONV-003, WS-OP-MSG-001..004, WS-OP-REACT-001..004);</li>
  *   <li>the {@code system.error} error path (WS-EVT-018) for malformed
  *       frames, unknown channels, and transport faults;</li>
  *   <li>registry cleanup on close (idempotent).</li>
@@ -76,18 +81,22 @@ public class YaccWebSocketHandler extends TextWebSocketHandler {
 
     private final ConnectorRelayService relay;
 
+    private final ApplicationEventRelayService applicationEvents;
+
     private final ObjectMapper mapper;
 
     public YaccWebSocketHandler(WebSocketSessionRegistry registry,
             WebSocketEventPublisher publisher, WebSocketPresenceService presence,
             WebSocketTypingService typing, WebSocketReconnectService reconnect,
-            ConnectorRelayService relay, ObjectMapper mapper) {
+            ConnectorRelayService relay, ApplicationEventRelayService applicationEvents,
+            ObjectMapper mapper) {
         this.registry = registry;
         this.publisher = publisher;
         this.presence = presence;
         this.typing = typing;
         this.reconnect = reconnect;
         this.relay = relay;
+        this.applicationEvents = applicationEvents;
         this.mapper = mapper;
     }
 
@@ -136,6 +145,32 @@ public class YaccWebSocketHandler extends TextWebSocketHandler {
                     relay(session, () -> relay.relayMessageError(frame.data()));
             case RealtimeEvents.CONNECTOR_MESSAGE_ACK ->
                     relay(session, () -> relay.relayMessageAck(frame.data()));
+            case RealtimeEvents.CONVERSATION_UPDATED ->
+                    relay(session, () -> applicationEvents.relayConversationUpdated(session,
+                            frame.data()));
+            case RealtimeEvents.MESSAGE_SENT ->
+                    relay(session, () -> applicationEvents.relayMessageSent(session,
+                            frame.data()));
+            case RealtimeEvents.MESSAGE_FAILED ->
+                    relay(session, () -> applicationEvents.relayMessageFailed(session,
+                            frame.data()));
+            case RealtimeEvents.MESSAGE_RETRY ->
+                    relay(session, () -> applicationEvents.relayMessageRetry(session,
+                            frame.data()));
+            case RealtimeEvents.MESSAGE_RECEIVED_ACK ->
+                    relay(session, () -> applicationEvents.relayMessageReceivedAck(frame.data()));
+            case RealtimeEvents.REACTION_ADDED ->
+                    relay(session, () -> applicationEvents.relayReactionAdded(session,
+                            frame.data()));
+            case RealtimeEvents.REACTION_REMOVED ->
+                    relay(session, () -> applicationEvents.relayReactionRemoved(session,
+                            frame.data()));
+            case RealtimeEvents.REACTION_LIST ->
+                    relay(session, () -> applicationEvents.relayReactionList(session,
+                            frame.data()));
+            case RealtimeEvents.REACTION_COUNT ->
+                    relay(session, () -> applicationEvents.relayReactionCount(session,
+                            frame.data()));
             case RealtimeEvents.PRESENCE_UPDATED -> presence.onPresenceUpdated(session, frame.data());
             case RealtimeEvents.USER_ONLINE -> presence.onUserOnline(session, frame.data());
             case RealtimeEvents.USER_OFFLINE -> presence.onUserOffline(session, frame.data());
