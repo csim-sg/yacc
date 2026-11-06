@@ -176,6 +176,11 @@ SELECT pg_export_snapshot();   -- record the returned id in <artifact-link>/sour
 **Terminal 1 — after the dump completes, capture the baseline from the same snapshot, then close the session:**
 
 ```
+-- Capture format: unaligned + tuples-only — the exact bytes `psql -Atc` writes in §5,
+-- so the §5 diff compares equal representations (default aligned/table output here would
+-- never byte-match §5 and would fail the diff even on identical data).
+\pset format unaligned
+\pset tuples_only on
 -- Schema state (versions + success flags)
 \o <artifact-link>/source-flyway-history.txt
 SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;
@@ -339,9 +344,11 @@ pg_restore --dbname="servicefile='$CAND_SVC_FILE' service=yacc_restore_cand" \
 Run against the **candidate** connection from §4.1 (same shell — the candidate service file from §4.1 and its cleanup `trap` are still live) and compare with the §3.2 snapshot captures:
 
 ```bash
-# Schema version state must match the source baseline exactly (ADR-027)
+# Schema version state must match the source baseline exactly (ADR-027).
+# -Atc = unaligned, tuples-only — the same deterministic format as the §3.2 captures,
+# so both diffs below compare equal representations (see §3.2 capture-format note).
 psql "servicefile='$CAND_SVC_FILE' service=yacc_restore_cand" \
-  -c "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;" \
+  -Atc "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;" \
   > <artifact-link>/restored-flyway-history.txt
 
 # Exact counts of the key tables in the restored database
@@ -373,4 +380,4 @@ Record actual backup and restore durations in the evidence template each time th
 
 ---
 
-**Last Updated**: 2026-10-21 (authored by MIG-070b #447; review rework ×4 same day — procedure only; no execution claimed)
+**Last Updated**: 2026-11-06 (authored by MIG-070b #447; review rework ×4 on 2026-10-21 and ×1 on 2026-11-06 — restore-verification capture formats aligned; procedure only; no execution claimed)
