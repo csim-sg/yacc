@@ -380,6 +380,47 @@ class YaccWebSocketHandlerTest {
         assertThat(peerEnvelopes.get(0).get("data").fieldNames())
                 .toIterable().containsExactly("messageId", "emoji", "count", "timestamp");
         assertThat(peerEnvelopes.get(0).get("data").get("count").asInt()).isEqualTo(3);
+
+        // AC-6 pin (MIG-091a rework): the corrected frozen inbound capture
+        // (#452) requires only [messageId, conversationId, emoji, count] —
+        // the routed frame above deliberately carries no timestamp and is
+        // accepted. The fan-out matches the frozen inbound values and the
+        // unchanged outbound ReactionCountPayload component: exact member
+        // set, no conversationId member outbound, server-generated RFC 3339
+        // timestamp (baseline regenerates it).
+        JsonNode fanOut = peerEnvelopes.get(0).get("data");
+        assertThat(fanOut.get("messageId").asText())
+                .isEqualTo("00000000-0000-4000-8000-0000000000m1");
+        assertThat(fanOut.get("emoji").asText()).isEqualTo("👍");
+        assertThat(fanOut.has("conversationId"))
+                .as("outbound payload has no conversationId member")
+                .isFalse();
+        assertThat(fanOut.get("timestamp").asText())
+                .matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z");
+    }
+
+    @Test
+    void reactionCountWithoutConversationIdIsABadFrameWithZeroRoomFanOut()
+            throws Exception {
+        handler.afterConnectionEstablished(session);
+        WebSocketSession peer = peerInConversation("00000000-0000-4000-8000-0000000000c1");
+        List<TextMessage> peerSent = peerFrames(peer);
+        sent.clear();
+
+        inbound("{\"event\":\"reaction.count\",\"data\":{"
+                + "\"messageId\":\"m-1\",\"emoji\":\"👍\",\"count\":3}}");
+
+        // The existing system.error path: bad_frame naming the missing member.
+        JsonNode error = soleEnvelope();
+        assertThat(error.get("event").asText()).isEqualTo(RealtimeEvents.SYSTEM_ERROR);
+        assertThat(error.get("data").get("error").get("code").asText())
+                .isEqualTo(YaccWebSocketHandler.ERROR_CODE_BAD_FRAME);
+        assertThat(error.get("data").get("error").get("message").asText())
+                .contains("conversationId");
+        // Zero publisher fan-out interactions: the unroutable frame emitted
+        // nothing to the room (soleEnvelope() above already pinned that no
+        // other frame reached the sender).
+        assertThat(peerSent).isEmpty();
     }
 
     @Test

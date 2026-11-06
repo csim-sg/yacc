@@ -328,6 +328,19 @@ class ApplicationEventRelayServiceTest {
                 .hasMessageContaining("userId");
     }
 
+    @Test
+    void reactionCountWithoutConversationIdThrowsWithZeroPublisherInteractions() {
+        // AC-6 pin (MIG-091a rework): conversationId is the routing member of
+        // the corrected frozen inbound payload (#452) — an unroutable frame
+        // is a bad frame that never reaches the publisher.
+        ObjectNode unroutable = reactionCountPayload(null);
+        unroutable.remove("conversationId");
+        assertThatThrownBy(() -> relay.relayReactionCount(sender, unroutable))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("conversationId");
+        verifyNoPublisherInteractions();
+    }
+
     // --- frozen types and string formats (review loop 1: no Jackson
     // asText() coercion of numbers/booleans/objects; uuid/date-time formats
     // enforced exactly where the frozen schemas declare them) ---
