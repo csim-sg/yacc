@@ -7,7 +7,7 @@ task: "https://github.com/csim-sg/yacc/issues/338"
 baseline_revision: 98db628d78c79578dd11eb0476fab812d81fed32
 baseline_branch: dev
 canonicalized_at: 2026-09-26
-amended_at: 2026-10-21
+amended_at: 2026-11-06
 amendments:
   - date: 2026-10-20
     authority: "Founder decision 2026-10-20 — MIG-073 finding TM-011, Option A (issue #442; bounded assignment-bound USER send fix + minimal frozen reconciliation; no AC-MIG-073-2 waiver, no cutover authorization)"
@@ -17,6 +17,10 @@ amendments:
     authority: "Founder decision 2026-10-21 — authorize the bounded reaction.count.publish frozen-schema capture correction (issue #366 decision comment #6310022755; scope = inline inbound publish payload only; no AC-6 waiver, no cutover authorization)"
     rows: [WS-OP-REACT-004]
     change: "asyncapi.yaml channels.reaction.count.publish.message now describes the baseline inbound request inline (required messageId/conversationId/emoji strings + count integer; no required inbound timestamp). Row WS-OP-REACT-004 Route/Behavior, Required target behavior, OpenAPI/AsyncAPI, Evidence location, Result, Rev cells are byte-unchanged; version and row_count unchanged."
+  - date: 2026-11-06
+    authority: "Founder decision 2026-11-06 — option B, #457 (Super Admin-only routing-rule administration and execution-log access per product role table, GOV-021 §2, GOV-034; narrow correction only)"
+    rows: [REST-RULES-001, REST-RULES-002, REST-RULES-003, REST-RULES-004, REST-RULES-005]
+    change: "REST-RULES-001..005 Route/Behavior and Required-target-behavior cells now record super admin only RBAC (was manager+ reads / admin+ writes — baseline drift, not an independent decision); matching openapi.yaml summaries and 403 descriptions updated; version and row_count unchanged; no other row changed."
 supersedes:
   - LEDGER-MIG-001-REST v1.0.0 (.docs/migration/ledger-mig-001-rest.md — capture provenance)
   - LEDGER-MIG-002-REALTIME v1.0.0 (.docs/migration/ledger-mig-002-realtime.md — capture provenance)
@@ -157,11 +161,11 @@ Canonicalization resolutions applied to deferred rows (summary — full rational
 
 | ID | Route / Behavior | Baseline source @98db628 | Required target behavior (Java/Spring) | OpenAPI | Evidence location | Result | Rev |
 |---|---|---|---|---|---|---|---|
-| REST-RULES-001 | `GET /api/routing-rules` — list all rules (manager+); BaseListResponse without pagination (limit=total) | `controllers/routing-rules.controller.ts:47` | `@RestController` GET, manager+ RBAC, same envelope semantics | `openapi.yaml` op `listRoutingRules` | MIG-041 contract test `listRoutingRules` | blocked | 2026-09-26 |
-| REST-RULES-002 | `POST /api/routing-rules` — create rule; admin+; 201; lenient rule JSON (ADR-021) | `controllers/routing-rules.controller.ts:102` | `@RestController` POST re-expressing ADR-021 lenient JSON validation in Java | `openapi.yaml` op `createRoutingRule` | MIG-041 contract test `createRoutingRule`; ADR-021 leniency tests | blocked | 2026-09-26 |
-| REST-RULES-003 | `PATCH /api/routing-rules/:id` — update rule; admin+; 200 | `controllers/routing-rules.controller.ts:152` | `@RestController` PATCH, admin+ RBAC | `openapi.yaml` op `updateRoutingRule` | MIG-041 contract test `updateRoutingRule` | blocked | 2026-09-26 |
-| REST-RULES-004 | `DELETE /api/routing-rules/:id` — delete rule; admin+; 200 | `controllers/routing-rules.controller.ts:208` | `@RestController` DELETE, admin+ RBAC | `openapi.yaml` op `deleteRoutingRule` | MIG-041 contract test `deleteRoutingRule` | blocked | 2026-09-26 |
-| REST-RULES-005 | `GET /api/routing-rules/:id/executions` — rule execution logs; manager+; 200 | `controllers/routing-rules.controller.ts:263` | `@RestController` GET, manager+ RBAC, execution-log payload parity | `openapi.yaml` op `getRoutingRuleExecutions` | MIG-041 contract test `getRoutingRuleExecutions` | blocked | 2026-09-26 |
+| REST-RULES-001 | `GET /api/routing-rules` — list all rules (super admin only); BaseListResponse without pagination (limit=total) | `controllers/routing-rules.controller.ts:47` | `@RestController` GET, super admin only RBAC, same envelope semantics | `openapi.yaml` op `listRoutingRules` | MIG-041 contract test `listRoutingRules` | blocked | 2026-09-26 |
+| REST-RULES-002 | `POST /api/routing-rules` — create rule; super admin only; 201; lenient rule JSON (ADR-021) | `controllers/routing-rules.controller.ts:102` | `@RestController` POST re-expressing ADR-021 lenient JSON validation in Java, super admin only RBAC | `openapi.yaml` op `createRoutingRule` | MIG-041 contract test `createRoutingRule`; ADR-021 leniency tests | blocked | 2026-09-26 |
+| REST-RULES-003 | `PATCH /api/routing-rules/:id` — update rule; super admin only; 200 | `controllers/routing-rules.controller.ts:152` | `@RestController` PATCH, super admin only RBAC | `openapi.yaml` op `updateRoutingRule` | MIG-041 contract test `updateRoutingRule` | blocked | 2026-09-26 |
+| REST-RULES-004 | `DELETE /api/routing-rules/:id` — delete rule; super admin only; 200 | `controllers/routing-rules.controller.ts:208` | `@RestController` DELETE, super admin only RBAC | `openapi.yaml` op `deleteRoutingRule` | MIG-041 contract test `deleteRoutingRule` | blocked | 2026-09-26 |
+| REST-RULES-005 | `GET /api/routing-rules/:id/executions` — rule execution logs; super admin only; 200 | `controllers/routing-rules.controller.ts:263` | `@RestController` GET, super admin only RBAC, execution-log payload parity | `openapi.yaml` op `getRoutingRuleExecutions` | MIG-041 contract test `getRoutingRuleExecutions` | blocked | 2026-09-26 |
 
 ## Bulk actions — BulkActionsController `@JsonController('/api/conversations')`
 
