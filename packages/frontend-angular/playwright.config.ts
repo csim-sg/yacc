@@ -52,9 +52,9 @@ export default defineConfig({
     // Same-origin relay: the Spring service has no CORS, so browser calls
     // reach the Java service through the dev-server proxy. `--proxy-config`
     // selects the env-overridable variant (YACC_API_PROXY_TARGET, default
-    // http://localhost:8080); plain `pnpm dev` serves the same routes from
+    // http://localhost:8080); plain `npm run dev` serves the same routes from
     // proxy.conf.json via the `serve` target's proxyConfig.
-    command: 'pnpm exec ng serve --proxy-config proxy.conf.js',
+    command: 'npm exec ng serve --proxy-config proxy.conf.js',
     url: 'http://localhost:4200',
     reuseExistingServer: !process.env.CI,
     // `ng serve` (AOT dev build) needs longer than the default 60s to become

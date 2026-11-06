@@ -42,22 +42,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9.0.0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Run backend tests
-        run: pnpm --filter @yacc/backend test tests/QA-001-integration.spec.ts
+        run: npm run test -w @yacc/backend -- tests/QA-001-integration.spec.ts
         env:
           DATABASE_URL: postgresql://yacc_user:yacc_password@localhost:5432/yacc_inbox
           REDIS_URL: redis://localhost:6379

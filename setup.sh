@@ -86,13 +86,13 @@ else
     SETUP_FAILED=1
 fi
 
-# Check pnpm
-if check_command "pnpm"; then
-    PNPM_VERSION=$(get_version "pnpm")
-    print_info "pnpm version: $PNPM_VERSION"
+# Check npm
+if check_command "npm"; then
+    NPM_VERSION=$(get_version "npm")
+    print_info "npm version: $NPM_VERSION"
 else
-    print_error "pnpm is required but not installed"
-    print_info "Install with: npm install -g pnpm@9.0.0"
+    print_error "npm is required but not installed"
+    print_info "Install Node.js with npm"
     SETUP_FAILED=1
 fi
 
@@ -157,20 +157,11 @@ if [ -d "node_modules" ]; then
     print_info "node_modules directory exists - skipping root install"
 else
     print_info "Installing root dependencies..."
-    pnpm install --frozen-lockfile || {
+    npm ci || {
         print_error "Failed to install root dependencies"
         SETUP_FAILED=1
     }
 fi
-
-# Install backend dependencies
-print_info "Installing backend dependencies..."
-cd packages/backend
-pnpm install --frozen-lockfile || {
-    print_error "Failed to install backend dependencies"
-    SETUP_FAILED=1
-}
-cd - > /dev/null
 
 print_success "All dependencies installed"
 
@@ -241,13 +232,13 @@ print_header "Step 5: Building Backend"
 
 cd packages/backend
 print_info "Running type-check..."
-pnpm type-check || {
+npm run type-check || {
     print_error "Type-check failed"
     SETUP_FAILED=1
 }
 
 print_info "Building TypeScript..."
-pnpm build || {
+npm run build || {
     print_error "Build failed"
     SETUP_FAILED=1
 }
@@ -275,7 +266,7 @@ if [ $SETUP_FAILED -eq 0 ]; then
     echo "  • View logs: docker-compose logs -f"
     echo "  • Stop services: docker-compose down"
     echo "  • Start dev: ./dev.sh"
-    echo "  • Run tests: pnpm test"
+    echo "  • Run tests: npm test"
     echo ""
 else
     print_error "Setup encountered errors - please fix issues above and run again"

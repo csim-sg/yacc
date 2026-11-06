@@ -21,7 +21,7 @@ export default defineConfig({
 
     // Test file patterns
     // By default, skip integration tests (WebSocket, queue tests)
-    // To run integration tests: RUN_INTEGRATION_TESTS=true pnpm test
+    // To run integration tests: RUN_INTEGRATION_TESTS=true npm test
     include: process.env.RUN_INTEGRATION_TESTS === 'true'
       ? [
           'tests/**/*.test.ts',

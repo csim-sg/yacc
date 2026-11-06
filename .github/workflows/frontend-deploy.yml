@@ -35,22 +35,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9.0.0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Build frontend (React)
-        run: pnpm --filter @yacc/frontend build
+        run: npm run build -w @yacc/frontend
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
@@ -90,22 +85,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9.0.0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Build frontend (Angular, validation only)
-        run: pnpm --filter @yacc/frontend-angular build
+        run: npm run build -w @yacc/frontend-angular
 
       - name: Verify build output path
         run: test -d packages/frontend-angular/dist/frontend-angular/browser

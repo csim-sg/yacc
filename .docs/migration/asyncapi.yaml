@@ -22,6 +22,21 @@
 #   retained-no-emitter (parity-of-absence; founder-visible scope note).
 # - presence.updated payload canonicalized to {userId, status, lastSeen}.
 # - Transport frozen to raw WebSocket (protocol: ws).
+#
+# Contract-change amendment (issue #452 / MIG-091c; per contract-canonicalization §4.7 —
+# founder-authorized capture correction, never silent drift):
+# - 2026-10-21 — channel `reaction.count`, inbound publish message
+#   (`channels.reaction.count.publish.message`, ledger row WS-OP-REACT-004): the
+#   single `$ref` to `components.messages.ReactionCountPayload` is replaced by the
+#   inline baseline inbound request shape (required messageId, conversationId, emoji
+#   strings + count integer; no required inbound timestamp), correcting a
+#   direction-confused capture that had bound the outbound room fan-out payload to
+#   the inbound request (baseline inbound source: reaction.controller.ts:138
+#   @98db628; founder decision 2026-10-21 — issue #366 decision comment 6310022755).
+#   Not changed: the channel set, `components.messages.ReactionCountPayload` (the
+#   outbound shape), every other message/schema and schema file, every ledger row
+#   and target-behaviour cell, the absence of any `reaction.count` `subscribe:`
+#   operation, and `info.version`.
 asyncapi: 2.6.0
 info:
   title: YACC Real-time API (canonical)
@@ -466,7 +481,16 @@ channels:
     publish:
       operationId: onReactionCount
       x-controller: packages/backend/src/socket-controllers/reaction.controller.ts:135 @98db628
-      message: {$ref: '#/components/messages/ReactionCountPayload'}
+      message:
+        x-baseline-source: packages/backend/src/socket-controllers/reaction.controller.ts:138 @98db628
+        payload:
+          type: object
+          required: [messageId, conversationId, emoji, count]
+          properties:
+            messageId: {type: string}
+            conversationId: {type: string}
+            emoji: {type: string}
+            count: {type: integer}
   typing.timeout:
     description: Server-side typing timeout trigger; emits typing.stopped to room.
     publish:

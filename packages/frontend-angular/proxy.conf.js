@@ -10,7 +10,7 @@
  * without editing anything — the Angular mirror of the React anchor's
  * VITE_API_URL override. When the variable is unset it is identical to
  * proxy.conf.json. Used by the Playwright webServer command
- * (`ng serve --proxy-config proxy.conf.js`); plain `pnpm dev` keeps the
+ * (`ng serve --proxy-config proxy.conf.js`); plain `npm run dev` keeps the
  * static default.
  */
 const defaults = require('./proxy.conf.json')

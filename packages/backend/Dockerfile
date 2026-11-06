@@ -1,36 +1,19 @@
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
+COPY package.json package-lock.json ./
+COPY packages ./packages
+RUN npm ci
+RUN npm run build -w @yacc/common && npm run build -w @yacc/backend
 
-# Install pnpm
-RUN npm install -g pnpm
-
-# Copy workspace files
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-
-# Copy packages
-COPY packages/backend ./packages/backend
-COPY packages/common ./packages/common
-
-# Install dependencies
-RUN pnpm install --frozen-lockfile
-
-# Build backend
-RUN pnpm --filter @yacc-inbox/backend build
-
-# Production stage
-FROM node:18-alpine
+FROM node:22-alpine AS production
 WORKDIR /app
-
-# Install pnpm
-RUN npm install -g pnpm
-
-# Copy only production files
-COPY --from=builder /app/packages/backend/dist ./dist
-COPY --from=builder /app/packages/backend/package.json ./
-
-# Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod
-
+COPY package.json package-lock.json ./
+COPY packages/backend/package.json ./packages/backend/package.json
+COPY packages/common/package.json ./packages/common/package.json
+COPY packages/frontend/package.json ./packages/frontend/package.json
+COPY packages/frontend-angular/package.json ./packages/frontend-angular/package.json
+RUN npm ci --omit=dev --workspace @yacc/backend
+COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
+COPY --from=builder /app/packages/common ./packages/common
 EXPOSE 3000
-
-CMD ["node", "dist/index.js"]
+CMD ["node", "packages/backend/dist/index.js"]
