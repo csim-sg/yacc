@@ -39,9 +39,11 @@ import com.yacc.repository.MessageRepository;
  *   <li>{@link #paginationHonorsCustomLimitPageOffsetTotalAndOutOfRangePages}
  *       — QA-001 TC-002-001..004, QA-004 HP-INBOX-001/EDGE-INBOX-002/SMOKE-007;</li>
  *   <li>{@link #filtersByChannelStatusPriorityAssigneeAndTheirCombinations} —
- *       QA-001 TC-003-001/TC-003-004 (+ the working AND subset of TC-003-005),
- *       QA-004 HP-INBOX-002/HP-INBOX-005/EDGE-INBOX-001/RBAC-INBOX-002..004
- *       (status/priority filter rows are finding F1 — see the method
+ *       QA-001 TC-003-001/TC-003-004 (+ the channel + assignee + status AND
+ *       combination of TC-003-005), QA-004
+ *       HP-INBOX-002/HP-INBOX-005/EDGE-INBOX-001/RBAC-INBOX-002..004
+ *       (status/priority label binding itself is covered by the #465
+ *       ConversationListEnumQueryLabelIntegrationTest — see the method
  *       javadoc);</li>
  *   <li>{@link #searchMatchesBodiesSendersAndThreadIdsCaseInsensitivelyAndReturnsEmptyWithoutMatches}
  *       — QA-001 TC-004-001..003, QA-004 SMOKE-014;</li>
@@ -166,19 +168,23 @@ class ConversationListQueryApiIntegrationTest extends AbstractApiIntegrationTest
     /**
      * QA-001 TC-003-001 and TC-003-004; QA-004 HP-INBOX-002/HP-INBOX-005,
      * EDGE-INBOX-001, RBAC-INBOX-002..004; the AND-combination substance of
-     * TC-003-005/HP-INBOX-006/SMOKE-008 on the two wire-correct filters
-     * (channel + assignee): channel/status/priority/assignee filters,
-     * combinations, and the empty intersection.
+     * TC-003-005/HP-INBOX-006/SMOKE-008 (channel + assignee pairings, plus
+     * {@code status} in the three-filter combination): channel, assignee and
+     * status filters, their combinations, and the empty intersection.
      *
-     * <p>FINDING F1 (#456): the {@code status} and {@code priority} list
-     * filters are NOT asserted here — both are enum-typed request params
-     * bound by Spring's case-sensitive {@code valueOf}, so every
-     * contract-valid lowercase label (open/pending/resolved,
-     * low/normal/high/urgent — the frozen OpenAPI enum values) is rejected
-     * with 400. That is a real product gap vs the frozen contract (ledger
-     * REST-CONV-001 "identical filter set"), reported on the issue per the
-     * no-{@code src/main}-change guardrail; this slice records it and asserts
-     * nothing about it.</p>
+     * <p>FINDING F1 (#456) — RESOLVED: at the original slice head the
+     * {@code status} and {@code priority} list filters rejected every
+     * contract-valid lowercase label (Spring bound the enum-typed request
+     * params via case-sensitive {@code valueOf}), so this test combined only
+     * channel + assignee. That product gap vs the frozen contract (ledger
+     * REST-CONV-001 "identical filter set") was fixed by #465 / PR #466
+     * (merged to {@code dev} at {@code 2dbb4a9}) via
+     * {@code EnumQueryBindingConfig}, which binds the four enum query params
+     * through the enums' {@code fromLabel} creators. The three-filter
+     * combination below now runs on the contract-conformant lowercase
+     * {@code status=open} label; label-level binding/filtering itself is
+     * pinned by {@code ConversationListEnumQueryLabelIntegrationTest}
+     * (#465).</p>
      */
     @Test
     void filtersByChannelStatusPriorityAssigneeAndTheirCombinations() throws Exception {
@@ -212,15 +218,19 @@ class ConversationListQueryApiIntegrationTest extends AbstractApiIntegrationTest
                 .containsExactlyInAnyOrder(tgOpenHighManager.getId().toString(),
                         ircResolvedLowManager.getId().toString());
 
-        // Combined AND logic on wire-correct filters (the working subset of
-        // TC-003-005 / HP-INBOX-006) and the impossible intersection →
-        // total 0 (EDGE-INBOX-001).
+        // Combined AND logic on contract-conformant filters (TC-003-005 /
+        // HP-INBOX-006 / SMOKE-008) and the three-filter channel + assignee +
+        // status intersection → total 0 (EDGE-INBOX-001). Status and assignee
+        // are load-bearing in that combination: dropping status or assignee
+        // each yields exactly 1 row, the full combination yields 0 (the
+        // channel member's load-bearing behavior is asserted by the two
+        // channel-only queries above).
         assertThat(listedIds("?channel=telegram&assignedUserId=" + OTHER_MANAGER_ID, SUPER))
                 .containsExactly(tgPending);
         assertThat(listedIds("?channel=telegram&assignedUserId=" + MANAGER_ID, SUPER))
                 .containsExactly(tgOpenHighManager.getId().toString());
         mockMvc.perform(get("/api/conversations?channel=telegram&assignedUserId="
-                        + OTHER_MANAGER_ID + "&status=OPEN")
+                        + OTHER_MANAGER_ID + "&status=open")
                         .header("Authorization", bearer(SUPER)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(0));
@@ -412,12 +422,13 @@ class ConversationListQueryApiIntegrationTest extends AbstractApiIntegrationTest
                 .andExpect(jsonPath("$.error")
                         .value("Invalid query: page must be a positive integer"));
 
-        // Invalid status / legacy priority labels → conversion 400
-        // (EDGE-INBOX-004/005). Note (finding F1 on #456): today EVERY label
-        // — including the contract-valid lowercase ones — is rejected here,
-        // because the enum-typed request params bind via case-sensitive
-        // {@code valueOf}; these two assertions document the 400 rejection
-        // shape only and must be re-read alongside F1.
+        // Invalid status / legacy priority labels → 400 (EDGE-INBOX-004/005).
+        // The contract-valid lowercase labels now bind through the enum label
+        // editors registered by #465 (EnumQueryBindingConfig) and are
+        // asserted in ConversationListEnumQueryLabelIntegrationTest; the two
+        // values below are genuine non-labels — `invalid` is not a frozen
+        // status label and `medium` is not a frozen priority label — so both
+        // stay invalid-value 400s.
         mockMvc.perform(get("/api/conversations?status=invalid")
                         .header("Authorization", auth))
                 .andExpect(status().isBadRequest())
