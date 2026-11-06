@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,6 +91,17 @@ class AsyncApiRealtimePayloadConformanceTest {
 
     private Map<String, JsonSchema> payloadSchemas;
 
+    /**
+     * MIG-091c (#452): the corrected inline {@code reaction.count} payloads,
+     * read from the frozen classpath mirror {@code /contract/asyncapi.yaml}
+     * (the channel's inbound publish payload and the outbound
+     * {@code ReactionCountPayload} component — neither has a schema file).
+     */
+    private JsonSchema reactionCountInboundSchema;
+    private JsonNode reactionCountInboundPayload;
+    private JsonSchema reactionCountOutboundSchema;
+    private JsonNode reactionCountOutboundPayload;
+
     @BeforeAll
     void loadPayloadSchemas() throws IOException {
         payloadSchemas = new LinkedHashMap<>();
@@ -118,6 +130,29 @@ class AsyncApiRealtimePayloadConformanceTest {
                                 .formatAssertionsEnabled(Boolean.TRUE)
                                 .build()));
             }
+        }
+
+        // MIG-091c (#452; founder decision 2026-10-21 — #366 comment 6310022755):
+        // load the inline reaction.count payloads from the frozen classpath
+        // mirror so the corrected inbound publish payload and the unchanged
+        // outbound component are both validated where they are declared.
+        try (InputStream contract = getClass()
+                .getResourceAsStream("/contract/asyncapi.yaml")) {
+            assertThat(contract)
+                    .as("frozen asyncapi.yaml on the test classpath").isNotNull();
+            JsonNode root = new ObjectMapper(new YAMLFactory()).readTree(contract);
+            reactionCountInboundPayload = root.path("channels").path("reaction.count")
+                    .path("publish").path("message").path("payload");
+            reactionCountOutboundPayload = root.path("components").path("messages")
+                    .path("ReactionCountPayload").path("payload");
+            assertThat(reactionCountInboundPayload.isObject())
+                    .as("channels.reaction.count.publish.message.payload is inline")
+                    .isTrue();
+            assertThat(reactionCountOutboundPayload.isObject())
+                    .as("components.messages.ReactionCountPayload.payload is inline")
+                    .isTrue();
+            reactionCountInboundSchema = inlineSchema(reactionCountInboundPayload);
+            reactionCountOutboundSchema = inlineSchema(reactionCountOutboundPayload);
         }
     }
 
@@ -254,6 +289,74 @@ class AsyncApiRealtimePayloadConformanceTest {
                 .as("inbound frames carry no timestamp (envelope is outbound-only)")
                 .isFalse();
         assertThat(errors("message-sent", wire.path("data"))).isEmpty();
+    }
+
+    // --- MIG-091c (#452): direction-specific reaction.count conformance.
+    // The corrected inline channel payload describes the baseline inbound
+    // request; the outbound component is unchanged (AC-2/AC-3/AC-4; founder
+    // decision 2026-10-21 — #366 comment 6310022755). ---
+
+    @Test
+    void reactionCountInboundPublishPayloadAcceptsTheBaselineShapeWithoutTimestamp() {
+        // Declared shape: required [messageId, conversationId, emoji, count]
+        // and no timestamp member — the baseline inbound request shape
+        // (reaction.controller.ts:138 @98db628).
+        List<String> required = new ArrayList<>();
+        reactionCountInboundPayload.path("required")
+                .forEach(n -> required.add(n.asText()));
+        assertThat(required).containsExactlyInAnyOrder(
+                "messageId", "conversationId", "emoji", "count");
+        assertThat(reactionCountInboundPayload.path("properties").has("timestamp"))
+                .as("inbound payload declares no timestamp member").isFalse();
+
+        // Baseline-shaped frame without timestamp (and without any extra
+        // member) validates with zero errors.
+        JsonNode inbound = mapper.createObjectNode()
+                .put("messageId", "m-1")
+                .put("conversationId", "00000000-0000-4000-8000-000000000002")
+                .put("emoji", "👍")
+                .put("count", 3);
+        assertThat(reactionCountInboundSchema.validate(inbound)).isEmpty();
+    }
+
+    @Test
+    void reactionCountInboundPublishPayloadRejectsAMissingConversationId() {
+        // conversationId is the routing member — a frame without it is rejected.
+        JsonNode unroutable = mapper.createObjectNode()
+                .put("messageId", "m-1")
+                .put("emoji", "👍")
+                .put("count", 3);
+        Set<ValidationMessage> violations = reactionCountInboundSchema.validate(unroutable);
+        assertThat(violations).isNotEmpty();
+        assertThat(violations).anySatisfy(message ->
+                assertThat(message.getMessage()).contains("conversationId"));
+    }
+
+    @Test
+    void reactionCountOutboundComponentStaysUnchanged() {
+        // The outbound ReactionCountPayload keeps its frozen shape: required
+        // [messageId, emoji, count, timestamp], no conversationId member.
+        List<String> required = new ArrayList<>();
+        reactionCountOutboundPayload.path("required")
+                .forEach(n -> required.add(n.asText()));
+        assertThat(required).containsExactlyInAnyOrder(
+                "messageId", "emoji", "count", "timestamp");
+        assertThat(reactionCountOutboundPayload.path("properties").has("conversationId"))
+                .as("outbound payload has no conversationId").isFalse();
+
+        // An outbound-shaped sample (RFC 3339 timestamp) still validates.
+        JsonNode outbound = mapper.createObjectNode()
+                .put("messageId", "m-1")
+                .put("emoji", "👍")
+                .put("count", 3)
+                .put("timestamp", "2026-10-21T10:00:00.000Z");
+        assertThat(reactionCountOutboundSchema.validate(outbound)).isEmpty();
+
+        // The timestamp stays required outbound — a frame without it is rejected.
+        assertThat(reactionCountOutboundSchema.validate(mapper.createObjectNode()
+                .put("messageId", "m-1")
+                .put("emoji", "👍")
+                .put("count", 3))).isNotEmpty();
     }
 
     // --- MIG-062 connector-bridge payload emitters (WS-EVT-003/004/005;
@@ -400,5 +503,12 @@ class AsyncApiRealtimePayloadConformanceTest {
 
     private Set<ValidationMessage> errors(String schemaName, JsonNode instance) {
         return payloadSchemas.get(schemaName).validate(instance);
+    }
+
+    private JsonSchema inlineSchema(JsonNode payload) {
+        return JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012)
+                .getSchema(payload, SchemaValidatorsConfig.builder()
+                        .formatAssertionsEnabled(Boolean.TRUE)
+                        .build());
     }
 }
