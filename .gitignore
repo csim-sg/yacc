@@ -21,3 +21,10 @@ packages/frontend/test-results/
 packages/frontend-angular/test-results/
 packages/frontend/playwright-report/
 .worktrees/
+
+# Compose local deployment (MIG-107 #473): decrypted SOPS output and local
+# TLS material are never committed — the only committed secret artifact is
+# the SOPS-encrypted *.sops.env file.
+deploy/compose/secrets/*.env
+!deploy/compose/secrets/*.sops.env
+deploy/compose/tls/

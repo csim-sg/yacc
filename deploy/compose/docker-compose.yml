@@ -1,0 +1,138 @@
+# =============================================================================
+# YACC local Docker Compose deployment target (ADR-032; MIG-107 #473).
+#
+# Local/dev FIRST baseline: PostgreSQL + Java backend + Traefik (TLS + /ws).
+# NOT a public target: Traefik binds 127.0.0.1 only; PostgreSQL and the
+# backend publish NO host ports (compose-internal network only). Staging/
+# production profiles, topology, and public exposure are deferred (ADR-032
+# open inputs; the exposure step is separately founder-gated).
+#
+# Secrets: no secret value lives in this file. Interpolation requires the
+# DECRYPTED SOPS env file (see deploy/compose/secrets/ and
+# .docs/runbooks/compose-local.md):
+#
+#   docker compose -f deploy/compose/docker-compose.yml \
+#     --env-file deploy/compose/secrets/local.env \
+#     up -d --build
+#
+# The same decrypted file is the backend service's env_file — one decryption,
+# one wiring. Compose fails closed ("POSTGRES_* required") when it is absent.
+#
+# Health semantics (honest, ADR-032 accepted losses): `healthcheck` provides
+# health VISIBILITY only — Docker does not restart a still-running unhealthy
+# container; `restart: unless-stopped` acts on process EXIT only; Traefik
+# routes without readiness gating (no health-aware policy configured here).
+# Recovery for an unhealthy-but-running container is manual intervention.
+# =============================================================================
+
+name: yacc-local
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    # No host ports: reachable only on the compose-internal network.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER required — decrypt deploy/compose/secrets/local.sops.env first}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required — decrypt deploy/compose/secrets/local.sops.env first}
+      POSTGRES_DB: yacc_inbox
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  backend:
+    # Build path kept for local iteration (MIG-107): the image is built from
+    # the repo Dockerfile — Temurin 21 JRE, non-root uid 1000 (ADR-029).
+    # Image builds are version-pinned by git commit; never a :latest flow.
+    build:
+      context: ../../services/backend-java
+    image: yacc-backend:compose-local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # ADR-029 envelope in container terms: non-root, read-only root FS, all
+    # capabilities dropped; writable paths are tmpfs only (tmpdir, heap
+    # dumps, logs — matching the Dockerfile's baked-in defaults).
+    user: "1000:1000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:uid=1000,gid=1000
+      - /app/heap-dumps:uid=1000,gid=1000,mode=700
+      - /app/logs:uid=1000,gid=1000,mode=700
+    # Resource sizing (ADR-029 amendment): 1 Gi floor / 2 Gi cap intent + CPU
+    # cap. Enforcement reality (validated, not assumed): `limits.memory` is a
+    # hard cgroup RAM cap (RSS beyond it → OOM kill); `reservations.memory`
+    # is ADVISORY in plain Compose — no scheduler admission, NOT a Kubernetes
+    # request equivalent. CPU limit is enforced via CFS quota.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2g
+        reservations:
+          memory: 1g
+    # One decryption, one wiring: the operator-decrypted SOPS env file feeds
+    # BOTH compose interpolation (postgres credentials above, via --env-file)
+    # and the backend container environment (env_file). backend.env carries
+    # only non-secret configuration; secrets/local.env is git-ignored.
+    env_file:
+      - ./backend.env
+      - path: ./secrets/local.env
+        required: true
+    # Health VISIBILITY only (see header): marks unhealthy; nothing restarts
+    # or unroutes an unhealthy container. curl is present in the Temurin
+    # Noble runtime image. /health/ready is application readiness, not a
+    # dependency proof.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+    # No `ports:` — the backend is reachable only through Traefik.
+
+  traefik:
+    image: traefik:v3.3.6
+    restart: unless-stopped
+    depends_on:
+      - backend
+    command:
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --providers.file.filename=/etc/traefik/dynamic/traefik-dynamic.yml
+      # LOCAL TLS: operator-provided self-signed certificate for the local
+      # origin (no ACME/Let's Encrypt — a host with no public DNS cannot
+      # complete the challenge). Certificates live at deploy/compose/tls/
+      # (git-ignored); see the runbook for generation + location.
+      - --ping=true
+      - --log.level=INFO
+      - --accesslog=true
+    # Loopback-only binding: no public listener (MIG-107 binding constraint).
+    ports:
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
+    volumes:
+      - ./traefik-dynamic.yml:/etc/traefik/dynamic/traefik-dynamic.yml:ro
+      - ./tls:/etc/traefik/certs:ro
+    # No docker.sock mount: routers are static (file provider), so Traefik
+    # has no Docker control surface.
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+volumes:
+  postgres_data:
