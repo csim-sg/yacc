@@ -27,22 +27,50 @@
 #
 # Secrets discipline: decrypted values are read from the git-ignored
 # deploy/compose/secrets/local.env and are NEVER printed by this script.
-# The `docker compose config` render lands in a mktemp file (it contains
-# decrypted values) that is removed on exit.
+# The file is treated strictly as DATA: a strict allowlist KEY=value parser
+# reads it — the decrypted contents are NEVER sourced or evaled, so shell
+# syntax / command substitutions inside values cannot execute. When the
+# script itself decrypts (sops), the plaintext is written to a mode-0600
+# mktemp file inside the secrets directory (umask 077; mode VERIFIED before
+# any secret is written) and atomically renamed into place — the decrypted
+# env file never exists with permissive permissions, and no post-write
+# chmod on an already-readable file is relied on. The `docker compose
+# config` render lands in a mktemp file (it contains decrypted values)
+# removed on exit.
+#
+# Cleanup discipline: an EXIT trap (SIGINT/SIGTERM/SIGHUP funnel through it)
+# removes this run's temp files and — once THIS script has started the stack
+# itself — tears the stack down with a project-scoped
+# `docker compose down -v --remove-orphans` touching ONLY the `yacc-local`
+# project's containers/network and its own postgres volume (no prune, no
+# kill patterns, unrelated Docker resources untouched). It runs on success,
+# failure, and interruption alike (unless --keep), and never masks the
+# original exit status.
 #
 # Usage:
 #   ./verify-local-stack.sh [--keep] [--skip-build]
 #     --keep        leave the stack running after verification (default:
-#                   `docker compose down -v` — full reset, deterministic reruns)
+#                   `docker compose down -v` — full reset, deterministic
+#                   reruns; the same scoped teardown also runs on failure or
+#                   interrupt once the stack is up)
 #     --skip-build  do not rebuild the backend image
 # =============================================================================
 set -euo pipefail
+
+# Restrictive-by-default for EVERYTHING this script creates: plaintext
+# secrets, TLS key material, rendered config, run temp files.
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
-COMPOSE="docker compose -f deploy/compose/docker-compose.yml"
+# Every Compose invocation MUST carry --env-file: the compose file
+# interpolates required secrets (${POSTGRES_USER:?...}), so even read-only
+# commands (`ps`, `logs`, `config`) fail without it (verified: compose v5
+# re-interpolates the model on every invocation, container state irrelevant).
+# Baking it in here makes it impossible to omit on any call site below.
+COMPOSE="docker compose -f deploy/compose/docker-compose.yml --env-file deploy/compose/secrets/local.env"
 ENV_FILE="deploy/compose/secrets/local.env"
 SOPS_FILE="deploy/compose/secrets/local.sops.env"
 ORIGIN="https://localhost"
@@ -55,7 +83,35 @@ KEEP=0; SKIP_BUILD=0
 [ "${2:-}" = "--skip-build" ] && SKIP_BUILD=1
 
 TMPDIR_RUN="$(mktemp -d /tmp/opencode/yacc473-verify.XXXXXX)"
-trap 'rm -rf "$TMPDIR_RUN"' EXIT
+STACK_UP=0          # set to 1 ONLY after this script successfully started the stack
+PLAINTEXT_TMP=""    # set only during SOPS decryption (mode-0600 temp in secrets dir)
+
+# Project-scoped teardown: Compose's label scoping limits `down -v
+# --remove-orphans` to containers/networks labeled for THIS project
+# (`name: yacc-local` in deploy/compose/docker-compose.yml) and to the
+# non-external volumes declared in that same file (its own postgres data
+# volume). It cannot touch other projects, other volumes, or images. No
+# `docker system prune`, no kill patterns anywhere in this script.
+teardown_stack() {
+  $COMPOSE down -v --remove-orphans
+}
+
+cleanup() {
+  rc=$?
+  trap - EXIT INT TERM HUP
+  if [ "$STACK_UP" -eq 1 ] && [ "$KEEP" -eq 0 ]; then
+    echo "  trap teardown (failure/interrupt): project-scoped down -v — removing ONLY the 'yacc-local' stack, its network and its own postgres volume"
+    teardown_stack >/dev/null 2>&1 || true
+  fi
+  if [ -n "$PLAINTEXT_TMP" ] && [ -e "$PLAINTEXT_TMP" ]; then
+    shred -u "$PLAINTEXT_TMP" 2>/dev/null || rm -f "$PLAINTEXT_TMP"
+  fi
+  rm -rf "$TMPDIR_RUN"
+  exit "$rc"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
 
 FAILURES=0
 pass() { echo "PASS  $1"; }
@@ -78,33 +134,103 @@ docker info >/dev/null 2>&1 && pass "docker daemon reachable" || { fail "docker 
 [ "$ok" -eq 1 ] || exit 1
 
 # ---------------------------------------------------------------- phase 2
-echo "--- Phase 2: decrypted secrets env"
+echo "--- Phase 2: decrypted secrets env (data-only handling — never sourced/evaled)"
 if [ -f "$ENV_FILE" ]; then
   pass "decrypted env present: $ENV_FILE (git-ignored)"
 else
   echo "  $ENV_FILE absent — attempting SOPS decryption (requires the private age identity — operator action)."
-  if require sops && sops -d "$SOPS_FILE" > "$ENV_FILE" 2>"$TMPDIR_RUN/sops.err"; then
-    chmod 600 "$ENV_FILE"; pass "decrypted via sops into $ENV_FILE (git-ignored)"
+  if require sops; then
+    # Restrictive-from-creation: a mode-0600 mktemp file INSIDE the secrets
+    # directory (same filesystem → atomic rename), mode VERIFIED before any
+    # plaintext is written. The final path comes into existence only via
+    # rename of an already-0600 file — no window where the plaintext is
+    # readable by other local users, and no reliance on post-write chmod.
+    PLAINTEXT_TMP="$(mktemp "$SCRIPT_DIR/secrets/.local.env.XXXXXX")"
+    mk_mode="$(stat -c '%a' "$PLAINTEXT_TMP")"
+    if [ "$mk_mode" != "600" ]; then
+      fail "mktemp created $PLAINTEXT_TMP with mode $mk_mode (expected 600) — aborting BEFORE any secret is written"
+      rm -f "$PLAINTEXT_TMP"; PLAINTEXT_TMP=""
+      exit 1
+    fi
+    if sops -d "$SOPS_FILE" > "$PLAINTEXT_TMP" 2>"$TMPDIR_RUN/sops.err" \
+       && [ "$(stat -c '%a' "$PLAINTEXT_TMP")" = "600" ]; then
+      mv -f "$PLAINTEXT_TMP" "$ENV_FILE"   # atomic rename: $ENV_FILE is 0600 from the instant it exists
+      PLAINTEXT_TMP=""
+      pass "decrypted via sops → $ENV_FILE (born 0600: mktemp + mode-verified + atomic rename; git-ignored)"
+    else
+      fail "SOPS decryption failed — nothing was written to $ENV_FILE; mode-0600 temp removed"
+      rm -f "$PLAINTEXT_TMP"; PLAINTEXT_TMP=""
+      exit 1
+    fi
   else
-    fail "no decrypted env and SOPS decryption unavailable — decrypt $SOPS_FILE with your private identity: sops -d $SOPS_FILE > $ENV_FILE (never commit/log the output)"
+    fail "no decrypted env and sops unavailable — decrypt $SOPS_FILE with your private identity (runbook §3.1: create the target file mode 0600 BEFORE decrypting; never commit/log the output)"
     exit 1
   fi
 fi
+# An operator-supplied existing file must not be group/world-readable either —
+# enforced BEFORE any content is read (reviewer finding: legacy redirect could
+# leave a 0644 file behind).
+cur_mode="$(stat -c '%a' "$ENV_FILE")"
+if [ "$cur_mode" != "600" ]; then
+  echo "  $ENV_FILE had mode $cur_mode — chmod 600 applied before any read"
+  chmod 600 "$ENV_FILE"
+  cur_mode="$(stat -c '%a' "$ENV_FILE")"
+fi
+if [ "$cur_mode" = "600" ]; then pass "$ENV_FILE mode is 0600"; else fail "could not enforce 0600 on $ENV_FILE"; exit 1; fi
 
-# Source the env (values stay in shell memory; never echoed).
-set -a; . "$ENV_FILE"; set +a
+# --- BEGIN dotenv data parser (verbatim-extractable for negative controls) ---
+# Strict DATA parser for the decrypted dotenv: KEY=value records only, keys
+# restricted to the artifact's exact allowlist, duplicate/malformed/unknown
+# keys rejected. Values are stored verbatim (one optional pair of matching
+# surrounding quotes stripped) and NEVER executed — no source, no eval: a
+# value like `$(reboot)` or backtick payloads is inert text.
+declare -A SECRETS
+ALLOWED_SECRET_KEYS="POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL RECOVERY_MODE RECOVERY_KEY YACC_RECOVERY_KEY_HASH YACC_AUTH_TOKEN_SIGNING_KEY YACC_INTEGRATION_ENCRYPTION_MASTER_KEY YACC_AUTH_EMAIL_SENDGRID_API_KEY"
+parse_env_as_data() {
+  local file="$1" line key value
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    case "$line" in ''|'#'*) continue ;; esac
+    case "$line" in
+      [A-Za-z_]*=*) : ;;
+      *) fail "env data parser: line is not KEY=value — rejected ($file)"; return 1 ;;
+    esac
+    key="${line%%=*}"
+    value="${line#*=}"
+    case "$key" in
+      *[!A-Za-z0-9_]*) fail "env data parser: invalid characters in key — rejected"; return 1 ;;
+    esac
+    case " $ALLOWED_SECRET_KEYS " in
+      *" $key "*) : ;;
+      *) fail "env data parser: key not in allowlist — rejected: $key"; return 1 ;;
+    esac
+    if [ -n "${SECRETS[$key]+set}" ]; then fail "env data parser: duplicate key — rejected: $key"; return 1; fi
+    if [ "${#value}" -ge 2 ]; then
+      v_first="${value:0:1}"; v_last="${value: -1}"
+      if { [ "$v_first" = '"' ] && [ "$v_last" = '"' ]; } || { [ "$v_first" = "'" ] && [ "$v_last" = "'" ]; }; then
+        value="${value:1:${#value}-2}"
+      fi
+    fi
+    SECRETS["$key"]="$value"
+  done < "$file"
+}
+# --- END dotenv data parser ---
+parse_env_as_data "$ENV_FILE" || exit 1
+pass "decrypted env parsed as strict DATA (allowlist only; no source/eval; values never printed)"
+
+ok_vars=1
 for varname in POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL \
   YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL \
   RECOVERY_KEY YACC_RECOVERY_KEY_HASH \
   YACC_AUTH_TOKEN_SIGNING_KEY YACC_INTEGRATION_ENCRYPTION_MASTER_KEY; do
-  [ -n "${!varname:-}" ] || fail "required secret var empty/missing in $ENV_FILE: $varname"
+  [ -n "${SECRETS[$varname]-}" ] || { fail "required secret var empty/missing in $ENV_FILE: $varname"; ok_vars=0; }
 done
 # RECOVERY_MODE must be PRESENT but is legitimately EMPTY (recovery off) in the
 # local baseline; the founder flips it to `once` deliberately at the console.
-grep -q '^RECOVERY_MODE=' "$ENV_FILE" || fail "RECOVERY_MODE not declared in $ENV_FILE (empty = recovery off)"
-pass "all required secret variables present in $ENV_FILE (values not printed)"
+[ -n "${SECRETS[RECOVERY_MODE]+set}" ] || fail "RECOVERY_MODE not declared in $ENV_FILE (empty = recovery off)"
+[ "$ok_vars" -eq 1 ] && pass "all required secret variables present in $ENV_FILE (values not printed)"
 # Fail fast on a malformed signing key (base64 PKCS#8 DER) instead of a slow boot-fail loop.
-if printf %s "$YACC_AUTH_TOKEN_SIGNING_KEY" | base64 -d 2>/dev/null | openssl pkcs8 -inform DER -nocrypt -out /dev/null 2>/dev/null; then
+if printf %s "${SECRETS[YACC_AUTH_TOKEN_SIGNING_KEY]-}" | base64 -d 2>/dev/null | openssl pkcs8 -inform DER -nocrypt -out /dev/null 2>/dev/null; then
   pass "token signing key decodes as PKCS#8 RSA private key (format check only — no output)"
 else
   fail "YACC_AUTH_TOKEN_SIGNING_KEY is not base64 PKCS#8 — the JVM will fail-closed at boot (JwtTokenService)"
@@ -147,7 +273,7 @@ STRAY="$(echo "$AGE_LINE_VALUES" | tr ',' '\n' | grep -vc "^$REC_A$\|^$REC_B$" |
 # ---------------------------------------------------------------- phase 4
 echo "--- Phase 4: compose config + env-name contract gate (TM-003 non-regression)"
 RENDER="$TMPDIR_RUN/rendered.yml"
-if $COMPOSE --env-file "$ENV_FILE" config > "$RENDER" 2>"$TMPDIR_RUN/config.err"; then
+if $COMPOSE config > "$RENDER" 2>"$TMPDIR_RUN/config.err"; then
   pass "docker compose config parses and validates"
 else
   fail "docker compose config failed: $(cat "$TMPDIR_RUN/config.err")"; exit 1
@@ -207,8 +333,9 @@ for port in 80 443; do
 done
 BUILD_FLAG=""; [ "$SKIP_BUILD" -eq 0 ] && BUILD_FLAG="--build"
 # Full reset first: deterministic evidence (fresh DB → bootstrap re-runs).
-$COMPOSE --env-file "$ENV_FILE" down -v --remove-orphans >/dev/null 2>&1 || true
-if $COMPOSE --env-file "$ENV_FILE" up -d $BUILD_FLAG >"$TMPDIR_RUN/up.log" 2>&1; then
+$COMPOSE down -v --remove-orphans >/dev/null 2>&1 || true
+if $COMPOSE up -d $BUILD_FLAG >"$TMPDIR_RUN/up.log" 2>&1; then
+  STACK_UP=1   # from here on, ANY exit path (failure/interrupt) tears the stack down unless --keep
   pass "docker compose up -d --build"
 else
   fail "docker compose up failed: $(tail -5 "$TMPDIR_RUN/up.log")"; exit 1
@@ -244,20 +371,21 @@ ready="$(curl -sk -o "$TMPDIR_RUN/ready.json" -w '%{http_code}' "$ORIGIN/health/
 
 # ---------------------------------------------------------------- phase 8
 echo "--- Phase 8: authenticated REST through the proxy (values redacted)"
+if [ "$ok_vars" -eq 0 ]; then fail "authenticated phases skipped — required secret variables missing"; exit 1; fi
 signin_code="$(curl -sk -o "$TMPDIR_RUN/signin1.json" -w '%{http_code}' "$ORIGIN/api/auth/sign-in/email" \
   -H 'Content-Type: application/json' \
-  --data "{\"email\":\"$YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL\",\"password\":\"$YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL\"}")"
+  --data "{\"email\":\"${SECRETS[YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL]}\",\"password\":\"${SECRETS[YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL]}\"}")"
 [ "$signin_code" = "200" ] && pass "POST /api/auth/sign-in/email → 200 (bootstrap Super Admin)" || { fail "sign-in → $signin_code"; cat "$TMPDIR_RUN/signin1.json"; exit 1; }
 TOKEN1="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("accessToken",""))' < "$TMPDIR_RUN/signin1.json")"
 [ -n "$TOKEN1" ] || { fail "no accessToken in sign-in response"; exit 1; }
 NEWPASS="$(openssl rand -base64 18)"
 chg_code="$(curl -sk -o "$TMPDIR_RUN/chg.json" -w '%{http_code}' "$ORIGIN/api/auth/change-password" \
   -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN1" \
-  --data "{\"currentPassword\":\"$YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL\",\"newPassword\":\"$NEWPASS\"}")"
+  --data "{\"currentPassword\":\"${SECRETS[YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL]}\",\"newPassword\":\"$NEWPASS\"}")"
 [ "$chg_code" = "200" ] && pass "forced-password-change branch: POST /api/auth/change-password → 200" || fail "change-password → $chg_code"
 signin2_code="$(curl -sk -o "$TMPDIR_RUN/signin2.json" -w '%{http_code}' "$ORIGIN/api/auth/sign-in/email" \
   -H 'Content-Type: application/json' \
-  --data "{\"email\":\"$YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL\",\"password\":\"$NEWPASS\"}")"
+  --data "{\"email\":\"${SECRETS[YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL]}\",\"password\":\"$NEWPASS\"}")"
 [ "$signin2_code" = "200" ] && pass "re-sign-in with replaced credential → 200" || fail "re-sign-in → $signin2_code"
 TOKEN2="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("accessToken",""))' < "$TMPDIR_RUN/signin2.json")"
 conv_code="$(curl -sk -o "$TMPDIR_RUN/conv.json" -w '%{http_code}' "$ORIGIN/api/conversations" -H "Authorization: Bearer $TOKEN2")"
@@ -331,9 +459,14 @@ if [ -z "$(git diff --check)" ]; then pass "git diff --check clean"; else fail "
 
 # ---------------------------------------------------------------- cleanup
 if [ "$KEEP" -eq 1 ]; then
-  echo "--- stack LEFT RUNNING (—keep): docker compose -f deploy/compose/docker-compose.yml --env-file $ENV_FILE ps"
+  echo "--- stack LEFT RUNNING (--keep): docker compose -f deploy/compose/docker-compose.yml --env-file $ENV_FILE ps"
 else
-  $COMPOSE --env-file "$ENV_FILE" down -v --remove-orphans >/dev/null 2>&1 && pass "teardown: docker compose down -v (project-scoped volumes removed; unrelated docker resources untouched)"
+  if teardown_stack >/dev/null 2>&1; then
+    STACK_UP=0   # normal-path teardown done — the EXIT trap will not repeat it
+    pass "teardown: docker compose down -v (project-scoped: only 'yacc-local' containers/network + its own postgres volume; unrelated docker resources untouched)"
+  else
+    fail "teardown: docker compose down -v reported failure (stack may still be running — inspect 'docker compose -f deploy/compose/docker-compose.yml ps')"
+  fi
 fi
 
 echo "==================================================================="
