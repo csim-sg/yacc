@@ -1,9 +1,9 @@
 # ADR-029: JVM Deployment Envelope + Observability
 
-**Status:** Accepted — **Amended 2026-11-10 (ADR-032 / MIG-106 #472): Kubernetes-specific expressions replaced with Compose equivalents; portable runtime contract unchanged — see amendment note**  
-**Date:** 2026-09-24  
-**Owner:** Tech-lead (technical author), Founder (decision authority)  
-**Type:** Architecture / Infrastructure  
+**Status:** Accepted — **Amended 2026-11-10 (ADR-032 / MIG-106 #472): Kubernetes-specific expressions re-expressed for Compose; portable runtime contract unchanged — see amendment note**
+**Date:** 2026-09-24
+**Owner:** Tech-lead (technical author), Founder (decision authority)
+**Type:** Architecture / Infrastructure
 **Amends:** ADR-019 (K3s/Helm pod spec), ADR-004 (logging)
 
 > **Amendment note (2026-11-10, ADR-032 / MIG-106 #472).** The deployment target is now
@@ -17,16 +17,23 @@
 > (field parity), MDC correlationId, Micrometer + `/actuator/prometheus`; audit via
 > Spring Security events + audit table; single instance per environment.
 >
-> **Replaced (Kubernetes-specific expressions → Compose equivalents):**
-> (1) *Pod envelope* (≥ 1Gi request / 2Gi limit, Helm `deploy.resources`) → the same
-> envelope restated as a **container memory limit contract** — at least 1 Gi reserved,
-> capped at 2 Gi — plus an explicit CPU limit; exact Compose expressions and values are
-> pinned by the Compose implementation issue (#473). The requirement survives; only the
-> vocabulary changed. (2) *emptyDir volumes* → tmpfs mounts / named volumes for tmpdir,
+> **Replaced (Kubernetes-specific expressions → Compose re-expression):**
+> (1) *Pod envelope* (≥ 1Gi request / 2Gi limit, Helm `deploy.resources`) → the sizing
+> requirement is carried over as an intended **container memory contract** — 1 Gi floor,
+> 2 Gi cap — plus an explicit CPU limit. This is **not** a claimed equivalence: a
+> Kubernetes request is a scheduler reservation/admission property with no identical
+> plain-Compose mechanism, and Compose resource semantics differ; the concrete Compose
+> expressions, what the chosen runtime actually enforces, and the validated host sizing
+> are pinned by the Compose implementation issue (#473) and count as satisfied only after
+> that validation. (2) *emptyDir volumes* → tmpfs mounts / named volumes for tmpdir,
 > heap dumps and logs. (3) *Kubernetes liveness/readiness probes* → container
-> `healthcheck` on the same `/health/*` wire paths plus a `restart` policy, with Traefik
-> as the routing layer; probe-driven restart and readiness-gated routing are accepted
-> losses recorded in ADR-032, not silent drops.
+> `healthcheck` on the same `/health/*` wire paths for health **visibility**, plus a
+> `restart` policy that acts on **process exit only** — Docker does not restart a
+> still-running unhealthy container, and Traefik is not readiness-gated unless a
+> health-check-aware routing policy is configured and verified. Probe-driven restart and
+> readiness-gated routing are accepted losses recorded in ADR-032, not silent drops; any
+> mechanism to restore part of that behavior is chosen and validated by #473, not
+> assumed here.
 
 ## Context
 

@@ -118,7 +118,7 @@ After message stored:
 | **Async / Queue** | Quartz + PostgreSQL DB DLQ | Outbound message retry queue (ADR-028; Redis dropped) |
 | **File Storage** | Cloudflare R2 | Raw payloads, attachments, re-hosted files |
 | **Email** | Spring mail / SendGrid | Password reset emails |
-| **Hosting** | Docker Compose (single-tenant MVP) | Single Docker host per environment; Traefik ingress; ADR-032 (supersedes ADR-019); ADR-029 JVM envelope |
+| **Hosting** | Docker Compose (single-tenant MVP) | Traefik ingress; ADR-032 (supersedes ADR-019); ADR-029 JVM envelope; host topology unresolved (deferred to #473) |
 | **Testing** | Playwright | E2E testing |
 | **Backend Testing** | JUnit 5 + Testcontainers | Unit, integration and contract tests (JaCoCo ≥85% gate) |
 | **Frontend Testing** | Vitest | Unit tests |

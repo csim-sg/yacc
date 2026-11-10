@@ -15,7 +15,7 @@ See [01-product-specification.md](./01-product-specification.md) for full scope 
 
 ## Deployment & CI/CD
 
-- Target runtime: Docker Compose (ADR-032, 2026-11-10 — supersedes ADR-019 K3s + Helm; single Docker host, manual pinned-image deploys)
+- Target runtime: Docker Compose (ADR-032, 2026-11-10 — supersedes ADR-019 K3s + Helm; manual pinned-image deploys; host topology unresolved, #473)
 - Ingress/secrets: Traefik (TLS; proxies `/api`, `/health/*`, `/ws`); SOPS-encrypted secrets (plaintext never the default)
 - Transitional until MIG-080 (#364): Helm chart `deploy/helm/yacc-backend` + K3s staging deploy job (ADR-019, superseded)
 - Backend image: Java 21 / Spring Boot (`services/backend-java/Dockerfile`; ADR-029 envelope)

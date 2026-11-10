@@ -35,10 +35,10 @@ Define the approved technology stack, runtime environments, deployment model, an
 ## Deployment Architecture (MVP)
 ### Targets
 - Frontend: AWS S3 + CloudFront
-- Backend: Docker Compose (single host per environment; ADR-032, 2026-11-10 — supersedes ADR-019 K3s + Helm; Helm chart transitional until MIG-080)
+- Backend: Docker Compose (ADR-032, 2026-11-10 — supersedes ADR-019 K3s + Helm; Helm chart transitional until MIG-080)
 
 ### Delivery / CI/CD
-- Deployment target: Docker Compose (local Docker first, per ADR-032; staging/production hosts follow)
+- Deployment target: Docker Compose (local Docker first, per ADR-032; staging/production environments follow — host count/topology unresolved, #473)
 - Ingress: Traefik (TLS termination; proxies `/api`, `/health/*`, `/ws`); secrets via SOPS-encrypted artifacts; manual image deployments
 - Transitional until MIG-080 (#364): Helm chart `deploy/helm/yacc-backend` + the K3s staging deploy job (ADR-019, superseded)
 - Reference: ADR-032 (target); ADR-029 (runtime envelope, amended for Compose)

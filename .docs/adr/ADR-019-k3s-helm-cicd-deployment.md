@@ -1,4 +1,4 @@
-**Status:** **Superseded by ADR-032 (2026-11-10)** — content retained unchanged below for history  
+**Status:** **Superseded by ADR-032 (2026-11-10)** — content retained unchanged below for history
 **Date:** 2026-02-20  
 **Deciders:** Enterprise Architect + Product Owner  
 **Related:** ADR-016 (06-tasks as task map), ADR-018 (Bun runtime migration), ADR-032 (Docker Compose deployment target, supersedes this ADR)
