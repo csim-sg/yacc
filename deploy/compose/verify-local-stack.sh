@@ -39,20 +39,29 @@
 # removed on exit.
 #
 # Cleanup discipline: an EXIT trap (SIGINT/SIGTERM/SIGHUP funnel through it)
-# removes this run's temp files and — once THIS script has started the stack
-# itself — tears the stack down with a project-scoped
-# `docker compose down -v --remove-orphans` touching ONLY the `yacc-local`
-# project's containers/network and its own postgres volume (no prune, no
-# kill patterns, unrelated Docker resources untouched). It runs on success,
-# failure, and interruption alike (unless --keep), and never masks the
-# original exit status.
+# removes this run's temp files and — once teardown is ARMED, immediately
+# before `docker compose up` is attempted — tears down THIS run's stack with
+# a project-scoped `docker compose down -v --remove-orphans`. The entire run
+# executes under an ISOLATED unique Compose project
+# (`yacc-local-verify-<run-id>`, via `-p` on every compose call), so the
+# teardown can only match resources labeled/namespaced for that project: its
+# containers, its network, and its own `<project>_postgres_data` volume. It
+# cannot `down` an operator's existing `yacc-local` stack, any other Compose
+# project, or any other volume — and there is no prune, no kill pattern, and
+# no shared/fixed-project `down -v` anywhere in this script. Failures BEFORE
+# `up` is attempted arm nothing and run no Compose teardown at all. After
+# arming, teardown runs on any failure or interruption (partial startups
+# included); `--keep` disarms it only when verification fully succeeded.
+# Exit status and signal-derived exit codes are never masked.
 #
 # Usage:
 #   ./verify-local-stack.sh [--keep] [--skip-build]
-#     --keep        leave the stack running after verification (default:
-#                   `docker compose down -v` — full reset, deterministic
-#                   reruns; the same scoped teardown also runs on failure or
-#                   interrupt once the stack is up)
+#     --keep        leave the stack running ONLY when verification fully
+#                   succeeded (default: `docker compose down -v` — scoped to
+#                   this run's project; the same teardown also runs on any
+#                   failure or interrupt once `up` has been attempted). The
+#                   kept stack lives under this run's unique project name;
+#                   inspect/tear-down commands are printed at exit.
 #     --skip-build  do not rebuild the backend image
 # =============================================================================
 set -euo pipefail
@@ -70,7 +79,15 @@ cd "$REPO_ROOT"
 # commands (`ps`, `logs`, `config`) fail without it (verified: compose v5
 # re-interpolates the model on every invocation, container state irrelevant).
 # Baking it in here makes it impossible to omit on any call site below.
-COMPOSE="docker compose -f deploy/compose/docker-compose.yml --env-file deploy/compose/secrets/local.env"
+#
+# Every invocation ALSO carries `-p "$VERIFY_PROJECT"`: the run executes in
+# an isolated, unique Compose project instead of the compose file's shared
+# `yacc-local` name. This is what makes the teardown provably scoped —
+# containers/networks are labeled with this project and the postgres volume
+# is namespaced `<project>_postgres_data` — so cleanup can never `down` an
+# operator's existing `yacc-local` stack, its data volume, or anything else.
+VERIFY_PROJECT="yacc-local-verify-$(date -u +%Y%m%d-%H%M%S)-$$-$RANDOM"
+COMPOSE="docker compose -p $VERIFY_PROJECT -f deploy/compose/docker-compose.yml --env-file deploy/compose/secrets/local.env"
 ENV_FILE="deploy/compose/secrets/local.env"
 SOPS_FILE="deploy/compose/secrets/local.sops.env"
 ORIGIN="https://localhost"
@@ -83,15 +100,16 @@ KEEP=0; SKIP_BUILD=0
 [ "${2:-}" = "--skip-build" ] && SKIP_BUILD=1
 
 TMPDIR_RUN="$(mktemp -d /tmp/opencode/yacc473-verify.XXXXXX)"
-STACK_UP=0          # set to 1 ONLY after this script successfully started the stack
+TEARDOWN_ARMED=0    # set to 1 immediately BEFORE `up` is attempted
+TEARDOWN_DONE=0     # set to 1 after a teardown completed (trap must not repeat it)
 PLAINTEXT_TMP=""    # set only during SOPS decryption (mode-0600 temp in secrets dir)
 
-# Project-scoped teardown: Compose's label scoping limits `down -v
-# --remove-orphans` to containers/networks labeled for THIS project
-# (`name: yacc-local` in deploy/compose/docker-compose.yml) and to the
-# non-external volumes declared in that same file (its own postgres data
-# volume). It cannot touch other projects, other volumes, or images. No
-# `docker system prune`, no kill patterns anywhere in this script.
+# Project-scoped teardown: every resource Compose manages for this run is
+# labeled/namespaced with $VERIFY_PROJECT (via `-p` on $COMPOSE), so
+# `down -v --remove-orphans` removes ONLY this run's containers + network and
+# this run's own `<project>_postgres_data` volume. It cannot touch other
+# projects (including the operator's `yacc-local` stack), other volumes, or
+# images. No `docker system prune`, no kill patterns anywhere in this script.
 teardown_stack() {
   $COMPOSE down -v --remove-orphans
 }
@@ -99,8 +117,8 @@ teardown_stack() {
 cleanup() {
   rc=$?
   trap - EXIT INT TERM HUP
-  if [ "$STACK_UP" -eq 1 ] && [ "$KEEP" -eq 0 ]; then
-    echo "  trap teardown (failure/interrupt): project-scoped down -v — removing ONLY the 'yacc-local' stack, its network and its own postgres volume"
+  if [ "$TEARDOWN_ARMED" -eq 1 ] && [ "$TEARDOWN_DONE" -eq 0 ]; then
+    echo "  trap teardown (failure/interrupt): project-scoped down -v — removing ONLY this run's stack ($VERIFY_PROJECT: containers, network, own postgres volume)"
     teardown_stack >/dev/null 2>&1 || true
   fi
   if [ -n "$PLAINTEXT_TMP" ] && [ -e "$PLAINTEXT_TMP" ]; then
@@ -135,8 +153,29 @@ docker info >/dev/null 2>&1 && pass "docker daemon reachable" || { fail "docker 
 
 # ---------------------------------------------------------------- phase 2
 echo "--- Phase 2: decrypted secrets env (data-only handling — never sourced/evaled)"
-if [ -f "$ENV_FILE" ]; then
-  pass "decrypted env present: $ENV_FILE (git-ignored)"
+# Operator-controlled path contract (reviewer finding: a symlink here made
+# the verifier chmod/parse the symlink TARGET): $ENV_FILE is accepted only as
+# a REGULAR file owned by the invoking user, checked BEFORE any stat/chmod/
+# read/write. A symlink — or any non-regular path — is rejected outright and
+# never followed; removal is left to the operator. The decrypt branch below
+# is symlink-safe by construction: mktemp creates its temp with O_EXCL (no
+# pre-existing path can be followed) and the final path comes into existence
+# only via atomic rename, which replaces a symlink WITHOUT following it.
+if [ -L "$ENV_FILE" ]; then
+  fail "$ENV_FILE is a symbolic link — refusing (remove it; this path must be a regular mode-0600 file owned by uid $(id -u))"
+  exit 1
+fi
+if [ -e "$ENV_FILE" ]; then
+  if [ ! -f "$ENV_FILE" ]; then
+    fail "$ENV_FILE exists but is not a regular file — refusing"
+    exit 1
+  fi
+  env_owner="$(stat -c '%u' "$ENV_FILE")"
+  if [ "$env_owner" != "$(id -u)" ]; then
+    fail "$ENV_FILE is owned by uid $env_owner, not the invoking uid $(id -u) — refusing"
+    exit 1
+  fi
+  pass "decrypted env present: $ENV_FILE (regular file, owner uid $(id -u), git-ignored)"
 else
   echo "  $ENV_FILE absent — attempting SOPS decryption (requires the private age identity — operator action)."
   if require sops; then
@@ -144,7 +183,8 @@ else
     # directory (same filesystem → atomic rename), mode VERIFIED before any
     # plaintext is written. The final path comes into existence only via
     # rename of an already-0600 file — no window where the plaintext is
-    # readable by other local users, and no reliance on post-write chmod.
+    # readable by other local users, no reliance on post-write chmod, and no
+    # symlink-following anywhere on the create/decrypt/rename path.
     PLAINTEXT_TMP="$(mktemp "$SCRIPT_DIR/secrets/.local.env.XXXXXX")"
     mk_mode="$(stat -c '%a' "$PLAINTEXT_TMP")"
     if [ "$mk_mode" != "600" ]; then
@@ -154,7 +194,7 @@ else
     fi
     if sops -d "$SOPS_FILE" > "$PLAINTEXT_TMP" 2>"$TMPDIR_RUN/sops.err" \
        && [ "$(stat -c '%a' "$PLAINTEXT_TMP")" = "600" ]; then
-      mv -f "$PLAINTEXT_TMP" "$ENV_FILE"   # atomic rename: $ENV_FILE is 0600 from the instant it exists
+      mv -f "$PLAINTEXT_TMP" "$ENV_FILE"   # atomic rename: replaces any path at $ENV_FILE WITHOUT following it
       PLAINTEXT_TMP=""
       pass "decrypted via sops → $ENV_FILE (born 0600: mktemp + mode-verified + atomic rename; git-ignored)"
     else
@@ -163,13 +203,15 @@ else
       exit 1
     fi
   else
-    fail "no decrypted env and sops unavailable — decrypt $SOPS_FILE with your private identity (runbook §3.1: create the target file mode 0600 BEFORE decrypting; never commit/log the output)"
+    fail "no decrypted env and sops unavailable — decrypt $SOPS_FILE with your private identity (runbook §3.1: decrypt into a fresh mode-0600 temp file and atomically rename it into place; never commit/log the output)"
     exit 1
   fi
 fi
 # An operator-supplied existing file must not be group/world-readable either —
 # enforced BEFORE any content is read (reviewer finding: legacy redirect could
-# leave a 0644 file behind).
+# leave a 0644 file behind). Reached only for a validated regular file owned
+# by the invoking user (guards above), so this chmod can never touch a
+# symlink target or another user's file.
 cur_mode="$(stat -c '%a' "$ENV_FILE")"
 if [ "$cur_mode" != "600" ]; then
   echo "  $ENV_FILE had mode $cur_mode — chmod 600 applied before any read"
@@ -312,6 +354,15 @@ if grep -E '0\.0\.0\.0:' "$RENDER" | grep -q .; then fail "a non-loopback port b
 # ---------------------------------------------------------------- phase 5
 echo "--- Phase 5: local TLS certificate"
 mkdir -p deploy/compose/tls
+# Operator-controlled cert paths get the same symlink contract as local.env:
+# openssl -keyout/-out follow symlinks and would truncate an unexpected
+# target — reject before any write (reviewer finding class).
+for tls_path in deploy/compose/tls/localhost.crt deploy/compose/tls/localhost.key; do
+  if [ -L "$tls_path" ]; then
+    fail "$tls_path is a symbolic link — refusing (remove it and let the script regenerate the certificate)"
+    exit 1
+  fi
+done
 if [ ! -f deploy/compose/tls/localhost.crt ] || [ ! -f deploy/compose/tls/localhost.key ]; then
   openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 825 \
     -keyout deploy/compose/tls/localhost.key -out deploy/compose/tls/localhost.crt \
@@ -323,22 +374,32 @@ else
 fi
 
 # ---------------------------------------------------------------- phase 6
-echo "--- Phase 6: stack up"
+echo "--- Phase 6: stack up (isolated project: $VERIFY_PROJECT)"
 for port in 80 443; do
   if ss -ltn "( sport = :$port )" 2>/dev/null | grep -q '127.0.0.1'; then
-    fail "127.0.0.1:$port already in use — stop the conflicting listener or override the mapping (runbook §ports)"
+    fail "127.0.0.1:$port already in use — stop the conflicting listener (e.g. a previously kept stack: 'docker compose ls' / 'docker ps') or override the mapping (runbook §ports)"
   else
     pass "host port 127.0.0.1:$port free"
   fi
 done
 BUILD_FLAG=""; [ "$SKIP_BUILD" -eq 0 ] && BUILD_FLAG="--build"
-# Full reset first: deterministic evidence (fresh DB → bootstrap re-runs).
+# Isolated per-run reset: nothing exists under this run's unique project yet,
+# so this is a no-op reset (belt-and-braces against a name collision). It
+# CANNOT delete unrelated resources: every resource Compose manages here is
+# labeled/namespaced with $VERIFY_PROJECT. There is deliberately NO shared or
+# fixed-project `down -v` in this script — nothing this script runs can
+# destroy an operator's existing `yacc-local` stack or its data volume
+# (reviewer finding).
 $COMPOSE down -v --remove-orphans >/dev/null 2>&1 || true
+# Arm the scoped teardown BEFORE `up`: from this point on, ANY exit path —
+# `up` failing after a partial create, SIGINT/SIGTERM during startup, or a
+# later check failure — tears down this run's (possibly partial) resources.
+TEARDOWN_ARMED=1
 if $COMPOSE up -d $BUILD_FLAG >"$TMPDIR_RUN/up.log" 2>&1; then
-  STACK_UP=1   # from here on, ANY exit path (failure/interrupt) tears the stack down unless --keep
-  pass "docker compose up -d --build"
+  pass "docker compose up -d $BUILD_FLAG (project $VERIFY_PROJECT)"
 else
-  fail "docker compose up failed: $(tail -5 "$TMPDIR_RUN/up.log")"; exit 1
+  fail "docker compose up failed: $(tail -5 "$TMPDIR_RUN/up.log")"
+  exit 1   # trap teardown is ARMED — removes this run's partial resources
 fi
 
 BACKEND_CID="$($COMPOSE ps -q backend)"
@@ -351,8 +412,15 @@ while [ "$elapsed" -lt "$BACKEND_WAIT_SECONDS" ]; do
   sleep 5; elapsed=$((elapsed+5))
 done
 if [ "$healthy" -eq 1 ]; then pass "backend container reports healthy (healthcheck on /health/ready — visibility signal)"; else fail "backend did not become healthy within ${BACKEND_WAIT_SECONDS}s"; $COMPOSE logs --tail 60 backend; fi
-$COMPOSE logs backend 2>/dev/null | grep -q "Started YaccApplication" && pass "backend log: Started YaccApplication" || fail "backend log lacks Started YaccApplication"
-$COMPOSE logs backend 2>/dev/null | grep -Eiq "flyway" && pass "backend log: Flyway migration activity" || fail "backend log lacks Flyway evidence"
+# Capture the backend log ONCE and grep the file: `docker compose logs` is a
+# streaming writer, and piping it into `grep -q` under `set -o pipefail` is
+# racy — an early grep exit can SIGPIPE the producer (reproduced: exit 255),
+# turning a matching log into a spurious FAIL. A file capture is
+# deterministic. A failed capture yields an empty file → honest FAILs below.
+BACKEND_LOG="$TMPDIR_RUN/backend.log"
+$COMPOSE logs backend > "$BACKEND_LOG" 2>/dev/null || true
+grep -q "Started YaccApplication" "$BACKEND_LOG" && pass "backend log: Started YaccApplication" || fail "backend log lacks Started YaccApplication"
+grep -Eiq "flyway" "$BACKEND_LOG" && pass "backend log: Flyway migration activity" || fail "backend log lacks Flyway evidence"
 
 PG_CID="$($COMPOSE ps -q postgres)"; TRAEFIK_CID="$($COMPOSE ps -q traefik)"
 [ "$(docker inspect -f '{{.State.Health.Status}}' "$PG_CID")" = "healthy" ] && pass "postgres healthy" || fail "postgres not healthy"
@@ -458,14 +526,20 @@ echo "--- Phase 13: whitespace hygiene"
 if [ -z "$(git diff --check)" ]; then pass "git diff --check clean"; else fail "git diff --check reported issues"; git diff --check; fi
 
 # ---------------------------------------------------------------- cleanup
-if [ "$KEEP" -eq 1 ]; then
-  echo "--- stack LEFT RUNNING (--keep): docker compose -f deploy/compose/docker-compose.yml --env-file $ENV_FILE ps"
+# --keep disarms the teardown ONLY after fully successful verification (the
+# reviewer's contract: a kept stack must be a verified stack). Any failure
+# check (FAILURES > 0) or pre-success exit still tears this run's stack down.
+if [ "$KEEP" -eq 1 ] && [ "$FAILURES" -eq 0 ]; then
+  TEARDOWN_ARMED=0   # deliberate disarm: verification succeeded — leave THIS run's stack running
+  echo "--- stack LEFT RUNNING (--keep) under isolated project '$VERIFY_PROJECT':"
+  echo "    inspect:  docker compose -p $VERIFY_PROJECT -f deploy/compose/docker-compose.yml --env-file $ENV_FILE ps"
+  echo "    teardown: docker compose -p $VERIFY_PROJECT -f deploy/compose/docker-compose.yml --env-file $ENV_FILE down -v"
 else
   if teardown_stack >/dev/null 2>&1; then
-    STACK_UP=0   # normal-path teardown done — the EXIT trap will not repeat it
-    pass "teardown: docker compose down -v (project-scoped: only 'yacc-local' containers/network + its own postgres volume; unrelated docker resources untouched)"
+    TEARDOWN_ARMED=0; TEARDOWN_DONE=1   # normal-path teardown done — the EXIT trap will not repeat it
+    pass "teardown: docker compose down -v (project-scoped to '$VERIFY_PROJECT': only this run's containers/network + its own postgres volume; the operator's 'yacc-local' stack, other projects and volumes untouched)"
   else
-    fail "teardown: docker compose down -v reported failure (stack may still be running — inspect 'docker compose -f deploy/compose/docker-compose.yml ps')"
+    fail "teardown: docker compose down -v reported failure (this run's stack '$VERIFY_PROJECT' may still be running — inspect 'docker compose -p $VERIFY_PROJECT ps')"
   fi
 fi
 
