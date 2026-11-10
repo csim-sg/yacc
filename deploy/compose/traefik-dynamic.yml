@@ -1,0 +1,41 @@
+# Traefik dynamic configuration for the YACC local Compose target
+# (MIG-107 #473). No secrets in this file — only routing and the local
+# self-signed certificate PATHS (cert/key files live in deploy/compose/tls/,
+# git-ignored).
+#
+# Routing surface (exactly the public-API prefixes named by ADR-032):
+#   /api          REST (authenticated except the frozen public auth endpoints)
+#   /health       /health/live and /health/ready (frozen wire paths, ADR-029)
+#   /oauth2       embedded OIDC authorization-server endpoints (MIG-033)
+#   /.well-known  OIDC discovery (issuer = the local origin, YACC_AUTH_AS_ISSUER)
+#   /ws           raw WebSocket upgrade (ADR-026)
+#
+# WebSocket upgrade pass-through: Traefik v3 forwards the Upgrade/Connection
+# headers natively on HTTP routers — no extra configuration. The /ws auth
+# gate is the backend's handshake interceptor (token query parameter; 401 on
+# an invalid token) — Traefik does not terminate or inspect the stream.
+#
+# Readiness semantics (ADR-032 accepted loss): this proxy routes to the
+# backend unconditionally — there is NO health-check-aware gating here. While
+# the backend is starting or unhealthy-but-running, requests through Traefik
+# fail (502/504); recovery is manual (check `docker compose ps`, logs).
+http:
+  routers:
+    yacc-backend:
+      entryPoints:
+        - websecure
+      rule: "PathPrefix(`/api`) || PathPrefix(`/health`) || PathPrefix(`/oauth2`) || PathPrefix(`/.well-known`) || PathPrefix(`/ws`)"
+      service: yacc-backend
+      tls: {}
+
+  services:
+    yacc-backend:
+      loadBalancer:
+        servers:
+          # Compose-network DNS name of the backend service (no host ports).
+          - url: "http://backend:8080"
+
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/localhost.crt
+      keyFile: /etc/traefik/certs/localhost.key
