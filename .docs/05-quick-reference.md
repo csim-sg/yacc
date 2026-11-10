@@ -15,10 +15,11 @@ See [01-product-specification.md](./01-product-specification.md) for full scope 
 
 ## Deployment & CI/CD
 
-- Target runtime: K3s (Kubernetes)
-- Installer: Helm (backend chart `deploy/helm/yacc-backend`; PostgreSQL pre-installed in the cluster — **no Redis**, ADR-028)
+- Target runtime: Docker Compose (ADR-032, 2026-11-10 — supersedes ADR-019 K3s + Helm; manual pinned-image deploys; host topology unresolved, #473)
+- Ingress/secrets: Traefik (TLS; proxies `/api`, `/health/*`, `/ws`); SOPS-encrypted secrets (plaintext never the default)
+- Transitional until MIG-080 (#364): Helm chart `deploy/helm/yacc-backend` + K3s staging deploy job (ADR-019, superseded)
 - Backend image: Java 21 / Spring Boot (`services/backend-java/Dockerfile`; ADR-029 envelope)
-- Architecture decision: `.docs/adr/ADR-019-k3s-helm-cicd-deployment.md` (envelope amended by ADR-029)
+- Architecture decision: `.docs/adr/ADR-032-docker-compose-deployment-target.md` (runtime envelope: ADR-029 as amended; predecessor: ADR-019)
 - **Node.js v20+** required for Node-workspace CI/CD (linting, testing, building) due to `eslint-plugin-unicorn` dependency; the Java backend uses Temurin 21 (`backend-java-ci.yml`)
 
 ---
@@ -152,6 +153,8 @@ pnpm --filter @yacc/common lint       # Common package linter
 ---
 
 ## Helm Deployment Commands
+
+> **Transitional (until MIG-080, #364):** the commands below drive the superseded K3s/Helm path (ADR-019 → superseded by ADR-032, 2026-11-10). They remain because the chart still exists; they do not describe the current Docker Compose target.
 
 **Prerequisites**: Helm 3.12+ installed, K3s cluster running, kubeconfig configured
 
