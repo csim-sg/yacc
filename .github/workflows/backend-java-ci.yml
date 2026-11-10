@@ -159,6 +159,27 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # MIG-105 (#471) packaging guard (AC-4): the shipped boot jar must carry
+      # the PostgreSQL JDBC driver. The original defect declared the driver
+      # testRuntimeOnly, so the image was built without it and could never
+      # boot; no test observed it because tests run on the test classpath.
+      # This asserts the artifact that actually ships — the jar inside the
+      # freshly built image — so bootJar configuration/exclusion drift cannot
+      # silently re-break the image. Offline and deterministic: docker create
+      # + cp of /app/app.jar, then a zip listing grep. Runs on every build
+      # (PR and dev), independent of IMAGE_PUBLISH.
+      - name: Assert boot jar carries the PostgreSQL JDBC driver (MIG-105)
+        run: |
+          cid="$(docker create "$REGISTRY/$IMAGE_NAME:$IMAGE_TAG")"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid":/app/app.jar "$RUNNER_TEMP/yacc-backend-boot.jar"
+          if ! unzip -l "$RUNNER_TEMP/yacc-backend-boot.jar" | grep -Eq 'BOOT-INF/lib/postgresql-[0-9][^/]*\.jar$'; then
+            echo "::error::boot jar is missing BOOT-INF/lib/postgresql-*.jar — the image cannot boot against PostgreSQL (MIG-105 #471 regression)"
+            exit 1
+          fi
+          echo "Boot jar packaging guard OK — PostgreSQL JDBC driver present:"
+          unzip -l "$RUNNER_TEMP/yacc-backend-boot.jar" | grep -E 'BOOT-INF/lib/postgresql-[0-9][^/]*\.jar$'
+
       - name: Set up Helm
         uses: azure/setup-helm@v3
 
