@@ -150,11 +150,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Docker image (publish on dev push / dispatch)
+      # load: true materializes the built image into the runner's local
+      # Docker daemon on every trigger (MIG-105 review loop 2). The Buildx
+      # docker-container driver set up by setup-buildx-action discards the
+      # build result otherwise, so the jar assertion below (docker create on
+      # this tag) failed with "No such image" on PRs and was not guaranteed
+      # on publishes either. Publish behavior is unchanged: push stays gated
+      # on IMAGE_PUBLISH exactly as before and the gha cache settings are
+      # untouched — load is an additional local output, not a second build.
+      - name: Build Docker image (publish on dev push / dispatch; always loaded locally)
         uses: docker/build-push-action@v5
         with:
           context: ${{ env.GRADLE_PROJECT_DIR }}
           push: ${{ env.IMAGE_PUBLISH == 'true' }}
+          load: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -166,8 +175,10 @@ jobs:
       # This asserts the artifact that actually ships — the jar inside the
       # freshly built image — so bootJar configuration/exclusion drift cannot
       # silently re-break the image. Offline and deterministic: docker create
-      # + cp of /app/app.jar, then a zip listing grep. Runs on every build
-      # (PR and dev), independent of IMAGE_PUBLISH.
+      # on the locally loaded image (load: true in the build step above) +
+      # cp of /app/app.jar, then a zip listing grep. Runs on every build (PR
+      # and dev), independent of IMAGE_PUBLISH — the image is always
+      # materialized locally by the build step, never pulled from a registry.
       - name: Assert boot jar carries the PostgreSQL JDBC driver (MIG-105)
         run: |
           cid="$(docker create "$REGISTRY/$IMAGE_NAME:$IMAGE_TAG")"
