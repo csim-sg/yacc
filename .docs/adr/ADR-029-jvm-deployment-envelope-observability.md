@@ -1,10 +1,32 @@
 # ADR-029: JVM Deployment Envelope + Observability
 
-**Status:** Accepted
-**Date:** 2026-09-24
-**Owner:** Tech-lead (technical author), Founder (decision authority)
-**Type:** Architecture / Infrastructure
+**Status:** Accepted — **Amended 2026-11-10 (ADR-032 / MIG-106 #472): Kubernetes-specific expressions replaced with Compose equivalents; portable runtime contract unchanged — see amendment note**  
+**Date:** 2026-09-24  
+**Owner:** Tech-lead (technical author), Founder (decision authority)  
+**Type:** Architecture / Infrastructure  
 **Amends:** ADR-019 (K3s/Helm pod spec), ADR-004 (logging)
+
+> **Amendment note (2026-11-10, ADR-032 / MIG-106 #472).** The deployment target is now
+> Docker Compose (ADR-032 supersedes ADR-019). This ADR's contract splits as follows;
+> the original decision content below is retained unchanged.
+>
+> **Survives unchanged (portable runtime contract):** Temurin 21 JRE base image;
+> non-root (runAsUser 1000, drop ALL caps); read-only root filesystem with tmpdir,
+> heap-dump and log locations on non-root-writable ephemeral storage; `/health/*` wire
+> paths (`/health`, `/health/live`, `/health/ready`); SLF4J/logback structured JSON
+> (field parity), MDC correlationId, Micrometer + `/actuator/prometheus`; audit via
+> Spring Security events + audit table; single instance per environment.
+>
+> **Replaced (Kubernetes-specific expressions → Compose equivalents):**
+> (1) *Pod envelope* (≥ 1Gi request / 2Gi limit, Helm `deploy.resources`) → the same
+> envelope restated as a **container memory limit contract** — at least 1 Gi reserved,
+> capped at 2 Gi — plus an explicit CPU limit; exact Compose expressions and values are
+> pinned by the Compose implementation issue (#473). The requirement survives; only the
+> vocabulary changed. (2) *emptyDir volumes* → tmpfs mounts / named volumes for tmpdir,
+> heap dumps and logs. (3) *Kubernetes liveness/readiness probes* → container
+> `healthcheck` on the same `/health/*` wire paths plus a `restart` policy, with Traefik
+> as the routing layer; probe-driven restart and readiness-gated routing are accepted
+> losses recorded in ADR-032, not silent drops.
 
 ## Context
 

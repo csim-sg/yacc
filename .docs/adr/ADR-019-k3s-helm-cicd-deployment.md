@@ -1,7 +1,13 @@
-**Status:** Accepted — **Amended by SPEC-002 (MIG-005, 2026-09-26); see amendment note**  
+**Status:** **Superseded by ADR-032 (2026-11-10)** — content retained unchanged below for history  
 **Date:** 2026-02-20  
 **Deciders:** Enterprise Architect + Product Owner  
-**Related:** ADR-016 (06-tasks as task map), ADR-018 (Bun runtime migration)
+**Related:** ADR-016 (06-tasks as task map), ADR-018 (Bun runtime migration), ADR-032 (Docker Compose deployment target, supersedes this ADR)
+
+> **Supersession note (2026-11-10, MIG-106 #472).** ADR-032 supersedes this ADR: Docker
+> Compose replaces K3s + Helm as the deployment target for local/dev, staging and
+> production. This record is retained unchanged for history. The K3s/Helm artifacts it
+> describes (`deploy/helm/**`, the staging deploy job, the K3s runbooks) remain in place
+> transitionally until decommission (MIG-080, #364).
 
 > **Amendment note (2026-09-26, MIG-005 #339).** K3s + Helm remains the accepted
 > deployment target, with these SPEC-002 amendments for the Java/Spring backend:

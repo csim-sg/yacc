@@ -1,9 +1,9 @@
 # 004 Java Backend Guardrails (Spring — replaces TS guardrails for the Java service)
 
 **Status:** Draft for MIG-004 (#337) — acceptance recorded in MIG-005 (#339)  
-**Last Updated:** 2026-10-16 (§1, §13 row 1, §14 rule 1 amended in place by MIG-100 #410 — standalone API-module model; §2–§12 unchanged)
-**Spec:** SPEC-002 — Java/Spring Backend Migration (TR-01..TR-09; Architecture Notes)
-**ADRs:** ADR-023 (contract), ADR-024 (architecture), ADR-025 (auth), ADR-026 (raw WS), ADR-027 (data), ADR-028 (async), ADR-029 (envelope/observability)
+**Last Updated:** 2026-11-10 (§11 deployment envelope re-expressed for the Docker Compose target — ADR-032 supersedes ADR-019, ADR-029 amended; §14 rule 8 aligned. Prior 2026-10-16 §1/§13/§14 MIG-100 #410 amendment unchanged)  
+**Spec:** SPEC-002 — Java/Spring Backend Migration (TR-01..TR-09; Architecture Notes)  
+**ADRs:** ADR-023 (contract), ADR-024 (architecture), ADR-025 (auth), ADR-026 (raw WS), ADR-027 (data), ADR-028 (async), ADR-029 (envelope/observability), ADR-032 (Compose deployment target)  
 **Supersedes for the Java service:** the TypeScript guardrails in `AGENTS.md` (§ Backend Entrypoints & Architecture Guardrails) — those remain authoritative for the Node POC until decommission (MIG-080).
 
 ---
@@ -81,7 +81,8 @@ Rule: **constructor injection only** — no other form of dependency injection i
 
 ## 11. Deployment envelope (TR-08)
 
-- **Temurin 21 JRE** base image; **non-root** (runAsUser 1000, drop ALL capabilities); **read-only root filesystem** (tmpdir, heap dumps, logs on emptyDir); pod envelope **≥1Gi request / 2Gi limit**; probes on `/actuator/health/{liveness,readiness}` (or custom `/health/*`); single replica (ADR-029).
+- **Target (2026-11-10):** Docker Compose — **ADR-032 supersedes ADR-019** (K3s + Helm). Traefik terminates TLS and proxies `/api`, `/health/*` and `/ws`; deployment is manual (pinned image tags, no CI auto-deploy); secrets are SOPS-encrypted artifacts — plaintext secret files are never the default. The Helm chart and the K3s deploy path remain transitional until decommission (MIG-080, #364).
+- **Temurin 21 JRE** base image; **non-root** (runAsUser 1000, drop ALL capabilities); **read-only root filesystem** (tmpdir, heap dumps, logs on tmpfs mounts); memory envelope carried as a **container limit contract** — at least 1 Gi reserved, capped at 2 Gi — plus an explicit CPU limit (exact Compose expressions/values pinned by the Compose implementation issue, #473); health endpoints `/actuator/health/{liveness,readiness}` or custom `/health/*` surfaced as container healthchecks + `restart` policy; single instance per environment (ADR-029 as amended by ADR-032; probe-driven restart and readiness-gated routing are accepted losses recorded there).
 
 ## 12. KISS / review gate (TR-09)
 
@@ -117,7 +118,7 @@ Also superseded for the Java service (context, not numbered guardrails): the POC
 5. Flyway-only schema changes; JPA repositories only; AES-256-GCM for IRC credentials.
 6. Quartz + DB DLQ; **Redis removed**; WS backlog in PostgreSQL.
 7. Logback JSON + MDC correlationId + Micrometer parity.
-8. Temurin 21, non-root, read-only FS, ≥1Gi/2Gi, actuator probes, single replica.
+8. Temurin 21, non-root, read-only FS, ≥1Gi/2Gi container memory envelope + CPU limit, `/health/*` health endpoints, single instance (Compose target — ADR-032; ADR-029 as amended).
 9. ≥85% coverage on new Java code.
 
 ## References
