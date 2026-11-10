@@ -88,6 +88,15 @@ dependencies {
     // Brings spring-boot-starter-jdbc (DataSource + JdbcTemplate for Flyway)
     // transitively — no separate JDBC starter declaration.
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    // MIG-105 (#471): the PostgreSQL JDBC driver is a RUNTIME dependency. It
+    // was declared testRuntimeOnly, which hid the regression from every
+    // context-loading test by construction: the test classpath carried the
+    // driver while runtimeClasspath (bootRun/bootJar) did not, so the packaged
+    // service failed at DataSource init ("Failed to load driver class
+    // org.postgresql.Driver"). runtimeOnly places it on the runtime classpath
+    // (test runtime extends it), with no duplicate declaration. Version stays
+    // BOM-managed; guarded by verifyPostgresDriverOnRuntimeClasspath below.
+    runtimeOnly("org.postgresql:postgresql")
 
     // --- MIG-063 async processing (SPEC-002 FR-07/TR-06; ADR-028) ---
     // Quartz scheduler for the DB-backed retry worker (backoff 1m/5m/30m,
@@ -117,7 +126,6 @@ dependencies {
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testRuntimeOnly("org.postgresql:postgresql")
 }
 
 tasks.withType<Test>().configureEach {
@@ -209,6 +217,39 @@ tasks.jacocoTestCoverageVerification {
     }
 }
 
+// MIG-105 (#471) regression guard (AC-4): the PostgreSQL JDBC driver must
+// resolve on the RUNTIME classpath. The defect was invisible from the test
+// suite by construction — with the driver declared testRuntimeOnly, the test
+// classpath carried it while runtimeClasspath (the surface bootRun/bootJar
+// consume) did not. This guard therefore inspects the runtime configuration
+// itself, never a test configuration, and fails `check` the moment the driver
+// leaves the runtime surface again. Fast and deterministic: dependency
+// resolution only, no test JVM, no network beyond artifact resolution.
+val verifyPostgresDriverOnRuntimeClasspath by tasks.registering {
+    group = "verification"
+    description =
+        "Fails unless org.postgresql:postgresql resolves on runtimeClasspath (MIG-105 #471)."
+    inputs.files(configurations.named("runtimeClasspath"))
+    doLast {
+        val driverOnRuntimeClasspath = configurations.named("runtimeClasspath").get()
+            .resolvedConfiguration.resolvedArtifacts
+            .map { it.moduleVersion.id }
+            .any { it.group == "org.postgresql" && it.name == "postgresql" }
+        if (!driverOnRuntimeClasspath) {
+            throw GradleException(
+                "org.postgresql:postgresql is NOT on runtimeClasspath — the packaged " +
+                    "service cannot boot against PostgreSQL (MIG-105 #471 regression). " +
+                    "The driver must be declared as a runtime dependency " +
+                    "(runtimeOnly), never testRuntimeOnly."
+            )
+        }
+        logger.lifecycle(
+            "MIG-105 guard OK: org.postgresql:postgresql resolves on runtimeClasspath."
+        )
+    }
+}
+
 tasks.named("check") {
     dependsOn(tasks.jacocoTestCoverageVerification)
+    dependsOn(verifyPostgresDriverOnRuntimeClasspath)
 }
