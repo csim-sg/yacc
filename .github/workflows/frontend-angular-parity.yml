@@ -112,22 +112,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9.0.0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20.x
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Unit suite + coverage thresholds (exit non-zero below target)
-        run: pnpm --filter @yacc/frontend-angular test:unit:coverage
+        run: npm run test:unit:coverage -w @yacc/frontend-angular
 
       - name: Upload coverage report (evidence)
         if: always()
@@ -220,16 +215,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9.0.0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20.x
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Set up Temurin 21 (satisfies the Gradle toolchain, ADR-024)
         uses: actions/setup-java@v4
@@ -239,7 +229,7 @@ jobs:
           cache: gradle
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Spec-file integrity gate (0 edits to existing suite files)
         if: github.event_name == 'pull_request'
@@ -328,7 +318,10 @@ jobs:
           exit 1
 
       - name: Install Playwright browsers
-        run: pnpm --filter @yacc/frontend-angular exec playwright install --with-deps chromium firefox webkit
+        # npm workspaces hoist binaries to the root .bin; running from the
+        # package directory resolves this workspace's @playwright/test —
+        # the exact cwd semantics of the previous `pnpm --filter … exec`.
+        run: (cd packages/frontend-angular && npx playwright install --with-deps chromium firefox webkit)
 
       - name: Run parity suite (${{ matrix.project }} — full U10 gate scope)
         id: run_parity
@@ -349,9 +342,9 @@ jobs:
           # Playwright exit code via PIPESTATUS[0], then restore `-e` so any
           # non-Playwright failure in this step still fails it.
           set +e
-          pnpm --filter @yacc/frontend-angular exec playwright test \
+          (cd packages/frontend-angular && npx playwright test \
             --project=${{ matrix.project }} \
-            --reporter=html,json 2>&1 | tee /tmp/opencode/parity/run-output.log
+            --reporter=html,json) 2>&1 | tee /tmp/opencode/parity/run-output.log
           code=${PIPESTATUS[0]}
           set -e
           echo "playwright_exit=$code" >> "$GITHUB_OUTPUT"
@@ -576,16 +569,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9.0.0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20.x
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Set up Temurin 21 (satisfies the Gradle toolchain, ADR-024)
         uses: actions/setup-java@v4
@@ -595,7 +583,7 @@ jobs:
           cache: gradle
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Baseline pre-flight (validate the committed anchor this capture would succeed)
         run: node packages/frontend-angular/parity/compare-baseline.mjs check
@@ -665,7 +653,9 @@ jobs:
           exit 1
 
       - name: Install Playwright browsers (React package)
-        run: pnpm --filter @yacc/frontend exec playwright install --with-deps chromium firefox webkit
+        # Package-directory cwd resolves this workspace's @playwright/test
+        # (npm workspaces hoist binaries to the root .bin).
+        run: (cd packages/frontend && npx playwright install --with-deps chromium firefox webkit)
 
       - name: Capture React-on-Java baseline (full suite, anchor run shape)
         run: |
@@ -682,8 +672,8 @@ jobs:
           # this step to reach `exit 0` at all; `-e` is restored immediately
           # after so non-Playwright failures still fail the step.
           set +e
-          pnpm --filter @yacc/frontend exec playwright test \
-            --reporter=html,json 2>&1 | tee /tmp/opencode/capture/run-output.log
+          (cd packages/frontend && npx playwright test \
+            --reporter=html,json) 2>&1 | tee /tmp/opencode/capture/run-output.log
           code=${PIPESTATUS[0]}
           set -e
           echo "playwright_exit=$code (red rows are recorded as-is; the capture does not require green)"
@@ -700,8 +690,8 @@ jobs:
             echo "capture_sha: ${{ github.sha }}"
             echo "event: ${{ github.event_name }}"
             echo "node: $(node --version)"
-            echo "pnpm: $(pnpm --version)"
-            echo "playwright: $(pnpm --filter @yacc/frontend exec playwright --version)"
+            echo "npm: $(npm --version)"
+            echo "playwright: $(cd packages/frontend && npx playwright --version)"
             echo "java: $(java -version 2>&1 | head -1)"
             echo "gradle: $(cd services/backend-java && ./gradlew --no-daemon --version 2>/dev/null | grep '^Gradle' | head -1)"
             echo "postgres: postgres:15-alpine (service container, yacc_e2e)"
