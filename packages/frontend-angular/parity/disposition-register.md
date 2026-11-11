@@ -211,6 +211,28 @@ disposition: no expected-red class touched, no register entry, no gate semantics
 the merge is validated by `parity/validate-merge-browser-reports.mjs` (incl. a
 round-trip + comparator-verdict-identity check against a real 3-browser report).
 
+**Execution-wiring record (11 Nov 2026):** parity run 39537005279 failed closed at the
+aggregation with zero comparator signal — both defects were gate WIRING, not parity
+results (tech-lead triage #6792814578): (1) `defaults.run.shell: bash` expands to
+`bash -eo pipefail`, so the per-browser suite steps aborted at the expected-red
+Playwright exit before their own trailing `exit 0` — the report-manifest step was
+skipped on every leg, and the identical defect sat in the CP-3 capture step (the React
+anchor itself is expected-red: 664 failed / 174 timedOut); (2) the
+`parity-json-<browser>` upload mixed `/tmp/opencode/parity/*` with
+`/tmp/opencode/java-service.log`, so upload-artifact's least-common-ancestor root was
+`/tmp/opencode` and reports downloaded to `_parity/<browser>/parity/parity-run.json`
+while the aggregation reads `_parity/<browser>/parity-run.json`. Correction (wiring
+only, same branch/PR): the suite and capture steps capture the exact Playwright exit
+with `set +e` + `PIPESTATUS[0]` and restore `-e` afterwards (a crash producing no
+report still fails closed via the unchanged manifest step + strict pre-flight); the
+Java log is copied into the parity evidence directory and the upload is a single
+directory, so downloads land flat at the exact strict consumer paths (all consumer
+checks unchanged); a `find _parity` listing was added before the aggregation
+pre-flight so layout drift stays diagnosable after run logs expire. No case, browser,
+assertion, comparator check, threshold, anchor, expected-red class or register row
+changed; Firefox's cancellation in that run was a separate run-level event (logs
+expired; the re-run settles it).
+
 ## 9. Registration discipline
 
 1. New expected difference discovered **before** a run → add the register row + `gate-scope.json`

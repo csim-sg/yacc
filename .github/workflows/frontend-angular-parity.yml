@@ -341,10 +341,19 @@ jobs:
           # rows stay red — the report is the evidence, the gate decision is
           # `parity-compare`. A crash that produces no report still fails the
           # gate (report-presence check below + fail-closed aggregation).
+          # `defaults.run.shell: bash` expands to `bash -eo pipefail`, so
+          # without `set +e` this expected-red exit would abort the step
+          # before the trailing `exit 0` (run 39537005279: this step's only
+          # possible terminal statement is `exit 0`, yet it concluded
+          # `failure`, skipping the report-manifest step). Capture the exact
+          # Playwright exit code via PIPESTATUS[0], then restore `-e` so any
+          # non-Playwright failure in this step still fails it.
+          set +e
           pnpm --filter @yacc/frontend-angular exec playwright test \
             --project=${{ matrix.project }} \
             --reporter=html,json 2>&1 | tee /tmp/opencode/parity/run-output.log
-          code=$?
+          code=${PIPESTATUS[0]}
+          set -e
           echo "playwright_exit=$code" >> "$GITHUB_OUTPUT"
           echo "Playwright (${{ matrix.project }}) exited $code (anchor-red rows are expected red; the comparator decides the gate)."
           exit 0
@@ -359,16 +368,36 @@ jobs:
           (cd /tmp/opencode/parity && sha256sum parity-run.json > parity-run.json.sha256)
           cat /tmp/opencode/parity/parity-run.json.sha256
 
+      - name: Collect Java service log into the evidence directory (single upload root)
+        # upload-artifact v4 preserves structure relative to the least common
+        # ancestor of the search paths: the previous mixed-path upload (parity
+        # files + /tmp/opencode/java-service.log) rooted at /tmp/opencode, so
+        # reports downloaded to `_parity/<browser>/parity/parity-run.json` —
+        # one level off from the strict `_parity/<browser>/parity-run.json`
+        # the aggregation reads (run 39537005279: every report "absent" to the
+        # pre-flight). Copying the Java log into the parity directory and
+        # uploading that SINGLE directory keeps downloads flat at the exact
+        # consumer paths. `if: always()` so diagnostics survive a hard leg
+        # failure too.
+        if: always()
+        run: |
+          if [ -f /tmp/opencode/java-service.log ]; then
+            cp /tmp/opencode/java-service.log /tmp/opencode/parity/java-service.log
+            echo "java-service.log collected into the evidence directory."
+          else
+            echo "java-service.log not present (service boot did not run/complete) — copy skipped."
+          fi
+
       - name: Upload per-browser JSON report (machine-readable evidence)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: parity-json-${{ matrix.project }}
-          path: |
-            /tmp/opencode/parity/parity-run.json
-            /tmp/opencode/parity/parity-run.json.sha256
-            /tmp/opencode/parity/run-output.log
-            /tmp/opencode/java-service.log
+          # Single-directory upload: the artifact root IS this directory, so
+          # the download lands flat as `_parity/<browser>/parity-run.json`
+          # (+ .sha256 / run-output.log / java-service.log) — exactly the
+          # paths parity-compare reads. Do not mix roots here again.
+          path: /tmp/opencode/parity/
           retention-days: 14
           if-no-files-found: warn
 
@@ -420,6 +449,13 @@ jobs:
         with:
           name: parity-json-webkit
           path: _parity/webkit
+
+      - name: Diagnostic listing of downloaded artifacts (readable after run logs expire)
+        # Post-expiry diagnosability (tech-lead #6792814578): if a future
+        # upload-root change shifts the layout again, the listing below makes
+        # the drift readable from the job log even after the failed run's own
+        # logs/artifacts expire. The pre-flight after this step stays strict.
+        run: find _parity -type f | sort
 
       - name: Aggregation pre-flight (all 3 browsers must have delivered a report)
         run: |
@@ -639,9 +675,18 @@ jobs:
           export PLAYWRIGHT_JSON_OUTPUT_NAME=baseline-report.json
           # Same command shape as the S2 capture (runbook §7.5): HTML + JSON
           # reporters, CI retries. Red rows are recorded as-is — the capture
-          # anchors the recorded state, it does not require green.
+          # anchors the recorded state, it does not require green (the React
+          # anchor itself records 664 failed / 174 timedOut, so the raw
+          # Playwright exit is guaranteed non-zero). `defaults.run.shell:
+          # bash` expands to `bash -eo pipefail`, so `set +e` is required for
+          # this step to reach `exit 0` at all; `-e` is restored immediately
+          # after so non-Playwright failures still fail the step.
+          set +e
           pnpm --filter @yacc/frontend exec playwright test \
             --reporter=html,json 2>&1 | tee /tmp/opencode/capture/run-output.log
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "playwright_exit=$code (red rows are recorded as-is; the capture does not require green)"
           exit 0
 
       - name: Derive per-case TSV + environment provenance

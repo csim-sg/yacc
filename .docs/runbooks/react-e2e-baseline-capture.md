@@ -283,3 +283,17 @@ with the exact SHA. The dispatch is evidence for AC-ANG-015-3 only: **no new anc
 substitution** — `ae42c67-on-java` stays the comparison anchor and no
 `gate-scope.json` anchor hash is refreshed from the capture (a new anchor would be a
 separate, deliberate register/gate-scope decision).
+
+**Status 2026-11-11 (capture-step exit repair):** tech-lead triage of parity run
+39537005279 ([#6792814578](https://github.com/csim-sg/yacc/pull/436#issuecomment-6792814578))
+identified a CI wiring defect that would have failed every CP-3 dispatch:
+`defaults.run.shell: bash` expands to `bash -eo pipefail`, and the capture step relied
+on a trailing `exit 0` after an expected-red suite (the React anchor records
+664 failed / 174 timedOut) that it could never reach. The capture step now preserves
+the exact Playwright exit via `set +e` + `PIPESTATUS[0]` and restores `-e` afterwards
+(a crash producing no report still fails the job downstream). The dispatch discipline
+above is unchanged: dispatch **once**, only after the `parity` gate has produced its
+complete merged 3-browser verdict — a second dispatch cancels the first (same
+branch-ref concurrency group), and the capture job's concurrency group
+(`refs/heads/task/ANG-015`) is distinct from the PR run's (`refs/pull/436/merge`), so
+the two do not cancel each other.
