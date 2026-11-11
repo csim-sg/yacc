@@ -184,6 +184,16 @@ config:
   FRONTEND_URL: https://app.example.com
   RESET_PASSWORD_URL: https://app.example.com/reset-password
 
+  # Spring environment contract (TM-003, #446) — non-sensitive values injected
+  # via envFrom and read by application.yml. Keep aligned with FRONTEND_URL:
+  # the WS allowed origin mirrors the frontend origin and the auth-email base
+  # URL is the frontend public base used in email links.
+  YACC_AUTH_AS_ISSUER: https://api.example.com
+  YACC_AUTH_EMAIL_PROVIDER: smtp
+  YACC_AUTH_EMAIL_FROM: no-reply@yacc.local
+  YACC_AUTH_EMAIL_BASE_URL: https://app.example.com
+  YACC_REALTIME_WS_ALLOWED_ORIGINS: https://app.example.com
+
 # ============================================
 # EXTERNAL SERVICES CONFIGURATION
 # ============================================
@@ -216,11 +226,18 @@ secrets:
     superAdminEmailKey: bootstrap-super-admin-email
     superAdminPasswordKey: bootstrap-super-admin-password
 
+  # Token signing key (RS256, base64 PKCS#8; MIG-030/MIG-033, ADR-025/ADR-029).
+  # One source for the embedded OIDC AS and the resource server.
+  auth:
+    existingSecret: yacc-auth-secrets
+    signingKeyKey: token-signing-key
+
   # Founder-controlled recovery (env-gated restart flag; ADR-025/F4)
   recovery:
     existingSecret: yacc-auth-secrets
     modeKey: recovery-mode
     keyKey: recovery-key
+    keyHashKey: recovery-key-hash
 
   # Cloudflare R2
   cloudflareR2:
@@ -251,6 +268,8 @@ secrets:
     existingSecret: yacc-integration-secrets
     telegramBotTokenKey: telegram-bot-token
     ircPasswordKey: irc-password
+    # AES-256-GCM master key for integration credentials at rest (ADR-027).
+    encryptionMasterKeyKey: encryption-master-key
 
 # ============================================
 # INGRESS (Optional - Post-MVP)

@@ -371,4 +371,37 @@ class AuthFlowIntegrationTest extends AbstractPostgresIntegrationTest {
                         .header("Authorization", "Bearer " + foreignToken))
                 .andExpect(status().isUnauthorized());
     }
+
+    /**
+     * MIG-091d offline QA-parity gap closure (#456) — QA-004 EDGE-AUTH-003:
+     * sign-in rejects a blank email, a malformed address, and a missing
+     * email member with the frozen 400 {error} shape ({@code @NotBlank @Email}
+     * bean validation on {@code SignInRequest}) before any credential check.
+     */
+    @Test
+    void signInRejectsBlankAndMalformedEmailsWithBeanValidation() throws Exception {
+        mockMvc.perform(post("/api/auth/sign-in/email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.createObjectNode()
+                                .put("email", "")
+                                .put("password", TEST_PASSWORD).toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").isNotEmpty());
+
+        mockMvc.perform(post("/api/auth/sign-in/email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.createObjectNode()
+                                .put("email", "not-an-email")
+                                .put("password", TEST_PASSWORD).toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").isNotEmpty());
+
+        com.fasterxml.jackson.databind.node.ObjectNode missingEmail = mapper.createObjectNode();
+        missingEmail.put("password", TEST_PASSWORD);
+        mockMvc.perform(post("/api/auth/sign-in/email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(missingEmail.toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").isNotEmpty());
+    }
 }

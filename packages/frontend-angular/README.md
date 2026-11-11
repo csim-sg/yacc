@@ -9,11 +9,11 @@ Angular app shell replacing the React SPA (`packages/frontend`) 1:1, built with 
 ## Commands
 
 ```bash
-pnpm --filter @yacc/frontend-angular dev     # ng serve (port 4200)
-pnpm --filter @yacc/frontend-angular build   # ng build -> dist/frontend-angular/browser/
-pnpm --filter @yacc/frontend-angular test:unit            # unit suite (Vitest via the first-party Angular unit-test builder — PARITY.md §4)
-pnpm --filter @yacc/frontend-angular test:unit:coverage   # PB-3 gate run (≥85/85/85/80 thresholds)
-pnpm --filter @yacc/frontend-angular test:e2e             # parity harness: existing Playwright suite vs this app (PARITY.md §3)
+npm run dev --workspace @yacc/frontend-angular     # ng serve (port 4200)
+npm run build --workspace @yacc/frontend-angular   # ng build -> dist/frontend-angular/browser/
+npm run test:unit --workspace @yacc/frontend-angular            # unit suite (see PARITY.md §4)
+npm run test:unit:coverage --workspace @yacc/frontend-angular   # PB-3 gate run (≥85/85/85/80 thresholds)
+npm run test:e2e --workspace @yacc/frontend-angular             # parity harness (see PARITY.md §3)
 ```
 
 Testing foundation + parity bar: `PARITY.md` (PB-1/2/3, disposition-register discipline,

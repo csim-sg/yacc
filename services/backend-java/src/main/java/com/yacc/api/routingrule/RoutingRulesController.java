@@ -31,7 +31,8 @@ import jakarta.validation.Valid;
  * Routing-rule wire surface (ledger rows REST-RULES-001..005; frozen
  * contract ops {@code listRoutingRules}, {@code createRoutingRule},
  * {@code updateRoutingRule}, {@code deleteRoutingRule},
- * {@code getRoutingRuleExecutions}): manager+ reads, admin+ writes.
+ * {@code getRoutingRuleExecutions}): super admin only (founder decision B,
+ * 2026-11-06, #457).
  */
 @RestController
 @RequestMapping("/api/routing-rules")
@@ -46,7 +47,7 @@ public class RoutingRulesController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public BaseListResponse<RoutingRuleResponse> list() {
         var all = rules.list();
         return BaseListResponse.of(
@@ -55,7 +56,7 @@ public class RoutingRulesController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
     public RuleEnvelope create(@Valid @RequestBody RoutingRuleWrite request,
             @AuthenticationPrincipal AuthUser principal) {
@@ -64,7 +65,7 @@ public class RoutingRulesController {
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public RuleEnvelope update(@PathVariable("id") UUID id,
             @Valid @RequestBody RoutingRuleWrite request,
             @AuthenticationPrincipal AuthUser principal) {
@@ -73,7 +74,7 @@ public class RoutingRulesController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public RuleEnvelope delete(@PathVariable("id") UUID id,
             @AuthenticationPrincipal AuthUser principal) {
         var rule = rules.getById(id);
@@ -82,7 +83,7 @@ public class RoutingRulesController {
     }
 
     @GetMapping("/{id}/executions")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public BaseListResponse<RoutingRuleExecutionResponse> executions(
             @PathVariable("id") UUID id,
             @RequestParam(defaultValue = "1") int page,

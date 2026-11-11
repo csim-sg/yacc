@@ -35,20 +35,21 @@ Define the approved technology stack, runtime environments, deployment model, an
 ## Deployment Architecture (MVP)
 ### Targets
 - Frontend: AWS S3 + CloudFront
-- Backend: K3s (Kubernetes) cluster
+- Backend: Docker Compose (ADR-032, 2026-11-10 — supersedes ADR-019 K3s + Helm; Helm chart transitional until MIG-080)
 
 ### Delivery / CI/CD
-- Deployment target: K3s
-- Installer: Helm (application charts + dependencies)
-- Reference: ADR-019 (pod envelope amended by ADR-029)
+- Deployment target: Docker Compose (local Docker first, per ADR-032; staging/production environments follow — host count/topology unresolved, #473)
+- Ingress: Traefik (TLS termination; proxies `/api`, `/health/*`, `/ws`); secrets via SOPS-encrypted artifacts; manual image deployments
+- Transitional until MIG-080 (#364): Helm chart `deploy/helm/yacc-backend` + the K3s staging deploy job (ADR-019, superseded)
+- Reference: ADR-032 (target); ADR-029 (runtime envelope, amended for Compose)
 
 ### Mermaid – High-Level Deployment
 ```mermaid
 flowchart LR
   U[Users] --> CF[CloudFront]
   CF --> S3[S3 Static Frontend]
-  U --> API[Java/Spring Backend - K3s]
-  API --> PG[(PostgreSQL - Helm)]
+  U --> API[Java/Spring Backend - Docker Compose]
+  API --> PG[(PostgreSQL - Compose service)]
   API --> Q[(Quartz + DLQ tables in PostgreSQL)]
   API --> R2[(Cloudflare R2)]
 ```
@@ -64,5 +65,6 @@ flowchart LR
 ## References
 - ADR-004 logging strategy: `.docs/adr/ADR-004-logging-strategy.md` (amended by ADR-029 for the JVM service)
 - ADR-005 config/infrastructure pattern: `.docs/adr/ADR-005-infrastructure-config-pattern.md` (Node-era; transitional until MIG-080)
-- ADR-019 K3s + Helm CI/CD target: `.docs/adr/ADR-019-k3s-helm-cicd-deployment.md`
+- ADR-032 Docker Compose deployment target (2026-11-10; supersedes ADR-019): `.docs/adr/ADR-032-docker-compose-deployment-target.md`
+- ADR-019 K3s + Helm CI/CD target (superseded by ADR-032): `.docs/adr/ADR-019-k3s-helm-cicd-deployment.md`
 - ADR-024/026/027/028/029: Java replacement architecture, raw WebSocket, data access, async processing, JVM envelope + observability

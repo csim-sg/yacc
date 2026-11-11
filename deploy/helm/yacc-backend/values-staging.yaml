@@ -41,6 +41,16 @@ config:
   FRONTEND_URL: https://staging.yacc.example.com
   RESET_PASSWORD_URL: https://staging.yacc.example.com/reset-password
 
+  # Spring environment contract (TM-003, #446): issuer is the public staging
+  # API base URL (stamped on AS-issued tokens and served by /.well-known);
+  # the email provider matches secrets.email.provider below; WS allowed
+  # origins and the auth-email base URL mirror the frontend origin.
+  YACC_AUTH_AS_ISSUER: https://api.staging.yacc.example.com
+  YACC_AUTH_EMAIL_PROVIDER: sendgrid
+  YACC_AUTH_EMAIL_FROM: no-reply@staging.yacc.example.com
+  YACC_AUTH_EMAIL_BASE_URL: https://staging.yacc.example.com
+  YACC_REALTIME_WS_ALLOWED_ORIGINS: https://staging.yacc.example.com
+
 # PostgreSQL (K3s cluster)
 postgresql:
   host: postgresql
@@ -59,10 +69,14 @@ secrets:
     existingSecret: yacc-auth-secrets
     superAdminEmailKey: bootstrap-super-admin-email
     superAdminPasswordKey: bootstrap-super-admin-password
+  auth:
+    existingSecret: yacc-auth-secrets
+    signingKeyKey: token-signing-key
   recovery:
     existingSecret: yacc-auth-secrets
     modeKey: recovery-mode
     keyKey: recovery-key
+    keyHashKey: recovery-key-hash
   cloudflareR2:
     existingSecret: yacc-cloudflare-secrets
     endpointKey: r2-endpoint
@@ -87,6 +101,7 @@ secrets:
     existingSecret: yacc-integration-secrets
     telegramBotTokenKey: telegram-bot-token
     ircPasswordKey: irc-password
+    encryptionMasterKeyKey: encryption-master-key
 
 # Ingress enabled for staging (if needed)
 ingress:

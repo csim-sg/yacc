@@ -118,7 +118,7 @@ After message stored:
 | **Async / Queue** | Quartz + PostgreSQL DB DLQ | Outbound message retry queue (ADR-028; Redis dropped) |
 | **File Storage** | Cloudflare R2 | Raw payloads, attachments, re-hosted files |
 | **Email** | Spring mail / SendGrid | Password reset emails |
-| **Hosting** | K3s + Helm (single-tenant MVP) | Backend runs on K3s; deploy via Helm; ADR-029 JVM envelope |
+| **Hosting** | Docker Compose (single-tenant MVP) | Traefik ingress; ADR-032 (supersedes ADR-019); ADR-029 JVM envelope; host topology unresolved (deferred to #473) |
 | **Testing** | Playwright | E2E testing |
 | **Backend Testing** | JUnit 5 + Testcontainers | Unit, integration and contract tests (JaCoCo ≥85% gate) |
 | **Frontend Testing** | Vitest | Unit tests |
@@ -1335,9 +1335,9 @@ const { data } = useConversations({ page: 0, limit: 20, status: 'open' });
 
 ## 7. Helm Deployment Architecture
 
-### Overview
+> **Transitional (until MIG-080, #364):** the deployment target is now Docker Compose (ADR-032, 2026-11-10, superseding ADR-019/K3s + Helm). This section documents the existing Helm chart path, which remains in the repository until decommission; it does not describe the current target.
 
-YACC backend deploys to Kubernetes via Helm (ADR-019 approved; pod envelope amended by ADR-029); production deployment/cutover remains pending MIG-070..072 (#361–#363). The Helm chart deploys the **Java/Spring backend** built from `services/backend-java/Dockerfile` (Temurin 21 JRE, non-root uid 1000, read-only root filesystem). PostgreSQL is managed as a Kubernetes StatefulSet; there is **no Redis** in the cluster (ADR-028).
+YACC backend has historically deployed to Kubernetes via Helm (ADR-019, superseded; pod envelope amended by ADR-029); production deployment/cutover remains pending MIG-070..072 (#361–#363). The Helm chart deploys the **Java/Spring backend** built from `services/backend-java/Dockerfile` (Temurin 21 JRE, non-root uid 1000, read-only root filesystem). PostgreSQL is managed as a Kubernetes StatefulSet; there is **no Redis** in the cluster (ADR-028).
 
 **Scope**: Backend deployment only. Frontend remains AWS S3 + CloudFront (separate pipeline).
 

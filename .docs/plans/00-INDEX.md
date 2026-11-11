@@ -1,6 +1,6 @@
 # Execution Status Index
 
-**Last Updated**: 2026-10-18  
+**Last Updated**: 2026-11-10
 **Status**: ✅ **PHASE 1 + PHASE 2 COMPLETE** | ✅ **SPEC-002 (Java backend) PHASES 0–6 MERGED** (Java service is the backend of record; Phase 7–8 cutover/decommission pending) | 📋 Historical phase records below are retained for reference (ADR-015)
 
 ---
@@ -20,6 +20,7 @@ Historical execution plans, phase packets, and session notes are removed post-MV
 - Gateway Plugin Architecture (GPA-007): ⏸️ **FROZEN under GOV-038** (migration scope lock; not scheduled during the Java migration)
 - **Infrastructure Phase (DEV-013-015)**: ✅ **COMPLETE & MERGED** (K3s + Helm + GitHub Actions, production-ready)
 - Phase 2 (Collaboration + Rules): ✅ **COMPLETE & MERGED** (tags/notes/assignments/routing-rules/audit; EA final gate passed 2026-02-25)
+- **Deployment target change (2026-11-10, founder decision)**: Docker Compose replaces K3s + Helm as the deployment target for local/dev, staging and production — **ADR-032 supersedes ADR-019**; ADR-029 amended (portable envelope kept, K8s expressions replaced); SPEC-002 AC-05/FR-02 target wording amended (MIG-106, #472). Helm chart + K3s deploy path stay transitional until MIG-080 (#364); first delivery target is the local Docker host (Compose baseline: #473/MIG-107). No deployment or public exposure has occurred.
 - SPEC-002 (Java backend migration): 🟡 **PHASES 0–6 MERGED — Phase 7–8 pending** (milestone #3: 28/37 issues closed; `services/backend-java` complete through auth/identity (MIG-030..034), REST + contract tests (MIG-040..041), raw WebSocket incl. presence/typing/backlog/reconnect (MIG-050..051), terminal-failure signal (MIG-052 scope settled by founder Option A), Telegram + IRC connectors (MIG-060..061), Quartz retry worker + DB DLQ + circuit breaker (MIG-063), and the MIG-100/MIG-101 package-layout correction pass. Remaining: cutover/rehearsal MIG-070..072 (#361–#363, held behind the MIG-052 #356 frontend decision), threat model MIG-073 (#367), test/QA parity MIG-091 (#366), docs sweep MIG-090 (#365, in progress), decommission MIG-080 (#364). Contract source: frozen `.docs/migration/{openapi.yaml,asyncapi.yaml,schemas/*}` per ADR-023.)
 - SPEC-003 (React→Angular frontend migration): 🟡 **IN IMPLEMENTATION** (milestone #4, 17 issues ANG-001..017; founder override 2026-09-26: parallel-with-Java, React-contracts 1:1; ANG-001 scaffold + Angular-target ARCH `.docs/architecture/005-...` + ADR-031 committed; ANG-002 local Zod contract layer + single HTTP/socket seam + contracts manifest committed in `packages/frontend-angular/src/app/contracts/`; ANG-015 CI parity/coverage gates + U10 gate scope + pre-registered disposition register landed (`.github/workflows/frontend-angular-parity.yml`, `packages/frontend-angular/parity/*`); production stays React until ANG-016 cutover)
 - QA: 🟡 **PARTIAL** (Node-era regression suite + Playwright E2E cover the transitional React/Node stack; Java-side test/QA parity is MIG-091 (#366), pending — see `.docs/04-qa-and-testing.md`)

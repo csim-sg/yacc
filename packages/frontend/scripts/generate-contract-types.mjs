@@ -15,7 +15,7 @@
  *                  the same OpenAPI generator can emit them; it adds no
  *                  shapes of its own.
  *
- * Run: `pnpm --filter @yacc/frontend contract:gen`
+ * Run: `npm run contract:gen -w @yacc/frontend`
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -31,7 +31,7 @@ const outDir = join(frontendDir, 'src/api/contract');
 const BANNER = `/**
  * GENERATED contract types — single frontend contract source (MIG-041; ADR-023).
  * Source of truth: the frozen canonical contracts in \`.docs/migration/\`.
- * Do not edit by hand — regenerate with \`pnpm --filter @yacc/frontend contract:gen\`.
+ * Do not edit by hand — regenerate with \`npm run contract:gen -w @yacc/frontend\`.
  */`;
 
 async function generate(source, outputFile) {

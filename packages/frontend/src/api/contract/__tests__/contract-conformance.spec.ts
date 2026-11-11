@@ -2,7 +2,7 @@
  * Frontend contract conformance (MIG-041; SPEC-002 AC-02/AC-07; ADR-023).
  *
  * Two-sided conformance, TS side: fixtures are declared with the GENERATED
- * contract types (so wire-shape drift fails `pnpm type-check`, compile-time)
+ * contract types (so wire-shape drift fails `npm run type-check`, compile-time)
  * and then parsed by the runtime Zod layer (so the validators accept exactly
  * the frozen contract shapes, runtime). The Java DTO side of the same
  * conformance runs in `services/backend-java` (`./gradlew contractTest`).

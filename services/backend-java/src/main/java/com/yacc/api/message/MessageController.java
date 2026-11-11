@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yacc.api.auth.AuthUser;
 import com.yacc.entity.UserRole;
 import com.yacc.common.controller.ForbiddenException;
+import com.yacc.common.controller.NotFoundException;
 import com.yacc.api.conversation.ConversationAccessService;
 import com.yacc.entity.Message;
 import com.yacc.api.message.MessageEnvelope;
@@ -35,8 +36,10 @@ import jakarta.validation.Valid;
  * {@code getConversationMessages}, {@code sendConversationMessage},
  * {@code retryConversationMessage}, {@code getConversationMessageStatus}).
  * GET list returns the frozen custom shape (deliberately NOT
- * BaseListResponse); POST send is open to all four roles; retry requires
- * conversation assignment for {@code user}-role identities (POC RBAC).
+ * BaseListResponse); POST send is open to all four roles — {@code user}
+ * only when assigned to the conversation (MIG-073 TM-011 remediation);
+ * retry requires conversation assignment for {@code user}-role identities
+ * (POC RBAC).
  */
 @RestController
 @RequestMapping("/api/conversations/{conversationId}/messages")
@@ -73,6 +76,14 @@ public class MessageController {
             @Valid @RequestBody SendMessageBody request,
             @AuthenticationPrincipal AuthUser principal,
             HttpServletRequest servletRequest) {
+        if (!access.exists(conversationId)) {
+            throw new NotFoundException("Conversation not found");
+        }
+        if (principal.getRole() == UserRole.USER
+                && !access.isAssignedTo(conversationId, principal.getId())) {
+            throw new ForbiddenException(
+                    "You do not have permission to send messages to this conversation");
+        }
         Message message = messages.send(conversationId, principal.getId(), request.body(),
                 servletRequest.getHeader("X-Correlation-Id"));
         return new MessageEnvelope(MessageResponse.from(message, mapper));

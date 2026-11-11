@@ -1,0 +1,15 @@
+# SOPS creation rules — YACC Compose deployment secrets (ADR-032; MIG-107 #473).
+#
+# Scope is deliberately narrow: only encrypted env artifacts under the
+# Compose secrets directory. No repo-wide wildcard — files anywhere else are
+# NOT silently encrypted with these recipients.
+#
+# Recipients are founder-supplied PUBLIC age keys (2026-11-10; safe to
+# commit). Private age identities never enter this repository, a PR, a log,
+# or a handover. The only committed secret artifact is the SOPS-encrypted
+# env file; decrypted output (deploy/compose/secrets/local.env) is
+# git-ignored and belongs to the operator who holds the private identity.
+creation_rules:
+  - path_regex: deploy/compose/secrets/.*\.sops\.env$
+    age: >-
+      age1w9keuadjqmzrv4qfwef4qzu09q9wt7x5mvxer9jffn4jpq8twsfsc7ay4z,age12wafnvwvnnlz3dw07k84vmen4pxgz2cahyt6qg3cvsvs25l8guwssjrtvj
