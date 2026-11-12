@@ -37,7 +37,7 @@ Everything else — the shared Traefik gateway, DNS/Cloudflare, other databases 
 | P4 | Decrypted env present | `deploy/compose/secrets/staging.env` exists (mode 0600, verified `stat -c '%a'` = 600), produced by [compose-staging.md](compose-staging.md) §3.1; the operator holds the private age identity for re-encryption (§7.7). | Operator |
 | P5 | Pinned image available | The exact `sha-<commit>` backend image pinned in `backend.staging.env` exists in the registry (restarts must not pull surprises). | Operator |
 | P6 | Tooling | Docker + compose plugin; `bash` (the guard blocks use `set -o pipefail`); `python3` (stdlib only); `openssl` and `sha256sum` (recovery-pair generation, §6.1); `sops` with age (§7.7); the `postgres:15` image present or pullable (§3 client). | Operator |
-| P7 | Shared-server facts | §3's pin succeeds (container, network, database name, major). If any pin fails or anything is ambiguous: **stop and record** — this is a founder-resolved fact, never a workaround. | Operator |
+| P7 | Shared-server facts | §3's pin succeeds (container, network, pinned-host converter check, connected-server identity binding, database name, major). If any pin fails or anything is ambiguous: **stop and record** — this is a founder-resolved fact, never a workaround. | Operator |
 
 **Stop** if any row is unmet. Record the abort per §9 and halt.
 
@@ -61,6 +61,12 @@ docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' 
 # the admin connection string <shared-admin-connection> (<founder to name>: a role
 # with ownership/CREATE rights on the yacc_client schema — a shared-server fact this
 # repository cannot verify) is typed into a 0600 temp file and converted in-process.
+# The converter also refuses any URL whose host is not EXPECTED_HOST below (the
+# pinned container name): a wrong-host URL never becomes a credential file.
+# Client tools reference the file through PGSERVICEFILE=/run/yacc-svc (the file's
+# path — not credential material) + the service= keyword: modern libpq client
+# tools reject an inline servicefile= connection keyword, so this procedure
+# never uses one (verified against the pinned postgres:15 image).
 # Requires bash + python3 (P6) and a no-swap/no-history EDITOR (see backup doc §3.2).
 SVC_FILE="$(mktemp)"
 URL_FILE="$(mktemp)"
@@ -68,65 +74,73 @@ trap 'rm -f -- "$SVC_FILE" "$URL_FILE"' EXIT
 trap 'rm -f -- "$SVC_FILE" "$URL_FILE"; exit 130' INT TERM
 $EDITOR "$URL_FILE"                # paste <shared-admin-connection>, save, quit
 chmod 600 "$URL_FILE"
+EXPECTED_HOST='antpolis-database-postgres-1'   # pinned shared server (§1)
 (
   set -o pipefail
   python3 -c '
 import re, sys
 from urllib.parse import urlsplit, unquote
 
-SERVICE = sys.argv[1]
-raw = sys.stdin.read().strip()
+SERVICE = sys.argv[1]                     # static section name — not a credential
+EXPECTED = sys.argv[2]                    # pinned/declared server host — any other host aborts
+raw = sys.stdin.read().strip()            # credential URL — never echoed
 
-def has_ctrl(value):
+def has_ctrl(value):                      # any ASCII control char (NUL/TAB/LF/CR/DEL/...)?
     return any(ord(c) <= 31 or ord(c) == 127 for c in value)
 
-if not raw or not re.fullmatch(r"[A-Za-z0-9_]+", SERVICE) or has_ctrl(raw):
-    sys.exit(2)
-if raw.startswith("jdbc:"):
+if (not raw or not EXPECTED or has_ctrl(EXPECTED)
+        or not re.fullmatch(r"[A-Za-z0-9_]+", SERVICE) or has_ctrl(raw)):
+    sys.exit(2)                           # empty, control chars, or bad service name => fail closed
+if raw.startswith("jdbc:"):               # JDBC form "jdbc:postgresql://..." accepted
     raw = raw[len("jdbc:"):]
 if not raw.startswith(("postgresql://", "postgres://")):
     sys.exit(2)
 
+# Query params are allowlisted to connection-quality options only. Every other key —
+# host, hostaddr, port, dbname, user, password, service, servicefile, ssl, or an
+# unknown name — is rejected, so a copied URL can never override the target host,
+# port, database or credentials parsed from the authority/path, or reach a nested
+# service definition. Values are re-checked after percent-decoding.
 SAFE_QUERY = {"sslmode", "connect_timeout", "application_name"}
 SSLMODES = ("disable", "allow", "prefer", "require", "verify-ca", "verify-full")
 
 try:
     u = urlsplit(raw)
-    host = (u.hostname or "").lower()
-    if not host or has_ctrl(host) or u.path.count("/") != 1:
+    host = (u.hostname or "").lower()     # hostname() unbrackets IPv6 + lowercases; "" when absent
+    if host != EXPECTED or u.path.count("/") != 1:
+        sys.exit(2)                       # any host other than the pinned one => fail closed
+    db = unquote(u.path[1:])              # database = the single path segment (percent-decoded)
+    if not db or has_ctrl(db):            # a decoded %0A/%0D must never reach the service file
         sys.exit(2)
-    db = unquote(u.path[1:])
-    if not db or has_ctrl(db):
-        sys.exit(2)
-    port = u.port
+    port = u.port                         # None when absent; raises ValueError when non-numeric
     if port is not None and not (0 < port <= 65535):
         sys.exit(2)
     user = unquote(u.username) if u.username is not None else None
     password = unquote(u.password) if u.password is not None else None
     if (user is not None and has_ctrl(user)) or (password is not None and has_ctrl(password)):
-        sys.exit(2)
-    params = []
+        sys.exit(2)                       # decoded control char in a credential => fail closed
+    params = []                           # safe, decoded, duplicate-free allowlisted params
     if u.query:
         for kv in u.query.split("&"):
             if not kv:
                 sys.exit(2)
             key, sep, value = kv.partition("=")
             if not sep or key not in SAFE_QUERY or any(key == done for done, _ in params):
-                sys.exit(2)
+                sys.exit(2)               # unknown/overriding/conflicting/duplicate key => fail closed
             value = unquote(value)
             if key == "sslmode" and value not in SSLMODES:
                 sys.exit(2)
             if key == "connect_timeout" and not re.fullmatch(r"[0-9]{1,5}", value):
                 sys.exit(2)
-            if has_ctrl(value):
+            if has_ctrl(value):           # decoded %0A/%0D in a query value => fail closed
                 sys.exit(2)
             params.append((key, value))
-except ValueError:
+except ValueError:                        # unparseable URL or port => fail closed
     sys.exit(2)
 
-def esc(value):
-    bs = chr(92)
-    q = chr(39)
+def esc(value):                           # libpq service-file quoting: backslash + quote escaped
+    bs = chr(92)                          # backslash (chr() keeps the payload quote-free)
+    q = chr(39)                           # single quote
     return q + value.replace(bs, bs + bs).replace(q, bs + q) + q
 
 lines = ["[%s]" % SERVICE, "host=%s" % esc(host)]
@@ -139,35 +153,49 @@ if password is not None:
     lines.append("password=%s" % esc(password))
 for key, value in params:
     lines.append("%s=%s" % (key, esc(value)))
-sys.stdout.write("\n".join(lines) + "\n")
-' yacc_reset_admin < "$URL_FILE" > "$SVC_FILE"
-) || { echo "ABORT: connection setup failed (unusable connection string); temporary credential files removed" >&2; exit 1; }
+sys.stdout.write("\n".join(lines) + "\n")  # the stanza goes ONLY to the 0600 file
+' yacc_reset_admin "$EXPECTED_HOST" < "$URL_FILE" > "$SVC_FILE"
+) || { echo "ABORT: connection setup failed (unusable connection string, or host is not the pinned antpolis-database-postgres-1); temporary credential files removed" >&2; exit 1; }
 [ -s "$SVC_FILE" ] || { echo "ABORT: connection string was empty; temporary credential files removed" >&2; exit 1; }
 printf 'service file: %s\n' "$SVC_FILE"
 
-# (3) In-session mechanical gate — abort unless connected to yacc_client on major 15.
-# The service file's host= pins 'antpolis-database-postgres-1'; Docker DNS on the pinned
-# network resolves it uniquely, so a resolved connection cannot land on another server.
-# Database name and major are non-secret; nothing else is printed.
+# (3) In-session mechanical gate — abort unless the CONNECTED server is the pinned
+# container serving yacc_client on major 15. Two identity layers: the converter (2)
+# already refused any URL host other than 'antpolis-database-postgres-1', and this
+# gate binds the established connection to that container — host(inet_server_addr())
+# is the server-side address of the connection that just ran (netmask suffix
+# removed), and it must match an address Docker DNS resolves the pinned container
+# name to on this network. A reachable different server carrying a same-named
+# yacc_client database on major 15 therefore aborts HERE, before any destructive
+# step: database name and major alone cannot pass it. Database name and major are
+# non-secret; nothing else is printed.
 docker run --rm -i --network antpolis-database_database \
+  -e PGSERVICEFILE=/run/yacc-svc \
   --mount type=bind,src="$SVC_FILE",dst=/run/yacc-svc,readonly \
   postgres:15 bash -c '
-    db="$(psql "servicefile=/run/yacc-svc service=yacc_reset_admin" -Atc "SELECT current_database();")" || exit 1
-    ver="$(psql "servicefile=/run/yacc-svc service=yacc_reset_admin" -Atc "SHOW server_version;")" || exit 1
+    db="$(psql "service=yacc_reset_admin" -Atc "SELECT current_database();")" || exit 1
+    ver="$(psql "service=yacc_reset_admin" -Atc "SHOW server_version;")" || exit 1
+    srv="$(psql "service=yacc_reset_admin" -Atc "SELECT host(inet_server_addr());")" || exit 1
     case "$db $ver" in
       "yacc_client "15.*) ;;
       *) echo "ABORT: connected target is not yacc_client on PostgreSQL major 15 (got db=$db server=$ver)"; exit 1 ;;
     esac
-    echo "target pin OK: yacc_client on PostgreSQL $ver"
+    [ -n "$srv" ] || { echo "ABORT: connected server reported no network address"; exit 1; }
+    EXP="$( { getent ahostsv4 antpolis-database-postgres-1 | awk "{print \$1}"; getent ahostsv6 antpolis-database-postgres-1 | awk "{print \$1}"; } | sort -u )"
+    [ -n "$EXP" ] || { echo "ABORT: pinned container did not resolve on this network"; exit 1; }
+    printf "%s\n" "$EXP" | grep -Fxq "$srv" \
+      || { echo "ABORT: connected server address is not antpolis-database-postgres-1 on this network — wrong-server target refused"; exit 1; }
+    echo "target pin OK: yacc_client on PostgreSQL $ver served by antpolis-database-postgres-1"
 ' || { echo "ABORT: target pin failed — refusing every destructive step"; exit 1; }
 
 # (4) Schema inventory — abort on ANY ambiguity. The reset in §5 is valid ONLY for the
 # single recorded application schema 'public'. Anything else (extra user schemas) is an
 # ambiguity this procedure does not resolve.
 SCHEMAS="$(docker run --rm -i --network antpolis-database_database \
+  -e PGSERVICEFILE=/run/yacc-svc \
   --mount type=bind,src="$SVC_FILE",dst=/run/yacc-svc,readonly \
   postgres:15 \
-  psql "servicefile=/run/yacc-svc service=yacc_reset_admin" -Atc \
+  psql "service=yacc_reset_admin" -Atc \
   "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('pg_catalog','information_schema') AND schema_name NOT LIKE 'pg_%' ORDER BY schema_name;")" \
   || { echo "ABORT: schema inventory query failed"; exit 1; }
 [ "$SCHEMAS" = "public" ] \
@@ -176,6 +204,37 @@ echo "schema inventory OK: public only"
 ```
 
 `<shared-admin-connection>` placeholder: the admin/owner role for the `yacc_client` schema on the shared server (`<founder to name>` — the shared server's ownership model is a host-internal fact). If that role cannot be supplied, the procedure stops here; nothing destructive runs.
+
+### 3.1 Negative control — a different server with the same database name and major aborts (throwaway resources only)
+
+This control proves the §3 gate refuses a wrong server **before** the §4 reset. It runs **only** on throwaway resources the operator creates for the control and removes afterwards — never the shared server, never a real database, never a real credential. Record the outcome as the §8 control row when the drill is executed.
+
+Setup — two throwaway PostgreSQL 15 servers on a throwaway network, each with a database named `yacc_client` and operator-chosen **throwaway** credentials (same database name and major as the real target — that coincidence is the point of the control):
+
+```bash
+docker network create <nc-network>
+docker run -d --name <nc-container-a> --network <nc-network> \
+  -e POSTGRES_USER=<nc-user> -e POSTGRES_PASSWORD=<nc-password> -e POSTGRES_DB=yacc_client postgres:15
+docker run -d --name <nc-container-b> --network <nc-network> \
+  -e POSTGRES_USER=<nc-user> -e POSTGRES_PASSWORD=<nc-password> -e POSTGRES_DB=yacc_client postgres:15
+for c in <nc-container-a> <nc-container-b>; do                      # bounded readiness wait
+  ok=""
+  for i in $(seq 1 30); do
+    docker exec "$c" pg_isready -U <nc-user> -d yacc_client >/dev/null 2>&1 && { ok=1; break; }
+    sleep 2
+  done
+  [ -n "$ok" ] || { echo "ABORT (control): $c never became ready"; exit 1; }
+done
+```
+
+| # | Action (against the throwaway pair only) | Required outcome |
+|---|---|---|
+| NC-1 | Run the §3 (2) conversion with a URL whose host is `<nc-container-b>` while `EXPECTED_HOST` is `<nc-container-a>` | converter exits non-zero and **no service file is written** — a wrong-host URL is refused before any credential file exists |
+| NC-2 | Control-only bypass of (2): write a throwaway 0600 libpq stanza **by hand** whose `host=` is `<nc-container-b>` (throwaway credentials, never the real URL), then run the §3 (3) gate block with the pinned container name replaced by `<nc-container-a>` on `<nc-network>` | gate **aborts** at the server-identity comparison (container B's address ≠ container A's resolved address) even though db name and major alone would pass — the §4 `DROP SCHEMA` step never runs, because §3 must pass first |
+| NC-3 | Same control stanza with `host=` = `<nc-container-a>` | gate passes ("target pin OK: … served by `<nc-container-a>`") — the positive path still works |
+| NC-4 | Tear the control down | `docker rm -f <nc-container-a> <nc-container-b> && docker network rm <nc-network>` |
+
+Hand-writing a libpq stanza is allowed **only** inside this control — throwaway values, throwaway network, never the shared server, never the real connection string. The same gate shape guards [compose-backup-restore.md](compose-backup-restore.md) §3.1a (shared source) and §4.2 (restore target), where a wrong host aborts before `pg_dump`/`pg_restore`.
 
 ---
 
@@ -198,11 +257,19 @@ Then the reset. It drops and recreates **only the `public` schema of `yacc_clien
 ```bash
 # Requires $SVC_FILE + trap from §3 (same shell). Re-run §3 first if the shell changed.
 docker run --rm -i --network antpolis-database_database \
+  -e PGSERVICEFILE=/run/yacc-svc \
   --mount type=bind,src="$SVC_FILE",dst=/run/yacc-svc,readonly \
   postgres:15 bash -c '
-    db="$(psql "servicefile=/run/yacc-svc service=yacc_reset_admin" -Atc "SELECT current_database();")" || exit 1
+    db="$(psql "service=yacc_reset_admin" -Atc "SELECT current_database();")" || exit 1
     [ "$db" = "yacc_client" ] || { echo "ABORT: pre-reset re-check failed (db=$db)"; exit 1; }
-    psql "servicefile=/run/yacc-svc service=yacc_reset_admin" -v ON_ERROR_STOP=1 \
+    # Server-identity re-assert at the moment of destruction: the address the server
+    # accepted this connection on must still belong to the pinned container.
+    srv="$(psql "service=yacc_reset_admin" -Atc "SELECT host(inet_server_addr());")" || exit 1
+    EXP="$( { getent ahostsv4 antpolis-database-postgres-1 | awk "{print \$1}"; getent ahostsv6 antpolis-database-postgres-1 | awk "{print \$1}"; } | sort -u )"
+    [ -n "$EXP" ] || { echo "ABORT: pinned container did not resolve on this network"; exit 1; }
+    printf "%s\n" "$EXP" | grep -Fxq "$srv" \
+      || { echo "ABORT: connected server is not antpolis-database-postgres-1 — refusing the reset"; exit 1; }
+    psql "service=yacc_reset_admin" -v ON_ERROR_STOP=1 \
       -c "DROP SCHEMA public CASCADE;" \
       -c "CREATE SCHEMA public;" || exit 1
     echo "reset done: schema public of yacc_client dropped and recreated"
@@ -405,6 +472,7 @@ One row per workflow, filled at execution time by the operator. **All fields sta
 | 8 | Recovery mode unset (§6.4) | | | | `staging` | | `<artifact-link>` |
 | 9 | Rotation batches 7.1–7.6 (one row per batch) | | | | `staging` | | `<artifact-link>` |
 | 10 | SOPS re-encryption (§7.7) | | | | `staging` | | `<artifact-link>` |
+| 11 | Wrong-host negative control (§3.1 — throwaway resources only) | | | | `throwaway control` | | `<artifact-link>` |
 
 Rules: timestamps UTC; every environment mutation (backend stop/start, credential replacement, env edits, re-grant) is recorded in the row of the workflow that caused it — never silently normalized; **empty rows mean the workflow did not happen**; no POC identity survives (recovery never resurrects one — ADR-025); secret values never appear in artifacts. **This procedure is not evidence.**
 
@@ -415,7 +483,7 @@ Rules: timestamps UTC; every environment mutation (backend stop/start, credentia
 Abort immediately, record the rows filled so far, and halt if any of these occurs:
 
 - Any §2 prerequisite is unmet or lapses mid-run (especially: the founder is no longer present at a gate, or the P3 backup cannot be retrieved).
-- Any §3 pin fails or anything is **ambiguous** (container/network/database/major mismatch, unexpected schema inventory, failed verification query). Ambiguity is an abort, never a judgment call.
+- Any §3 pin fails or anything is **ambiguous** (container/network mismatch, connected server not bound to the pinned container by the §3 gate, database/major mismatch, unexpected schema inventory, failed verification query). Ambiguity is an abort, never a judgment call.
 - The reset block exits non-zero, or its post-conditions cannot be verified.
 - Bootstrap does not produce exactly one forced-change Super Admin, boot fails, or a restart creates a second Super Admin (that is a product finding, recorded — not normalized).
 - The recovery pair check does not print `MATCH`; recovery does not trigger; the pre-drill credential still authenticates after recovery.
@@ -439,4 +507,4 @@ On abort: **do not restart the backend into a half-reset state**; recover only b
 
 ---
 
-**Last Updated**: 2026-11-13 (authored by MIG-070e #488; feeds MIG-071 #362 AC-MIG-071-1..3; pins the recovery medium (env-gated `RECOVERY_MODE=once` + founder-held `RECOVERY_KEY` via the operator-held SOPS-derived env file) and the rotation order; procedure only — no execution claimed)
+**Last Updated**: 2026-11-13 (authored by MIG-070e #488; feeds MIG-071 #362 AC-MIG-071-1..3; pins the recovery medium (env-gated `RECOVERY_MODE=once` + founder-held `RECOVERY_KEY` via the operator-held SOPS-derived env file) and the rotation order; review pass 1 (PR #492): server-identity binding added — converter rejects any URL host other than the pinned `antpolis-database-postgres-1`, §3/§4 gate and reset block bind the connected server to the pinned container via `inet_server_addr()` ↔ container address, §3.1 wrong-host negative control added; procedure only — no execution claimed)

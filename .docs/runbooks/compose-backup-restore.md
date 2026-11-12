@@ -21,7 +21,7 @@
 - **Schema state**: `flyway_schema_history` (Flyway-managed; ADR-027).
 - **Storage location / retention**: `<artifact-link>` directory on the operator's side — `<founder to name>` decides location and retention period; recorded on #361, not in this document.
 
-**Never** print, log, or copy credential values into evidence artifacts. Reference names/keys only. Connection credentials are parsed **in-process** into a mode-`0600` temporary libpq **service file** (§3.2, §4.1) that `psql`/`pg_dump`/`pg_restore` reference by `servicefile=` + `service=` name — the credential value never appears in a shell variable, a command argument (`ps`-visible), an environment entry, or `set -x` trace output, and the file is removed by a trap on exit. The operator-typed connection string additionally requires the no-swap/no-history editor invocation specified in §3.2 — editor-internal copies (swap/viminfo/backup) sit outside every trap. Every percent-**decoded** component (database, username, password, each query value) is checked for ASCII control characters before it is written, so an encoded `%0A`/`%0D` can never create a service-file line, and query parameters are allowlisted (§3.2) so a copied URL cannot override the parsed target or credentials.
+**Never** print, log, or copy credential values into evidence artifacts. Reference names/keys only. Connection credentials are parsed **in-process** into a mode-`0600` temporary libpq **service file** (§3.2, §4.1) that `psql`/`pg_dump`/`pg_restore` reference through the `PGSERVICEFILE` environment variable (the file's path — not credential material) + the `service=` keyword — the credential value never appears in a shell variable, a command argument (`ps`-visible), an environment entry, or `set -x` trace output, and the file is removed by a trap on exit. (An inline `servicefile=` connection keyword is rejected by modern libpq client tools — verified against the pinned `postgres:15` image — so this procedure never uses one.) The operator-typed connection string additionally requires the no-swap/no-history editor invocation specified in §3.2 — editor-internal copies (swap/viminfo/backup) sit outside every trap. Every percent-**decoded** component (database, username, password, each query value) is checked for ASCII control characters before it is written, so an encoded `%0A`/`%0D` can never create a service-file line, and query parameters are allowlisted (§3.2) so a copied URL cannot override the parsed target or credentials.
 
 ---
 
@@ -37,7 +37,7 @@
 ### 3.1 Pre-backup checks
 
 - [ ] `/health/live` and `/health/ready` return 200 — through `https://staging.riotingnerds.com` ([compose-staging.md](compose-staging.md) §5 Step 2) for the staging target, or the candidate loopback check ([compose-rehearsal-stop-authority.md](compose-rehearsal-stop-authority.md) Step 2) for a rehearsal candidate — back up a healthy service.
-- [ ] **Client tools pinned to the source server's major version — PostgreSQL 15** for this service. The documented pinned-tools path is the `postgres:15` client container used throughout (the image tag pins the **major**; the same-major rule is a major-version rule — exactly the reviewed posture: dump output is documented to load same-or-newer major, never guaranteed older, and `pg_dump` refuses a newer source). If operator-installed host clients are used instead, preflight them identically: `pg_dump --version`, `pg_restore --version` — record both and confirm **major 15**; abort otherwise. `pg_export_snapshot()`, `pg_dump --snapshot`, and the `servicefile` connection parameter require these modern clients.
+- [ ] **Client tools pinned to the source server's major version — PostgreSQL 15** for this service. The documented pinned-tools path is the `postgres:15` client container used throughout (the image tag pins the **major**; the same-major rule is a major-version rule — exactly the reviewed posture: dump output is documented to load same-or-newer major, never guaranteed older, and `pg_dump` refuses a newer source). If operator-installed host clients are used instead, preflight them identically: `pg_dump --version`, `pg_restore --version` — record both and confirm **major 15**; abort otherwise. `pg_export_snapshot()` and `pg_dump --snapshot` require these modern clients. Connections go through the `PGSERVICEFILE` environment variable (a file path — not credential material) + the `service=` keyword; an inline `servicefile=` connection keyword is rejected by modern libpq client tools (verified on the pinned `postgres:15` image), so this procedure never uses one.
 - [ ] Operator shell for the setup/guard blocks is **`bash`** — the fail-closed blocks use `set -o pipefail`, which POSIX `sh`/dash rejects.
 - [ ] **`python3`** available (standard library only) — powers the §3.2/§4.1 in-process credential conversion.
 - [ ] Docker + compose plugin on the host; the `postgres:15` image present or pullable.
@@ -47,7 +47,7 @@
 
 #### 3.1a Shared-server target pin (staging source only — fail closed)
 
-Every check must pass; **any failure or ambiguity aborts**. The connection can then only land on the pinned container, database, and major:
+Every check must pass; **any failure or ambiguity aborts**. The connection is then provably bound to the pinned container (converter host pin in §3.2 + connected-server address binding in the gate below), database, and major:
 
 ```bash
 # Fail-closed pins for the SHARED source (staging). Run before building the service file.
@@ -62,22 +62,34 @@ docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' 
 echo "shared-server pin OK: antpolis-database-postgres-1 on antpolis-database_database"
 ```
 
-After the §3.2 service file exists, the **connection gate** below mechanically verifies the database name and server major before anything else runs (database name and major are non-secret; nothing else is printed):
+After the §3.2 service file exists, the **connection gate** below mechanically verifies the connected server identity, the database name, and the server major before anything else runs (database name and major are non-secret; nothing else is printed):
 
 ```bash
-# Connection gate — abort unless connected to 'yacc_client' on PostgreSQL major 15.
-# Requires $SVC_FILE from §3.2. Client container joins the shared network so the
-# pinned container name resolves; the service file is bind-mounted read-only.
+# Connection gate — abort unless the CONNECTED server is the pinned container serving
+# 'yacc_client' on PostgreSQL major 15. Two identity layers: (a) the §3.2 converter
+# already refused any URL host other than antpolis-database-postgres-1 (a wrong-host
+# URL never became a service file); (b) host(inet_server_addr()) — the server-side
+# address of the connection that just ran, without the netmask suffix — must match an
+# address Docker DNS resolves the pinned container name to on this network, so a
+# reachable different server with a same-named yacc_client database on major 15
+# aborts HERE, before pg_dump runs.
 docker run --rm -i --network antpolis-database_database \
+  -e PGSERVICEFILE=/run/yacc-svc \
   --mount type=bind,src="$SVC_FILE",dst=/run/yacc-svc,readonly \
   postgres:15 bash -c '
-    db="$(psql "servicefile=/run/yacc-svc service=yacc_backup_src" -Atc "SELECT current_database();")" || exit 1
-    ver="$(psql "servicefile=/run/yacc-svc service=yacc_backup_src" -Atc "SHOW server_version;")" || exit 1
+    db="$(psql "service=yacc_backup_src" -Atc "SELECT current_database();")" || exit 1
+    ver="$(psql "service=yacc_backup_src" -Atc "SHOW server_version;")" || exit 1
+    srv="$(psql "service=yacc_backup_src" -Atc "SELECT host(inet_server_addr());")" || exit 1
     case "$db $ver" in
       "yacc_client "15.*) ;;
       *) echo "ABORT: connected target is not yacc_client on PostgreSQL major 15 (got db=$db server=$ver)"; exit 1 ;;
     esac
-    echo "target pin OK: yacc_client on PostgreSQL $ver"
+    [ -n "$srv" ] || { echo "ABORT: connected server reported no network address"; exit 1; }
+    EXP="$( { getent ahostsv4 antpolis-database-postgres-1 | awk "{print \$1}"; getent ahostsv6 antpolis-database-postgres-1 | awk "{print \$1}"; } | sort -u )"
+    [ -n "$EXP" ] || { echo "ABORT: pinned container did not resolve on this network"; exit 1; }
+    printf "%s\n" "$EXP" | grep -Fxq "$srv" \
+      || { echo "ABORT: connected server address is not antpolis-database-postgres-1 on this network — refusing the shared source"; exit 1; }
+    echo "target pin OK: yacc_client on PostgreSQL $ver served by antpolis-database-postgres-1"
 ' || { echo "ABORT: shared-source connection gate failed"; exit 1; }
 ```
 
@@ -96,8 +108,8 @@ Run the connection-setup block below **in Terminal 1's shell** (the shell that w
 - The connection string exists **only** inside the mode-`0600` editor temp file and the mode-`0600` service file. It is never assigned to a shell variable, never passed as a command argument, never exported into the environment, and never echoed — so nothing can leak via `ps`, child-process environments, shell history, or `set -x` trace output.
 - `mktemp` creates both files with mode `0600`; the trap removes them on normal exit, abort, or Ctrl-C (`EXIT`/`INT`/`TERM` — an interrupt cleans up and stops the procedure with exit 130). Do not remove the trap. Never `cat`, `echo`, edit, or copy the service file (including into evidence artifacts) — reference it by path only.
 - **The trap cannot reach editor-internal copies**: an editor that keeps a swap file, undo history, viminfo, or backup copies leaves credential-bearing files the trap never removes, so the only-inside-temporary-files property holds **only** under a no-swap/no-history editor invocation — e.g. `EDITOR='vim -n -i NONE'` (no swap file, no viminfo; vim keeps backups off by default — do not use an editor environment that enables swap/backup/undo persistence, or disable it for this invocation). If the editor's file behavior cannot be verified, treat the connection string as having left additional local copies on that workstation and remove them deliberately afterwards.
-- The converter parses in-process (strips a `jdbc:` prefix, percent-decodes, validates host/database/port), emits the stanza only to the `0600` file, prints nothing else, and exits non-zero on empty, control-character-bearing, or unparseable input. Because libpq reads the service file **line by line**, every **decoded** component — database, username, password, and each query value — is rejected when it contains an ASCII control character (NUL/TAB/LF/CR/DEL/…): percent-encoded `%0A`/`%0D` therefore cannot split a value into extra service-file lines or directives. Query parameters are **allowlisted** to `sslmode` (value-validated), `connect_timeout`, and `application_name`; any other key — `host`, `hostaddr`, `port`, `dbname`, `user`, `password`, `service`, `servicefile`, `ssl`, or anything unknown — is rejected, as are duplicate or keyless pairs, so a copied URL can never override the parsed target/credentials or inject a nested service. Abort messages never contain credential material.
-- The service file pins the source host as **`antpolis-database-postgres-1`** for the staging source (the pinned container name — Docker DNS resolves it uniquely on the `antpolis-database_database` network, so a resolved connection cannot land on a different server). A rehearsal candidate pins its candidate container name instead.
+- The converter parses in-process (strips a `jdbc:` prefix, percent-decodes, validates host/database/port, and **rejects any URL whose host is not the declared expected host** — `antpolis-database-postgres-1` for the shared source, `db` for a rehearsal candidate), emits the stanza only to the `0600` file, prints nothing else, and exits non-zero on empty, control-character-bearing, wrong-host, or unparseable input. Because libpq reads the service file **line by line**, every **decoded** component — database, username, password, and each query value — is rejected when it contains an ASCII control character (NUL/TAB/LF/CR/DEL/…): percent-encoded `%0A`/`%0D` therefore cannot split a value into extra service-file lines or directives. Query parameters are **allowlisted** to `sslmode` (value-validated), `connect_timeout`, and `application_name`; any other key — `host`, `hostaddr`, `port`, `dbname`, `user`, `password`, `service`, `servicefile`, `ssl`, or anything unknown — is rejected, as are duplicate or keyless pairs, so a copied URL can never override the parsed target/credentials or inject a nested service. Abort messages never contain credential material.
+- The service file pins the source host as **`antpolis-database-postgres-1`** for the staging source — enforced, not assumed: the converter refuses any URL whose host is not the pinned name, and the §3.1a connection gate binds the **connected** server to the pinned container by comparing the server-side connection address (`host(inet_server_addr())`) with the container's Docker-DNS address on the pinned network, so a reachable different server carrying a same-named `yacc_client` database on major 15 aborts. A rehearsal candidate pins its candidate host instead (`db`).
 - The file is read by libpq **at connect time**: an open session keeps working if the file is later removed, but new connections fail after the setup shell exits — if that happens early, re-run the setup block (it prints a fresh path).
 
 ```bash
@@ -108,10 +120,14 @@ Run the connection-setup block below **in Terminal 1's shell** (the shell that w
 # Rehearsal use: the candidate stack of compose-rehearsal-stop-authority.md —
 # host = db (the candidate db service name on network <candidate-project>_cand),
 # database = <candidate-database> (never the shared server; see that doc's Step 3).
+# The converter's host pin follows the source: EXPECTED_HOST below is the pinned
+# shared container for the staging source; a rehearsal source sets EXPECTED_HOST=db.
 SVC_FILE="$(mktemp)"
 URL_FILE="$(mktemp)"
 trap 'rm -f -- "$SVC_FILE" "$URL_FILE"' EXIT
 trap 'rm -f -- "$SVC_FILE" "$URL_FILE"; exit 130' INT TERM   # Ctrl-C/TERM abort: clean up, then stop
+EXPECTED_HOST='antpolis-database-postgres-1'   # pinned source host (§3.1a) — the converter
+                                               # refuses any other URL host; rehearsal source: db
 # The editor invocation must leave no swap/history/backup copies — those would
 # outlive the trap, e.g. EDITOR='vim -n -i NONE'. $EDITOR is deliberately UNQUOTED
 # so it may carry editor flags; it holds no credential material itself.
@@ -127,12 +143,14 @@ import re, sys
 from urllib.parse import urlsplit, unquote
 
 SERVICE = sys.argv[1]                     # static section name — not a credential
+EXPECTED = sys.argv[2]                    # pinned/declared server host — any other host aborts
 raw = sys.stdin.read().strip()            # credential URL — never echoed
 
 def has_ctrl(value):                      # any ASCII control char (NUL/TAB/LF/CR/DEL/...)?
     return any(ord(c) <= 31 or ord(c) == 127 for c in value)
 
-if not raw or not re.fullmatch(r"[A-Za-z0-9_]+", SERVICE) or has_ctrl(raw):
+if (not raw or not EXPECTED or has_ctrl(EXPECTED)
+        or not re.fullmatch(r"[A-Za-z0-9_]+", SERVICE) or has_ctrl(raw)):
     sys.exit(2)                           # empty, control chars, or bad service name => fail closed
 if raw.startswith("jdbc:"):               # JDBC form "jdbc:postgresql://..." accepted
     raw = raw[len("jdbc:"):]
@@ -150,8 +168,8 @@ SSLMODES = ("disable", "allow", "prefer", "require", "verify-ca", "verify-full")
 try:
     u = urlsplit(raw)
     host = (u.hostname or "").lower()     # hostname() unbrackets IPv6 + lowercases; "" when absent
-    if not host or has_ctrl(host) or u.path.count("/") != 1:
-        sys.exit(2)
+    if host != EXPECTED or u.path.count("/") != 1:
+        sys.exit(2)                       # any host other than the pinned one => fail closed
     db = unquote(u.path[1:])              # database = the single path segment (percent-decoded)
     if not db or has_ctrl(db):            # a decoded %0A/%0D must never reach the service file
         sys.exit(2)
@@ -197,8 +215,8 @@ if password is not None:
 for key, value in params:
     lines.append("%s=%s" % (key, esc(value)))
 sys.stdout.write("\n".join(lines) + "\n")  # the stanza goes ONLY to the 0600 file
-' yacc_backup_src < "$URL_FILE" > "$SVC_FILE"
-) || { echo "ABORT: connection setup failed (unusable connection string); the temporary credential files were removed" >&2; exit 1; }
+' yacc_backup_src "$EXPECTED_HOST" < "$URL_FILE" > "$SVC_FILE"
+) || { echo "ABORT: connection setup failed (unusable connection string, or host is not the pinned source host); the temporary credential files were removed" >&2; exit 1; }
 [ -s "$SVC_FILE" ] || { echo "ABORT: connection string was empty; the temporary credential files were removed" >&2; exit 1; }
 
 printf 'service file: %s\n' "$SVC_FILE"   # the printed path is not credential material; the file content never is
@@ -208,10 +226,11 @@ printf 'service file: %s\n' "$SVC_FILE"   # the printed path is not credential m
 
 ```bash
 docker run --rm -it --network antpolis-database_database \
+  -e PGSERVICEFILE=/run/yacc-svc \
   --mount type=bind,src="<svc-file-path>",dst=/run/yacc-svc,readonly \
   --mount type=bind,src="<artifact-link-dir>",dst=/run/art \
   postgres:15 \
-  psql "servicefile=/run/yacc-svc service=yacc_backup_src"
+  psql "service=yacc_backup_src"
 ```
 
 ```
@@ -259,13 +278,14 @@ Capture order matters: `pg_export_snapshot()` first (it fixes the transaction sn
 # artifacts directory (operator-side <artifact-link>); the snapshot id is read from
 # the operator-side file Terminal 1 recorded.
 docker run --rm -i --network antpolis-database_database \
+  -e PGSERVICEFILE=/run/yacc-svc \
   --mount type=bind,src="<svc-file-path>",dst=/run/yacc-svc,readonly \
   --mount type=bind,src="<artifact-link-dir>",dst=/run/art \
   postgres:15 \
   pg_dump --format=custom --no-owner --no-privileges \
     --snapshot="$(cat <artifact-link>/source-snapshot-id.txt)" \
     --file=/run/art/yacc-db-$(date -u +%Y%m%dT%H%M%SZ).dump \
-    "servicefile=/run/yacc-svc service=yacc_backup_src"
+    "service=yacc_backup_src"
 ```
 
 - Run while the Terminal-1 session from §3.2 is still open — the exported snapshot exists only until that transaction ends.
@@ -277,7 +297,7 @@ docker run --rm -i --network antpolis-database_database \
 ### 3.4 Backup failure handling
 
 - §3.2 setup failure (unusable connection string) ⇒ the block aborts with a generic message and the `trap` has already removed the temporary credential files; fix the cause and re-run the setup block. No credential material is printed on any abort path.
-- §3.1a pin or connection-gate failure ⇒ **abort**; the shared server, network, database name, or major is not what this procedure pins. Never proceed on an ambiguous target.
+- §3.1a pin or connection-gate failure ⇒ **abort**; the shared server, network, connected-server identity, database name, or major is not what this procedure pins. Never proceed on an ambiguous target.
 - `pg_dump` exits non-zero ⇒ **no backup exists**; fix the cause (connectivity, disk, permissions) and re-run. Do not mark a partial dump as a backup.
 - Dump succeeded but cannot be stored/retrieved ⇒ treat as failed (a backup that cannot be restored to is not a backup).
 - Abort per [compose-rehearsal-stop-authority.md](compose-rehearsal-stop-authority.md) §4 if the backup gate cannot be met during a rehearsal.
@@ -310,9 +330,18 @@ Two supported shapes; either way the candidate server runs **PostgreSQL major 15
     -e POSTGRES_DB=<candidate-database> postgres:15
   ```
 
-Then build the candidate service file. Same credential-safe mechanism as §3.2, with one operator-typed difference: the admin connection string is entered **inside the editor** into a mode-`0600` temporary file (mktemp + trap on exit/abort/Ctrl-C — an interrupt cleans up and stops with exit 130) — never pasted as a shell argument, never exported, never echoed — so it cannot leak via history, argv, the environment, or `set -x`. The no-swap/no-history editor invocation requirement from §3.2 applies unchanged. The embedded converter is the **same program** as §3.2 (only the service name and stdin source differ): it rejects decoded control characters and applies the same query-param allowlist, so a mistyped or hostile candidate URL fails closed identically. The parsed `host=` pins the candidate server's address — `db` on the rehearsal candidate network, `<candidate-container>` for the standalone candidate — which Docker DNS resolves uniquely on the candidate network, so a resolved connection cannot land on another server.
+Then build the candidate service file. Same credential-safe mechanism as §3.2, with one operator-typed difference: the admin connection string is entered **inside the editor** into a mode-`0600` temporary file (mktemp + trap on exit/abort/Ctrl-C — an interrupt cleans up and stops with exit 130) — never pasted as a shell argument, never exported, never echoed — so it cannot leak via history, argv, the environment, or `set -x`. The no-swap/no-history editor invocation requirement from §3.2 applies unchanged. The embedded converter is the **same program** as §3.2 (only the service name, expected host, and stdin source differ): it rejects decoded control characters, applies the same query-param allowlist, and **refuses any URL whose host is not the declared candidate host** (`CAND_EXPECTED_HOST` — `db` for the rehearsal shape, `<candidate-container>` for the standalone shape), so a mistyped or hostile candidate URL fails closed identically. The §4.2 identity gate then binds the **connected** server to the declared candidate container (`CAND_CONTAINER`) by comparing the server-side connection address with the container's Docker-DNS address on the candidate network, and pins the connected database to `CAND_DB` — so a same-named, same-major database on any other host aborts before `pg_restore` runs.
 
 ```bash
+# Candidate identity declarations — set per shape BEFORE running (fail-closed in §4.2):
+CAND_EXPECTED_HOST='db'                      # converter host pin — the candidate service name
+                                             # (rehearsal shape); standalone shape: replace with
+                                             # '<candidate-container>'
+CAND_CONTAINER='<candidate-project>-db-1'    # the declared candidate server container (rehearsal
+                                             # shape, G5 naming); standalone shape: '<candidate-container>'
+CAND_DB='<candidate-restored-database>'      # the fresh restore-target database created above —
+                                             # never '<candidate-database>' (the candidate backend
+                                             # serves that one)
 CAND_URL_FILE="$(mktemp)"
 CAND_SVC_FILE="$(mktemp)"
 trap 'rm -f -- "$CAND_URL_FILE" "$CAND_SVC_FILE"' EXIT
@@ -328,12 +357,14 @@ import re, sys
 from urllib.parse import urlsplit, unquote
 
 SERVICE = sys.argv[1]                     # static section name — not a credential
+EXPECTED = sys.argv[2]                    # pinned/declared server host — any other host aborts
 raw = sys.stdin.read().strip()            # credential URL — never echoed
 
 def has_ctrl(value):                      # any ASCII control char (NUL/TAB/LF/CR/DEL/...)?
     return any(ord(c) <= 31 or ord(c) == 127 for c in value)
 
-if not raw or not re.fullmatch(r"[A-Za-z0-9_]+", SERVICE) or has_ctrl(raw):
+if (not raw or not EXPECTED or has_ctrl(EXPECTED)
+        or not re.fullmatch(r"[A-Za-z0-9_]+", SERVICE) or has_ctrl(raw)):
     sys.exit(2)                           # empty, control chars, or bad service name => fail closed
 if raw.startswith("jdbc:"):               # JDBC form "jdbc:postgresql://..." accepted
     raw = raw[len("jdbc:"):]
@@ -351,8 +382,8 @@ SSLMODES = ("disable", "allow", "prefer", "require", "verify-ca", "verify-full")
 try:
     u = urlsplit(raw)
     host = (u.hostname or "").lower()     # hostname() unbrackets IPv6 + lowercases; "" when absent
-    if not host or has_ctrl(host) or u.path.count("/") != 1:
-        sys.exit(2)
+    if host != EXPECTED or u.path.count("/") != 1:
+        sys.exit(2)                       # any host other than the pinned one => fail closed
     db = unquote(u.path[1:])              # database = the single path segment (percent-decoded)
     if not db or has_ctrl(db):            # a decoded %0A/%0D must never reach the service file
         sys.exit(2)
@@ -398,40 +429,75 @@ if password is not None:
 for key, value in params:
     lines.append("%s=%s" % (key, esc(value)))
 sys.stdout.write("\n".join(lines) + "\n")  # the stanza goes ONLY to the 0600 file
-' yacc_restore_cand < "$CAND_URL_FILE" > "$CAND_SVC_FILE"
-) || { echo "ABORT: candidate connection string was not a usable postgresql:// (or jdbc:postgresql://) URL; temporary files removed" >&2; exit 1; }
+' yacc_restore_cand "$CAND_EXPECTED_HOST" < "$CAND_URL_FILE" > "$CAND_SVC_FILE"
+) || { echo "ABORT: candidate connection string was not a usable postgresql:// (or jdbc:postgresql://) URL for the declared candidate host; temporary files removed" >&2; exit 1; }
 [ -s "$CAND_SVC_FILE" ] || { echo "ABORT: candidate connection string was empty; temporary files removed" >&2; exit 1; }
 ```
 
 ### 4.2 Restore the dump into the candidate database
 
-Run in the **same shell** as §4.1 — `$CAND_SVC_FILE` and its cleanup trap are live there. The client container joins the §4.1 candidate network (`<candidate-project>_cand` for the rehearsal shape, `<candidate-network>` for the standalone candidate) so the pinned candidate server address resolves:
+Run in the **same shell** as §4.1 — `$CAND_SVC_FILE`, `$CAND_CONTAINER`, `$CAND_DB` and the cleanup trap are live there. The client container joins the §4.1 candidate network (`<candidate-project>_cand` for the rehearsal shape, `<candidate-network>` for the standalone candidate) so the declared candidate container address resolves:
 
 ```bash
-# Version preflight — run BEFORE the restore; record the value with the evidence.
-# Must report major 15 (e.g. "15.x"): the same major as the source and the §3.1 tools.
+# Restore-target identity gate — run BEFORE the restore; record the verdict with the
+# evidence. Aborts unless the connected target is the declared candidate database
+# (CAND_DB) on PostgreSQL major 15, served by the declared candidate container
+# (CAND_CONTAINER): host(inet_server_addr()) is the server-side address of the
+# connection that just ran (netmask suffix removed) and must match an address Docker
+# DNS resolves CAND_CONTAINER to on the candidate network. A reachable different
+# server with a same-named, same-major database therefore aborts HERE, before
+# pg_restore runs.
 docker run --rm -i --network <candidate-network> \
+  -e CAND_CONTAINER="$CAND_CONTAINER" -e CAND_DB="$CAND_DB" \
+  -e PGSERVICEFILE=/run/yacc-svc \
   --mount type=bind,src="$CAND_SVC_FILE",dst=/run/yacc-svc,readonly \
-  postgres:15 \
-  psql "servicefile=/run/yacc-svc service=yacc_restore_cand" -Atc "SHOW server_version;"
+  postgres:15 bash -c '
+    db="$(psql "service=yacc_restore_cand" -Atc "SELECT current_database();")" || exit 1
+    ver="$(psql "service=yacc_restore_cand" -Atc "SHOW server_version;")" || exit 1
+    srv="$(psql "service=yacc_restore_cand" -Atc "SELECT host(inet_server_addr());")" || exit 1
+    case "$db $ver" in
+      "$CAND_DB "15.*) ;;
+      *) echo "ABORT: connected target is not $CAND_DB on PostgreSQL major 15 (got db=$db server=$ver)"; exit 1 ;;
+    esac
+    [ -n "$srv" ] || { echo "ABORT: connected server reported no network address"; exit 1; }
+    EXP="$( { getent ahostsv4 "$CAND_CONTAINER" | awk "{print \$1}"; getent ahostsv6 "$CAND_CONTAINER" | awk "{print \$1}"; } | sort -u )"
+    [ -n "$EXP" ] || { echo "ABORT: candidate container did not resolve on this network"; exit 1; }
+    printf "%s\n" "$EXP" | grep -Fxq "$srv" \
+      || { echo "ABORT: connected server address is not $CAND_CONTAINER on this network — refusing the restore"; exit 1; }
+    echo "restore-target pin OK: $CAND_DB on PostgreSQL $ver served by $CAND_CONTAINER"
+' || { echo "ABORT: restore-target identity gate failed — refusing the restore"; exit 1; }
 ```
 
 ```bash
 docker run --rm -i --network <candidate-network> \
+  -e PGSERVICEFILE=/run/yacc-svc \
   --mount type=bind,src="$CAND_SVC_FILE",dst=/run/yacc-svc,readonly \
   --mount type=bind,src="<artifact-link-dir>",dst=/run/art,readonly \
   postgres:15 \
-  pg_restore --dbname="servicefile=/run/yacc-svc service=yacc_restore_cand" \
+  pg_restore --dbname="service=yacc_restore_cand" \
     --no-owner --no-privileges --exit-on-error \
     /run/art/yacc-db-<timestamp>.dump
 ```
 
 - `--exit-on-error` stops on the first error so a failed restore is never mistaken for a complete one.
-- **Version compatibility**: the candidate server must run PostgreSQL **major 15** — the **same major** as the source and the §3.1-pinned tools; abort the restore if the preflight above reports anything else. PostgreSQL documents dump output as expected to load into servers of the **same or newer** major than the `pg_dump` tool and **not guaranteed** to load into an **older** major, so a newer dump tool against a PG15 target would be an unsupported pair — pinning source, tools, and target to one major (15) is the only configuration where every pairing in this procedure is documented-supported. This is a restore-fidelity rule for the documented PG15 datastore, not a database upgrade policy: a restore into any other major is not a configuration this procedure validates.
-- §4.1 setup failure (empty or unparseable connection string) ⇒ abort with a generic message; the `trap` has already removed both temporary files. Fix the cause and re-run §4.1.
+- **Version compatibility**: the candidate server must run PostgreSQL **major 15** — the **same major** as the source and the §3.1-pinned tools; abort the restore if the identity gate above reports anything else. PostgreSQL documents dump output as expected to load into servers of the **same or newer** major than the `pg_dump` tool and **not guaranteed** to load into an **older** major, so a newer dump tool against a PG15 target would be an unsupported pair — pinning source, tools, and target to one major (15) is the only configuration where every pairing in this procedure is documented-supported. This is a restore-fidelity rule for the documented PG15 datastore, not a database upgrade policy: a restore into any other major is not a configuration this procedure validates.
+- **Identity-gate failure** ⇒ abort; the connected server is not the declared candidate container/database on major 15. A same-named, same-major database on any other host must never receive the restore — see §4.3's negative control.
+- §4.1 setup failure (empty or unparseable connection string, or host not matching the declared candidate host) ⇒ abort with a generic message; the `trap` has already removed both temporary files. Fix the cause and re-run §4.1.
 - If the candidate database must be recreated first: drop/recreate **inside the candidate server** (it is operator-owned; e.g. `dropdb` + `createdb` as in §4.1), then re-run `pg_restore`. Never drop anything on the shared server.
 - **Failure handling**: any `pg_restore` error ⇒ drop/recreate the candidate database inside the candidate server, fix the cause, restart from §3 (a clean re-restore from a verified dump; never patch a half-restored database by hand).
 - §5 runs in the **same shell** as §4.1/§4.2 — the candidate service file and its cleanup `trap` are still live. If a fresh shell must be used, re-run §4.1 there first (it prints and cleans up its own files).
+
+### 4.3 Negative control — a different server with the same database name and major aborts before the restore (throwaway resources only)
+
+This control proves the §4 gates refuse a wrong server **before** `pg_restore` runs. Use the throwaway resource pair from [compose-reset-recovery-rotation.md](compose-reset-recovery-rotation.md) §3.1 (two throwaway PostgreSQL 15 containers on a throwaway network, each with a database named `yacc_client` and throwaway credentials; same teardown) — never the shared server, never a real database or credential. Record the outcome as an extra evidence row when the procedure is executed.
+
+| # | Action (against the throwaway pair only) | Required outcome |
+|---|---|---|
+| NC-1 | Run the §4.1 conversion with the candidate URL for `<nc-container-b>` while `CAND_EXPECTED_HOST` is `<nc-container-a>` | converter exits non-zero and **no candidate service file is written** — a wrong-host URL is refused before any credential file exists |
+| NC-2 | Control-only bypass of §4.1: write a throwaway 0600 libpq stanza **by hand** whose `host=` is `<nc-container-b>` (throwaway credentials, never the real URL), then run the §4.2 identity gate with `CAND_CONTAINER=<nc-container-a>`, `CAND_DB=yacc_client` on the throwaway network | gate **aborts** at the server-identity comparison (container B's address ≠ container A's resolved address) even though database name and major alone would pass — `pg_restore` never runs |
+| NC-3 | Same control stanza with `host=` = `<nc-container-a>` | gate passes ("restore-target pin OK: … served by `<nc-container-a>`") — the positive path still works |
+
+Hand-writing a libpq stanza is allowed **only** inside this control — throwaway values, throwaway network, never the shared server, never the real connection string.
 
 ---
 
@@ -444,19 +510,21 @@ Run against the **candidate** connection from §4.1 (same shell — the candidat
 # -Atc = unaligned, tuples-only — the same deterministic format as the §3.2 captures,
 # so both diffs below compare equal representations (see §3.2 capture-format note).
 docker run --rm -i --network <candidate-network> \
+  -e PGSERVICEFILE=/run/yacc-svc \
   --mount type=bind,src="$CAND_SVC_FILE",dst=/run/yacc-svc,readonly \
   --mount type=bind,src="<artifact-link-dir>",dst=/run/art \
   postgres:15 \
-  psql "servicefile=/run/yacc-svc service=yacc_restore_cand" \
+  psql "service=yacc_restore_cand" \
     -Atc "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;" \
     > <artifact-link>/restored-flyway-history.txt
 
 # Exact counts of the key tables in the restored database
 docker run --rm -i --network <candidate-network> \
+  -e PGSERVICEFILE=/run/yacc-svc \
   --mount type=bind,src="$CAND_SVC_FILE",dst=/run/yacc-svc,readonly \
   --mount type=bind,src="<artifact-link-dir>",dst=/run/art \
   postgres:15 \
-  psql "servicefile=/run/yacc-svc service=yacc_restore_cand" \
+  psql "service=yacc_restore_cand" \
     -Atc "SELECT 'users', count(*) FROM users UNION ALL SELECT 'conversations', count(*) FROM conversations UNION ALL SELECT 'messages', count(*) FROM messages;" \
     > <artifact-link>/restored-exact-counts.txt
 
@@ -485,4 +553,4 @@ Record actual backup and restore durations in the evidence template each time th
 
 ---
 
-**Last Updated**: 2026-11-13 (authored by MIG-070e #488 as the Compose successor to the K8s-shaped `backup-restore.md`; preserves the reviewed substance — PG15 same-major source/tools/target with version preflights, MVCC-snapshot-consistent baseline, unaligned/`-Atc` byte-comparable captures, counted-diff gate, candidate-only restore, trap-scoped 0600 credential files, in-process converter with control-char/query-allowlist hardening; adds the fail-closed shared-server target pin; procedure only — no execution claimed)
+**Last Updated**: 2026-11-13 (authored by MIG-070e #488 as the Compose successor to the K8s-shaped `backup-restore.md`; preserves the reviewed substance — PG15 same-major source/tools/target with version preflights, MVCC-snapshot-consistent baseline, unaligned/`-Atc` byte-comparable captures, counted-diff gate, candidate-only restore, trap-scoped 0600 credential files, in-process converter with control-char/query-allowlist hardening; adds the fail-closed shared-server target pin; review pass 1 (PR #492): server-identity binding added — converter rejects any URL host other than the pinned/declared host on source and candidate paths, §3.1a/§4.2 gates bind the connected server to the pinned container via `inet_server_addr()` ↔ container address, §4.2 pins the restore database to the declared candidate database, §4.3 wrong-host negative control; connection mechanism corrected to `PGSERVICEFILE` + `service=` after live verification showed the inline `servicefile=` keyword is rejected by the pinned `postgres:15` client tools; procedure only — no execution claimed)

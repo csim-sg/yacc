@@ -216,13 +216,13 @@ docker exec <candidate-project>-backend-1 \
 
 ### Step 3 — Backup (candidate source)
 
-Execute the backup per [compose-backup-restore.md](compose-backup-restore.md) §3 with the **candidate database as the source**: in §3.2 the connection string is `postgresql://<candidate-db-user>:<candidate-db-password>@db:5432/<candidate-database>` (host `db` — the candidate `db` service name resolves on the candidate network), the client containers join the candidate network `<candidate-project>_cand` instead of the shared one, and §3.1a (shared-server pin) does **not** apply — a rehearsal backup reads only candidate resources. Record the dump artifact as `<artifact link>`.
+Execute the backup per [compose-backup-restore.md](compose-backup-restore.md) §3 with the **candidate database as the source**: in §3.2 the connection string is `postgresql://<candidate-db-user>:<candidate-db-password>@db:5432/<candidate-database>` (host `db` — the candidate `db` service name resolves on the candidate network), the client containers join the candidate network `<candidate-project>_cand` instead of the shared one, and §3.1a (shared-server pin) does **not** apply — a rehearsal backup reads only candidate resources. §3.2's converter host pin follows the source: set `EXPECTED_HOST=db` for the rehearsal source (`antpolis-database-postgres-1` remains the pin for the shared staging source). Record the dump artifact as `<artifact link>`.
 
 **Gate**: backup completes and its artifact is storable/retrievable in the operator's storage location (`<artifact-link>`).
 
 ### Step 4 — Restore into a candidate database
 
-Execute the restore per [compose-backup-restore.md](compose-backup-restore.md) §4–5 into a **second, fresh candidate database** on the same candidate server (§4.1 rehearsal shape: `docker exec <candidate-project>-db-1 createdb -U <candidate-db-user> <candidate-restored-database>`, then the §4.1 service file pins that database) — never into `<candidate-database>`, which the candidate backend is serving.
+Execute the restore per [compose-backup-restore.md](compose-backup-restore.md) §4–5 into a **second, fresh candidate database** on the same candidate server (§4.1 rehearsal shape: `docker exec <candidate-project>-db-1 createdb -U <candidate-db-user> <candidate-restored-database>`, then declare `CAND_EXPECTED_HOST=db`, `CAND_CONTAINER=<candidate-project>-db-1`, `CAND_DB=<candidate-restored-database>` so the §4.2 identity gate binds the restore to this container and database) — never into `<candidate-database>`, which the candidate backend is serving.
 
 ### Step 5 — Post-restore integrity checks
 
@@ -331,4 +331,4 @@ On abort: tear the candidate stack down (`docker compose -f deploy/compose/compo
 
 ---
 
-**Last Updated**: 2026-11-13 (authored by MIG-070e #488 as the Compose successor to the K8s-shaped `cutover-rehearsal.md`; preserves the reviewed substance — fail-closed G1–G5 with explicit-absence semantics, candidate isolation, snapshot-consistent backup/restore via the linked procedure, evidence template, abort criteria, human stop authority; candidate isolation re-expressed as a separate Compose project/network/database with no shared surface; attribution is the founder/sole operator per AC-10 as amended — the superseded three-developer wording was not carried; procedure only — no execution claimed)
+**Last Updated**: 2026-11-13 (authored by MIG-070e #488 as the Compose successor to the K8s-shaped `cutover-rehearsal.md`; preserves the reviewed substance — fail-closed G1–G5 with explicit-absence semantics, candidate isolation, snapshot-consistent backup/restore via the linked procedure, evidence template, abort criteria, human stop authority; candidate isolation re-expressed as a separate Compose project/network/database with no shared surface; attribution is the founder/sole operator per AC-10 as amended — the superseded three-developer wording was not carried; review pass 1 (PR #492): Step 3/4 declarations aligned with the backup/restore server-identity gates (`EXPECTED_HOST`, `CAND_*`); procedure only — no execution claimed)
