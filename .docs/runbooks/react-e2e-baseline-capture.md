@@ -297,3 +297,21 @@ complete merged 3-browser verdict — a second dispatch cancels the first (same
 branch-ref concurrency group), and the capture job's concurrency group
 (`refs/heads/task/ANG-015`) is distinct from the PR run's (`refs/pull/436/merge`), so
 the two do not cancel each other.
+
+**Status 2026-11-12 (stable boot keys across W19 restarts):** the embedded
+`boot-java.sh` heredoc (identical in the `parity` matrix legs and this capture job)
+minted a fresh RSA signing key + integration master key on every invocation — including
+every W19 in-spec restart — which would invalidate the client's stored WS handshake
+token (`R1-W19-*` red via tier-0 promotion in `compare-baseline.mjs`) and the seeded
+integration ciphertext on the first exercised restart (latent in CI: run 43005613144's
+W19 rows were serial-cascade-skipped; #478 removes that cascade). The launcher now
+persists the pair once per job under `/tmp/opencode/.e2e-keys` (outside every artifact
+upload `path:`; `umask 077`, dir 0700 / files 0600; atomic tmp→`mv`; non-empty reuse
+check; no echo/xtrace; no regeneration-on-failure fallback — corruption fails the
+restart health poll loudly). Tech-lead decision + required verification evidence:
+[#6815218829](https://github.com/csim-sg/yacc/issues/385#issuecomment-6815218829);
+local proof — `bash -n` + byte-identical key block in both embedded copies, two
+invocations export identical keys (PKCS#8 DER RSA-2048), bearer token minted before a
+real SIGTERM restart returns 200 on `GET /api/users` after it, regenerated-key control
+returns 401. No case/browser/assertion/threshold/anchor/register row changed; the
+dispatch discipline above is unchanged.

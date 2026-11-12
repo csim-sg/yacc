@@ -288,8 +288,36 @@ jobs:
           cat > /tmp/opencode/boot-java.sh <<SCRIPT
           #!/usr/bin/env bash
           set -euo pipefail
-          SIGNING_KEY="\$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null | openssl pkcs8 -topk8 -nocrypt -outform DER 2>/dev/null | base64 -w0)"
-          MASTER_KEY="\$(openssl rand -base64 32)"
+          # Persist the generated key pair ONCE per job under a directory no
+          # artifact upload path covers, and reuse it for every W19 in-spec
+          # restart (tests/realtime-rawws-r1.spec.ts): minting a fresh RSA
+          # key per boot invalidates the client's stored WS handshake token
+          # after a restart (the reconnect ladder reuses the pre-restart
+          # token -> R1-W19-* red) and the seeded integration ciphertext
+          # (DeterministicSeed is skip-if-present). Key material is never
+          # echoed/xtraced (this script's output lands in the uploaded
+          # java-service.log), generation is atomic (tmp -> mv under
+          # set -euo pipefail, so a failed openssl can never leave a
+          # truncated key for a later restart to reuse), and there is NO
+          # regeneration-on-failure fallback: a corrupt key fails the
+          # restart health poll loudly instead of silently re-identifying
+          # the service mid-run. Modes: dir 0700, files 0600 (umask 077).
+          KEY_DIR=/tmp/opencode/.e2e-keys
+          if [ ! -s "\$KEY_DIR/signing.key" ] || [ ! -s "\$KEY_DIR/master.key" ]; then
+            mkdir -p "\$KEY_DIR" && chmod 700 "\$KEY_DIR"
+            (
+              umask 077
+              openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null \\
+                | openssl pkcs8 -topk8 -nocrypt -outform DER 2>/dev/null \\
+                | base64 -w0 > "\$KEY_DIR/.signing.key.tmp"
+              openssl rand -base64 32 > "\$KEY_DIR/.master.key.tmp"
+              chmod 600 "\$KEY_DIR/.signing.key.tmp" "\$KEY_DIR/.master.key.tmp"
+              mv "\$KEY_DIR/.signing.key.tmp" "\$KEY_DIR/signing.key"
+              mv "\$KEY_DIR/.master.key.tmp" "\$KEY_DIR/master.key"
+            )
+          fi
+          SIGNING_KEY="\$(cat "\$KEY_DIR/signing.key")"
+          MASTER_KEY="\$(cat "\$KEY_DIR/master.key")"
           env SPRING_PROFILES_ACTIVE=e2e \\
             SPRING_APPLICATION_JSON='{"yacc":{"e2e":{"seed-enabled":true}}}' \\
             DATABASE_URL=jdbc:postgresql://localhost:5432/yacc_e2e \\
@@ -624,8 +652,36 @@ jobs:
           cat > /tmp/opencode/boot-java.sh <<SCRIPT
           #!/usr/bin/env bash
           set -euo pipefail
-          SIGNING_KEY="\$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null | openssl pkcs8 -topk8 -nocrypt -outform DER 2>/dev/null | base64 -w0)"
-          MASTER_KEY="\$(openssl rand -base64 32)"
+          # Persist the generated key pair ONCE per job under a directory no
+          # artifact upload path covers, and reuse it for every W19 in-spec
+          # restart (tests/realtime-rawws-r1.spec.ts): minting a fresh RSA
+          # key per boot invalidates the client's stored WS handshake token
+          # after a restart (the reconnect ladder reuses the pre-restart
+          # token -> R1-W19-* red) and the seeded integration ciphertext
+          # (DeterministicSeed is skip-if-present). Key material is never
+          # echoed/xtraced (this script's output lands in the uploaded
+          # java-service.log), generation is atomic (tmp -> mv under
+          # set -euo pipefail, so a failed openssl can never leave a
+          # truncated key for a later restart to reuse), and there is NO
+          # regeneration-on-failure fallback: a corrupt key fails the
+          # restart health poll loudly instead of silently re-identifying
+          # the service mid-run. Modes: dir 0700, files 0600 (umask 077).
+          KEY_DIR=/tmp/opencode/.e2e-keys
+          if [ ! -s "\$KEY_DIR/signing.key" ] || [ ! -s "\$KEY_DIR/master.key" ]; then
+            mkdir -p "\$KEY_DIR" && chmod 700 "\$KEY_DIR"
+            (
+              umask 077
+              openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null \\
+                | openssl pkcs8 -topk8 -nocrypt -outform DER 2>/dev/null \\
+                | base64 -w0 > "\$KEY_DIR/.signing.key.tmp"
+              openssl rand -base64 32 > "\$KEY_DIR/.master.key.tmp"
+              chmod 600 "\$KEY_DIR/.signing.key.tmp" "\$KEY_DIR/.master.key.tmp"
+              mv "\$KEY_DIR/.signing.key.tmp" "\$KEY_DIR/signing.key"
+              mv "\$KEY_DIR/.master.key.tmp" "\$KEY_DIR/master.key"
+            )
+          fi
+          SIGNING_KEY="\$(cat "\$KEY_DIR/signing.key")"
+          MASTER_KEY="\$(cat "\$KEY_DIR/master.key")"
           env SPRING_PROFILES_ACTIVE=e2e \\
             SPRING_APPLICATION_JSON='{"yacc":{"e2e":{"seed-enabled":true}}}' \\
             DATABASE_URL=jdbc:postgresql://localhost:5432/yacc_e2e \\

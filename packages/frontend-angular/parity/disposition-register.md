@@ -233,6 +233,32 @@ assertion, comparator check, threshold, anchor, expected-red class or register r
 changed; Firefox's cancellation in that run was a separate run-level event (logs
 expired; the re-run settles it).
 
+**Execution-wiring record (12 Nov 2026):** the embedded `boot-java.sh` launcher
+(identical heredoc in the `parity` matrix legs and the CP-3 capture job — one launcher
+for the initial boot AND the W19 in-spec restarts via `YACC_JAVA_RESTART_CMD`) minted a
+fresh RSA signing key + integration master key on every invocation. Latent defect,
+never yet exercised in CI: run 43005613144's W19 rows never executed (serial cascade),
+but #478 removes that cascade, so the next gate run would restart the service with a
+new key while the Angular client still replays its stored handshake token
+(`websocket-client.service.ts` reuses the `connect()` token for every ladder attempt;
+`WebSocketHandshakeAuthInterceptor` → `JwtTokenService` verifies against the rotated
+key → upgrade 401 → ladder exhausts → `R1-W19-*` red), and the same rotation makes
+seeded integration ciphertext undecryptable (`DeterministicSeed` is skip-if-present).
+Correction (wiring only, tech-lead decision #6815218829): persist the pair ONCE per
+job under `/tmp/opencode/.e2e-keys` (outside every artifact upload `path:`), outer
+non-empty reuse check, generation under `umask 077` with dir 0700 / files 0600,
+atomic tmp→`mv` under `set -euo pipefail` (a failed `openssl` can never leave a
+truncated key for a later restart to reuse), key material never echoed/xtraced
+(nothing lands in the uploaded logs), and NO regeneration-on-failure fallback — a
+corrupt key fails the restart health poll loudly instead of silently re-identifying
+the service mid-run. No auth weakening: same key type/length/algorithm (RSA-2048,
+PKCS#8 DER base64), same fail-closed startup, same env contract; no case, browser,
+assertion, comparator check, threshold, anchor, expected-red class or register row
+changed. Verified locally: rendered scripts pass `bash -n` (both copies byte-identical
+for this block), two invocations export identical keys, the signing key decodes as
+PKCS#8 DER RSA-2048, and a token minted before a real SIGTERM restart still returns
+200 on `GET /api/users` afterwards while a regenerated-key control run returns 401.
+
 ## 9. Registration discipline
 
 1. New expected difference discovered **before** a run → add the register row + `gate-scope.json`
