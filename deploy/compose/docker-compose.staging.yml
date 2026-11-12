@@ -1,0 +1,155 @@
+# =============================================================================
+# YACC staging Docker Compose deployment definition (ADR-032; MIG-070d #487).
+#
+# STAGING target — the backend service ONLY, joined to the host's existing
+# shared Traefik gateway network and the shared PostgreSQL server's network.
+# This project deliberately defines NEITHER the gateway NOR the database:
+#   - Ingress is the host's EXTERNAL shared Traefik gateway (routing happens
+#     through the Docker labels below; TLS termination + certificate renewal
+#     belong to that gateway's ACME resolver). The gateway's compose
+#     definition is not part of this repository, and it must never enable an
+#     unauthenticated dashboard/API (traefik.api.insecure) on any listener
+#     that is not bound to loopback — that draft defect was NOT carried into
+#     this artifact; it is recorded as a founder finding in the #487 PR.
+#   - PostgreSQL is the SHARED server (container `antpolis-database-postgres-1`,
+#     database `yacc_client`). This project owns no database container and no
+#     database volume: `docker compose down` here cannot touch shared data,
+#     and nothing in this file may assume ownership of the shared server.
+#
+# Secrets: no secret value lives in this file or in backend.staging.env.
+# Compose interpolation is driven by the committed NON-SECRET staging env
+# file; the backend's secret values come only from the operator-decrypted
+# SOPS artifact (required env_file below — compose fails closed when it is
+# absent, exactly like the local target):
+#
+#   # decrypt first (see .docs/runbooks/compose-staging.md §3) so that
+#   # deploy/compose/secrets/staging.env exists, then every invocation is:
+#   docker compose -f deploy/compose/docker-compose.staging.yml \
+#     --env-file deploy/compose/backend.staging.env <config|up -d|ps|logs|down>
+#
+# One origin rule (MIG-070d draft-finding 1 fix): the OIDC issuer, the auth
+# email base URL and the WS allowed origins are ALL derived below from the
+# single variable YACC_ORIGIN — they cannot drift apart the way the
+# unreviewed draft let them.
+#
+# Health semantics (honest, ADR-032 accepted losses): `healthcheck` provides
+# health VISIBILITY only — Docker does not restart a still-running unhealthy
+# container; `restart: unless-stopped` acts on process EXIT only; the shared
+# gateway routes without readiness gating. Recovery for an unhealthy-but-
+# running container is manual intervention (compose-staging.md §8).
+#
+# Render note: `docker compose config` validates that required env_file paths
+# EXIST, so the render (like every other command) needs the decrypted
+# staging.env in place first — compose-staging.md §4 orders decrypt before
+# validate for exactly this reason.
+# =============================================================================
+
+# Matches the staging project name already deployed on the host (`yacc-app`),
+# so `docker compose -f …` commands manage the running stack in place rather
+# than creating a parallel one.
+name: yacc-app
+
+services:
+  backend:
+    # Version-pinned immutable image (MIG-070d): CI publishes
+    # ghcr.io/csim-sg/yacc/yacc-backend:sha-<commit>. YACC_BACKEND_IMAGE is
+    # set in backend.staging.env to the EXACT sha-<commit> tag being
+    # deployed — never `latest`, never a locally-built tag. The committed
+    # all-zero placeholder renders for validation but cannot pull or run:
+    # `up` fails visibly until the operator pins a real tag.
+    image: ${YACC_BACKEND_IMAGE:?YACC_BACKEND_IMAGE required in backend.staging.env — immutable tag, e.g. ghcr.io/csim-sg/yacc/yacc-backend:sha-<commit>; never latest}
+    restart: unless-stopped
+    # ADR-029 envelope in container terms (identical to the local target):
+    # non-root, read-only root FS, all capabilities dropped; writable paths
+    # are tmpfs only (tmpdir, heap dumps, logs — matching the Dockerfile's
+    # baked-in defaults).
+    user: "1000:1000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:uid=1000,gid=1000
+      - /app/heap-dumps:uid=1000,gid=1000,mode=700
+      - /app/logs:uid=1000,gid=1000,mode=700
+    # Resource sizing (ADR-029 amendment; same intent as the local target):
+    # 1 Gi floor / 2 Gi cap + CPU cap. Enforcement reality (validated on the
+    # local target, not assumed): `limits.memory` is a hard cgroup RAM cap
+    # (RSS beyond it → OOM kill); `reservations.memory` is ADVISORY in plain
+    # Compose — no scheduler admission, NOT a Kubernetes request equivalent.
+    # CPU limit is enforced via CFS quota.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2g
+        reservations:
+          memory: 1g
+    # Wiring: backend.staging.env carries ONLY non-secret staging config;
+    # secrets/staging.env (operator-decrypted SOPS artifact, git-ignored)
+    # carries ONLY secret values (POSTGRES_USER/POSTGRES_PASSWORD for the
+    # shared server plus the bootstrap/signing/recovery/encryption/email
+    # secret names). The two key sets are disjoint by design; `environment:`
+    # below wins over both where it sets a key.
+    env_file:
+      - ./backend.staging.env
+      - path: ./secrets/staging.env
+        required: true
+    environment:
+      # One origin drives issuer + email links + WS origins together
+      # (draft-finding 1 fix — no drift possible).
+      YACC_AUTH_AS_ISSUER: ${YACC_ORIGIN:?YACC_ORIGIN required in backend.staging.env — the public staging origin, no trailing slash}
+      YACC_AUTH_EMAIL_BASE_URL: ${YACC_ORIGIN:?YACC_ORIGIN required in backend.staging.env}
+      YACC_REALTIME_WS_ALLOWED_ORIGINS: ${YACC_ORIGIN:?YACC_ORIGIN required in backend.staging.env}
+      # Shared PostgreSQL server (ADR-027 data layer). Host and database name
+      # are NON-SECRET coordinates, pinned here and in backend.staging.env;
+      # credentials are NOT here — they reach the datasource through the
+      # decrypted staging.env as POSTGRES_USER / POSTGRES_PASSWORD (the
+      # property names application.yml binds).
+      DATABASE_URL: jdbc:postgresql://${YACC_DB_HOST:-antpolis-database-postgres-1}:5432/${YACC_DB_NAME:-yacc_client}
+    # Health VISIBILITY only (see header): marks unhealthy; nothing restarts
+    # or unroutes an unhealthy container. curl is present in the Temurin
+    # Noble runtime image. /health/ready is application readiness, not a
+    # dependency proof.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+    # Reachability: only the two external networks below. No `ports:` — the
+    # backend publishes NO host ports; the public surface is exclusively the
+    # shared gateway.
+    networks:
+      - proxy
+      - database
+    labels:
+      # Routing lives on the shared gateway via labels (draft mechanism,
+      # made self-consistent — draft-finding 4 fix). The rule exposes exactly
+      # the public-API prefixes ADR-032 names.
+      - traefik.enable=true
+      # Must match the external proxy network name so the gateway resolves
+      # the backend's address on that network.
+      - traefik.docker.network=treafik-proxy
+      - traefik.http.routers.yacc.rule=Host(`staging.riotingnerds.com`) && (PathPrefix(`/api`) || PathPrefix(`/health`) || PathPrefix(`/oauth2`) || PathPrefix(`/.well-known`) || PathPrefix(`/ws`))
+      - traefik.http.routers.yacc.entrypoints=websecure
+      - traefik.http.routers.yacc.tls=true
+      # ACME resolver on the shared gateway (`le` per the founder draft).
+      # compose-staging.md prerequisite P6 verifies this name against the
+      # gateway's actual resolver configuration before any deploy.
+      - traefik.http.routers.yacc.tls.certresolver=le
+      - traefik.http.services.yacc.loadbalancer.server.port=8080
+
+networks:
+  # The host's existing external networks, referenced by their REAL names.
+  # `treafik-proxy` carries a historical "treafik" spelling — that is the
+  # name that actually exists on the host (founder draft + deployed stack);
+  # it is kept verbatim and used consistently everywhere in this file
+  # (draft-finding 4 fix: one name, no yacc-proxy/treafik-proxy mixing).
+  proxy:
+    name: treafik-proxy
+    external: true
+  database:
+    name: antpolis-database_database
+    external: true

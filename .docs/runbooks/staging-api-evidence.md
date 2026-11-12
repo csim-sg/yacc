@@ -1,6 +1,7 @@
 # Staging API Evidence Procedure — `staging-api-evidence.md`
 
 **Status**: Documented procedure (MIG-070c #454). **Not evidence of execution.**
+**Superseded (deployment target)**: the staging deploy path is now Docker Compose (ADR-032) — see [compose-staging.md](compose-staging.md) (MIG-070d #487) for the current staging procedure. This K8s/Helm-shaped document is retained for history only and owns no step against the Compose target; retirement belongs to MIG-080 (#364).
 **Audience**: the named operator executing the first authorized staging deploy (MIG-070 #361)
 **Source issue**: https://github.com/csim-sg/yacc/issues/454
 **Related**: [cutover-rehearsal.md](cutover-rehearsal.md) · [backup-restore.md](backup-restore.md) · [helm-rollback.md](helm-rollback.md) · ADR-029 (deployment envelope, frozen probe wire paths) · ADR-025 (bootstrap/recovery, forced credential replacement) · ADR-027 (Flyway, forward-only)
