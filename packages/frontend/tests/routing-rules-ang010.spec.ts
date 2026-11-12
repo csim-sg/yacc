@@ -38,6 +38,15 @@ import { ensureSuperAdminCredential } from './helpers/auth';
  *   /api/routing-rules now 403s for ADMIN). Every nav/list/detail/
  *   execution assertion is kept and no ADMIN-denial assertion is added
  *   here — RBAC propagation to both frontends is #480's scope.
+ * - Re-point (2026-11-12, #485 — recorded, not silent): ANG010-CRUD-1
+ *   likewise signs in as the seeded bootstrap SUPER_ADMIN and seeds its
+ *   disposable rule through a SUPER_ADMIN bearer token, because
+ *   MIG-091e-fix #467 (founder decision B, `72e7fd1`) makes every
+ *   routing-rule operation SUPER_ADMIN-only (the former ADMIN sign-in and
+ *   ADMIN seed token predate that backend decision: GET/POST
+ *   /api/routing-rules now 403 for ADMIN). The title is byte-identical
+ *   and every assertion is kept; no ADMIN-denial assertion is added
+ *   here — RBAC propagation to both frontends is #480's scope.
  */
 
 test.describe.configure({ mode: 'serial' });
@@ -64,10 +73,14 @@ test.describe('ANG-010 routing rules (real backend)', () => {
     await page.waitForURL(/\/inbox/);
   }
 
-  /** Frozen `POST /api/routing-rules` seed for the disposable delete row. */
+  /**
+   * Frozen `POST /api/routing-rules` seed for the disposable delete row
+   * (SUPER_ADMIN bearer — #467/`72e7fd1` makes the operation
+   * SUPER_ADMIN-only; the ADMIN token now 403s).
+   */
   async function createRuleViaApi(page: Page, name: string): Promise<string> {
     const signIn = await page.request.post(`${API_BASE}/auth/sign-in/email`, {
-      data: { email: ADMIN.email, password: ADMIN.password },
+      data: { email: SUPER_ADMIN.email, password: SUPER_ADMIN.password },
     });
     const { accessToken } = (await signIn.json()) as { accessToken: string };
     const created = await page.request.post(`${API_BASE}/routing-rules`, {
@@ -127,8 +140,16 @@ test.describe('ANG-010 routing rules (real backend)', () => {
 
   test('ANG010-CRUD-1: status toggle persists through PATCH; a seeded-then-deleted rule round-trips the list', async ({
     page,
+    request,
   }) => {
-    await realSignIn(page);
+    // MIG-091e-fix #467 (founder decision B, `72e7fd1`): routing-rule
+    // operations are SUPER_ADMIN-only, so the row signs in as the seeded
+    // bootstrap SUPER_ADMIN (a-1 forced-password-change step first —
+    // called here so the case is deterministic in isolation) and seeds
+    // through the same identity.
+    const superSession = await ensureSuperAdminCredential(request);
+    expect(superSession.status).toBe(200);
+    await realSignIn(page, SUPER_ADMIN);
     await page.goto('/routing-rules');
     await expect(page.locator(`[data-testid="rule-item-${RULE_VIP_ID}"]`)).toBeVisible();
 
