@@ -1,0 +1,21 @@
+/**
+ * Login page component styles (component-scoped, flat file beside
+ * `login.ts` per ARCH-005/ADR-031).
+ *
+ * The template's Tailwind utilities (`w-full` / `max-w-md` and the flex
+ * centring chain around them) are inert today: this package has no PostCSS
+ * configuration, so no Tailwind/daisyUI CSS reaches the build (recorded
+ * app-wide gap, tracked separately — do not fix it here). Until that wiring
+ * lands, this plain-CSS rule reproduces the React login card's `max-w-md`
+ * constraint (28rem = 448px) and horizontal centring so the form is
+ * width-constrained and centred at desktop widths.
+ *
+ * Layout width only: deliberately does not size the submit button or the
+ * inline SVGs — a geometry-dependent suite row relies on their unstyled
+ * defaults.
+ */
+.login-panel {
+  width: 100%;
+  max-width: 28rem;
+  margin-inline: auto;
+}
