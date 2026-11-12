@@ -1,6 +1,7 @@
 # PostgreSQL Backup & Restore — `backup-restore.md`
 
 **Status**: Documented procedure (MIG-070b #447). **Not evidence of execution.**
+**Superseded (deployment target)**: the deployment target is now Docker Compose (ADR-032) — see [compose-backup-restore.md](compose-backup-restore.md) (MIG-070e #488) for the current backup/restore procedure. This K8s/Helm-shaped document is retained for history only and owns no step against the Compose target; retirement belongs to MIG-080 (#364).
 **Audience**: Operations/SRE, the named cutover/reset owner
 **Source issue**: https://github.com/csim-sg/yacc/issues/447
 **Related**: [cutover-rehearsal.md](cutover-rehearsal.md) · [helm-rollback.md](helm-rollback.md) · ADR-027 (Flyway + JPA; forward-only schema) · ADR-028 (Quartz + DB DLQ; Redis dropped)
