@@ -66,10 +66,15 @@ umask 077
 TMPENV="$(mktemp deploy/compose/secrets/.staging.env.XXXXXX)"  # fresh file, born 0600 (umask 077)
 chmod 600 "$TMPENV"                              # ACTIVE enforcement — before any secret exists
 stat -c '%a' "$TMPENV"                           # MUST print 600 — verify BEFORE decrypting
-sops -d deploy/compose/secrets/staging.sops.env > "$TMPENV"
+if ! sops -d deploy/compose/secrets/staging.sops.env > "$TMPENV"; then
+  rm -f "$TMPENV"                                # the temp may hold empty/partial plaintext — remove it
+  echo "ABORT: sops decryption failed — staging.env was NOT installed" >&2
+  exit 1                                         # FAIL-CLOSED: no mv, no empty/partial env file, no continue
+fi
 mv -fT "$TMPENV" deploy/compose/secrets/staging.env   # atomic rename (same dir; replaces any stale symlink, never follows it)
 stat -c '%a' deploy/compose/secrets/staging.env  # MUST print 600 — verify before use
-#    If sops fails, remove the temp and stop: rm -f "$TMPENV" (the final path was not touched).
+#    The guard above makes decryption fail-closed (review finding, PR #491 pass 1): a
+#    failed sops run removes the temp and exits 1 — the final path was not touched.
 #    If staging.env already exists as a symlink or directory, investigate and remove it
 #    deliberately — never decrypt onto it.
 ```
@@ -307,6 +312,7 @@ Rules: timestamps in UTC; the Environment column names the staging target (`stag
 Abort immediately, record the rows filled so far, and halt if any of these occurs:
 
 - Any §2 prerequisite is unmet or lapses mid-run (including either external network missing).
+- SOPS decryption fails (§3.1) — its fail-closed guard removes the temp file and exits before `staging.env` is installed or modified.
 - The render gate (§4.1) fails for any reason, or `up -d` fails, or the backend does not become `healthy`, or the log lacks Flyway/`Started YaccApplication`.
 - Either health endpoint is non-200 through `https://staging.riotingnerds.com`.
 - Sign-in fails for a provisioned identity (record the status; do not retry with varied credentials — that is a finding, not a workaround).
@@ -336,4 +342,4 @@ On abort: report on **#361**; no partial pass may be claimed.
 
 ---
 
-**Last Updated**: 2026-11-13 (authored by MIG-070d #487; procedure only — no execution claimed)
+**Last Updated**: 2026-11-13 (authored by MIG-070d #487; §3.1 decrypt guard hardened fail-closed per PR #491 review pass 1; procedure only — no execution claimed)
