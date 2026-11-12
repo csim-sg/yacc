@@ -1,6 +1,7 @@
 # Cutover Rehearsal Procedure — `cutover-rehearsal.md`
 
 **Status**: Documented procedure (MIG-070b #447). **Not evidence of execution.**
+**Superseded (deployment target)**: the deployment target is now Docker Compose (ADR-032) — see [compose-rehearsal-stop-authority.md](compose-rehearsal-stop-authority.md) (MIG-070e #488) for the current rehearsal + stop-authority procedure. This K8s/Helm-shaped document is retained for history only and owns no step against the Compose target; retirement belongs to MIG-080 (#364).
 **Audience**: Operations/SRE, the named cutover/reset owner, the three named developers
 **Source issue**: https://github.com/csim-sg/yacc/issues/447
 **Related**: [backup-restore.md](backup-restore.md) · [helm-rollback.md](helm-rollback.md) · ADR-029 (deployment envelope) · ADR-027 (Flyway, forward-only) · ADR-028 (Quartz + DB DLQ; no Redis)

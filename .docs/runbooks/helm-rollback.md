@@ -3,6 +3,8 @@
 **Author**: Enterprise Architect  
 **Date**: 2026-02-26 (rewritten 2026-10-18, MIG-090 #365)  
 **Status**: Current for the Java/Spring service (ADR-029 envelope)  
+**Superseded (deployment target)**: the deployment target is now Docker Compose (ADR-032) — see [compose-roll-forward.md](compose-roll-forward.md) (MIG-070e #488) for the current roll-forward incident procedure. This K8s/Helm-shaped document is retained for history only and owns no step against the Compose target; retirement belongs to MIG-080 (#364).
+
 **Audience**: Operations/SRE, On-Call Engineers, DevOps Team  
 **Related**: ADR-019 (K3s + Helm), ADR-029 (JVM deployment envelope), K3s Cluster Requirements
 
