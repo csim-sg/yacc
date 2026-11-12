@@ -109,12 +109,7 @@ test.describe('Backend API — Conversation Endpoints (frozen Java contract)', (
     });
 
     test('should support status filter', async ({ request }) => {
-      // The frozen contract documents lowercase enum labels; the merged Java
-      // service binds list-filter enums case-sensitively (lowercase answers
-      // 400 Validation error — recorded service-vs-contract observation for
-      // tech-lead). The same filter capability is exercised via the
-      // service's accepted spelling of the frozen value.
-      const response = await request.get(`${API_BASE_URL}/conversations?status=OPEN`, {
+      const response = await request.get(`${API_BASE_URL}/conversations?status=open`, {
         headers: {
           Authorization: `Bearer ${authToken}`,
         },
@@ -131,8 +126,7 @@ test.describe('Backend API — Conversation Endpoints (frozen Java contract)', (
     });
 
     test('should support priority filter', async ({ request }) => {
-      // Same case-sensitivity observation as the status filter above.
-      const response = await request.get(`${API_BASE_URL}/conversations?priority=HIGH`, {
+      const response = await request.get(`${API_BASE_URL}/conversations?priority=high`, {
         headers: {
           Authorization: `Bearer ${authToken}`,
         },
@@ -162,9 +156,8 @@ test.describe('Backend API — Conversation Endpoints (frozen Java contract)', (
     });
 
     test('should support combined filters', async ({ request }) => {
-      // Case-sensitivity observation as recorded for the status filter.
       const response = await request.get(
-        `${API_BASE_URL}/conversations?channel=telegram&status=OPEN&page=1&limit=20`,
+        `${API_BASE_URL}/conversations?channel=telegram&status=open&page=1&limit=20`,
         {
           headers: {
             Authorization: `Bearer ${authToken}`,

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { ensureSuperAdminCredential } from './helpers/auth';
+
 /**
  * ANG-010 (#380) Tier-0 evidence rows — routing rules (W14): ADMIN-gated
  * CRUD + executions surface (AC-ANG-010-1, AC-ANG-010-2).
@@ -28,6 +30,14 @@ import { expect, test, type Page } from '@playwright/test';
  *   world is shared across the suite — no residual mutation).
  * - Serial mode within this file: the rows share the seeded rules world,
  *   so intra-file ordering is pinned (no parallel toggles of `…2001`).
+ * - Re-point (2026-11-12, #478 — recorded, not silent): ANG010-RULES-1
+ *   signs in as the seeded bootstrap SUPER_ADMIN (a-1 mapping,
+ *   helpers/auth.ts) because MIG-091e-fix #467 (founder decision B,
+ *   `72e7fd1`) makes every routing-rule operation SUPER_ADMIN-only (the
+ *   former ADMIN sign-in predates that backend decision: GET
+ *   /api/routing-rules now 403s for ADMIN). Every nav/list/detail/
+ *   execution assertion is kept and no ADMIN-denial assertion is added
+ *   here — RBAC propagation to both frontends is #480's scope.
  */
 
 test.describe.configure({ mode: 'serial' });
@@ -35,6 +45,8 @@ test.describe.configure({ mode: 'serial' });
 test.describe('ANG-010 routing rules (real backend)', () => {
   const ADMIN = { email: 'admin2@yacc.local', password: 'admin123' };
   const USER = { email: 'user@yacc.local', password: 'admin123' };
+  /** ADR-025 bootstrap super admin (routing-rule ops are SUPER_ADMIN-only). */
+  const SUPER_ADMIN = { email: 'admin@yacc.local', password: 'admin123' };
 
   /** Deterministic S1 fixture rules (DeterministicSeed RULE_*_ID). */
   const RULE_VIP_ID = '00000000-0000-0000-0000-000000002001';
@@ -69,11 +81,18 @@ test.describe('ANG-010 routing rules (real backend)', () => {
 
   test('ANG010-RULES-1: ADMIN reaches the page through the gated nav and direct goto; seeded rules render; selection shows details + executions', async ({
     page,
+    request,
   }) => {
-    await realSignIn(page);
+    // MIG-091e-fix #467 (founder decision B, `72e7fd1`): routing-rule
+    // operations are SUPER_ADMIN-only, so the row signs in as the seeded
+    // bootstrap SUPER_ADMIN (a-1 forced-password-change step first).
+    const superSession = await ensureSuperAdminCredential(request);
+    expect(superSession.status).toBe(200);
+    await realSignIn(page, SUPER_ADMIN);
 
-    // W23 nav gate: ADMIN sees the Routing Rules item (nav data + role
-    // filter) and it navigates to the page.
+    // W23 nav gate: the signed-in SUPER_ADMIN sees the Routing Rules item
+    // (nav data allows SUPER_ADMIN/ADMIN; the backend ops gate is
+    // SUPER_ADMIN-only) and it navigates to the page.
     const nav = page.locator('nav[aria-label="Main navigation"]');
     await expect(nav.getByText('Routing Rules')).toBeVisible();
     await nav.getByText('Routing Rules').click();

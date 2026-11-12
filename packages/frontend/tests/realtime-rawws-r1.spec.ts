@@ -73,6 +73,13 @@ function listeningServicePid(): number | null {
  * real server-restart lifecycle (a mid-run restart would break
  * concurrently running files, so run this file targeted). The
  * failure-cascade stop is a run-mode property, not a test skip.
+ *
+ * Re-point (2026-11-12, #478 — recorded, not silent): R1-RBAC-1 now
+ * evidences the assignment-bound USER send rule enforced by MIG-073
+ * TM-011 #442 (`533535e`): unassigned `user` send 403 → manager+ POST
+ * assign → assigned `user` send 201 (equivalent-or-stronger; no assertion
+ * removed). The former unconditional user+ send expectation predates that
+ * backend decision.
  */
 test.describe.configure({ mode: 'serial' });
 
@@ -84,6 +91,8 @@ const WS_BASE_URL =
 const FIXTURES = {
   user: { email: 'user@yacc.local', password: 'admin123' },
   manager: { email: 'manager@yacc.local', password: 'admin123' },
+  /** Admin identity for the frozen PATCH-assign ops (admin+ surface). */
+  admin: { email: 'admin2@yacc.local', password: 'admin123' },
   /** Telegram fixture conversation (avoided for sends: its message list
    *  accumulates queue retry-cycle rows, pushing probe rows past the
    *  list's first page). */
@@ -436,7 +445,58 @@ test('R1-RBAC-1: REST RBAC tiering holds for the WS-authenticated identity', asy
   });
   expect(users.status()).toBe(403);
 
-  // The same identity may send messages (frozen contract allows user+).
+  // Deterministic posture reset: the fixture conversation is restored to
+  // unassigned (frozen PATCH assign, admin+) so this row asserts the send
+  // rule from a known state regardless of sibling rows or prior browser
+  // legs sharing the seeded world.
+  const admin = await signIn(
+    page.context().request,
+    FIXTURES.admin.email,
+    FIXTURES.admin.password,
+  );
+  expect(admin.role).toBe('admin');
+  const reset = await page.context().request.patch(
+    `${API_BASE_URL}/conversations/${FIXTURES.conversationId}/assign`,
+    {
+      data: { assignedUserId: null },
+      headers: { Authorization: `Bearer ${admin.accessToken}` },
+    },
+  );
+  expect(reset.status()).toBe(200);
+
+  // MIG-073 TM-011 (#442, `533535e`): message sending is assignment-bound
+  // for the USER role — the unassigned fixture user is denied on the send
+  // surface (a denied request persists no Message row).
+  const deniedSend = await page.context().request.post(
+    `${API_BASE_URL}/conversations/${FIXTURES.conversationId}/messages`,
+    {
+      data: { body: 'R1-RBAC-1 unassigned send canary' },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+  expect(deniedSend.status()).toBe(403);
+
+  // The manager+ assign op (frozen assignConversationByPost) binds the
+  // fixture conversation to the user identity; the assignment stays in
+  // place for the serial rows below (R1-MSG-1 / R1-W19-3 send as the same
+  // identity and are accepted exactly because of this rule).
+  const manager = await signIn(
+    page.context().request,
+    FIXTURES.manager.email,
+    FIXTURES.manager.password,
+  );
+  expect(manager.role).toBe('manager');
+  const userId = decodeJwtClaims(accessToken as string).sub as string;
+  const assign = await page.context().request.post(
+    `${API_BASE_URL}/conversations/${FIXTURES.conversationId}/assign`,
+    {
+      data: { assignedUserId: userId },
+      headers: { Authorization: `Bearer ${manager.accessToken}` },
+    },
+  );
+  expect(assign.status()).toBe(200);
+
+  // The assigned user identity may send messages (frozen contract).
   const send = await page.context().request.post(
     `${API_BASE_URL}/conversations/${FIXTURES.conversationId}/messages`,
     {
