@@ -259,6 +259,25 @@ for this block), two invocations export identical keys, the signing key decodes 
 PKCS#8 DER RSA-2048, and a token minted before a real SIGTERM restart still returns
 200 on `GET /api/users` afterwards while a regenerated-key control run returns 401.
 
+**Execution-wiring record (12 Nov 2026, second):** parity run 43160616114 at the key-fix
+head produced `PARITY GATE RED: 9 violations / 0 regressions / 18 weakenings` — and all
+9 violations trace to one remaining wiring defect: the generated `boot-java.sh` baked a
+**repo-relative** jar path (`$JAR` expands at heredoc-write time), while the W19
+in-spec restart executes the script from the Playwright cwd `packages/frontend-angular`
+(`execAsync` inherits cwd; no `cwd:` in the suite handle). Every restart died with
+`Error: Could not find or load main class org.springframework.boot.loader.launch.
+PropertiesLauncher` in every leg's `java-service.log`, the service never returned, and
+the two tier-0 files ordered after `realtime-rawws-r1.spec.ts`
+(`routing-rules-ang010`, `users-admin-ang011`) failed at their first `:8080` sign-in
+with `ECONNREFUSED`; the 18 weakenings were the serial-group cascade and the per-leg
+"1 flaky" (`R1-AUTH-1`) a retry artifact. The key-persistence fix above was therefore
+never exercised in CI — not disproven. Correction (wiring only, tech-lead decision
+#6823125181): the writing shell now resolves the jar to an **absolute path at
+generation time** (`JAR="$(realpath "$JAR")"` + fail-closed `test -f "$JAR"`), applied
+byte-identically to **both** embedded heredocs; `$KEY_DIR`, the pid file, the log and
+`-Dloader.path` were already absolute. No key material echoed, no key/auth/anchor/
+gate-scope/comparator/threshold/case/browser/assertion change, no register row change.
+
 ## 9. Registration discipline
 
 1. New expected difference discovered **before** a run → add the register row + `gate-scope.json`

@@ -267,6 +267,13 @@ jobs:
         run: |
           set -euo pipefail
           JAR="$(ls services/backend-java/build/libs/yacc-backend-*.jar | head -1)"
+          # Absolute path, resolved + verified AT GENERATION TIME: the W19
+          # in-spec restart re-executes the generated script from the Playwright
+          # cwd (packages/frontend-angular), and a repo-relative jar path makes
+          # every restart die with "Could not find or load main class" (run
+          # 43160616114). Fail closed here rather than at first restart.
+          JAR="$(realpath "$JAR")"
+          test -f "$JAR"
           LOADER_ARGS=()
           # The postgresql driver is testRuntimeOnly; if it is not packaged in
           # the bootJar (flyway-database-postgresql usually carries it), fall
@@ -636,6 +643,13 @@ jobs:
         run: |
           set -euo pipefail
           JAR="$(ls services/backend-java/build/libs/yacc-backend-*.jar | head -1)"
+          # Absolute path, resolved + verified AT GENERATION TIME: the W19
+          # in-spec restart re-executes the generated script from the Playwright
+          # cwd (packages/frontend-angular), and a repo-relative jar path makes
+          # every restart die with "Could not find or load main class" (run
+          # 43160616114). Fail closed here rather than at first restart.
+          JAR="$(realpath "$JAR")"
+          test -f "$JAR"
           LOADER_ARGS=()
           if ! unzip -l "$JAR" | grep -q 'org/postgresql/Driver.class'; then
             PG_JAR="$(find ~/.gradle/caches/modules-2/files-2.1/org.postgresql -name 'postgresql-*.jar' 2>/dev/null | head -1)"
