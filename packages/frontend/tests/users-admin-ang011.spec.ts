@@ -45,6 +45,14 @@ import { ensureSuperAdminCredential } from './helpers/auth';
  *   activation (constraint validation included). The store → frozen-API →
  *   list-invalidation path is fully real; the rendered-modal visuals land
  *   with the ANG-015/ANG-016 styling polish.
+ * - Re-point (2026-11-12, #478 — recorded, not silent): ANG011-CRUD-1
+ *   discovers the created disposable row through the page's search box
+ *   (`search=<disposable email>`) instead of unfiltered page 1, because
+ *   `/api/users` orders page 1 by `createdAt` ASC (`UserDirectoryService`)
+ *   and a shared-run database holds more users than one page holds — the
+ *   fresh row lands on a later page. The full create → rename → delete
+ *   round-trip and every assertion are kept (equivalent-or-stronger);
+ *   the search is cleared before the seeded-world assertions.
  */
 
 /** Set a hidden field's value through real DOM input events. */
@@ -148,7 +156,14 @@ test.describe('ANG-011 users admin (real backend)', () => {
     await page.getByTestId('create-submit-btn').dispatchEvent('click');
     await expect(page.getByTestId('create-user-modal')).toHaveCount(0);
 
-    // The list invalidation refetches; the disposable row appears.
+    // The list invalidation refetches. Page-1 discovery is not
+    // order-independent: `/api/users` orders page 1 by `createdAt` ASC
+    // (`UserDirectoryService`) and a shared-run database holds more users
+    // than one page holds, so the fresh row sits on a later page. The
+    // page's search box (React search parity) narrows the list to the
+    // disposable identity, making the row discoverable independent of
+    // page ordering.
+    await page.getByTestId('search-input').fill(disposableEmail);
     const disposableRow = page.locator('[data-testid^="user-row-"]', { hasText: disposableEmail });
     await expect(disposableRow).toBeVisible({ timeout: 15000 });
     await expect(disposableRow.locator('.badge').first()).toHaveText('manager');
@@ -181,6 +196,10 @@ test.describe('ANG-011 users admin (real backend)', () => {
     await page.getByTestId('delete-confirm-btn').dispatchEvent('click');
     await expect(page.getByTestId('delete-user-modal')).toHaveCount(0);
     await expect(disposableRow).toHaveCount(0, { timeout: 15000 });
+
+    // Clear the search so the seeded-world assertions see the full list
+    // again (the debounced reset lands well inside the retry window).
+    await page.getByTestId('search-input').fill('');
 
     // The seeded fixture world is intact (identities still present).
     await expect(page.locator('[data-testid="users-table"]')).toContainText('admin2@yacc.local');
