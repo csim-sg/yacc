@@ -13,6 +13,7 @@ import type { ResourceSnapshot } from '../../services/resource-state';
 import { UnreadBadge } from '../../components/unread-badge/unread-badge';
 import { apiErrorMessage } from '../../lib/api-error-message';
 import { AuthService } from '../../services/auth.service';
+import { ConversationSubscriptionService } from '../../services/conversation-subscription.service';
 import { ConversationsStore } from '../../services/conversations.store';
 
 /** Page size (React `pageSize`). */
@@ -78,10 +79,12 @@ function urlMatchesProjection(params: ParamMap, projected: Record<string, string
  *
  * W6: every conversation card renders `UnreadBadge` from the row's
  * `unreadCount`; opening a conversation clears it optimistically via the
- * store-owned `markAsRead` cache patch. The `message.received` badge
- * refresh rides ANG-006's conversations-list invalidation; the React
- * `incrementUnreadCount` local-increment path is unwired live and is
- * recorded as parity-of-absence (ANG-015 register).
+ * store-owned `markAsRead` cache patch. The `message.received` badge/
+ * preview refresh is the #499 AC-5 local patch (`MessageEventsService` →
+ * `ConversationsStore.patchReceived`) over the bounded inbox interest
+ * (this page reports its rendered ids to the subscription owner); the
+ * former "local increment unwired live" parity-of-absence record is
+ * superseded by founder-authorized #499 (2026-11-13).
  *
  * W13/W17 REST dispositions: no bulk-actions UI and no notifications
  * REST UI is built (parity of absence, U4) — the store manifest keeps
@@ -97,6 +100,7 @@ export class Inbox {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly conversationsStore = inject(ConversationsStore);
+  private readonly subscriptions = inject(ConversationSubscriptionService);
   private readonly auth = inject(AuthService);
 
   protected readonly user = this.auth.user;
@@ -143,6 +147,19 @@ export class Inbox {
     checkScreenSize();
     window.addEventListener('resize', checkScreenSize);
     this.destroyRef.onDestroy(() => window.removeEventListener('resize', checkScreenSize));
+
+    // #499 AC-2: bounded inbox interest — the ids CURRENTLY RENDERED in
+    // the loaded page are the subscription owner's inbox interest (the
+    // service diffs page changes, caps at the list page size and
+    // releases on navigation). Keep-previous re-emissions of the same
+    // page are a no-op in the service.
+    effect(() => {
+      const renderedIds = this.conversations().map((conversation) => conversation.id);
+      untracked(() => this.subscriptions.setInboxPage(renderedIds));
+    });
+    // Leaving the inbox releases the page interest (the active detail
+    // conversation — inbox → detail — is retained by the service).
+    this.destroyRef.onDestroy(() => this.subscriptions.releaseInbox());
 
     // W5: load the displayed list entry. `loadList` creates the cache
     // entry synchronously, so the tracked snapshot read below observes

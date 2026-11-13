@@ -10,6 +10,7 @@ import {
 } from '../contracts/ws/connection';
 import {
   ConversationReopenedPayloadSchema,
+  ConversationSubscriptionAckPayloadSchema,
   ConversationUpdatedPayloadSchema,
   MessageFailedPayloadSchema,
   MessageReceivedPayloadSchema,
@@ -57,10 +58,15 @@ export type SocketConnectionState =
  * Transport is the browser-native `WebSocket` against the Java raw
  * Spring WS endpoint (`environment.wsUrl` → `/ws`), JSON text frames
  * only. There is no Socket.io client library, no STOMP/SockJS, and no
- * SSE/`EventSource`/long-poll fallback (ADR-026). INBOUND-ONLY by
- * construction: this service never sends a frame — the verified
- * frontend surface emits nothing (T2 B14 / T3-G10), so there is no
- * `send`/`emit` on this seam and no `eventId` dependency.
+ * SSE/`EventSource`/long-poll fallback (ADR-026). CONTRACT-SCOPED
+ * SUBSCRIPTION CONTROL ONLY (B14 narrowed, founder-authorized #499,
+ * 2026-11-13): the ONLY outbound frames are the two frozen subscription
+ * control channels — `subscribe.conversation` / `unsubscribe.conversation`
+ * with the bare conversationId string as `data` (ack
+ * `conversation.subscribed` / `conversation.unsubscribed` `{conversationId}`;
+ * a missing/empty id would draw `system.error` `bad_frame`, so the send
+ * seams refuse it). There is NO general `send(event, data)` API and no
+ * arbitrary-frame escape hatch; all other traffic is inbound.
  *
  * Wire conformance (AC-ANG-006-3): every inbound text frame is parsed
  * against the frozen `{event, data, timestamp}` envelope
@@ -138,6 +144,8 @@ export class WebSocketClientService {
   } = {
     'conversation.updated': new Subject(),
     'conversation.reopened': new Subject(),
+    'conversation.subscribed': new Subject(),
+    'conversation.unsubscribed': new Subject(),
     'message.received': new Subject(),
     'message.sent': new Subject(),
     'message.failed': new Subject(),
@@ -167,6 +175,10 @@ export class WebSocketClientService {
       this.publish('conversation.updated', ConversationUpdatedPayloadSchema, data),
     'conversation.reopened': (data) =>
       this.publish('conversation.reopened', ConversationReopenedPayloadSchema, data),
+    'conversation.subscribed': (data) =>
+      this.publish('conversation.subscribed', ConversationSubscriptionAckPayloadSchema, data),
+    'conversation.unsubscribed': (data) =>
+      this.publish('conversation.unsubscribed', ConversationSubscriptionAckPayloadSchema, data),
     'message.received': (data) =>
       this.publish('message.received', MessageReceivedPayloadSchema, data),
     'message.sent': (data) => this.publish('message.sent', MessageSentPayloadSchema, data),
@@ -261,6 +273,51 @@ export class WebSocketClientService {
   /** Typed inbound stream for one frozen channel (the event router's fan-out). */
   on$<K extends WsServerEventName>(eventName: K): Observable<WsEventPayloadMap[K]> {
     return this.eventSubjects[eventName].asObservable();
+  }
+
+  // -------------------------------------------------------------------------
+  // Frozen client→server subscription control (B14 narrowed — #499)
+  // -------------------------------------------------------------------------
+
+  /**
+   * `subscribe.conversation`: join the `conversation:{id}` room. `data`
+   * is the BARE conversationId string (frozen `asyncapi.yaml`); the
+   * server answers `conversation.subscribed {conversationId}` (or
+   * `system.error` `bad_frame` for a missing id). Frames ride an OPEN
+   * socket only — without a live transport this is a no-op (the caller
+   * re-subscribes on the next successful open). No general emit API
+   * exists: this and `unsubscribeConversation` are the only outbound
+   * seams (ARCH-005 boundary 2, narrowed).
+   */
+  subscribeConversation(conversationId: string): void {
+    this.sendControl('subscribe.conversation', conversationId);
+  }
+
+  /**
+   * `unsubscribe.conversation`: leave the `conversation:{id}` room; the
+   * server answers `conversation.unsubscribed {conversationId}`. Same
+   * bare-string `data` and no-op-on-closed-socket semantics as
+   * `subscribeConversation`.
+   */
+  unsubscribeConversation(conversationId: string): void {
+    this.sendControl('unsubscribe.conversation', conversationId);
+  }
+
+  /**
+   * The ONE control-frame seam: frozen channel name + bare conversationId
+   * string in the `{event, data}` client→server frame shape. An empty id
+   * is refused here (the frozen server answer would be `system.error`
+   * `bad_frame` — never sent).
+   */
+  private sendControl(
+    event: 'subscribe.conversation' | 'unsubscribe.conversation',
+    conversationId: string,
+  ): void {
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN || conversationId.length === 0) {
+      return;
+    }
+    socket.send(JSON.stringify({ event, data: conversationId }));
   }
 
   // -------------------------------------------------------------------------

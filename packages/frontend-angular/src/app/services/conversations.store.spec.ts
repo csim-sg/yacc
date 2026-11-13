@@ -178,4 +178,66 @@ describe('ConversationsStore', () => {
       expect(store.listSnapshot({})?.data?.data[0]?.unreadCount).toBe(0);
     });
   });
+
+  describe('patchReceived (#499 AC-5 — local publish-only relay patch)', () => {
+    const receivedResponse = {
+      ...listResponse,
+      data: [{ ...listResponse.data[0], unreadCount: 2, latestMessagePreview: 'old preview' }],
+    };
+
+    async function loadReceived(): Promise<void> {
+      const load = store.loadList({});
+      http.expectOne('/api/conversations').flush(receivedResponse);
+      await load;
+    }
+
+    it('patches preview and increments unread for a non-active conversation', async () => {
+      await loadReceived();
+
+      store.patchReceived('c1', 'fresh body', { incrementUnread: true });
+
+      const row = store.listSnapshot({})?.data?.data[0];
+      expect(row?.latestMessagePreview).toBe('fresh body');
+      expect(row?.unreadCount).toBe(3);
+      http.expectNone('/api/conversations'); // local patch — no refetch
+    });
+
+    it('patches the preview without incrementing when the conversation is active', async () => {
+      await loadReceived();
+
+      store.patchReceived('c1', 'fresh body', { incrementUnread: false });
+
+      const row = store.listSnapshot({})?.data?.data[0];
+      expect(row?.latestMessagePreview).toBe('fresh body');
+      expect(row?.unreadCount).toBe(2);
+    });
+
+    it('covers every loaded list entry (filter variants) and leaves absent rows alone', async () => {
+      const openLoad = store.loadList({ status: 'open' });
+      http.expectOne('/api/conversations?status=open').flush(receivedResponse);
+      await openLoad;
+      const unreadLoad = store.loadList({ unread: true });
+      http.expectOne('/api/conversations?unread=true').flush({
+        ...receivedResponse,
+        data: [{ ...receivedResponse.data[0], id: 'c2', unreadCount: 5 }],
+      });
+      await unreadLoad;
+
+      store.patchReceived('c1', 'fresh body', { incrementUnread: true });
+
+      const openRow = store.listSnapshot({ status: 'open' })?.data?.data[0];
+      expect(openRow?.latestMessagePreview).toBe('fresh body');
+      expect(openRow?.unreadCount).toBe(3);
+      // c2's entry carries a different conversation — untouched.
+      const unreadRow = store.listSnapshot({ unread: true })?.data?.data[0];
+      expect(unreadRow?.id).toBe('c2');
+      expect(unreadRow?.latestMessagePreview).toBe('old preview');
+      expect(unreadRow?.unreadCount).toBe(5);
+    });
+
+    it('is a no-op when no list entry is loaded', () => {
+      store.patchReceived('c1', 'fresh body', { incrementUnread: true });
+      expect(store.listSnapshot({})).toBeUndefined();
+    });
+  });
 });

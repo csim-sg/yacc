@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { cacheKeys } from '../contracts/cache-keys';
 import type { ListMessagesResponse, Message, SendMessageRequest } from '../contracts/http/messages.schema';
 import { generateTempId } from '../lib/tempId';
+import { AuthService } from './auth.service';
 import { ConversationsStore } from './conversations.store';
 import { MessagesService } from './messages.service';
 import { ResourceState } from './resource-state';
@@ -15,16 +16,40 @@ import { ResourceState } from './resource-state';
  * and invalidates the conversations family; `retryMessage` patches the
  * message in place and invalidates the same way.
  *
- * Optimistic mechanism (U5): `sendPending`/`reconcile`/`fail`/`remove`/
- * `exists` port the React `useOptimisticMessage` semantics, but stay
- * TESTED-BUT-INACTIVE — the live send path is the server-confirmed append
- * (KISS default; activation is ANG-008's surfaced decision).
+ * Optimistic mechanism (U5 — ACTIVATED by founder-authorized #499,
+ * 2026-11-13; supersedes the "tested-but-inactive" disposition): the
+ * live send path appends a pending row (`{id: tempId, status: 'pending'}`)
+ * BEFORE the POST, reconciles the tempId to the 201's returned server
+ * row (exactly one row; `tempId` stays reachable as a secondary key
+ * through the alias map), and rolls the row to `failed` on
+ * HTTP/transport failure. `updateMessageStatus` matches
+ * `id === messageId || tempId === messageId` and is idempotent —
+ * duplicate frames patch the same row once, never duplicating rows.
  */
 @Injectable({ providedIn: 'root' })
 export class MessagesStore {
   private readonly service = inject(MessagesService);
   private readonly conversations = inject(ConversationsStore);
+  private readonly auth = inject(AuthService);
   private readonly lists = new ResourceState<ListMessagesResponse>();
+
+  /**
+   * Bounded re-delivery window for the message-id dedup (AC-5, #499):
+   * the most recent inbound message ids, so a re-delivered
+   * `message.received` frame cannot double-count unread/preview patches
+   * even when the conversation's detail list is not loaded.
+   */
+  private static readonly RECENT_INBOUND_LIMIT = 256;
+  private readonly recentInboundIds = new Set<string>();
+
+  /**
+   * Optimistic secondary key (AC-4, #499): tempId → server message id,
+   * recorded at reconcile so a status frame that still references the
+   * tempId patches the reconciled server row (`id === messageId ||
+   * tempId === messageId`). Bounded by sends per session; each tempId is
+   * recorded exactly once (duplicate frames keep the first mapping).
+   */
+  private readonly tempIdAliases = new Map<string, string>();
 
   /** Reactive snapshot of one conversation's message list, if loaded. */
   listSnapshot(conversationId: string) {
@@ -50,16 +75,30 @@ export class MessagesStore {
   }
 
   /**
-   * Send a message (server-confirmed append — the live React behavior):
-   * on success the message is appended to the list cache and the
-   * conversations family is invalidated. Rejects on failure — the
-   * composer surfaces the typed error.
+   * Send a message through the ACTIVATED optimistic mechanism (U5,
+   * #499): `sendPending` BEFORE the POST (pending row `{id: tempId,
+   * status: 'pending'}`), `reconcile` with the 201's returned server row
+   * (the frozen send operation answers a PENDING server message) on
+   * success, `fail` on HTTP/transport failure. The conversations family
+   * is invalidated on success (B4 mapping). Rejects on failure — the
+   * composer surfaces the typed error and the failed temp row keeps the
+   * retry affordance (server-id rows only; the click guard is the
+   * conversation page's).
    */
   async send(conversationId: string, body: SendMessageRequest): Promise<Message> {
-    const message = await this.service.send(conversationId, body);
-    this.append(conversationId, message);
-    this.conversations.invalidate();
-    return message;
+    const tempId = this.sendPending(conversationId, {
+      body: body.body,
+      senderName: this.auth.user()?.name ?? 'Agent',
+    });
+    try {
+      const message = await this.service.send(conversationId, body);
+      this.reconcile(conversationId, tempId, message);
+      this.conversations.invalidate();
+      return message;
+    } catch (err: unknown) {
+      this.fail(conversationId, tempId);
+      throw err;
+    }
   }
 
   /**
@@ -87,18 +126,28 @@ export class MessagesStore {
 
   /**
    * Append an inbound `message.received` row to a loaded conversation's
-   * list (React `handleMessageReceived` parity): dedup by message id
-   * (backlog replay re-delivers rows), append at the list tail — the
-   * store's single ordering convention, matching the confirmed-send
-   * append. No-op when the conversation's list is not loaded (parity:
-   * React only patched an existing cache entry).
+   * list (React `handleMessageReceived` parity): append at the list tail
+   * — the store's single ordering convention, matching the
+   * confirmed-send append. No-op when the conversation's list is not
+   * loaded (parity: React only patched an existing cache entry).
+   *
+   * Returns whether this frame is the FIRST delivery of the message id —
+   * the ONE re-delivery filter (backlog replay + room fan-out
+   * re-delivery). The bounded recent-id window (AC-5, #499) answers the
+   * dedup even when the detail list is not loaded, so inbox
+   * preview/unread patching cannot double-count; the loaded-list
+   * existence check stays as the second gate.
    */
   receiveInbound(message: Message): boolean {
+    if (this.recentInboundIds.has(message.id)) {
+      return false; // Re-delivery (backlog replay / duplicate frame).
+    }
+    this.rememberInboundId(message.id);
     if (this.listSnapshot(message.conversationId)?.data === undefined) {
-      return false; // List not loaded — no cache patch (parity).
+      return true; // New frame — no cache patch (list not loaded, parity).
     }
     if (this.exists(message.conversationId, message.id)) {
-      return false; // Duplicate (e.g. backlog replay re-delivery).
+      return false; // Duplicate already in the loaded list.
     }
     this.lists.update(cacheKeys.conversations.messages(message.conversationId), (previous) => {
       if (!previous) {
@@ -115,20 +164,28 @@ export class MessagesStore {
 
   /**
    * Patch one message's delivery `status` in a loaded list
-   * (`message.sent` / `message.failed` handler parity). No-op when the
-   * list is not loaded or the row is absent.
+   * (`message.sent` / `message.failed` handler parity). The match is
+   * id-agnostic (AC-4/AC-6, #499): the frame's message id may be the
+   * server id or the optimistic tempId — `id === messageId ||
+   * tempId === messageId` via the reconcile alias map. Idempotent: a
+   * duplicate frame patches the same row to the same status, never
+   * duplicating rows. No-op when the list is not loaded or the row is
+   * absent.
    */
   updateMessageStatus(
     conversationId: string,
     messageId: string,
     status: 'sent' | 'failed',
   ): void {
+    const alias = this.tempIdAliases.get(messageId);
     this.lists.update(cacheKeys.conversations.messages(conversationId), (previous) => {
       if (!previous) {
         return undefined;
       }
       const messages = previous.messages.map((message) =>
-        message.id === messageId ? { ...message, status } : message,
+        message.id === messageId || (alias !== undefined && message.id === alias)
+          ? { ...message, status }
+          : message,
       );
       return { ...previous, messages };
     });
@@ -140,7 +197,7 @@ export class MessagesStore {
   }
 
   // ---------------------------------------------------------------------------
-  // Optimistic mechanism (U5 — tested-but-inactive; activation is ANG-008)
+  // Optimistic mechanism (U5 — ACTIVATED by founder-authorized #499)
   // ---------------------------------------------------------------------------
 
   /** Append a pending optimistic message keyed by `tempId`. */
@@ -164,17 +221,37 @@ export class MessagesStore {
     return tempId;
   }
 
-  /** Reconcile a pending optimistic message with its server-confirmed row. */
+  /**
+   * Reconcile a pending optimistic message with its server-confirmed row
+   * (U5, #499): the temp row is replaced exactly once — the server row
+   * becomes the single row for that body, and `tempId` stays reachable
+   * as a secondary key through the alias map (status frames may still
+   * reference it). Race-safe: a delivery status a status frame already
+   * applied (by server id or tempId) before the 201 resolved is never
+   * regressed by the returned pending row, and re-reconciliation is a
+   * no-op on the row set (one alias per tempId).
+   */
   reconcile(conversationId: string, tempId: string, serverMessage: Message): void {
+    if (!this.tempIdAliases.has(tempId)) {
+      this.tempIdAliases.set(tempId, serverMessage.id);
+    }
     this.lists.update(cacheKeys.conversations.messages(conversationId), (previous) => {
       if (!previous) {
         return previous;
       }
-      // Dedup: never keep both the temp row and the confirmed row.
-      const confirmed = previous.messages.some((message) => message.id === serverMessage.id);
+      // Never keep both the temp row and the confirmed row; preserve a
+      // status a racing frame already applied (sent/failed beats the
+      // server row's pending default).
+      const confirmedRow = previous.messages.find((message) => message.id === serverMessage.id);
+      const tempRow = previous.messages.find((message) => message.id === tempId);
+      const racedStatus =
+        confirmedRow?.status ?? (tempRow && tempRow.status !== 'pending' ? tempRow.status : null);
+      const reconciled: Message = racedStatus
+        ? { ...serverMessage, status: racedStatus }
+        : serverMessage;
       const messages = previous.messages
-        .filter((message) => message.id !== tempId)
-        .concat(confirmed ? [] : [serverMessage]);
+        .filter((message) => message.id !== tempId && message.id !== serverMessage.id)
+        .concat([reconciled]);
       return { ...previous, messages };
     });
   }
@@ -209,6 +286,17 @@ export class MessagesStore {
   exists(conversationId: string, messageId: string): boolean {
     const data = this.listSnapshot(conversationId)?.data;
     return data?.messages.some((message) => message.id === messageId) ?? false;
+  }
+
+  /** Record one inbound id in the bounded re-delivery window (oldest evicted). */
+  private rememberInboundId(id: string): void {
+    this.recentInboundIds.add(id);
+    if (this.recentInboundIds.size > MessagesStore.RECENT_INBOUND_LIMIT) {
+      const oldest = this.recentInboundIds.values().next().value;
+      if (oldest !== undefined) {
+        this.recentInboundIds.delete(oldest);
+      }
+    }
   }
 
   private append(conversationId: string, message: Message): void {

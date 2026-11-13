@@ -133,7 +133,7 @@ ANG-015); the founder decisions U1–U4/U12 remain untouched.
 
 | ID | Surfaced difference | Disposition (delivered) | Owning issue |
 |---|---|---|---|
-| **U5** | Optimistic-send activation vs live server-confirmed append | **U5 inactive**: messages append on server confirmation (React parity); retry is exactly-once per message; `canReplyAndRetry` RBAC gate preserved | ANG-008 (#378) |
+| **U5** | Optimistic-send activation vs live server-confirmed append | **ACTIVATED** (superseded 2026-11-13 — founder-authorized #499; was "**U5 inactive**" per ANG-008 #378): pending row before the POST, race-safe reconcile to the returned server row (tempId as a secondary key), idempotent id-agnostic status patches, retry click guarded to server-id rows — see §6d | #499 (activation); ANG-008 (#378, original disposition) |
 | **U6** | Token-capture semantics (`set-auth-token` header + localStorage + handshake token) | **Bearer + rotating refresh pair**, kind `local\|oidc`, React-on-Java keys `yacc_token` / `yacc_refresh_token` / `yacc_token_kind`, legacy-key clear; ANG-005/006 consume the seam | ANG-004 (#374) |
 | **U7** | `WebSocketStateService` persistence drop (typing/presence/event-ids/connection state lose localStorage) | **In-memory event stores** — nothing user-visible reads the dropped persistence after reload (parity of absence, verified via W19 rows) | ANG-006 (#376) |
 | **U8** | Offline-queue UI scope (mechanism ported, no `OfflineIndicator` UI) | **Mechanism ported, no UI built** — FIFO queue drains only after confirmed delivery; failures persist with per-row errors + `syncError`; live parity is absence | ANG-005 (#375) |
@@ -154,6 +154,25 @@ ANG-015); the founder decisions U1–U4/U12 remain untouched.
 |---|---|
 | **F4 — auth contract drift** (`/simple-auth/*` routes that exist nowhere; header-less `/auth/*` paths) | **Not reproduced.** Angular wires only live endpoints (T3 G1 design rule): the Spring/OIDC auth surface (ADR-025) per §Auth Target Correction. CI grep gates assert 0 `/simple-auth` references and no header-less `/auth/*` API paths (ANG-004 verification, kept in the register as a standing rule) |
 | **F5 — drift blast radius** (`registerPage` registration + store-based logout hitting dead endpoints) | Register/recovery/logout are **wired to live endpoints**; the drifted paths' absence is parity-of-absence. Mixed mock/real assertions about the drifted UI (`fe-002-login-ui` subset) are Class E expected-red rows (§3) |
+
+## 6d. B14 superseded (narrowed) + U5 activated — founder-authorized #499 (2026-11-13)
+
+**Provenance.** Founder selected the option label **"Authorize #499 (Recommended)"** (recorded as the
+selected option, relayed 2026-11-13; authorization record: [#6856122454 on #499](https://github.com/csim-sg/yacc/issues/499#issuecomment-6856122454);
+strategist recommendation [#6854656196](https://github.com/csim-sg/yacc/issues/499#issuecomment-6854656196);
+tech-lead per-case lifecycle package [#6855967721](https://github.com/csim-sg/yacc/issues/499#issuecomment-6855967721)).
+This narrows the recorded architecture boundary for **exactly** the scope below — no acceptance case is
+waived, amended or de-scoped, and the frozen contract (`asyncapi.yaml`, GOV-038), the frozen suite
+(`packages/frontend/tests|e2e`), the anchor, `gate-scope.json`, the comparator, the thresholds
+(≥85/85/85/80), classes A–E and the CI matrix are untouched.
+
+| Disposition | Content |
+|---|---|
+| **B14 superseded (narrowed)** | The client is no longer strictly "inbound-only": client→server frames are **contract-scoped subscription control only** — the two frozen channels `subscribe.conversation` / `unsubscribe.conversation` (bare conversationId string) + their `conversation.subscribed` / `conversation.unsubscribed` acks, re-subscribed idempotently on every successful (re)open. **No general emit API** exists; every other frozen publish op (message.retry, presence/typing/reaction/connector) stays unimplemented, and all other traffic remains inbound. Recorded in ARCH-005 (real-time row + boundary 2) and ADR-031 Decision 5 in the same PR. |
+| **U5 activated** | The optimistic send mechanism (`sendPending`/`reconcile`/`fail` — dormant since ANG-008 #378) is wired into the live send path: a pending row (`{id: tempId, status: 'pending'}`) precedes the POST; the 201's returned server row reconciles the tempId exactly once (tempId retained as a secondary key); HTTP/transport failure rolls the row to `failed`; `updateMessageStatus` matches `id === messageId \|\| tempId === messageId` idempotently; the retry click path is guarded to server-id rows (a temp id is never sent to the retry endpoint). The "server-ID row visible + temp-ID row count 0 + exactly one row for the body" B4 strength (recorded on #499) becomes observable; no `serverId` field is invented. |
+| **Companion activation (same PR)** | Local inbox patch from `message.received` (#499 AC-5): `latestMessagePreview` = body and `unreadCount` +1 only for a non-active conversation, deduped by message id; the blanket `invalidateLists()` is removed from the receive path (the connector relay is publish-only — a refetch would clobber the patch with stale rows) and kept on the persisted-change paths (status handlers, `connect$` re-open). |
+| **Surfaces** | `websocket-client.service.ts` (two frozen control sends + ack routing only), `conversation-subscription.service.ts` (the ONE interest owner: active-detail lifecycle, bounded inbox interest capped at the list page size `INBOX_INTEREST_LIMIT`, idempotent `connect$` re-subscription — R1 ladder/heartbeat/backlog untouched), `messages.store.ts`, `conversations.store.ts`, `message-events.service.ts`, `realtime-binding.service.ts` (session reset), the conversation/inbox pages. |
+| **Evidence** | Angular unit suite + coverage at the unchanged thresholds with the new AC-1..AC-6 tests; manual observation recipe (Chromium + Firefox, S1 `:8080`/`:4200`) on the PR; R1's 11 rows green at the PR head. The 15 FE-013/014/015 case runs are #495's evidence (both engines, unchanged spec) once this lands. |
 
 ## 7. Unanchored known files (gate-scope `unanchoredKnownFiles`)
 

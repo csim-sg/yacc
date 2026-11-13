@@ -144,4 +144,42 @@ export class ConversationsStore {
         : undefined,
     );
   }
+
+  /**
+   * Local inbox patch from a `message.received` frame (AC-5, #499): sets
+   * `latestMessagePreview` to the body on every LOADED list entry that
+   * contains the conversation and increments `unreadCount` ONLY when the
+   * caller says the conversation is not the active one (the active-detail
+   * decision is the `ConversationSubscriptionService`'s — the single
+   * interest owner).
+   *
+   * Publish-only relay truth: the connector relay never persists, so a
+   * refetch here returns pre-persist data and would clobber the patch —
+   * the blanket `invalidateLists()` deliberately does NOT run on the
+   * receive path (see `MessageEventsService`); list truth converges
+   * through the persisted-change paths (mutations, `conversation.updated`,
+   * the `connect$` re-open invalidation). The patch is fresh per
+   * `ResourceState.update` semantics (an in-flight response cannot
+   * overwrite it).
+   */
+  patchReceived(
+    conversationId: string,
+    body: string,
+    options: { incrementUnread: boolean },
+  ): void {
+    this.lists.updateLoaded((previous) => ({
+      ...previous,
+      data: previous.data.map((conversation) =>
+        conversation.id === conversationId
+          ? {
+              ...conversation,
+              latestMessagePreview: body,
+              unreadCount: options.incrementUnread
+                ? (conversation.unreadCount ?? 0) + 1
+                : conversation.unreadCount,
+            }
+          : conversation,
+      ),
+    }));
+  }
 }

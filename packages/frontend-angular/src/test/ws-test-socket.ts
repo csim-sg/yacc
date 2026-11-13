@@ -28,6 +28,11 @@ export class FakeRealtimeSocket {
     this.onopen?.();
   }
 
+  /** Client→server frame capture (the frozen subscription control sends). */
+  send(data: string): void {
+    this.sent.push(data);
+  }
+
   message(data: unknown): void {
     this.onmessage?.({ data } as MessageEvent);
   }
