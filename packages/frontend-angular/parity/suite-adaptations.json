@@ -1,1 +1,25 @@
-[]
+[
+  {
+    "issue": "#495",
+    "date": "2026-11-13",
+    "file": "packages/frontend/e2e/FE-013-014-015-websocket-listeners.spec.ts",
+    "cases": [
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-013: message.received Listener should receive and display new inbound message in real-time",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-013: message.received Listener should update unread count when new message arrives",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-013: message.received Listener should update conversation list with latest message preview",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-013: message.received Listener should handle duplicate message.received events",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-013: message.received Listener should preserve message order in timeline",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-014: message.sent Listener should update message status from pending to sent",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-014: message.sent Listener should reconcile temporary ID with server ID",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-014: message.sent Listener should handle duplicate message.sent events",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-015: message.failed Listener should update message status from pending to failed",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-015: message.failed Listener should display error reason in message",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-015: message.failed Listener should show retry capability when canRetry is true",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-015: message.failed Listener should handle duplicate message.failed events",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners WebSocket Resilience & Error Handling should deduplicate events across reconnections"
+    ],
+    "kind": "contract-conformance",
+    "rationale": "ANG-015-P6 (#495, tech-lead adjudication #6852513056): re-point the FE-013/014/015 event-injection stimulus to the frozen raw-WS contract \u2014 one-object page.evaluate arity, token-authenticated injection socket, connector.message.received (+senderId, uuid messageId), message.sent sentAt, message.failed retryAt+attempt \u2014 and the single declared B4 substitution asserting the row whose data-message-id equals message.sent#messageId; titles and assertions otherwise byte-identical.",
+    "approval": "https://github.com/csim-sg/yacc/issues/495#issuecomment-6852513056"
+  }
+]
