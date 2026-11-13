@@ -246,8 +246,20 @@
                         }
                         @if (!messagesLoading() && messages().length > 0) {
                           <div class="flex flex-col gap-3">
+                            <!-- #495 DOM contract hooks (attributes only; no behavior/event/store
+                                 change). React parity sources:
+                                 - data-message-id: TimelineMessage.tsx `data-message-id={message.id}`.
+                                 - data-status: machine-readable projection of the React MessageStatus
+                                   badge value on the row (no React attribute equivalent existed).
+                                 - message-status: React MessageStatus status indicator
+                                   (MessageStatus.tsx "Sending…/Sent/Failed").
+                                 - message-retry-button: React MessageStatus failed-state Retry button
+                                   (MessageStatus.tsx). `message-error` is NOT added: no React source
+                                   element ever carried it (the React failed state shows a static
+                                   tooltip, not the error reason) and the frozen message row contract
+                                   carries no error member. -->
                             @for (msg of messages(); track msg.id) {
-                              <div data-testid="message-item">
+                              <div data-testid="message-item" [attr.data-message-id]="msg.id" [attr.data-status]="msg.status">
                                 <div class="flex {{ msg.direction === 'inbound' ? 'justify-start' : 'justify-end' }}">
                                   <div
                                     class="max-w-[80%] rounded-lg px-4 py-3 shadow-sm {{ msg.direction === 'inbound' ? 'bg-base-100 border border-base-200' : 'bg-primary text-primary-content' }}"
@@ -256,7 +268,7 @@
                                       <span data-testid="message-sender">{{ msg.senderName || (msg.direction === 'inbound' ? 'Inbound' : 'Agent') }}</span>
                                       <span>•</span>
                                       <span>{{ formatTimestamp(msg.createdAt) }}</span>
-                                      <span class="badge badge-xs badge-outline">
+                                      <span class="badge badge-xs badge-outline" data-testid="message-status">
                                         {{ msg.status }}
                                       </span>
                                     </div>
@@ -272,7 +284,7 @@
                                             class="btn btn-xs btn-outline"
                                             [attr.data-testid]="'message-retry-' + msg.id"
                                           >
-                                            Retry
+                                            <span data-testid="message-retry-button">Retry</span>
                                           </button>
                                         } @else if (hasAlreadyRetried(msg)) {
                                           <button type="button" disabled class="btn btn-xs btn-outline opacity-50">

@@ -11,19 +11,41 @@
  * - Test user account exists
  * - Test conversations exist in database
  * - WebSocket server accessible at ws://localhost:3000
+ *
+ * #495 re-point (2026-11-13): setup/preconditions only, against the
+ * Angular/Java surface — pinned harness env resolution (React-era names kept
+ * as fallbacks, dead :5173/:3000 defaults removed), seeded identity
+ * (`TEST_USERS.admin` = `admin2@yacc.local`; `test-user@yacc.local` is not in
+ * `DeterministicSeed`), login submit `[data-testid="login-submit"]` (the
+ * Angular button text is "Sign In"), post-login URL `/inbox` (Angular
+ * redirects `/` → `/inbox`). Every test title and every assertion is
+ * byte-identical to the pre-re-point file (#478/#485 precedent; SPEC-003
+ * AM-2 manual evidence — #477).
  */
 
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:5173';
-const API_URL = process.env.PLAYWRIGHT_TEST_API_URL || 'http://localhost:3000';
-const WS_URL = process.env.PLAYWRIGHT_TEST_WS_URL || 'ws://localhost:3000';
+import { TEST_USERS } from '../tests/helpers/auth';
 
-// Test user credentials
-const TEST_USER = {
-  email: 'test-user@yacc.local',
-  password: 'TestPassword123',
-};
+// #495 re-point (2026-11-13): resolve the pinned Angular/Java harness env
+// first (`BASE_URL`/`API_URL`/`PLAYWRIGHT_TEST_API_BASE_URL`, per
+// `.github/workflows/frontend-angular-parity.yml`), keep the React-era names
+// as fallbacks, and default to the live Angular/Java posture — the dead
+// React/Node ports (:5173/:3000) are never used.
+const BASE_URL =
+  process.env.BASE_URL || process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:4200';
+const API_URL =
+  process.env.API_URL ||
+  process.env.PLAYWRIGHT_TEST_API_BASE_URL ||
+  process.env.PLAYWRIGHT_TEST_API_URL ||
+  'http://localhost:8080/api';
+const WS_URL = process.env.PLAYWRIGHT_TEST_WS_URL || 'ws://localhost:8080/ws';
+
+// #495 re-point (2026-11-13): seeded S1 identity — `test-user@yacc.local` is
+// not in the Java `DeterministicSeed` fixture world; `TEST_USERS.admin`
+// (`admin2@yacc.local`) is, via the shared helpers (`packages/frontend/
+// tests/helpers/auth.ts`).
+const TEST_USER = TEST_USERS.admin;
 
 test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
   test.beforeEach(async ({ page }) => {
@@ -31,10 +53,10 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
     await page.goto(`${BASE_URL}/login`);
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
-    await page.click('button:has-text("Sign in")');
+    await page.click('[data-testid="login-submit"]');
     
     // Wait for navigation and WebSocket connection
-    await page.waitForURL(`${BASE_URL}/`);
+    await page.waitForURL(`${BASE_URL}/inbox`);
     await page.waitForLoadState('networkidle');
     
     // Wait for WebSocket to connect
