@@ -386,6 +386,8 @@ Any mismatch ⇒ **fail**: do not proceed; abort per [cutover-rehearsal.md](cuto
 
 Record actual backup and restore durations in the evidence template each time the procedure runs. There is no committed RTO/RPO number yet; establishing one is part of **MIG-070 (#361)**'s rehearsal evidence, not something this document can assert.
 
+**Amended 2026-11-13:** the rehearsal evidence named above was retired by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`) — no rehearsal evidence exists or is required for MIG-070; durations, if recorded, are voluntary operator information and this procedure asserts no acceptance gate. §4/§5 verification gates are unchanged; the K8s/Helm-shaped retirement of this runbook itself remains MIG-080 (#364).
+
 ---
 
 **Last Updated**: 2026-11-06 (authored by MIG-070b #447; review rework ×4 on 2026-10-21 and ×3 on 2026-11-06 — restore-verification capture formats aligned; source server, client tools, and restore target pinned to one major (15): dump output is only documented to load same-or-newer major, never guaranteed older; procedure only; no execution claimed)

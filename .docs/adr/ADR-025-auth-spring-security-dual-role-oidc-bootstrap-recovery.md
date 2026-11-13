@@ -33,6 +33,7 @@ The founder fixed: YACC is both an OIDC relying party (RP) and an OIDC authoriza
 
 - BetterAuth removed; frontend auth adapts (reconcile API clients, forced re-login, single auth contract).
 - Bootstrap-from-empty and recovery drill are acceptance gates (AC-08).
+  - **Amended 2026-11-13:** the live recovery drill named above was retired as an acceptance gate by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`). As amended, **AC-08** keeps bootstrap-from-empty and requires reset-time secret/key replacement plus the recovery control verified by its passing automated tests — no drill record; a drill may still be run voluntarily.
 
 ## Standards Alignment
 

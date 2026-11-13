@@ -1546,6 +1546,8 @@ kubectl rollout status deployment/yacc-backend -n yacc-staging --timeout=2m
 
 **Details**: See `.docs/runbooks/helm-rollback.md` — despite its historical name, it now documents the roll-forward incident procedure (trigger conditions, forward-verification, stop authority). The rehearsal-evidenced incident/rollback decision procedure lands with MIG-070 (#361).
 
+**Amended 2026-11-13:** the rehearsal-evidenced procedure named above was retired by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`) — no rehearsal evidences MIG-070. As amended, **AC-MIG-070-2 is “roll-forward incident runbook exists”** (`compose-roll-forward.md` is the current incident runbook for the Compose target). The K3s/Helm deployment-target wording in this section is out of scope here.
+
 ### Related Documentation
 
 - **ADR-019**: K3s + Helm deployment decision & rationale

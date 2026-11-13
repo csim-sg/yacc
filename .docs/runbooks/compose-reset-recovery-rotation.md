@@ -4,6 +4,7 @@
 **Audience**: the founder/sole operator (OPC) executing the MIG-071 (#362) drills
 **Source issue**: https://github.com/csim-sg/yacc/issues/488
 **Consumers**: MIG-071 (**#362**, AC-MIG-071-1..3 — this document defines how they are performed and recorded; the runs and records belong to #362)
+**Amended 2026-11-13**: as amended by #362, **AC-MIG-071-2** is the recovery control verified by its passing automated tests in the reset state plus the reset-time rotation record — **no separate live drill record**; the drill sections below are optional operator procedures and record nothing toward acceptance (founder decision “no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`).
 **Related**: [compose-staging.md](compose-staging.md) (staging target, §3 decrypt flow, §5 evidence steps + §6 template) · [compose-backup-restore.md](compose-backup-restore.md) (mandatory pre-reset backup; §3) · [compose-rehearsal-stop-authority.md](compose-rehearsal-stop-authority.md) · ADR-025 (deterministic bootstrap; founder-controlled recovery; no surviving POC identities) · ADR-027 (Flyway forward-only; integration-credential encryption) · ADR-032 (Compose target; SOPS secret medium) · ADR-028 (Quartz + DB DLQ — queue tables are schema objects and reset with the schema)
 
 > **This is a destructive, founder-gated procedure.** The founder holds stop authority at every pre-irreversible gate; each gate records an explicit go/no-go before it is crossed. Nothing here authorizes a production cutover (MIG-072, #363).
@@ -340,6 +341,8 @@ docker compose -f deploy/compose/docker-compose.staging.yml \
 
 ## 6. Founder-controlled recovery drill (AC-MIG-071-2)
 
+> **Amended 2026-11-13:** the live drill this section describes was retired as an acceptance record by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`). As amended, **AC-MIG-071-2** is the recovery control verified by its passing automated tests in the reset state plus the reset-time rotation record — **no separate live drill record**. §6.1–6.4 below and the recovery medium remain an optional operator procedure, byte-identical, and record nothing toward acceptance.
+
 **Recovery medium (pinned, ADR-025 + #362 guardrail F4):** the env-gated restart flag — `RECOVERY_MODE=once` + founder-held `RECOVERY_KEY`, delivered **out-of-band through the operator-held, SOPS-derived env file** (`deploy/compose/secrets/staging.env`, mode 0600) — never a public endpoint, never a repo artifact, never a command argument. The durable verification material is `YACC_RECOVERY_KEY_HASH` (SHA-256 of the key); only the founder holds the preimage. Recovery forces a **fresh** credential (never restores an old one) and is audit-logged on every use. `RECOVERY_MODE` must be returned to **empty** afterwards (§6.4).
 
 ### 6.1 Generate the recovery pair (founder-held preimage + pinned hash)
@@ -490,7 +493,7 @@ One row per workflow, filled at execution time by the operator. **All fields sta
 | 4 | Bootstrap-from-empty + idempotency (§5) | | | | `staging` | | `<artifact-link>` |
 | 5 | Forced credential change (§5) | | | | `staging` | | `<artifact-link>` |
 | 6 | Recovery pair + pair check (§6.1) | | | | `staging` | | `<artifact-link>` |
-| 7 | Recovery drill + fresh-credential proof (§6.2–6.3) | | | | `staging` | | `<artifact-link>` |
+| 7 | Recovery drill + fresh-credential proof (§6.2–6.3) — **Amended 2026-11-13:** optional — AC-MIG-071-2 is the tested recovery control + reset-time rotation record, no drill record; a voluntary run records nothing (founder decision “no need for such DR processes”; SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`) | | | | `staging` | | `<artifact-link>` |
 | 8 | Recovery mode unset (§6.4) | | | | `staging` | | `<artifact-link>` |
 | 9 | Rotation batches 7.1–7.6 (one row per batch) | | | | `staging` | | `<artifact-link>` |
 | 10 | SOPS re-encryption (§7.7) | | | | `staging` | | `<artifact-link>` |

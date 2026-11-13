@@ -206,6 +206,8 @@ kubectl exec -it <pod-name> -n yacc-staging -- curl http://localhost:8080/health
 
 The operational posture is **roll-forward only** (ARCH-004 §1): remediate by deploying a forward fix — `helm rollback` is not the primary path. See `.docs/runbooks/helm-rollback.md` (roll-forward incident runbook; rehearsal lands with MIG-070 #361).
 
+**Amended 2026-11-13:** the rehearsal named above was retired by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`) — no rehearsal lands with MIG-070; as amended, **AC-MIG-070-2 is “roll-forward incident runbook exists”**. The K3s/Helm target wording in this section is out of scope here.
+
 ```bash
 # Deploy a forward fix
 helm upgrade --install yacc-backend ./deploy/helm/yacc-backend \

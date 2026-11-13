@@ -431,6 +431,8 @@ kubectl describe pod -n yacc-staging <pod-name>
 ## Incident Procedures (Roll-Forward Posture)
 
 > **The migration operational posture is roll-forward only** (ARCH-004 §1; ADR-030 Decision 6): remediate incidents by deploying a forward fix. `helm rollback` is **not** the primary recovery path (schema-affecting changes are Flyway-managed and not designed for reversal). The rehearsal-evidenced incident procedure — including formal trigger conditions and stop authority — lands with MIG-070 (#361).
+>
+> **Amended 2026-11-13:** the rehearsal-evidenced requirement named above was retired by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`) — no rehearsal evidences MIG-070; as amended, **AC-MIG-070-2 is “roll-forward incident runbook exists”** and **AC-MIG-070-1** is the staging health gates plus one authenticated read. The K3s/Helm deployment-target wording in this file is out of scope here.
 
 ### Forward Fix (Primary Path)
 
@@ -466,6 +468,7 @@ See `.docs/runbooks/helm-rollback.md` — despite its historical filename, it do
 - Root cause documented in a GitHub issue within 24 hours
 - Prevention items merged as forward fixes
 - Stop authority: escalate per the runbook's escalation matrix (rehearsal-owned by MIG-070)
+  - **Amended 2026-11-13:** the rehearsal ownership named above was retired by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`) — no drill evidences MIG-070; real stop authority is unchanged and remains with the founder/sole operator (exercised at the real irreversible gate, MIG-072 #363).
 
 ---
 
