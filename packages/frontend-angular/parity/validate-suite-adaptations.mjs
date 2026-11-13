@@ -78,6 +78,9 @@ test.describe('Outer group', () => {
       await page.goto('/');
       await expect(page).toHaveTitle(/yacc/);
     });
+    test('CASE-D: rename bait', async ({ page }) => {
+      await expect(page).toHaveTitle(/none/);
+    });
   });
   test('CASE-B: standalone inside outer', async ({ page }) => {
     await expect(page.locator('body')).toBeVisible();
@@ -99,6 +102,9 @@ test.describe('E2E wrapper', () => {
 const EMPTY_MANIFEST = '[]\n';
 const APPROVAL = 'https://github.com/csim-sg/yacc/issues/481#issuecomment-6852529734';
 const TITLE_A = 'Outer group Inner group CASE-A: does something';
+const TITLE_B = 'Outer group CASE-B: standalone inside outer';
+const TITLE_C = 'CASE-C: top level';
+const TITLE_D = 'Outer group Inner group CASE-D: rename bait';
 const TITLE_E2E = 'E2E wrapper CASE-E2E: promoted flow';
 
 function entry(over = {}) {
@@ -287,9 +293,6 @@ ok('declared case title no longer in the file fails as stale', () => {
 
 // --- 2b. per-case authorization (loop-1 review correction) ---------------------
 
-const TITLE_B = 'Outer group CASE-B: standalone inside outer';
-const TITLE_C = 'CASE-C: top level';
-
 ok('editing a SECOND, undeclared case in a declared file fails closed naming that case', () => {
   const repo = makeRepo();
   commitHead(repo, (d) => {
@@ -371,6 +374,76 @@ ok('a describe-level hook edit between cases fails as unattributable', () => {
   assert.match(out, /cannot be attributed to any case body/);
 });
 
+// --- 2c. both-side attribution + duplicate-title rejection (loop-3) ------------
+
+ok('rename bypass: undeclared case renamed to a declared title + assertion swapped fails closed', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    // CASE-D (undeclared) renamed to CASE-A's declared title, assertions replaced.
+    const renamed = SUITE_A
+      .replace(`test('${'CASE-D: rename bait'}', async ({ page }) => {`, `test('${'CASE-A: does something'}', async ({ page }) => {`)
+      .replace("      await expect(page).toHaveTitle(/none/);", "      await expect(page).toHaveText('unauthorized');");
+    writeFileSync(join(d, 'packages/frontend/tests/suite-a.spec.ts'), renamed);
+    writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify([entry()], null, 2)}\n`);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1, `expected fail (bypass must be closed), got 0:\n${r.stdout}\n${r.stderr}`);
+  const out = `${r.stdout}\n${r.stderr}`;
+  // First violation class for this shape: the declared title now occurs 2× at
+  // HEAD, so title identity is ambiguous — fail closed before any attribution.
+  assert.match(out, /occurs 2× in the file at HEAD — duplicate case titles make title identity ambiguous/);
+});
+
+ok('duplicate full case titles in a declared file fail closed as ambiguous', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    // Title-only rename: CASE-D becomes a second 'CASE-A: does something'.
+    writeFileSync(join(d, 'packages/frontend/tests/suite-a.spec.ts'), SUITE_A.replace('CASE-D: rename bait', 'CASE-A: does something'));
+    writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify([entry()], null, 2)}\n`);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  const out = `${r.stdout}\n${r.stderr}`;
+  assert.match(out, /occurs 2× in the file at HEAD — duplicate case titles make title identity ambiguous/);
+});
+
+ok('duplicate titles are rejected even in --manifest-only mode', () => {
+  const repo = makeRepo();
+  writeFileSync(join(repo.dir, 'packages/frontend/tests/suite-a.spec.ts'), SUITE_A.replace('CASE-D: rename bait', 'CASE-A: does something'));
+  writeFileSync(join(repo.dir, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify([entry()], null, 2)}\n`);
+  const r = runGate(repo.dir, ['--manifest-only']);
+  assert.equal(r.status, 1);
+  assert.match(`${r.stdout}\n${r.stderr}`, /duplicate case titles make title identity ambiguous/);
+});
+
+ok('a replacement hunk whose BASE side sits in an undeclared case fails even when the new title is declared', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    // Same rename shape, but the bait keeps a UNIQUE new title — only the old
+    // lines map to the undeclared CASE-D region, proving old-side attribution
+    // fires for replacements, not just pure deletions.
+    const renamed = SUITE_A
+      .replace('CASE-D: rename bait', 'CASE-D: renamed body')
+      .replace("      await expect(page).toHaveTitle(/none/);", "      await expect(page).toHaveText('swapped');");
+    writeFileSync(join(d, 'packages/frontend/tests/suite-a.spec.ts'), renamed);
+    writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify([entry({ cases: [TITLE_A, 'Outer group Inner group CASE-D: renamed body'] })], null, 2)}\n`);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  const out = `${r.stdout}\n${r.stderr}`;
+  assert.match(out, /CASE-D: rename bait/);
+});
+
+ok('a legitimate in-case edit keeps passing (both sides inside the declared case)', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeFileSync(join(d, 'packages/frontend/tests/suite-a.spec.ts'), SUITE_A.replace("await expect(page).toHaveTitle(/yacc/);\n    });\n    test('CASE-D: rename bait', async ({ page }) => {\n      await expect(page).toHaveTitle(/none/);", "await expect(page).toHaveTitle(/YACC/);\n    });\n    test('CASE-D: rename bait', async ({ page }) => {\n      await expect(page).toHaveTitle(/some/);"));
+    writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify([entry({ cases: [TITLE_A, TITLE_D] })], null, 2)}\n`);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 0, `expected pass, got ${r.status}:\n${r.stdout}\n${r.stderr}`);
+});
+
 // --- 3. manifest schema/shape -------------------------------------------------
 
 const schemaCases = [
@@ -432,7 +505,7 @@ ok('declared file+case exist but PR did not touch them: gate still passes', () =
 
 ok('extractFullTitles: nested describes join into full titles (fixture shapes)', () => {
   const titles = extractFullTitles(SUITE_A);
-  assert.deepEqual(titles, [TITLE_A, 'Outer group CASE-B: standalone inside outer', 'CASE-C: top level']);
+  assert.deepEqual(titles, [TITLE_A, TITLE_D, TITLE_B, TITLE_C]);
   assert.deepEqual(extractFullTitles(E2E_A), [TITLE_E2E]);
 });
 

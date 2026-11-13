@@ -26,13 +26,18 @@
  *                    is the intent).
  *                    Per-case authorization (loop-1 review correction): for a
  *                    MODIFIED declared file, changed `-U0` hunks are
- *                    attributed to case bodies on both sides of the diff
- *                    (additions/modifications vs HEAD regions, pure deletions
- *                    vs BASE regions) and every touched case must be declared
- *                    — a declaration never authorizes edits to other cases in
- *                    the same file. Hunks outside every case body
- *                    (describe-level hooks, file-local helpers, imports,
- *                    file-level code) cannot be attributed and fail closed.
+ *                    attributed to case bodies on BOTH sides of the diff —
+ *                    every non-empty new range against HEAD regions AND every
+ *                    non-empty old range against BASE regions (loop-3 review
+ *                    correction: replacements included, so an undeclared case
+ *                    cannot evade the gate by renaming itself to a declared
+ *                    title while its assertions are swapped) — and every
+ *                    touched case must be declared on both sides. Hunks
+ *                    outside every case body (describe-level hooks, file-local
+ *                    helpers, imports, file-level code) cannot be attributed
+ *                    and fail closed, and duplicate full case titles make
+ *                    region↔title identity ambiguous → fail closed
+ *                    (declaration-level and attribution-level).
  *                    Renames/deletes keep the file-level checks (they can
  *                    never satisfy a declaration).
  *   --manifest-only  Manifest schema + declared-entry existence only (no git
@@ -183,11 +188,6 @@ export function extractFullTitles(sourceText) {
   return extractCaseRegions(sourceText).map((r) => r.title);
 }
 
-function titlesInFile(absPath) {
-  if (!existsSync(absPath)) return null;
-  return extractFullTitles(readFileSync(absPath, 'utf8'));
-}
-
 // ---------------------------------------------------------------------------
 // Manifest validation
 // ---------------------------------------------------------------------------
@@ -277,14 +277,18 @@ function checkDeclaredEntriesExist(repo, entries, manifestPath) {
   const errors = [];
   for (const [idx, entry] of entries.entries()) {
     const abs = join(repo, entry.file);
-    const titles = titlesInFile(abs);
-    if (titles === null) {
+    const regions = existsSync(abs) ? extractCaseRegions(readFileSync(abs, 'utf8')) : null;
+    if (regions === null) {
       errors.push(`Manifest ${manifestPath} entry[${idx}] declares ${JSON.stringify(entry.file)} (${entry.issue}, ${entry.date}) but that file no longer exists at HEAD — stale declaration, fail closed (prune the entry in a reviewed change or restore the file).`);
       continue;
     }
+    const titles = regions.map((r) => r.title);
     for (const c of entry.cases) {
-      if (!titles.includes(c)) {
+      const occurrences = titles.filter((t) => t === c).length;
+      if (occurrences === 0) {
         errors.push(`Manifest ${manifestPath} entry[${idx}] declares case ${JSON.stringify(c)} of ${JSON.stringify(entry.file)} (${entry.issue}, ${entry.date}) but no such case title exists in the file at HEAD — stale declaration, fail closed. Exact FULL titles as 'npx playwright test --list' prints them are required (describe prefix included).`);
+      } else if (occurrences > 1) {
+        errors.push(`Manifest ${manifestPath} entry[${idx}] declares case ${JSON.stringify(c)} of ${JSON.stringify(entry.file)}, but that full title occurs ${occurrences}× in the file at HEAD — duplicate case titles make title identity ambiguous, fail closed (titles must be unique per file for a declaration to map to exactly one case).`);
       }
     }
   }
@@ -385,17 +389,34 @@ function checkMrdAgainstManifest(repo, base, entries, manifestPath) {
     const baseContent = gitShowOrNull(repo, base, item.path);
     const baseRegions = baseContent === null ? [] : extractCaseRegions(baseContent);
 
+    // Title identity must be unambiguous on both sides (loop-3 review
+    // correction): duplicate full titles make region↔title mapping ambiguous.
+    const duplicated = (regions) => {
+      const counts = new Map();
+      for (const r of regions) counts.set(r.title, (counts.get(r.title) || 0) + 1);
+      return [...counts.entries()].filter(([, n]) => n > 1).map(([t, n]) => `'${t}' ×${n}`);
+    };
+    const dupHead = duplicated(headRegions);
+    const dupBase = duplicated(baseRegions);
+    if (dupHead.length > 0 || dupBase.length > 0) {
+      caseViolations.push(`${item.path} :: duplicate full case title(s) — ambiguous region mapping, fail closed${dupHead.length ? `; HEAD: ${dupHead.join(', ')}` : ''}${dupBase.length ? `; BASE: ${dupBase.join(', ')}` : ''}. Renaming an undeclared case to a declared title is not an authorisation route.`);
+    }
+
     const touched = new Set();
     const unattributable = [];
     for (const h of diffFileHunks(repo, base, item.path)) {
+      // BOTH sides of every hunk are attributed (loop-3 review correction):
+      // new lines against HEAD regions, old lines against BASE regions —
+      // replacements included, so an undeclared case cannot evade the gate by
+      // being renamed to a declared title while its assertions are swapped.
       if (h.newCount > 0) {
         const t = titlesTouching(headRegions, lineRange(h.newStart, h.newCount));
         if (t.size === 0) unattributable.push(`new lines ${h.newStart}-${h.newStart + h.newCount - 1}`);
         else for (const x of t) touched.add(x);
       }
-      if (h.oldCount > 0 && h.newCount === 0) {
+      if (h.oldCount > 0) {
         const t = titlesTouching(baseRegions, lineRange(h.oldStart, h.oldCount));
-        if (t.size === 0) unattributable.push(`deleted base lines ${h.oldStart}-${h.oldStart + h.oldCount - 1}`);
+        if (t.size === 0) unattributable.push(`base lines ${h.oldStart}-${h.oldStart + h.oldCount - 1}`);
         else for (const x of t) touched.add(x);
       }
     }
@@ -404,7 +425,7 @@ function checkMrdAgainstManifest(repo, base, entries, manifestPath) {
     }
     const undeclaredCases = [...touched].filter((t) => !declaredTitles.has(t));
     if (undeclaredCases.length > 0) {
-      caseViolations.push(`${item.path} :: changed case(s) NOT covered by a declaration:\n${undeclaredCases.map((t) => `    - '${t}'`).join('\n')}\n  A declaration authorises edits only inside its declared cases (exact full titles) — every other case in the same file stays protected.`);
+      caseViolations.push(`${item.path} :: changed case(s) NOT covered by a declaration:\n${undeclaredCases.map((t) => `    - '${t}'`).join('\n')}\n  A declaration authorises edits only inside its declared cases (exact full titles, on BOTH the base and head side of every hunk) — every other case in the same file stays protected.`);
     }
   }
 

@@ -333,6 +333,25 @@ import with both declared fails as unattributable). No gate semantic relaxed;
 no suite file, anchor, `gate-scope.json`, comparator, threshold or register
 row changed.
 
+**Loop-2 review correction (13 Nov 2026, PR #497 review):** the reviewer
+reproduced a residual bypass: replacement hunks (`oldCount > 0 &&
+newCount > 0`) were attributed only on the new side, so an UNDECLARED case
+could be renamed to an already-declared full title while its assertions were
+swapped and pass the gate (reproduced at head `3254656`: RBAC-1 renamed to
+RULES-1's declared title → exit 0). Correction (strictly narrower): EVERY
+hunk's non-empty old range is now attributed against BASE case regions (not
+only pure deletions) and every non-empty new range against HEAD regions —
+each touched case must be declared on both sides; and duplicate full case
+titles now fail closed at two levels (a declaration naming a title that
+occurs more than once in the file at HEAD, and duplicate titles among a
+declared modified file's regions — ambiguous title identity). Verified: the
+identical real-suite bypass scenario fails closed (exit 1, duplicate-title
+ambiguity); validator extended 41 → 46 checks (rename bypass, duplicate
+rejection incl. `--manifest-only`, replacement-hunk base-side attribution
+with a unique new title, in-case-edit positive on the extended fixture).
+No gate semantic relaxed; no suite file, anchor, `gate-scope.json`,
+comparator, threshold or register row changed.
+
 ## 9. Registration discipline
 
 1. New expected difference discovered **before** a run → add the register row + `gate-scope.json`
