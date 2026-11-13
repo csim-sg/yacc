@@ -34,14 +34,16 @@
  *                    title while its assertions are swapped) — and every
  *                    touched case must be declared on both sides. Hunks
  *                    outside every case body (describe-level hooks, file-local
- *                    helpers, imports, file-level code) cannot be attributed
- *                    and fail closed, and duplicate full case titles make
- *                    region↔title identity ambiguous → fail closed
- *                    (declaration-level and attribution-level).
+ *                    helpers, imports, file-level code) are attributed to
+ *                    DECLARED support regions (see below) and fail closed
+ *                    when unmarked or undeclared, and duplicate full case
+ *                    titles make region↔title identity ambiguous → fail
+ *                    closed (declaration-level and attribution-level).
  *                    Renames/deletes keep the file-level checks (they can
  *                    never satisfy a declaration).
- *   --manifest-only  Manifest schema + declared-entry existence only (no git
- *                    diff, no workflow guard).
+ *   --manifest-only  Manifest schema (incl. `support`) + declared-entry
+ *                    existence + support-region integrity only (no git diff,
+ *                    no workflow guard).
  *   --guard          PB-2 PR-matrix deferral-guard consistency only: the
  *                    `PB2-PR-MATRIX: SUSPENDED|ACTIVE` sentinel in
  *                    `.github/workflows/frontend-angular-parity.yml` must agree
@@ -62,7 +64,37 @@
  *      "cases": ["<exact FULL case title as `npx playwright test --list` prints it>"],
  *      "kind": "contract-conformance" | "founder-decision" | "fixture-fragility",
  *      "rationale": "<one sentence>",
- *      "approval": "<https:// review-decision URL>" }]
+ *      "approval": "<https:// review-decision URL>",
+ *      "support": [                      // OPTIONAL (#498) — bounded file-level
+ *           { "label": "imports-env",   // preconditions; see below
+ *             "kind": "imports" | "env-resolution" | "identity" | "helper" | "hook",
+ *             "reason": "<one sentence>" } ] }]
+ *
+ * Declared support regions (#498): case-body attribution cannot cover the
+ * FILE-LEVEL lines a contract-conformance re-point legitimately needs
+ * (header doc-block, imports + env resolution, identity const, helpers,
+ * describe-level hooks). A declaration may additionally authorise a bounded,
+ * explicitly labelled set of such lines by (a) listing them in the entry's
+ * optional `support` array — a closed `kind` enum, a slug `label` and a
+ * reason — and (b) wrapping exactly those lines in the spec file with
+ * marker comments:
+ *
+ *   // @suite-adaptation-support:<label>
+ *   …authorised file-level lines…
+ *   // @suite-adaptation-support:end
+ *
+ * An unattributable hunk is authorised ONLY inside a marker region whose
+ * label is declared for that exact file. Fail closed on: an unmarked
+ * unattributable hunk, an undeclared label, a declared label with no marker
+ * region, nested / unterminated / empty / duplicated / malformed markers, a
+ * region overlapping any case body (case attribution wins; the overlap is
+ * ambiguous), and support markers in a file with no declaring manifest
+ * entry. A support region is a reviewed permission, never an implicit
+ * allowlist: there is no file/glob allowlist and no bypass flag, and plain
+ * BASE-side file-level lines are tolerated only when the hunk's new side
+ * lies entirely inside declared HEAD support regions (a region wrap or
+ * interior edit) — old-side lines inside a case body still require that
+ * case's declaration, exactly as before.
  *
  * A declaration is per exact case title, never a file glob: a declared file
  * whose declared titles no longer exist authorises nothing, and only edits
@@ -78,8 +110,8 @@
 'use strict';
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -90,6 +122,17 @@ const MANIFEST_REL = 'packages/frontend-angular/parity/suite-adaptations.json';
 const WORKFLOW_REL = '.github/workflows/frontend-angular-parity.yml';
 const ADAPTATION_KINDS = ['contract-conformance', 'founder-decision', 'fixture-fragility'];
 const REQUIRED_ENTRY_KEYS = ['issue', 'date', 'file', 'cases', 'kind', 'rationale', 'approval'];
+const OPTIONAL_ENTRY_KEYS = ['support'];
+const SUPPORT_KINDS = ['imports', 'env-resolution', 'identity', 'helper', 'hook'];
+const SUPPORT_ITEM_KEYS = ['label', 'kind', 'reason'];
+const SUPPORT_LABEL_RE = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/;
+const SUPPORT_MARKER_TEXT = '@suite-adaptation-support:';
+// Order matters: ':end' must be tested before the start form (a start-form
+// regex would otherwise parse the literal label 'end'), and any line that
+// LOOKS like a marker but matches neither form is malformed → fail closed.
+const SUPPORT_END_RE = /^[ \t]*\/\/[ \t]*@suite-adaptation-support:end[ \t]*$/;
+const SUPPORT_START_RE = /^[ \t]*\/\/[ \t]*@suite-adaptation-support:([a-z0-9](?:[a-z0-9._-]*[a-z0-9])?)[ \t]*$/;
+const SUPPORT_MARKERISH_RE = /^[ \t]*\/\/[ \t]*@suite-adaptation-support:/;
 const DEFERRAL_LINE = 'PB-2 PR verdict deferred to AM-1/#490 — no verdict claimed';
 const DEFERRAL_JOB = 'pb2-pr-deferral';
 
@@ -189,6 +232,82 @@ export function extractFullTitles(sourceText) {
 }
 
 // ---------------------------------------------------------------------------
+// Support-marker extraction (#498) — declared file-level support regions
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse the `// @suite-adaptation-support:<label>` … `:end` marker regions of
+ * one spec file. Regions are INCLUSIVE of their two marker lines (adding or
+ * moving a whole well-formed region is a unit that attributes cleanly), with
+ * 1-based line numbers like `extractCaseRegions`.
+ *
+ * Structural violations are collected in `errors` (the caller fails closed on
+ * ANY of them): stray `:end`, nested markers, unterminated regions, empty
+ * regions, duplicate labels, and malformed marker-like lines. Parsing never
+ * silently tolerates a marker-looking line it cannot understand.
+ */
+export function extractSupportRegions(sourceText) {
+  const regions = [];
+  const errors = [];
+  const lines = sourceText.split(/\r?\n/);
+  let open = null; // { label, startLine }
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const n = i + 1;
+    if (SUPPORT_END_RE.test(line)) {
+      if (!open) {
+        errors.push(`stray '@suite-adaptation-support:end' at line ${n} — no support region is open`);
+        continue;
+      }
+      if (n === open.startLine + 1) {
+        errors.push(`empty support region '${open.label}' (lines ${open.startLine}-${n}) — a region must wrap at least one authorised line`);
+      }
+      regions.push({ label: open.label, start: open.startLine, end: n });
+      open = null;
+      continue;
+    }
+    const startMatch = line.match(SUPPORT_START_RE);
+    if (startMatch) {
+      if (open) {
+        errors.push(`nested support marker '${startMatch[1]}' at line ${n} (inside region '${open.label}' opened at line ${open.startLine}) — markers must not nest`);
+      } else {
+        open = { label: startMatch[1], startLine: n };
+      }
+    } else if (SUPPORT_MARKERISH_RE.test(line)) {
+      errors.push(`malformed support marker at line ${n} (${JSON.stringify(line.trim())}) — the only valid forms are '// @suite-adaptation-support:<label>' and '// @suite-adaptation-support:end' with a lowercase [a-z0-9._-] label`);
+    }
+  }
+  if (open) {
+    errors.push(`unterminated support region '${open.label}' (opened at line ${open.startLine}) — missing '@suite-adaptation-support:end'`);
+  }
+  const byLabel = new Map();
+  for (const r of regions) {
+    if (!byLabel.has(r.label)) byLabel.set(r.label, []);
+    byLabel.get(r.label).push(`${r.start}-${r.end}`);
+  }
+  for (const [label, spans] of byLabel) {
+    if (spans.length > 1) {
+      errors.push(`support label '${label}' has ${spans.length} marker regions (lines ${spans.join(', ')}) — duplicate regions for one label are ambiguous, fail closed (use a distinct label per region)`);
+    }
+  }
+  return { regions, errors };
+}
+
+function caseTitleAt(regions, line) {
+  for (const r of regions) {
+    if (line >= r.start && line <= r.end) return r.title;
+  }
+  return null;
+}
+
+function supportLabelAt(regions, line) {
+  for (const r of regions) {
+    if (line >= r.start && line <= r.end) return r.label;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Manifest validation
 // ---------------------------------------------------------------------------
 
@@ -211,7 +330,7 @@ function validateManifestText(text, manifestPath) {
       return;
     }
     for (const key of Object.keys(entry)) {
-      if (!REQUIRED_ENTRY_KEYS.includes(key)) errors.push(`${at}: unknown key '${key}' (allowed: ${REQUIRED_ENTRY_KEYS.join(', ')}) — fail closed.`);
+      if (!REQUIRED_ENTRY_KEYS.includes(key) && !OPTIONAL_ENTRY_KEYS.includes(key)) errors.push(`${at}: unknown key '${key}' (allowed: ${REQUIRED_ENTRY_KEYS.join(', ')}, optional: ${OPTIONAL_ENTRY_KEYS.join(', ')}) — fail closed.`);
     }
     for (const key of REQUIRED_ENTRY_KEYS) {
       if (!(key in entry)) errors.push(`${at}: missing required field '${key}'.`);
@@ -258,6 +377,46 @@ function validateManifestText(text, manifestPath) {
     if (typeof entry.approval !== 'string' || !/^https:\/\/\S+$/.test(entry.approval)) {
       errors.push(`${at}: 'approval' must be an https:// review-decision URL (found ${JSON.stringify(entry.approval)}).`);
     }
+    // Optional declared support regions (#498): [{ label, kind, reason }].
+    if ('support' in entry) {
+      const sup = entry.support;
+      if (!Array.isArray(sup) || sup.length === 0) {
+        errors.push(`${at}: 'support' must be a non-empty array of { label, kind, reason } objects (omit the key entirely when the entry declares no support regions).`);
+      } else {
+        sup.forEach((s, si) => {
+          const sat = `${at}: support[${si}]`;
+          if (s === null || typeof s !== 'object' || Array.isArray(s)) {
+            errors.push(`${sat}: must be an object with keys ${SUPPORT_ITEM_KEYS.join(', ')}.`);
+            return;
+          }
+          for (const key of Object.keys(s)) {
+            if (!SUPPORT_ITEM_KEYS.includes(key)) errors.push(`${sat}: unknown key '${key}' (allowed: ${SUPPORT_ITEM_KEYS.join(', ')}) — fail closed.`);
+          }
+          for (const key of SUPPORT_ITEM_KEYS) {
+            if (!(key in s)) errors.push(`${sat}: missing required field '${key}'.`);
+          }
+          if (typeof s.label !== 'string' || !SUPPORT_LABEL_RE.test(s.label) || s.label === 'end') {
+            errors.push(`${sat}: 'label' must be a lowercase slug ([a-z0-9._-]; 'end' is reserved for the :end marker) (found ${JSON.stringify(s.label)}).`);
+          }
+          if (typeof s.kind !== 'string' || !SUPPORT_KINDS.includes(s.kind)) {
+            errors.push(`${sat}: 'kind' must be one of ${SUPPORT_KINDS.join(' | ')} (found ${JSON.stringify(s.kind)}).`);
+          }
+          if (typeof s.reason !== 'string' || s.reason.trim().length === 0) {
+            errors.push(`${sat}: 'reason' must be a non-empty one-sentence reason for this support region.`);
+          }
+        });
+        const labels = sup.filter((s) => s !== null && typeof s === 'object' && !Array.isArray(s) && typeof s.label === 'string').map((s) => s.label);
+        const uniqueLabels = new Set(labels);
+        if (uniqueLabels.size !== labels.length) {
+          errors.push(`${at}: duplicate support labels inside 'support' — a region is identified by its label, fail closed.`);
+        }
+        for (const l of uniqueLabels) {
+          const dedupKey = `${JSON.stringify(entry.file)}\nsupport:${l}`;
+          if (seen.has(dedupKey)) errors.push(`${at}: support label ${JSON.stringify(l)} of ${JSON.stringify(entry.file)} is already declared by another entry — duplicate support declarations are ambiguous, fail closed.`);
+          seen.add(dedupKey);
+        }
+      }
+    }
   });
   return { errors, entries };
 }
@@ -289,6 +448,102 @@ function checkDeclaredEntriesExist(repo, entries, manifestPath) {
         errors.push(`Manifest ${manifestPath} entry[${idx}] declares case ${JSON.stringify(c)} of ${JSON.stringify(entry.file)} (${entry.issue}, ${entry.date}) but no such case title exists in the file at HEAD — stale declaration, fail closed. Exact FULL titles as 'npx playwright test --list' prints them are required (describe prefix included).`);
       } else if (occurrences > 1) {
         errors.push(`Manifest ${manifestPath} entry[${idx}] declares case ${JSON.stringify(c)} of ${JSON.stringify(entry.file)}, but that full title occurs ${occurrences}× in the file at HEAD — duplicate case titles make title identity ambiguous, fail closed (titles must be unique per file for a declaration to map to exactly one case).`);
+      }
+    }
+  }
+  return errors;
+}
+
+// ---------------------------------------------------------------------------
+// Support-region integrity (#498, runs ALWAYS like the stale-entry check)
+// ---------------------------------------------------------------------------
+
+function listProtectedFiles(repo) {
+  const files = [];
+  for (const prefix of PROTECTED_PREFIXES) {
+    const root = join(repo, prefix);
+    if (!existsSync(root)) continue;
+    const walk = (dir) => {
+      let dirEntries;
+      try {
+        dirEntries = readdirSync(dir, { withFileTypes: true });
+      } catch (e) {
+        die([`Cannot list ${dir} (${e.message}) — the support-region integrity check cannot run, fail closed.`]);
+      }
+      for (const e of dirEntries) {
+        const p = join(dir, e.name);
+        if (e.isDirectory()) walk(p);
+        else if (e.isFile()) files.push(p);
+      }
+    };
+    walk(root);
+  }
+  return files;
+}
+
+/**
+ * Markers only exist where the manifest declares them (fail-closed both
+ * directions, in EVERY mode):
+ *   - any protected file containing support markers must have an entry whose
+ *     `support` array declares every label found in the file;
+ *   - every declared support label must have a marker region at HEAD (stale
+ *     declarations fail, like stale files/cases);
+ *   - marker structure (stray/nested/unterminated/empty/duplicate/malformed)
+ *     and case-body overlap fail closed.
+ */
+function checkSupportIntegrity(repo, entries, manifestPath) {
+  const errors = [];
+  const declaredLabelsByFile = new Map();
+  for (const e of entries) {
+    if (!Array.isArray(e.support) || e.support.length === 0) continue;
+    if (!declaredLabelsByFile.has(e.file)) declaredLabelsByFile.set(e.file, new Set());
+    for (const s of e.support) declaredLabelsByFile.get(e.file).add(s.label);
+  }
+  const markerLabelsByFile = new Map(); // HEAD state of every marker-bearing protected file
+
+  for (const abs of listProtectedFiles(repo)) {
+    const text = readFileSync(abs, 'utf8');
+    if (!text.includes(SUPPORT_MARKER_TEXT)) continue;
+    const rel = relative(repo, abs).split(sep).join('/');
+    const { regions, errors: structural } = extractSupportRegions(text);
+    for (const e of structural) errors.push(`${rel} :: ${e} — support-marker structure is invalid, fail closed.`);
+    const labels = regions.map((r) => r.label);
+    markerLabelsByFile.set(rel, labels);
+    const declared = declaredLabelsByFile.get(rel);
+    if (!declared) {
+      errors.push(`${rel} :: support marker region(s) found (label${labels.length === 1 ? '' : 's'}: ${[...new Set(labels)].map((l) => `'${l}'`).join(', ')}) but no manifest entry declares support for this file — fail closed (${manifestPath}; a support region authorises lines only where a declaring entry's 'support' array lists its label).`);
+      continue;
+    }
+    for (const l of new Set(labels)) {
+      if (!declared.has(l)) {
+        errors.push(`${rel} :: support region '${l}' is not declared for this file — fail closed (${manifestPath}; add { label, kind, reason } to the declaring entry's 'support' array or remove the markers).`);
+      }
+    }
+    if (structural.length === 0) {
+      // Markers must never enclose test()/test.describe() declarations: the
+      // case-attribution path governs case bodies, and a region that reaches
+      // into one is ambiguous → fail closed, naming the case.
+      const caseRegions = extractCaseRegions(text);
+      for (const r of regions) {
+        for (const c of caseRegions) {
+          if (c.start <= r.end && r.start <= c.end) {
+            errors.push(`${rel} :: support region '${r.label}' (lines ${r.start}-${r.end}) overlaps the case body of '${c.title}' (lines ${c.start}-${c.end}) — markers must not enclose test()/test.describe() declarations; edits inside a case body go through that case's declaration, and the overlap is ambiguous, fail closed.`);
+          }
+        }
+      }
+    }
+  }
+
+  for (const [file, labels] of declaredLabelsByFile) {
+    const present = markerLabelsByFile.get(file);
+    if (!present) {
+      if (!existsSync(join(repo, file))) continue; // stale-file check already reports the missing file
+      errors.push(`Manifest ${manifestPath} declares support label${labels.size === 1 ? '' : 's'} ${[...labels].map((l) => `'${l}'`).join(', ')} for ${JSON.stringify(file)}, but the file has no support marker region at HEAD — stale declaration, fail closed (prune the 'support' array in a reviewed change or add the markers).`);
+      continue;
+    }
+    for (const l of labels) {
+      if (!present.includes(l)) {
+        errors.push(`Manifest ${manifestPath} declares support label '${l}' for ${JSON.stringify(file)}, but no marker region with that label exists in the file at HEAD — stale declaration, fail closed (prune the label in a reviewed change or restore the markers).`);
       }
     }
   }
@@ -340,35 +595,39 @@ function lineRange(start, count) {
   return Array.from({ length: count }, (_, i) => start + i);
 }
 
-function titlesTouching(regions, lineNumbers) {
-  const touched = new Set();
-  for (const r of regions) {
-    for (const l of lineNumbers) {
-      if (l >= r.start && l <= r.end) { touched.add(r.title); break; }
-    }
-  }
-  return touched;
-}
-
 /**
- * Per-case authorization for MODIFIED declared files (loop-1 review finding,
- * #481/PR #497): a declaration authorises edits ONLY inside its declared
- * cases' bodies. Changed `-U0` hunks are attributed to case regions on BOTH
- * sides of the diff — additions/modifications against the HEAD regions,
- * pure deletions against the BASE regions — and every touched case must be
- * declared for that exact file. Hunks outside every case body (describe-level
- * hooks, file-local helpers, imports, file-level code) cannot be attributed
- * and fail closed. R/D keep the file-level checks (a rename/delete can never
- * satisfy a declaration: the declared file/cases must still exist at HEAD).
+ * Per-case + per-support-region authorization for MODIFIED declared files
+ * (loop-1/loop-3 review findings, #481/PR #497; support regions added by
+ * #498): a declaration authorises edits ONLY inside its declared cases'
+ * bodies and inside declared, marker-delimited support regions. Changed
+ * `-U0` hunk lines are attributed on BOTH sides of the diff — every new line
+ * against the HEAD case/support regions, every old line against the BASE
+ * case/support regions (case attribution wins over support attribution) —
+ * and every touched case must be declared, every touched support label must
+ * be declared for that exact file. Any hunk line inside neither kind of
+ * region is unattributable and fails closed, with ONE bounded exception: a
+ * BASE-side line that was plain file-level (never inside any region) is
+ * tolerated when the SAME hunk's new side exists and lies entirely inside
+ * HEAD support regions — i.e. a reviewed wrap or interior rewrite of
+ * previously unmarked file-level lines. Old-side lines inside a case body
+ * still require that case's declaration (no exception), so an undeclared
+ * case cannot be emptied into a support region. R/D keep the file-level
+ * checks (a rename/delete can never satisfy a declaration: the declared
+ * file/cases must still exist at HEAD).
  */
 function checkMrdAgainstManifest(repo, base, entries, manifestPath) {
   const changed = changedSuiteEntries(repo, base);
   if (changed.length === 0) return [];
 
   const declaredTitlesByFile = new Map();
+  const declaredSupportByFile = new Map();
   for (const e of entries) {
     if (!declaredTitlesByFile.has(e.file)) declaredTitlesByFile.set(e.file, new Set());
     for (const c of e.cases) declaredTitlesByFile.get(e.file).add(c);
+    if (Array.isArray(e.support) && e.support.length > 0) {
+      if (!declaredSupportByFile.has(e.file)) declaredSupportByFile.set(e.file, new Set());
+      for (const s of e.support) declaredSupportByFile.get(e.file).add(s.label);
+    }
   }
 
   const errors = [];
@@ -385,9 +644,23 @@ function checkMrdAgainstManifest(repo, base, entries, manifestPath) {
     if (item.status !== 'M') continue; // R/D: file-level only (see docblock)
 
     const declaredTitles = declaredTitlesByFile.get(item.path);
-    const headRegions = extractCaseRegions(readFileSync(join(repo, item.path), 'utf8'));
+    const declaredSupport = declaredSupportByFile.get(item.path);
+    const headContent = readFileSync(join(repo, item.path), 'utf8');
+    const headRegions = extractCaseRegions(headContent);
+    const headSupport = extractSupportRegions(headContent);
     const baseContent = gitShowOrNull(repo, base, item.path);
     const baseRegions = baseContent === null ? [] : extractCaseRegions(baseContent);
+    const baseSupport = baseContent === null ? { regions: [], errors: [] } : extractSupportRegions(baseContent);
+    // Structural marker violations fail with their own messages; attribution
+    // on a structurally broken side cannot be trusted → treat as empty.
+    for (const e of headSupport.errors) {
+      caseViolations.push(`${item.path} :: ${e} (at HEAD) — support-marker structure is invalid, fail closed.`);
+    }
+    for (const e of baseSupport.errors) {
+      caseViolations.push(`${item.path} :: ${e} (at BASE) — support-marker structure is invalid, fail closed.`);
+    }
+    const headSupportRegions = headSupport.errors.length === 0 ? headSupport.regions : [];
+    const baseSupportRegions = baseSupport.errors.length === 0 ? baseSupport.regions : [];
 
     // Title identity must be unambiguous on both sides (loop-3 review
     // correction): duplicate full titles make region↔title mapping ambiguous.
@@ -404,28 +677,71 @@ function checkMrdAgainstManifest(repo, base, entries, manifestPath) {
 
     const touched = new Set();
     const unattributable = [];
+    const supportTouched = new Set();
+    const supportTouchedBase = new Set();
     for (const h of diffFileHunks(repo, base, item.path)) {
-      // BOTH sides of every hunk are attributed (loop-3 review correction):
-      // new lines against HEAD regions, old lines against BASE regions —
-      // replacements included, so an undeclared case cannot evade the gate by
-      // being renamed to a declared title while its assertions are swapped.
+      let newOutside = 0;
+      let newInsideSupport = 0;
+      let oldOutside = 0;
+      // BOTH sides of every hunk are attributed line-by-line (loop-3 review
+      // correction): new lines against HEAD regions, old lines against BASE
+      // regions — replacements included, so an undeclared case cannot evade
+      // the gate by being renamed to a declared title while its assertions
+      // are swapped. Case regions win over support regions.
       if (h.newCount > 0) {
-        const t = titlesTouching(headRegions, lineRange(h.newStart, h.newCount));
-        if (t.size === 0) unattributable.push(`new lines ${h.newStart}-${h.newStart + h.newCount - 1}`);
-        else for (const x of t) touched.add(x);
+        for (const l of lineRange(h.newStart, h.newCount)) {
+          const t = caseTitleAt(headRegions, l);
+          if (t !== null) { touched.add(t); continue; }
+          const lbl = supportLabelAt(headSupportRegions, l);
+          if (lbl !== null) { supportTouched.add(lbl); newInsideSupport += 1; continue; }
+          newOutside += 1;
+        }
       }
       if (h.oldCount > 0) {
-        const t = titlesTouching(baseRegions, lineRange(h.oldStart, h.oldCount));
-        if (t.size === 0) unattributable.push(`base lines ${h.oldStart}-${h.oldStart + h.oldCount - 1}`);
-        else for (const x of t) touched.add(x);
+        for (const l of lineRange(h.oldStart, h.oldCount)) {
+          const t = caseTitleAt(baseRegions, l);
+          if (t !== null) { touched.add(t); continue; }
+          const lbl = supportLabelAt(baseSupportRegions, l);
+          if (lbl !== null) { supportTouchedBase.add(lbl); continue; }
+          oldOutside += 1;
+        }
+      }
+      if (newOutside > 0) {
+        unattributable.push(`new lines ${h.newStart}-${h.newStart + h.newCount - 1}`);
+      }
+      // The one bounded exception for plain BASE-side file-level lines: only
+      // when this hunk's new side exists and EVERY new line sits inside a
+      // HEAD support region (a reviewed region wrap / interior rewrite).
+      // newCount === 0 (pure deletion of unmarked file-level lines) and any
+      // partially-marked hunk stay unattributable.
+      if (oldOutside > 0 && !(h.newCount > 0 && newOutside === 0 && newInsideSupport === h.newCount)) {
+        unattributable.push(`base lines ${h.oldStart}-${h.oldStart + h.oldCount - 1}`);
       }
     }
     if (unattributable.length > 0) {
-      caseViolations.push(`${item.path} :: changed hunk(s) cannot be attributed to any case body (${unattributable.join('; ')}) — declarations authorise edits ONLY inside declared cases' bodies; describe-level hooks, file-local helpers, imports and file-level code are not authorisable via the manifest.`);
+      caseViolations.push(`${item.path} :: changed hunk(s) cannot be attributed to any case body or declared support region (${unattributable.join('; ')}) — declarations authorise edits ONLY inside declared cases' bodies and inside declared, marker-delimited support regions ('// @suite-adaptation-support:<label>' … ':end', declared via the manifest entry's 'support' array); unmarked describe-level hooks, file-local helpers, imports and file-level code fail closed.`);
     }
     const undeclaredCases = [...touched].filter((t) => !declaredTitles.has(t));
     if (undeclaredCases.length > 0) {
       caseViolations.push(`${item.path} :: changed case(s) NOT covered by a declaration:\n${undeclaredCases.map((t) => `    - '${t}'`).join('\n')}\n  A declaration authorises edits only inside its declared cases (exact full titles, on BOTH the base and head side of every hunk) — every other case in the same file stays protected.`);
+    }
+    if (declaredSupport) {
+      const undeclaredSupport = [...supportTouched].filter((l) => !declaredSupport.has(l));
+      if (undeclaredSupport.length > 0) {
+        caseViolations.push(`${item.path} :: changed support region(s) with label(s) NOT declared for this file: ${undeclaredSupport.map((l) => `'${l}'`).join(', ')} — a support region authorises lines only when the manifest entry for this file declares { label, kind, reason } in its 'support' array.`);
+      }
+    } else if (supportTouched.size > 0) {
+      caseViolations.push(`${item.path} :: changed support region(s) ${[...supportTouched].map((l) => `'${l}'`).join(', ')} but no manifest entry declares 'support' for this file — fail closed.`);
+    }
+    // BASE-side support lines: a label that is still declared is fine; a
+    // label whose region is GONE at HEAD is the atomic region-removal route
+    // (markers + label retracted in the same reviewed change — the stale
+    // declaration check would fail any other shape). A label that is
+    // undeclared yet still has a region at HEAD is ambiguous → fail.
+    const headSupportLabels = new Set(headSupportRegions.map((r) => r.label));
+    const undeclaredBaseSupport = [...supportTouchedBase].filter((l) => !(declaredSupport && declaredSupport.has(l)) && headSupportLabels.has(l));
+    if (undeclaredBaseSupport.length > 0) {
+      caseViolations.push(`${item.path} :: changed support region(s) on the BASE side with label(s) NOT declared for this file: ${undeclaredBaseSupport.map((l) => `'${l}'`).join(', ')} — fail closed (declared labels authorize their regions; a removed region must be retracted atomically with its declaration).`);
     }
   }
 
@@ -558,12 +874,16 @@ function main() {
   const manifest = readManifest(args.manifest);
   if (manifest.errors.length) die(manifest.errors);
 
-  // Declared entries must exist at HEAD (stale file/case → fail closed).
+  // Declared entries must exist at HEAD (stale file/case → fail closed), and
+  // support markers only exist where the manifest declares them (#498, both
+  // directions, always — including --manifest-only).
   const staleErrors = checkDeclaredEntriesExist(args.repo, manifest.entries, args.manifest);
+  const supportErrors = checkSupportIntegrity(args.repo, manifest.entries, args.manifest);
   if (staleErrors.length) die(staleErrors);
+  if (supportErrors.length) die(supportErrors);
 
   if (args.manifestOnly) {
-    process.stdout.write(`Manifest ${args.manifest}: valid (${manifest.entries.length} declared adaptation${manifest.entries.length === 1 ? '' : 's'}, all declared files/cases exist at HEAD).\n`);
+    process.stdout.write(`Manifest ${args.manifest}: valid (${manifest.entries.length} declared adaptation${manifest.entries.length === 1 ? '' : 's'}, all declared files/cases/support regions exist at HEAD).\n`);
     return;
   }
 
