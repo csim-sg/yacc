@@ -170,7 +170,7 @@ expansion); registering it here + in `gate-scope.json` is a deliberate, review-v
 | Gate | CI job (`.github/workflows/frontend-angular-parity.yml`) | Enforcement |
 |---|---|---|
 | **PB-1** build | `build-angular` in `frontend-deploy.yml` (pre-existing, unchanged) | `ng build` green |
-| **PB-2** E2E parity | `parity` matrix jobs (chromium/firefox/webkit — one FULL U10-suite run per browser, evidence only) + `parity-compare` gate job | Spec-edit integrity gate (no modified/renamed/deleted suite files per PR — in every browser job); anchor pre-flight (`compare-baseline.mjs check` — fail-closed on missing/bad/mismatched baseline incl. SHA-256 — in every browser job and again in `parity-compare`); Java service in the S1 e2e posture per browser job; full U10-scope Playwright run ×3 browsers (one browser per job — a leg that cannot finish never produces a verdict); `parity-compare` downloads all three raw JSON reports and fails closed if any browser job/report is absent, empty, hash-mismatched, mis-scoped (foreign project) or covers a different case set, merges them into the complete 3-browser report (`parity/merge-browser-reports.mjs`), then `compare-baseline.mjs compare` — fails on regressions, weakenings, scope leaks, register gaps, missing results; summary surfaces every bucket (expected red, unanchored red/green, improvements, flaky) |
+| **PB-2** E2E parity | `parity` matrix jobs (chromium/firefox/webkit — one FULL U10-suite run per browser, evidence only) + `parity-compare` gate job — **`workflow_dispatch`-only since #481 (13 Nov 2026, interim AM-1 suspension): PRs get the `preflight` declared-adaptation gate + the `pb2-pr-deferral` "no verdict claimed" marker until #490 restores the matrix atomically** | Spec-edit integrity gate = the manifest-aware declared-adaptation gate in the `preflight` job (`parity/check-suite-adaptations.mjs` — undeclared M/R/D, malformed/partial manifest and stale declared file/case all fail closed; in every browser job on dispatch runs too via preflight); anchor pre-flight (`compare-baseline.mjs check` — fail-closed on missing/bad/mismatched baseline incl. SHA-256 — in every browser job and again in `parity-compare`); Java service in the S1 e2e posture per browser job; full U10-scope Playwright run ×3 browsers (one browser per job — a leg that cannot finish never produces a verdict); `parity-compare` downloads all three raw JSON reports and fails closed if any browser job/report is absent, empty, hash-mismatched, mis-scoped (foreign project) or covers a different case set, merges them into the complete 3-browser report (`parity/merge-browser-reports.mjs`), then `compare-baseline.mjs compare` — fails on regressions, weakenings, scope leaks, register gaps, missing results; summary surfaces every bucket (expected red, unanchored red/green, improvements, flaky) |
 | **PB-3** unit + coverage | `unit-coverage` job | `test:unit:coverage` with thresholds **≥85 lines / ≥85 statements / ≥85 functions / ≥80 branches** (angular.json; exit non-zero below target; never lowered) |
 | **CP-3** baseline capture | `react-baseline-capture` job (`workflow_dispatch` only) | Boots the same Java posture, runs the **React** harness at the current SHA, derives the per-case TSV + env versions + JSON + HTML report, uploads them as workflow artifacts (full provenance: `github.sha`, tool versions). Archiving a new anchor into the repo is a separate deliberate act (register + `gate-scope.json` update) |
 | Tier-1 backend | `backend-java-ci.yml` (pre-existing, unchanged) | JUnit + Testcontainers + JaCoCo ≥85% + contract tests |
@@ -277,6 +277,41 @@ generation time** (`JAR="$(realpath "$JAR")"` + fail-closed `test -f "$JAR"`), a
 byte-identically to **both** embedded heredocs; `$KEY_DIR`, the pid file, the log and
 `-Dloader.path` were already absolute. No key material echoed, no key/auth/anchor/
 gate-scope/comparator/threshold/case/browser/assertion change, no register row change.
+
+**Execution-wiring record (13 Nov 2026 — declared-adaptation route + interim PB-2 PR
+suspension, issue #481):** two mechanical facts on the merged workflow made lawful
+suite work unmergeable and PRs prohibitively expensive: (1) the spec-file integrity
+gate failed closed on **any** M/R/D under `packages/frontend/tests|e2e` with no
+lawful declared route (correct PB-2 default, but every reviewed backend-decided
+re-point — #480, #495's AM-2 repairs — became unmergeable after #385 landed); (2)
+`on.pull_request.paths` launches the full chromium/firefox/webkit matrix + the gate
+decision on any suite-path PR — a superseded gate under founder-accepted **AM-1**
+(CI engines are exactly `{obscura}`, #490 pending) at ~12 h of runner time per PR.
+Correction (wiring only, #481; gate able to run without the matrix, fail-closed
+throughout): (a) new declaration manifest `parity/suite-adaptations.json` — per-case
+titles (never a file glob) with issue/date/kind/rationale/approval URL; (b) the
+integrity gate is now the manifest-aware `parity/check-suite-adaptations.mjs`
+(undeclared M/R/D, missing/unparsable/partial manifest, and stale declared
+file/case all fail closed with actionable `::error::` messages; the legacy
+"Spec files must never be edited…" message is kept for the undeclared case) —
+the old inline per-browser step is superseded and removed; (c) new `preflight` job
+(PR + `push dev` + dispatch, no `npm ci`, target < 2 min) carries the manifest
+check, the full gate at the PR merge base, and the gate self-validation
+(`parity/validate-suite-adaptations.mjs`: declared/undeclared M/R/D, stale
+declarations, 12 schema/shape negatives, title extraction proven against the real
+frozen suite titles, and the guard fixtures); (d) the `parity` matrix and
+`parity-compare` are suspended on `pull_request` — `workflow_dispatch` only until
+#490 — and every PR prints `PB-2 PR verdict deferred to AM-1/#490 — no verdict
+claimed` via the `pb2-pr-deferral` job (**no PB-2 verdict is claimed for PRs** in
+this window; dispatch remains available for a deliberate full verdict); (e) the
+suspension is **self-reverting**: a `PB2-PR-MATRIX: SUSPENDED|ACTIVE` sentinel is
+checked by `--guard` against the actual job conditions and the deferral marker —
+re-enabling the matrix without removing the marker, or removing the marker without
+re-enabling the matrix, fails preflight; the restoration condition is **#490 does
+both in the same change**. `unit-coverage` (PB-3) and the CP-3 job are untouched;
+no suite file, anchor, `gate-scope.json`, comparator, threshold, expected-red
+class or register row changed; AM-3 leaves the frozen `ae42c67` anchor in force.
+This is gate WIRING, not a disposition: it widens nothing and waives nothing.
 
 ## 9. Registration discipline
 

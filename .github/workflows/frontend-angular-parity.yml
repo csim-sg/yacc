@@ -7,6 +7,17 @@ name: Frontend Angular Parity Gates
 #   unit-coverage          PB-3 merge gate: Angular unit suite + coverage
 #                          thresholds >=85/85/85/80 (angular.json; the run exits
 #                          non-zero below target — never lowered).
+#   preflight              Declared-adaptation integrity gate for the frozen
+#                          suite (#481): the manifest-aware fail-closed MRD gate
+#                          (`parity/check-suite-adaptations.mjs`), the manifest
+#                          schema check, the gate self-validation, and the PB-2
+#                          PR-matrix deferral guard. Runs on every trigger —
+#                          PR + push dev + dispatch — without the parity matrix
+#                          (target < 2 min).
+#   pb2-pr-deferral        PR-only marker job (interim, #481): prints
+#                          `PB-2 PR verdict deferred to AM-1/#490 — no verdict
+#                          claimed`. Removed by #490 in the same change that
+#                          restores the matrix (guarded — see preflight).
 #   parity (matrix)        PB-2 E2E parity EVIDENCE: boots the Java backend of
 #                          record in the S1 (#423) fail-closed E2E fixture
 #                          posture (PostgreSQL ONLY among data stores — the Java
@@ -67,11 +78,24 @@ name: Frontend Angular Parity Gates
 # partial seed, no super_admin row, ADR-025). This workflow never re-points the
 # production `deploy` job (ANG-014/ANG-016 own deploy enablement/cutover).
 #
-# Spec-file integrity is enforced per PR (in every browser job): modified/
-# renamed/deleted files under packages/frontend/tests|e2e fail the parity job
-# (spec files are never edited to make Angular pass; additive specs are visible
-# to review and must be registered in parity/gate-scope.json — unknown files
-# fail the comparator).
+# Spec-file integrity is enforced per PR by the `preflight` job (declared-
+# adaptation manifest-aware gate, #481): modified/renamed/deleted files under
+# packages/frontend/tests|e2e fail preflight unless declared in
+# parity/suite-adaptations.json with an approval link (fail closed on
+# undeclared changes, malformed manifests and stale declarations; spec files
+# are never edited to make Angular pass; additive specs are visible to review
+# and must be registered in parity/gate-scope.json — unknown files fail the
+# comparator).
+#
+# Interim AM-1 suspension (#481, 2026-11-13): the `parity` matrix and
+# `parity-compare` run workflow_dispatch ONLY while #490 (Obscura-only CI
+# engine, founder-accepted AM-1) is pending — a PR touching the protected
+# suite paths must launch the cheap preflight gate, never a superseded
+# ~12 h three-engine run. Every PR prints the deferral line via
+# `pb2-pr-deferral` and claims NO verdict. The suspension is self-reverting:
+# `check-suite-adaptations.mjs --guard` fails preflight if the matrix is
+# re-enabled without removing the deferral marker, or the marker is removed
+# without re-enabling the matrix. #490 must do both in the SAME change.
 
 on:
   push:
@@ -134,12 +158,92 @@ jobs:
           if-no-files-found: warn
 
   # ------------------------------------------------------------------
+  # Declared-adaptation integrity gate (#481) — the only suite-file gate a PR
+  # needs while the PB-2 matrix is suspended on pull_request (interim AM-1).
+  # Fail closed on: undeclared M/R/D suite edits, malformed/partial manifest,
+  # missing manifest, declared file/case that no longer exists, and any
+  # divergence between the matrix suspension state and the deferral marker.
+  # Zero dependencies + no npm ci: checkout + node scripts only (< 2 min).
+  # ------------------------------------------------------------------
+  preflight:
+    name: preflight (declared-adaptation integrity gate + PB-2 matrix guard)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (full history — merge-base integrity diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve merge base (PR base sha; push/dispatch → first parent)
+        id: base
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags origin "${{ github.event.pull_request.base.sha }}"
+            echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=$(git rev-parse --verify -q HEAD^1 || echo HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Manifest schema/shape check (fail-closed)
+        run: node packages/frontend-angular/parity/check-suite-adaptations.mjs --manifest-only
+
+      - name: Declared-adaptation integrity gate (fail-closed MRD vs manifest)
+        run: node packages/frontend-angular/parity/check-suite-adaptations.mjs --base "${{ steps.base.outputs.base }}"
+
+      - name: PB-2 PR-matrix deferral guard (self-reverting consistency, #481)
+        run: node packages/frontend-angular/parity/check-suite-adaptations.mjs --guard
+
+      - name: Gate self-validation (declared/undeclared M/R/D + matrix/marker guard fixtures)
+        run: node packages/frontend-angular/parity/validate-suite-adaptations.mjs
+
+  # ------------------------------------------------------------------
+  # Interim AM-1 deferral marker (#481): PR runs claim NO PB-2 verdict.
+  # Removed by #490 in the same change that re-enables the parity matrix for
+  # pull_request — the preflight guard fails if the two ever diverge.
+  # ------------------------------------------------------------------
+  pb2-pr-deferral:
+    name: PB-2 PR verdict — deferred to AM-1/#490 (no verdict claimed)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Print deferral marker (interim AM-1 suspension, #481)
+        run: |
+          echo "PB-2 PR verdict deferred to AM-1/#490 — no verdict claimed"
+          echo "The three-engine parity matrix is suspended on pull_request by #481 (founder-accepted AM-1: CI engines are exactly {obscura}; #490 pending)."
+          echo "Restoration: #490 must re-enable 'parity' + 'parity-compare' for pull_request and remove this job in the SAME change (guarded by parity/check-suite-adaptations.mjs --guard; undeclared suite edits still fail the preflight integrity gate)."
+          {
+            echo "## PB-2 PR verdict"
+            echo ""
+            echo "**PB-2 PR verdict deferred to AM-1/#490 — no verdict claimed**"
+            echo ""
+            echo "The three-engine parity matrix is suspended on \`pull_request\` by #481 (founder-accepted AM-1: CI engines are exactly \`{obscura}\`; #490 pending)."
+            echo "No PB-2 verdict is claimed for this PR. Suite-file integrity is still enforced fail-closed by the \`preflight\` job (declared-adaptation manifest)."
+            echo "Restoration: #490 re-enables the matrix for \`pull_request\` and removes this job in the same change (guarded — the two must never diverge)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ------------------------------------------------------------------
   # PB-2 — E2E parity evidence: one FULL U10-suite run per browser.
   # The gate decision lives in `parity-compare` below (single decision
   # point over the complete merged 3-browser report).
+  #
+  # INTERIM SUSPENSION on pull_request (#481, 2026-11-13): workflow_dispatch
+  # ONLY while #490 installs the Obscura-only CI engine (founder-accepted
+  # AM-1: CI engines are exactly {obscura}) — a PR touching the protected
+  # suite paths must launch the cheap preflight gate, never a superseded
+  # ~12 h three-engine run. Dispatching remains possible for a deliberate
+  # full PB-2 verdict. Restoration is atomic and guarded (PB2-PR-MATRIX
+  # sentinel + pb2-pr-deferral + these conditions must change together).
   # ------------------------------------------------------------------
   parity:
     name: parity (PB-2 evidence — ${{ matrix.project }})
+    # Managed suspension sentinel — see parity/check-suite-adaptations.mjs --guard.
+    # Restoration (#490, same change): allow pull_request here AND on
+    # parity-compare, flip this sentinel to ACTIVE, remove pb2-pr-deferral.
+    # PB2-PR-MATRIX: SUSPENDED
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # One browser's full-suite run incl. setup (~2x the observed per-browser
     # duration; the previous single-job cap of 350 min covered all 3 browsers
@@ -230,19 +334,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Spec-file integrity gate (0 edits to existing suite files)
-        if: github.event_name == 'pull_request'
-        run: |
-          base="${{ github.event.pull_request.base.sha }}"
-          git fetch --no-tags origin "$base"
-          changed="$(git diff --name-only --diff-filter=MRD "$base"...HEAD -- packages/frontend/tests packages/frontend/e2e || true)"
-          if [ -n "$changed" ]; then
-            echo "::error::Spec files must never be edited to make Angular pass (PB-2; a wiring need is itself a disposition-register entry):"
-            echo "$changed"
-            exit 1
-          fi
-          echo "No existing suite file modified/renamed/deleted — integrity gate OK."
 
       - name: Baseline pre-flight (fail-closed anchor validation)
         run: node packages/frontend-angular/parity/compare-baseline.mjs check
@@ -446,7 +537,10 @@ jobs:
   parity-compare:
     name: parity-compare (PB-2 gate decision vs ae42c67 anchor)
     needs: [parity]
-    if: always()
+    # Same interim suspension as the `parity` matrix job above (#481): the
+    # decision job must not fabricate a verdict from absent PR legs — it is
+    # dispatch-only together with the matrix until #490 restores both.
+    if: always() && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

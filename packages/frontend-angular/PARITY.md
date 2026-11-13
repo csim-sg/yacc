@@ -49,6 +49,34 @@ AD-2) and stay blocking until it exists.
   (none anticipated — `baseURL` is config, not spec) is itself a disposition-register
   entry. Zero spec edits is the ANG-003 acceptance state and is verified by
   `git diff --stat dev -- packages/frontend/tests packages/frontend/e2e` (empty).
+- **Declared suite adaptations — the mechanical form of the "declared, never silent"
+  rule (issue #481, 2026-11-13).** A frozen-suite file (`packages/frontend/tests|e2e`)
+  may be modified/renamed/deleted in a PR **only** when declared in
+  `parity/suite-adaptations.json`: per entry — issue (`#NNN`), date, file, the **exact
+  FULL case titles** (`npx playwright test --list` form, describe prefix included —
+  never a file glob), `kind` (`contract-conformance` | `founder-decision` |
+  `fixture-fragility`), a one-sentence rationale, and an `https://` approval link to the
+  recorded review decision. The gate (`parity/check-suite-adaptations.mjs`, carried by
+  the workflow `preflight` job) is **fail-closed**: an undeclared M/R/D change, a
+  missing/unparsable/partial manifest (unknown key, missing field, bad kind/date/approval,
+  empty or duplicate cases), or a declared file/case that no longer exists at HEAD all
+  exit non-zero naming the offending file/case and the manifest path. A declaration
+  **never** authorises assertion weakening — the reviewer still verifies
+  equivalent-or-stronger, and expected-red/anchor semantics are unchanged. There is no
+  approval-bypass flag, no allowlist keyed on paths/globs, and no silent fallback when
+  the manifest is absent.
+- **Interim PB-2 PR suspension (2026-11-13, issue #481 — founder-accepted AM-1: CI
+  engines are exactly `{obscura}`).** The three-engine `parity` matrix and
+  `parity-compare` run `workflow_dispatch`-only until **#490** installs the Obscura-only
+  CI engine; every PR instead runs the cheap `preflight` integrity gate and prints
+  `PB-2 PR verdict deferred to AM-1/#490 — no verdict claimed` (the `pb2-pr-deferral`
+  job) — **no PB-2 verdict is claimed for PRs** during this gap, and dispatching the
+  matrix remains possible for a deliberate full verdict. **Restoration condition:** #490
+  must re-enable the matrix for `pull_request` and remove the deferral job **in the same
+  change** — `check-suite-adaptations.mjs --guard` fails preflight if the
+  `PB2-PR-MATRIX: SUSPENDED|ACTIVE` sentinel, the job conditions and the deferral marker
+  ever diverge (the suspension cannot silently become permanent). PB-3 `unit-coverage`
+  and the declared-adaptation preflight gate are unaffected and keep running on every PR.
 - **Ownership:** the register **content** (entries + CI enforcement of the gate scope,
   `e2e/` promotion, debug-spec exclusion) is authored in **ANG-015** (U10). This issue
   delivers the discipline + the harness; Tier-0/Tier-1/Tier-2 classification per T4 §2.
