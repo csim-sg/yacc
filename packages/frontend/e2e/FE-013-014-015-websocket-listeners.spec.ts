@@ -21,9 +21,23 @@
  * redirects `/` → `/inbox`). Every test title and every assertion is
  * byte-identical to the pre-re-point file (#478/#485 precedent; SPEC-003
  * AM-2 manual evidence — #477).
+ *
+ * #495 stimulus re-point (2026-11-13, tech-lead adjudication #6852513056):
+ * (B1) the injection socket authenticates like the frozen R1 spec — a real
+ * access token from the seeded-identity sign-in rides the `?token=` upgrade
+ * parameter; (B2) `message.received` injections use the frozen inbound
+ * channel `connector.message.received` with the required `senderId` member;
+ * (B3) `message.sent`/`message.failed` injections carry the frozen payload
+ * members (`sentAt` / `retryAt` + `attempt`); (A) every `page.evaluate`
+ * passes its arguments as the single object Playwright evaluates accept;
+ * (B4, declared — `parity/suite-adaptations.json`, `kind:
+ * contract-conformance`) the `serverId` case asserts the row whose
+ * `data-message-id` equals `message.sent#messageId` — `serverId` exists in
+ * no frozen schema or code path. Assertion statements keep their shape and
+ * strength; only the declared B4 locator identity is re-pointed.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
 
 import { TEST_USERS } from '../tests/helpers/auth';
 
@@ -47,6 +61,21 @@ const WS_URL = process.env.PLAYWRIGHT_TEST_WS_URL || 'ws://localhost:8080/ws';
 // tests/helpers/auth.ts`).
 const TEST_USER = TEST_USERS.admin;
 
+// #495 B1 (2026-11-13): the event-injection socket authenticates exactly like
+// the frozen R1 spec's sockets — the upgrade URL carries `?token=` with a real
+// access token minted by the seeded-identity sign-in (`POST /api/auth/sign-in/
+// email`). Acquired once per test in `beforeEach` (serial execution,
+// `--workers=1`).
+let injectionToken = '';
+
+async function signInToken(request: APIRequestContext): Promise<string> {
+  const response = await request.post(`${API_URL}/auth/sign-in/email`, {
+    data: { email: TEST_USER.email, password: TEST_USER.password },
+  });
+  const body = (await response.json()) as { accessToken?: string };
+  return body.accessToken ?? '';
+}
+
 test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
   test.beforeEach(async ({ page }) => {
     // Login before each test
@@ -61,6 +90,9 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
     
     // Wait for WebSocket to connect
     await page.waitForTimeout(1000);
+
+    // #495 B1: token for the authenticated injection socket (below).
+    injectionToken = await signInToken(page.request);
   });
 
   test.describe('FE-013: message.received Listener', () => {
@@ -82,23 +114,24 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       
       // Emit WebSocket event from test backend
       // In real test, this would be via test API endpoint or direct WebSocket emission
-      await page.evaluate((wsUrl) => {
-        const socket = new WebSocket(wsUrl);
+      // (#495 B1/B2: authenticated socket, frozen inbound channel + payload).
+      await page.evaluate(({ wsUrl, token, conversationId, senderId }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
           socket.send(JSON.stringify({
-            event: 'message.received',
+            event: 'connector.message.received',
             data: {
-              conversationId: '${conversationId}',
-              messageId: 'test-msg-' + Date.now(),
+              conversationId,
+              messageId: crypto.randomUUID(),
               platform: 'telegram',
+              senderId,
               senderName: 'Test Sender',
               body: 'Real-time test message from WebSocket',
               timestamp: new Date().toISOString(),
-              eventId: 'test-event-' + Date.now(),
             },
           }));
         };
-      }, WS_URL);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, senderId: TEST_USER.id });
       
       // Wait for new message to appear
       const updatedMessageCount = await page.locator('[data-testid="message-item"]').count();
@@ -128,23 +161,24 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       }
       
       // Simulate receiving message
-      await page.evaluate((wsUrl, convId) => {
-        const socket = new WebSocket(wsUrl);
+      // (#495 B1/B2: authenticated socket, frozen inbound channel + payload.)
+      await page.evaluate(({ wsUrl, token, conversationId, senderId }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
           socket.send(JSON.stringify({
-            event: 'message.received',
+            event: 'connector.message.received',
             data: {
-              conversationId: convId,
-              messageId: 'test-msg-' + Date.now(),
+              conversationId,
+              messageId: crypto.randomUUID(),
               platform: 'telegram',
+              senderId,
               senderName: 'Test Sender',
               body: 'Test message',
               timestamp: new Date().toISOString(),
-              eventId: 'test-event-' + Date.now(),
             },
           }));
         };
-      }, WS_URL, conversationId);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, senderId: TEST_USER.id });
       
       // Wait for unread count to update
       await page.waitForTimeout(500);
@@ -170,23 +204,24 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       
       // Simulate receiving new message
       const testMessage = `Real-time preview ${Date.now()}`;
-      await page.evaluate((wsUrl, convId, msg) => {
-        const socket = new WebSocket(wsUrl);
+      // (#495 B1/B2: authenticated socket, frozen inbound channel + payload.)
+      await page.evaluate(({ wsUrl, token, conversationId, senderId, msg }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
           socket.send(JSON.stringify({
-            event: 'message.received',
+            event: 'connector.message.received',
             data: {
-              conversationId: convId,
-              messageId: 'test-msg-' + Date.now(),
+              conversationId,
+              messageId: crypto.randomUUID(),
               platform: 'telegram',
+              senderId,
               senderName: 'Test Sender',
               body: msg,
               timestamp: new Date().toISOString(),
-              eventId: 'test-event-' + Date.now(),
             },
           }));
         };
-      }, WS_URL, conversationId, testMessage);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, senderId: TEST_USER.id, msg: testMessage });
       
       // Wait for preview to update
       await page.waitForTimeout(500);
@@ -209,29 +244,31 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       const initialCount = await page.locator('[data-testid="message-item"]').count();
       
       // Send same event twice (simulating duplicate)
-      const eventId = 'test-duplicate-' + Date.now();
-      const messageId = 'test-msg-' + Date.now();
+      // (#495 B1/B2: authenticated socket, frozen inbound channel + payload;
+      // the wire has no eventId (T3-G10) — message-id uniqueness is the dedup
+      // mechanism, so the duplicate is the same messageId sent twice.)
+      const messageId = crypto.randomUUID();
       
-      await page.evaluate((wsUrl, convId, msgId, evt) => {
-        const socket = new WebSocket(wsUrl);
+      await page.evaluate(({ wsUrl, token, conversationId, senderId, msgId }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
-          // Send twice with same eventId
+          // Send twice with same messageId
           for (let i = 0; i < 2; i++) {
             socket.send(JSON.stringify({
-              event: 'message.received',
+              event: 'connector.message.received',
               data: {
-                conversationId: convId,
+                conversationId,
                 messageId: msgId,
                 platform: 'telegram',
+                senderId,
                 senderName: 'Test Sender',
                 body: 'Duplicate test message',
                 timestamp: new Date().toISOString(),
-                eventId: evt,
               },
             }));
           }
         };
-      }, WS_URL, conversationId, messageId, eventId);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, senderId: TEST_USER.id, msgId: messageId });
       
       // Wait for processing
       await page.waitForTimeout(500);
@@ -254,23 +291,24 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       
       // Send multiple messages in sequence
       for (let i = 0; i < 3; i++) {
-        await page.evaluate((wsUrl, convId, idx) => {
-          const socket = new WebSocket(wsUrl);
+        // (#495 B1/B2: authenticated socket, frozen inbound channel + payload.)
+        await page.evaluate(({ wsUrl, token, conversationId, senderId, idx }) => {
+          const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
           socket.onopen = () => {
             socket.send(JSON.stringify({
-              event: 'message.received',
+              event: 'connector.message.received',
               data: {
-                conversationId: convId,
-                messageId: 'msg-' + idx + '-' + Date.now(),
+                conversationId,
+                messageId: crypto.randomUUID(),
                 platform: 'telegram',
+                senderId,
                 senderName: 'Sender ' + idx,
                 body: 'Message ' + idx,
                 timestamp: new Date().toISOString(),
-                eventId: 'evt-' + idx + '-' + Date.now(),
               },
             }));
           };
-        }, WS_URL, conversationId, i);
+        }, { wsUrl: WS_URL, token: injectionToken, conversationId, senderId: TEST_USER.id, idx: i });
         
         await page.waitForTimeout(100);
       }
@@ -328,21 +366,21 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       const lastMessage = page.locator('[data-testid="message-item"]').last();
       const messageId = await lastMessage.getAttribute('data-message-id');
       
-      await page.evaluate((wsUrl, convId, msgId) => {
-        const socket = new WebSocket(wsUrl);
+      // (#495 B1/B3: authenticated socket, frozen `message.sent` payload.)
+      await page.evaluate(({ wsUrl, token, conversationId, msgId }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
           socket.send(JSON.stringify({
             event: 'message.sent',
             data: {
-              conversationId: convId,
+              conversationId,
               messageId: msgId,
               status: 'sent',
-              timestamp: new Date().toISOString(),
-              eventId: 'sent-' + Date.now(),
+              sentAt: new Date().toISOString(),
             },
           }));
         };
-      }, WS_URL, conversationId, messageId);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, msgId: messageId });
       
       // Wait for status to update
       await page.waitForTimeout(500);
@@ -373,29 +411,32 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       const tempId = await tempMessage.getAttribute('data-message-id');
       
       // Simulate message.sent event with server ID
-      const serverId = 'server-msg-' + Date.now();
-      await page.evaluate((wsUrl, convId, tmpId, srvId) => {
-        const socket = new WebSocket(wsUrl);
+      // (#495 B1/B3/B4 — DECLARED contract-conformance substitution: `serverId`
+      // exists in no frozen schema or code path; the frozen `message.sent`
+      // payload carries `messageId`, so the equivalent observable is the row
+      // whose `data-message-id` equals `message.sent#messageId` — the
+      // optimistic row is replaced by the contract-identified row.)
+      await page.evaluate(({ wsUrl, token, conversationId, msgId }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
           socket.send(JSON.stringify({
             event: 'message.sent',
             data: {
-              conversationId: convId,
-              messageId: tmpId,
-              serverId: srvId,
+              conversationId,
+              messageId: msgId,
               status: 'sent',
-              timestamp: new Date().toISOString(),
-              eventId: 'sent-' + Date.now(),
+              sentAt: new Date().toISOString(),
             },
           }));
         };
-      }, WS_URL, conversationId, tempId, serverId);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, msgId: tempId });
       
       // Wait for update
       await page.waitForTimeout(500);
       
       // Verify message ID was updated to server ID
-      const updatedMessage = page.locator(`[data-message-id="${serverId}"]`);
+      // (#495 B4: declared substitution — see above.)
+      const updatedMessage = page.locator(`[data-message-id="${tempId}"]`);
       await expect(updatedMessage).toBeVisible();
     });
 
@@ -420,26 +461,26 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       const messageId = await page.locator('[data-testid="message-item"]').last().getAttribute('data-message-id');
       
       // Send duplicate message.sent events
-      const eventId = 'sent-dup-' + Date.now();
-      
-      await page.evaluate((wsUrl, convId, msgId, evt) => {
-        const socket = new WebSocket(wsUrl);
+      // (#495 B1/B3: authenticated socket, frozen `message.sent` payload;
+      // the duplicate is the same messageId sent twice — message-id
+      // uniqueness is the dedup mechanism, T3-G10.)
+      await page.evaluate(({ wsUrl, token, conversationId, msgId }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
           // Send twice
           for (let i = 0; i < 2; i++) {
             socket.send(JSON.stringify({
               event: 'message.sent',
               data: {
-                conversationId: convId,
+                conversationId,
                 messageId: msgId,
                 status: 'sent',
-                timestamp: new Date().toISOString(),
-                eventId: evt,
+                sentAt: new Date().toISOString(),
               },
             }));
           }
         };
-      }, WS_URL, conversationId, messageId, eventId);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, msgId: messageId });
       
       // Wait for processing
       await page.waitForTimeout(500);
@@ -472,23 +513,23 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       const messageId = await page.locator('[data-testid="message-item"]').last().getAttribute('data-message-id');
       
       // Simulate message.failed event
-      await page.evaluate((wsUrl, convId, msgId) => {
-        const socket = new WebSocket(wsUrl);
+      // (#495 B1/B3: authenticated socket, frozen `message.failed` payload.)
+      await page.evaluate(({ wsUrl, token, conversationId, msgId }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
           socket.send(JSON.stringify({
             event: 'message.failed',
             data: {
-              conversationId: convId,
+              conversationId,
               messageId: msgId,
               status: 'failed',
               error: 'Network error',
-              canRetry: true,
-              timestamp: new Date().toISOString(),
-              eventId: 'failed-' + Date.now(),
+              retryAt: new Date().toISOString(),
+              attempt: 1,
             },
           }));
         };
-      }, WS_URL, conversationId, messageId);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, msgId: messageId });
       
       // Wait for status update
       await page.waitForTimeout(500);
@@ -520,23 +561,23 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       
       // Simulate message.failed with error reason
       const errorReason = 'Network timeout';
-      await page.evaluate((wsUrl, convId, msgId, error) => {
-        const socket = new WebSocket(wsUrl);
+      // (#495 B1/B3: authenticated socket, frozen `message.failed` payload.)
+      await page.evaluate(({ wsUrl, token, conversationId, msgId, error }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
           socket.send(JSON.stringify({
             event: 'message.failed',
             data: {
-              conversationId: convId,
+              conversationId,
               messageId: msgId,
               status: 'failed',
-              error: error,
-              canRetry: true,
-              timestamp: new Date().toISOString(),
-              eventId: 'failed-' + Date.now(),
+              error,
+              retryAt: new Date().toISOString(),
+              attempt: 1,
             },
           }));
         };
-      }, WS_URL, conversationId, messageId, errorReason);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, msgId: messageId, error: errorReason });
       
       // Wait for error to display
       await page.waitForTimeout(500);
@@ -572,23 +613,23 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       const messageId = await page.locator('[data-testid="message-item"]').last().getAttribute('data-message-id');
       
       // Simulate message.failed with canRetry = true
-      await page.evaluate((wsUrl, convId, msgId) => {
-        const socket = new WebSocket(wsUrl);
+      // (#495 B1/B3: authenticated socket, frozen `message.failed` payload.)
+      await page.evaluate(({ wsUrl, token, conversationId, msgId }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
           socket.send(JSON.stringify({
             event: 'message.failed',
             data: {
-              conversationId: convId,
+              conversationId,
               messageId: msgId,
               status: 'failed',
               error: 'Network error',
-              canRetry: true,
-              timestamp: new Date().toISOString(),
-              eventId: 'failed-' + Date.now(),
+              retryAt: new Date().toISOString(),
+              attempt: 1,
             },
           }));
         };
-      }, WS_URL, conversationId, messageId);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, msgId: messageId });
       
       // Wait for update
       await page.waitForTimeout(500);
@@ -622,28 +663,28 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       const messageId = await page.locator('[data-testid="message-item"]').last().getAttribute('data-message-id');
       
       // Send duplicate message.failed events
-      const eventId = 'failed-dup-' + Date.now();
-      
-      await page.evaluate((wsUrl, convId, msgId, evt) => {
-        const socket = new WebSocket(wsUrl);
+      // (#495 B1/B3: authenticated socket, frozen `message.failed` payload;
+      // the duplicate is the same messageId sent twice — message-id
+      // uniqueness is the dedup mechanism, T3-G10.)
+      await page.evaluate(({ wsUrl, token, conversationId, msgId }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
           // Send twice
           for (let i = 0; i < 2; i++) {
             socket.send(JSON.stringify({
               event: 'message.failed',
               data: {
-                conversationId: convId,
+                conversationId,
                 messageId: msgId,
                 status: 'failed',
                 error: 'Error',
-                canRetry: true,
-                timestamp: new Date().toISOString(),
-                eventId: evt,
+                retryAt: new Date().toISOString(),
+                attempt: 1,
               },
             }));
           }
         };
-      }, WS_URL, conversationId, messageId, eventId);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, msgId: messageId });
       
       // Wait for processing
       await page.waitForTimeout(500);
@@ -693,48 +734,51 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       const initialCount = await page.locator('[data-testid="message-item"]').count();
       
       // Send event, simulate disconnect, send same event again
-      const eventId = 'dedup-test-' + Date.now();
+      // (#495 B1/B2: authenticated socket, frozen inbound channel + payload;
+      // same messageId twice — message-id uniqueness is the dedup mechanism,
+      // T3-G10.)
+      const messageId = crypto.randomUUID();
       
-      await page.evaluate((wsUrl, convId, evt) => {
-        const socket = new WebSocket(wsUrl);
+      await page.evaluate(({ wsUrl, token, conversationId, senderId, msgId }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
           socket.send(JSON.stringify({
-            event: 'message.received',
+            event: 'connector.message.received',
             data: {
-              conversationId: convId,
-              messageId: 'msg-' + Date.now(),
+              conversationId,
+              messageId: msgId,
               platform: 'telegram',
+              senderId,
               senderName: 'Test',
               body: 'Dedup test',
               timestamp: new Date().toISOString(),
-              eventId: evt,
             },
           }));
         };
-      }, WS_URL, conversationId, eventId);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, senderId: TEST_USER.id, msgId: messageId });
       
       // Wait for message
       await page.waitForTimeout(500);
       const countAfterFirst = await page.locator('[data-testid="message-item"]').count();
       
       // Send same event again (simulating reconnection backlog)
-      await page.evaluate((wsUrl, convId, evt) => {
-        const socket = new WebSocket(wsUrl);
+      await page.evaluate(({ wsUrl, token, conversationId, senderId, msgId }) => {
+        const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
           socket.send(JSON.stringify({
-            event: 'message.received',
+            event: 'connector.message.received',
             data: {
-              conversationId: convId,
-              messageId: 'msg-' + Date.now(),
+              conversationId,
+              messageId: msgId,
               platform: 'telegram',
+              senderId,
               senderName: 'Test',
               body: 'Dedup test',
               timestamp: new Date().toISOString(),
-              eventId: evt,
             },
           }));
         };
-      }, WS_URL, conversationId, eventId);
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, senderId: TEST_USER.id, msgId: messageId });
       
       // Wait for potential duplicate
       await page.waitForTimeout(500);
