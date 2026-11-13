@@ -11,6 +11,8 @@
 > **Why this file keeps its name**: `deploy/helm/yacc-backend/README.md` links to `.docs/runbooks/helm-rollback.md` by path. The **procedure** below is roll-forward: `helm rollback` is not the primary recovery path. The historical rollback runbook was retired with the migration posture (ARCH-004 §1; ADR-030 Decision 6).
 >
 > **Rehearsal status**: the rehearsal-evidenced incident/stop-authority procedure is **AC-MIG-070-2 (#361)**. The documented procedures to execute are [cutover-rehearsal.md](cutover-rehearsal.md) (with [backup-restore.md](backup-restore.md)); until that rehearsal evidences them, the content below is documented intent.
+>
+> **Amended 2026-11-13:** that rehearsal-evidenced requirement was retired by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`). As amended, **AC-MIG-070-2 is “roll-forward incident runbook exists”** — it contains no rehearsal/drill evidence requirement; this document is optional history retained until retirement (MIG-080, #364), and the current roll-forward incident procedure is [compose-roll-forward.md](compose-roll-forward.md).
 
 ---
 
@@ -189,6 +191,8 @@ echo "[?] Migration:";    kubectl logs -n yacc-staging -l app.kubernetes.io/name
 
 **Stop authority** = the explicit decision to halt deployments/traffic rather than continue forward-fixing. **[The rehearsal-evidenced stop-authority drill is AC-MIG-070-2 (#361); the matrix below is documented intent.]**
 
+**Amended 2026-11-13:** the rehearsal-evidenced stop-authority drill named above was retired by the founder scope decision (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`); as amended, **AC-MIG-070-2 is “roll-forward incident runbook exists”**, so no drill evidences it — real stop authority is unchanged and remains with the founder. This section is optional history (retirement: MIG-080, #364).
+
 | Level | Role | Authority | Triggered when |
 | ----- | ---- | ---------- | --------------- |
 | 1 | On-Call Engineer | Execute the forward fix; monitor; open the incident ticket | Any trigger condition fires |
@@ -333,3 +337,5 @@ kubectl logs -n yacc-staging -l app.kubernetes.io/name=yacc-backend --all-contai
 **Last Updated**: 2026-10-18 (roll-forward rewrite, MIG-090 #365)  
 **Next Review**: at the MIG-070 (#361) cutover rehearsal — the rehearsal evidences the stop-authority drill and finalizes this runbook  
 **Feedback**: Send issues to #infrastructure-engineering
+
+**Amended 2026-11-13**: the rehearsal-based review trigger in “Next Review” above was retired by the founder scope decision (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`); no rehearsal will occur or finalize this runbook — as amended, AC-MIG-070-2 is “roll-forward incident runbook exists”. This document is optional history (retirement: MIG-080, #364).

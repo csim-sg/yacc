@@ -9,6 +9,8 @@
 > **This is a procedure, not evidence.** Nothing in this document asserts that a rehearsal, deploy, backup, restore, or drill has happened. The rehearsal execution, the attributable developer records (AC-MIG-070-3/4), and the stop-authority exercise are owned by **MIG-070 (#361)** — this document only defines how they are performed and recorded.
 >
 > **Rehearsal ≠ production cutover.** The rehearsal runs in a candidate environment against candidate resources. The production cutover is **MIG-072 (#363)** and is founder-governed; no step here authorizes or performs it.
+>
+> **Amended 2026-11-13 — optional/superseded:** the DR rehearsals this procedure describes (backup/restore rehearsal, stop-authority drill) were retired as acceptance requirements by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`). This K8s/Helm-shaped rehearsal is optional history retained until retirement (MIG-080, #364); it records nothing and gates nothing.
 
 ---
 
@@ -258,6 +260,8 @@ Re-run the §Step-2 health gates. **Gate**: both 200 **and** the image check abo
 ## 3. Evidence-record template
 
 One row per step, filled at execution time by the actor. **All fields start empty** — this template is unusable as "proof" until a human fills it. The same template records the three attributable build/test records and three attributable deploy-or-operate records defined by #361 (AC-MIG-070-3/4).
+
+**Amended 2026-11-13:** the rehearsal-evidence purpose of this template was retired by the founder scope decision (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`); a run of this K8s-shaped procedure is optional history only (retirement: MIG-080, #364) and is not an acceptance record.
 
 | # | Step | Actor (role) | Actor (name) | Timestamp (UTC) | Command / procedure | Artifact link | Pass/Fail | Deviations |
 | - | ---- | ------------ | ------------ | --------------- | ------------------- | ------------- | --------- | ---------- |

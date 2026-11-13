@@ -7,6 +7,8 @@
 
 > **This is a procedure, not evidence.** Nothing in this document asserts that a rehearsal, deploy, backup, restore, or drill has happened. The rehearsal execution, the attributable operator record (AC-10 as amended, `17ea19d6`), and the stop-authority exercise are owned by **MIG-070 (#361)** — this document only defines how they are performed and recorded.
 >
+> **Amended 2026-11-13 — optional procedure:** the mandatory DR-rehearsal requirement this procedure served was retired by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`). **AC-MIG-070-1** now requires the staging health gates (`/health/live` + `/health/ready` through the deployed host) plus one authenticated read (`GET /api/conversations` 200) — not this rehearsal. Running and recording this procedure on #361 remains permitted and voluntary; nothing here is a gate.
+>
 > **Rehearsal ≠ production cutover.** The rehearsal runs on **candidate resources only** — its own Compose project, its own network, its own candidate database container — never the live staging project (`yacc-app`), never the shared networks (`treafik-proxy`, `antpolis-database_database`), never the shared PostgreSQL server `antpolis-database-postgres-1`, never production. The production cutover is **MIG-072 (#363)** and is founder-governed; no step here authorizes or performs it.
 
 ---
@@ -15,7 +17,7 @@
 
 | # | Item | Requirement | Owner |
 | - | ---- | ----------- | ----- |
-| P1 | Authorization + operator | The run is founder-authorized and will be recorded on **#361** (AC-MIG-070-1): one attributable record per workflow — operator / UTC timestamp / commit SHA / environment / result. The operator is the founder/sole operator (OPC). | Founder |
+| P1 | Authorization + operator | The run is founder-authorized and will be recorded on **#361** (AC-MIG-070-1): one attributable record per workflow — operator / UTC timestamp / commit SHA / environment / result. The operator is the founder/sole operator (OPC). **Amended 2026-11-13:** this rehearsal is an optional procedure — AC-MIG-070-1 now requires the staging health gates plus one authenticated read, not a rehearsal record (founder decision “no need for such DR processes”; SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`); a voluntary run may still be recorded on #361. | Founder |
 | P2 | Stop authority | The founder is personally present and reachable for the drill; an unattended rehearsal does not start. | Founder |
 | P3 | Candidate isolation | A **dedicated candidate Compose project** `<candidate-project>` with its own network and its own candidate database container (§2.1) — **never** the live `yacc-app` project, never a project that joins `treafik-proxy` or `antpolis-database_database`, no shared production credentials. The Step-1 guards fail closed unless the resolved Docker state is clean. | Operator |
 | P4 | Secret material present | The operator's decrypted `deploy/compose/secrets/staging.env` exists (mode 0600; [compose-staging.md](compose-staging.md) §3.1) — the candidate reuses it as **data** (`env_file`), never `source`d. Its values are operator-held; nothing is copied into runbooks or evidence. | Operator |
@@ -277,7 +279,7 @@ Re-run the §Step-2 health gates. **Gate**: both 200 **and** the image check pas
 
 ## 3. Evidence-record template
 
-One row per step, filled at execution time by the operator. **All fields start empty** — this template is unusable as "proof" until a human fills it. Same record shape as [compose-staging.md](compose-staging.md) §6; the completed rehearsal feeds the **AC-MIG-070-1** record on **#361** (one attributable record per workflow — operator / UTC timestamp / commit / environment / result).
+One row per step, filled at execution time by the operator. **All fields start empty** — this template is unusable as "proof" until a human fills it. Same record shape as [compose-staging.md](compose-staging.md) §6; the completed rehearsal feeds the **AC-MIG-070-1** record on **#361** (one attributable record per workflow — operator / UTC timestamp / commit / environment / result). **Amended 2026-11-13:** a completed rehearsal no longer feeds AC-MIG-070-1 — that criterion requires the staging health gates plus one authenticated read; this template is used only for a voluntary run (founder decision “no need for such DR processes”; SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`).
 
 | # | Step | Operator | Timestamp (UTC) | Commit SHA | Image tag | Environment | Command (shape) | Result | Evidence link |
 |---|------|----------|-----------------|------------|-----------|-------------|-----------------|--------|---------------|
