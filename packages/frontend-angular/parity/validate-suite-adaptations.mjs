@@ -7,12 +7,17 @@
  * mirroring `validate-merge-browser-reports.mjs`:
  *
  *   1.  Happy path — a DECLARED M change under `packages/frontend/tests` and
- *       one under `packages/frontend/e2e` pass the gate at a real merge base.
+ *       one under `packages/frontend/e2e` pass the gate at a real merge base;
+ *       authorization is PER CASE (loop-1 review correction): declaring one
+ *       case never authorizes edits to another case or to file-level code.
  *   2.  Negative MRD paths — undeclared M, undeclared R (rename), undeclared D
  *       (delete) each fail closed naming the offending file and the manifest
  *       path; a declared D (declared file deleted) fails as a stale
  *       declaration; a declared file whose case title no longer exists fails
- *       as stale.
+ *       as stale; editing a SECOND case (or its assertions) while only the
+ *       first is declared fails naming the undeclared case; a deleted line
+ *       inside an undeclared case fails via base-side attribution; a
+ *       file-level/helper edit in a declared file fails as unattributable.
  *   3.  Manifest schema/shape — missing manifest, unparsable JSON, non-array,
  *       missing required field, unknown key, bad kind, bad date, non-https
  *       approval, empty/duplicate cases, duplicate cross-entry declaration,
@@ -278,6 +283,92 @@ ok('declared case title no longer in the file fails as stale', () => {
   const out = `${r.stdout}\n${r.stderr}`;
   assert.match(out, /no such case title exists in the file at HEAD/);
   assert.match(out, /CASE-A: does something/);
+});
+
+// --- 2b. per-case authorization (loop-1 review correction) ---------------------
+
+const TITLE_B = 'Outer group CASE-B: standalone inside outer';
+const TITLE_C = 'CASE-C: top level';
+
+ok('editing a SECOND, undeclared case in a declared file fails closed naming that case', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    // Change only CASE-B's assertion; manifest declares only CASE-A.
+    writeFileSync(join(d, 'packages/frontend/tests/suite-a.spec.ts'), SUITE_A.replace("await expect(page.locator('body')).toBeVisible();", "await expect(page.locator('body')).toContainText('yacc');"));
+    writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify([entry()], null, 2)}\n`);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1, `expected fail, got 0:\n${r.stdout}\n${r.stderr}`);
+  const out = `${r.stdout}\n${r.stderr}`;
+  assert.match(out, /changed case\(s\) NOT covered by a declaration/);
+  assert.match(out, /CASE-B: standalone inside outer/);
+  assert.match(out, /suite-adaptations\.json/);
+});
+
+ok('an assertion change inside an undeclared top-level case fails closed', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeFileSync(join(d, 'packages/frontend/tests/suite-a.spec.ts'), SUITE_A.replace("await page.goto('/login');", "await page.goto('/login');\n  await expect(page).toHaveTitle(/x/);"));
+    writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify([entry()], null, 2)}\n`);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  const out = `${r.stdout}\n${r.stderr}`;
+  assert.match(out, /CASE-C: top level/);
+});
+
+ok('a deleted line inside an undeclared case fails via base-side attribution', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeFileSync(join(d, 'packages/frontend/tests/suite-a.spec.ts'), SUITE_A.replace("    await expect(page.locator('body')).toBeVisible();\n", ''));
+    writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify([entry()], null, 2)}\n`);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  const out = `${r.stdout}\n${r.stderr}`;
+  assert.match(out, /CASE-B: standalone inside outer/);
+});
+
+ok('a file-level/helper edit in a declared file fails as unattributable', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeFileSync(join(d, 'packages/frontend/tests/suite-a.spec.ts'), `import { test, expect } from '@playwright/test';\nimport * as nodeFs from 'node:fs';\n\n${SUITE_A.replace(`import { test, expect } from '@playwright/test';\n\n`, '')}`);
+    writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify([entry()], null, 2)}\n`);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  const out = `${r.stdout}\n${r.stderr}`;
+  assert.match(out, /cannot be attributed to any case body/);
+});
+
+ok('editing two cases with BOTH declared passes', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeFileSync(
+      join(d, 'packages/frontend/tests/suite-a.spec.ts'),
+      SUITE_A
+        .replace('await expect(page).toHaveTitle(/yacc/);', "await expect(page).toHaveTitle(/YACC/);")
+        .replace("await expect(page.locator('body')).toBeVisible();", "await expect(page.locator('body')).toContainText('yacc');"),
+    );
+    writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify([entry({ cases: [TITLE_A, TITLE_B] }), entry({ file: 'packages/frontend/tests/suite-a.spec.ts', cases: [TITLE_C], issue: '#998' })], null, 2)}\n`);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 0, `expected pass, got ${r.status}:\n${r.stdout}\n${r.stderr}`);
+});
+
+ok('a describe-level hook edit between cases fails as unattributable', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeFileSync(
+      join(d, 'packages/frontend/tests/suite-a.spec.ts'),
+      SUITE_A.replace("  test('CASE-B: standalone inside outer', async ({ page }) => {", "  test.beforeEach(async () => { await page.goto('/'); });\n  test('CASE-B: standalone inside outer', async ({ page }) => {"),
+    );
+    writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify([entry()], null, 2)}\n`);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  const out = `${r.stdout}\n${r.stderr}`;
+  assert.match(out, /cannot be attributed to any case body/);
 });
 
 // --- 3. manifest schema/shape -------------------------------------------------

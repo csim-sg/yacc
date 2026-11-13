@@ -60,7 +60,14 @@ AD-2) and stay blocking until it exists.
   the workflow `preflight` job) is **fail-closed**: an undeclared M/R/D change, a
   missing/unparsable/partial manifest (unknown key, missing field, bad kind/date/approval,
   empty or duplicate cases), or a declared file/case that no longer exists at HEAD all
-  exit non-zero naming the offending file/case and the manifest path. A declaration
+  exit non-zero naming the offending file/case and the manifest path. **Authorization is
+  per changed case, never per file (loop-1 review correction, 2026-11-13):** for a
+  modified declared file the gate attributes the changed hunks to case bodies on both
+  sides of the diff (additions/modifications against HEAD regions, pure deletions against
+  base regions) and fails closed on any changed case not declared for that file, and on
+  any hunk outside all case bodies (describe-level hooks, file-local helpers, imports,
+  file-level code) — edits to other cases in the same file are never authorized.
+  Renames/deletes stay file-level (they can never satisfy a declaration). A declaration
   **never** authorises assertion weakening — the reviewer still verifies
   equivalent-or-stronger, and expected-red/anchor semantics are unchanged. There is no
   approval-bypass flag, no allowlist keyed on paths/globs, and no silent fallback when

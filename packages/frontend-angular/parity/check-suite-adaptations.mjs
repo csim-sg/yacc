@@ -24,6 +24,17 @@
  *                    gate). Without `--base` the MRD cross-check is skipped
  *                    with a loud note (use --manifest-only instead when that
  *                    is the intent).
+ *                    Per-case authorization (loop-1 review correction): for a
+ *                    MODIFIED declared file, changed `-U0` hunks are
+ *                    attributed to case bodies on both sides of the diff
+ *                    (additions/modifications vs HEAD regions, pure deletions
+ *                    vs BASE regions) and every touched case must be declared
+ *                    — a declaration never authorizes edits to other cases in
+ *                    the same file. Hunks outside every case body
+ *                    (describe-level hooks, file-local helpers, imports,
+ *                    file-level code) cannot be attributed and fail closed.
+ *                    Renames/deletes keep the file-level checks (they can
+ *                    never satisfy a declaration).
  *   --manifest-only  Manifest schema + declared-entry existence only (no git
  *                    diff, no workflow guard).
  *   --guard          PB-2 PR-matrix deferral-guard consistency only: the
@@ -49,7 +60,10 @@
  *      "approval": "<https:// review-decision URL>" }]
  *
  * A declaration is per exact case title, never a file glob: a declared file
- * whose declared titles no longer exist authorises nothing. The manifest never
+ * whose declared titles no longer exist authorises nothing, and only edits
+ * INSIDE the declared cases' bodies are authorised — changed hunks are
+ * attributed to case regions (both diff sides) and any other changed case, or
+ * any hunk outside all case bodies, fails closed. The manifest never
  * authorises assertion weakening — the reviewer still verifies
  * equivalent-or-stronger; expected-red/anchor semantics are unchanged.
  *
@@ -121,36 +135,52 @@ const DESCRIBE_RE = /\btest\.describe(?:\.\w+)?\(\s*(?:'([^']*)'|"([^"]*)")/;
 const TEST_RE = /\btest(?:\.\w+)?\(\s*(?:'([^']*)'|"([^"]*)")/;
 
 /**
- * Extract full case titles (describe stack joined with a single space + test
- * title) from a spec's source text — the exact form `npx playwright test
- * --list` prints. Plain quoted literals only: an exotic title form is not
- * extractable and therefore can never be satisfied by a declaration, which is
- * the fail-closed direction (a stale-looking declaration forces a human look).
+ * Extract every case's FULL title (describe stack joined with a single space +
+ * test title) together with its 1-based inclusive body line range — the exact
+ * form `npx playwright test --list` prints. Plain quoted literals only: an
+ * exotic title form is not extractable and therefore can never be satisfied by
+ * a declaration, which is the fail-closed direction (a stale-looking
+ * declaration forces a human look).
+ *
+ * The body range is the test callback's brace block: it starts on the `test(`
+ * line and ends when the brace depth returns to the depth the line started at.
+ * Lines outside any case body (describe-level hooks, helpers, imports,
+ * file-level code) are intentionally NOT covered by any region — the gate
+ * fails closed when a changed hunk cannot be attributed to a declared case.
  */
-export function extractFullTitles(sourceText) {
-  const titles = [];
-  const describeStack = []; // { title, depthBefore }
+export function extractCaseRegions(sourceText) {
+  const regions = [];
+  const regionStack = []; // { title, depthBefore, startLine } — describes AND tests
   let depth = 0;
-  for (const line of sourceText.split(/\r?\n/)) {
+  const lines = sourceText.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const describeMatch = line.match(DESCRIBE_RE);
     const testMatch = TEST_RE.test(line) && !/test\.describe/.test(line) ? line.match(TEST_RE) : null;
     if (describeMatch) {
-      describeStack.push({ title: describeMatch[1] ?? describeMatch[2], depthBefore: depth });
+      regionStack.push({ title: describeMatch[1] ?? describeMatch[2], depthBefore: depth, startLine: i + 1, isTest: false });
     } else if (testMatch) {
-      const parts = describeStack.map((d) => d.title).concat([testMatch[1] ?? testMatch[2]]);
-      titles.push(parts.join(' '));
+      const title = regionStack.map((d) => d.title).concat([testMatch[1] ?? testMatch[2]]).join(' ');
+      regionStack.push({ title, depthBefore: depth, startLine: i + 1, isTest: true });
     }
     for (const ch of line) {
       if (ch === '{') depth += 1;
-      else if (ch === '}') {
-        depth -= 1;
-        while (describeStack.length && describeStack[describeStack.length - 1].depthBefore >= depth) {
-          describeStack.pop();
-        }
-      }
+      else if (ch === '}') depth -= 1;
+    }
+    // Pop only AFTER the whole line: balanced braces on a region's own opening
+    // line (e.g. the `({ page })` destructuring before the callback's `{`) must
+    // not close the region it just opened; a region closes when a LATER line
+    // (its `});`) returns the depth to the level the opening line started at.
+    while (regionStack.length && regionStack[regionStack.length - 1].depthBefore >= depth) {
+      const done = regionStack.pop();
+      if (done.isTest) regions.push({ title: done.title, start: done.startLine, end: i + 1 });
     }
   }
-  return titles;
+  return regions;
+}
+
+export function extractFullTitles(sourceText) {
+  return extractCaseRegions(sourceText).map((r) => r.title);
 }
 
 function titlesInFile(absPath) {
@@ -265,35 +295,131 @@ function checkDeclaredEntriesExist(repo, entries, manifestPath) {
 // MRD cross-check (undeclared suite changes fail closed)
 // ---------------------------------------------------------------------------
 
-function changedSuitePaths(repo, base) {
-  const r = spawnSync(
-    'git',
-    ['-C', repo, 'diff', '--name-status', '--diff-filter=MRD', `${base}...HEAD`, '--', ...PROTECTED_PREFIXES.map((p) => p.replace(/\/$/, ''))],
-    { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
-  );
+function gitOutput(args) {
+  const r = spawnSync('git', ['-C', args.repo, ...args.cmd], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
   if (r.status !== 0) {
-    die([`git diff --name-status --diff-filter=MRD ${base}...HEAD failed: ${(r.stderr || '').trim()}`]);
+    die([`${args.cmd.join(' ')} failed: ${(r.stderr || '').trim()}`]);
   }
-  const paths = [];
-  for (const line of (r.stdout || '').split('\n')) {
-    if (!line.trim()) continue;
-    // M/D: <status>\t<path>; R/C: <status>\t<old>\t<new> — both sides must be declared.
-    paths.push(...line.split('\t').slice(1));
-  }
-  return paths;
+  return r.stdout || '';
 }
 
+function changedSuiteEntries(repo, base) {
+  const out = gitOutput({ repo, cmd: ['diff', '--name-status', '--diff-filter=MRD', `${base}...HEAD`, '--', ...PROTECTED_PREFIXES.map((p) => p.replace(/\/$/, ''))] });
+  const items = [];
+  for (const line of out.split('\n')) {
+    if (!line.trim()) continue;
+    const parts = line.split('\t');
+    const status = parts[0][0]; // M / D / R (rename detection on)
+    if (status === 'R') items.push({ status, oldPath: parts[1], newPath: parts[2] });
+    else items.push({ status, path: parts[1] });
+  }
+  return items;
+}
+
+/** Unified-diff `-U0` hunk headers for one file: [{oldStart, oldCount, newStart, newCount}]. */
+function diffFileHunks(repo, base, path) {
+  const out = gitOutput({ repo, cmd: ['diff', '-U0', `${base}...HEAD`, '--', path] });
+  const hunks = [];
+  for (const line of out.split('\n')) {
+    const m = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
+    if (m) hunks.push({ oldStart: Number(m[1]), oldCount: m[2] === undefined ? 1 : Number(m[2]), newStart: Number(m[3]), newCount: m[4] === undefined ? 1 : Number(m[4]) });
+  }
+  return hunks;
+}
+
+function gitShowOrNull(repo, ref, path) {
+  const r = spawnSync('git', ['-C', repo, 'show', `${ref}:${path}`], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+  return r.status === 0 ? r.stdout : null;
+}
+
+function lineRange(start, count) {
+  return Array.from({ length: count }, (_, i) => start + i);
+}
+
+function titlesTouching(regions, lineNumbers) {
+  const touched = new Set();
+  for (const r of regions) {
+    for (const l of lineNumbers) {
+      if (l >= r.start && l <= r.end) { touched.add(r.title); break; }
+    }
+  }
+  return touched;
+}
+
+/**
+ * Per-case authorization for MODIFIED declared files (loop-1 review finding,
+ * #481/PR #497): a declaration authorises edits ONLY inside its declared
+ * cases' bodies. Changed `-U0` hunks are attributed to case regions on BOTH
+ * sides of the diff — additions/modifications against the HEAD regions,
+ * pure deletions against the BASE regions — and every touched case must be
+ * declared for that exact file. Hunks outside every case body (describe-level
+ * hooks, file-local helpers, imports, file-level code) cannot be attributed
+ * and fail closed. R/D keep the file-level checks (a rename/delete can never
+ * satisfy a declaration: the declared file/cases must still exist at HEAD).
+ */
 function checkMrdAgainstManifest(repo, base, entries, manifestPath) {
-  const changed = changedSuitePaths(repo, base);
+  const changed = changedSuiteEntries(repo, base);
   if (changed.length === 0) return [];
-  const declaredFiles = new Set(entries.map((e) => e.file));
+
+  const declaredTitlesByFile = new Map();
+  for (const e of entries) {
+    if (!declaredTitlesByFile.has(e.file)) declaredTitlesByFile.set(e.file, new Set());
+    for (const c of e.cases) declaredTitlesByFile.get(e.file).add(c);
+  }
+
   const errors = [];
-  const undeclared = changed.filter((p) => !declaredFiles.has(p));
-  if (undeclared.length > 0) {
+  const undeclaredFiles = [];
+  const caseViolations = [];
+
+  for (const item of changed) {
+    const paths = item.oldPath ? [item.oldPath, item.newPath] : [item.path];
+    const undeclared = paths.filter((p) => !declaredTitlesByFile.has(p));
+    if (undeclared.length > 0) {
+      undeclaredFiles.push(...undeclared);
+      continue;
+    }
+    if (item.status !== 'M') continue; // R/D: file-level only (see docblock)
+
+    const declaredTitles = declaredTitlesByFile.get(item.path);
+    const headRegions = extractCaseRegions(readFileSync(join(repo, item.path), 'utf8'));
+    const baseContent = gitShowOrNull(repo, base, item.path);
+    const baseRegions = baseContent === null ? [] : extractCaseRegions(baseContent);
+
+    const touched = new Set();
+    const unattributable = [];
+    for (const h of diffFileHunks(repo, base, item.path)) {
+      if (h.newCount > 0) {
+        const t = titlesTouching(headRegions, lineRange(h.newStart, h.newCount));
+        if (t.size === 0) unattributable.push(`new lines ${h.newStart}-${h.newStart + h.newCount - 1}`);
+        else for (const x of t) touched.add(x);
+      }
+      if (h.oldCount > 0 && h.newCount === 0) {
+        const t = titlesTouching(baseRegions, lineRange(h.oldStart, h.oldCount));
+        if (t.size === 0) unattributable.push(`deleted base lines ${h.oldStart}-${h.oldStart + h.oldCount - 1}`);
+        else for (const x of t) touched.add(x);
+      }
+    }
+    if (unattributable.length > 0) {
+      caseViolations.push(`${item.path} :: changed hunk(s) cannot be attributed to any case body (${unattributable.join('; ')}) — declarations authorise edits ONLY inside declared cases' bodies; describe-level hooks, file-local helpers, imports and file-level code are not authorisable via the manifest.`);
+    }
+    const undeclaredCases = [...touched].filter((t) => !declaredTitles.has(t));
+    if (undeclaredCases.length > 0) {
+      caseViolations.push(`${item.path} :: changed case(s) NOT covered by a declaration:\n${undeclaredCases.map((t) => `    - '${t}'`).join('\n')}\n  A declaration authorises edits only inside its declared cases (exact full titles) — every other case in the same file stays protected.`);
+    }
+  }
+
+  if (undeclaredFiles.length > 0) {
     errors.push([
       'Spec files must never be edited to make Angular pass (PB-2; a wiring need is itself a disposition-register entry):',
-      ...undeclared.map((p) => `  - ${p}`),
+      ...undeclaredFiles.map((p) => `  - ${p}`),
       `Undeclared frozen-suite change(s) above — fail closed. The only lawful route is a reviewed declaration in ${manifestPath} (issue, date, file, exact case titles, kind, rationale, approval URL); renames/deletes can never satisfy a declaration (the declared file/cases must still exist at HEAD).`,
+    ].join('\n'));
+  }
+  if (caseViolations.length > 0) {
+    errors.push([
+      'Spec files must never be edited to make Angular pass (PB-2; a wiring need is itself a disposition-register entry):',
+      ...caseViolations.map((v) => `  - ${v}`),
+      `Declarations are per exact case, never per file: ${manifestPath} must cover every changed case of a declared file — no silent fallback.`,
     ].join('\n'));
   }
   return errors;

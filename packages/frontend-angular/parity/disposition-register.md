@@ -313,6 +313,26 @@ no suite file, anchor, `gate-scope.json`, comparator, threshold, expected-red
 class or register row changed; AM-3 leaves the frozen `ae42c67` anchor in force.
 This is gate WIRING, not a disposition: it widens nothing and waives nothing.
 
+**Loop-1 review correction (13 Nov 2026, PR #497 review):** the reviewer found the
+gate's undeclared check reduced declarations to a per-file set
+(`declaredFiles.has(path)`), so declaring ONE case of a file authorized any edit
+anywhere in that file — including other cases' assertions — contradicting the
+per-case guardrail. Correction (same fail-closed discipline, per-case only):
+changed `-U0` hunks of a MODIFIED declared file are now attributed to case
+bodies on BOTH sides of the diff (additions/modifications against HEAD case
+regions, pure deletions against BASE case regions) and every touched case must
+be declared for that exact file; hunks outside all case bodies
+(describe-level hooks, file-local helpers, imports, file-level code) cannot be
+attributed and fail closed; R/D keep the file-level checks. Self-validation
+extended 35 → 41 checks (second-undeclared-case edit, undeclared assertion
+change, base-side deletion attribution, unattributable file-level/helper and
+describe-hook edits, two-cases-both-declared positive) and demonstrated on the
+REAL frozen suite in scratch worktrees (RULES-1+CRUD-1 body edits: only-CRUD-1
+declared fails naming RULES-1's full title; both declared passes; a file-level
+import with both declared fails as unattributable). No gate semantic relaxed;
+no suite file, anchor, `gate-scope.json`, comparator, threshold or register
+row changed.
+
 ## 9. Registration discipline
 
 1. New expected difference discovered **before** a run → add the register row + `gate-scope.json`
