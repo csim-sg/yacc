@@ -22,8 +22,8 @@
  *       missing required field, unknown key, bad kind, bad date, non-https
  *       approval, empty/duplicate cases, duplicate cross-entry declaration,
  *       file outside the protected prefixes, `..` traversal: all fail closed.
- *   4.  Modes — `--manifest-only` validates schema/existence without a base;
- *       a PR with NO suite change and an empty manifest passes.
+ *   4.  Modes — `--manifest-only` validates schema/existence (incl. `support`)
+ *       without a base; a PR with NO suite change and an empty manifest passes.
  *   5.  Title extraction — real frozen suite files (routing-rules-ang010)
  *       yield exactly the real full case titles Playwright prints.
  *   6.  PB-2 PR-matrix deferral guard — consistent SUSPENDED/ACTIVE workflows
@@ -32,6 +32,18 @@
  *       re-enabling the matrix, missing/duplicated sentinel, half-restored
  *       parity-compare, deferral line left behind). The REAL workflow at HEAD
  *       must pass.
+ *   7.  Declared support regions (#498) — positives for every `kind`
+ *       (`imports` | `env-resolution` | `identity` | `helper` | `hook`),
+ *       interior edits inside declared regions, combined support+case edits,
+ *       `--manifest-only` support validation, atomic region removal; and
+ *       EVERY fail-closed negative: the identical edit without markers,
+ *       undeclared label, declared-but-absent region (both no-markers and
+ *       deleted-region shapes), nested/unterminated/empty/duplicated/
+ *       malformed/stray-end markers, region overlapping a case body, markers
+ *       in an undeclared file, undeclared-case-emptied-into-a-region evasion,
+ *       marker relabelling, and support schema violations (non-array/empty
+ *       array/missing label/unknown key/bad kind/empty reason/bad slug/
+ *       reserved `end`/cross-entry duplicate label).
  *
  * Run: node packages/frontend-angular/parity/validate-suite-adaptations.mjs
  * (exit 0 = all validations pass; any assertion aborts non-zero)
@@ -99,6 +111,82 @@ test.describe('E2E wrapper', () => {
   });
 });
 `;
+// Support-region fixture (#498): the PLAIN variant is the base state (no
+// markers); the MARKED variant wraps the same file-level lines in declared
+// support regions — the exact shape a real consumer (#495's precondition
+// hunks) produces.
+const SUITE_SUP_PLAIN = `import { test, expect } from '@playwright/test';
+
+import * as nodePath from 'node:path';
+
+const FIX_BASE = process.env.FIX_BASE_URL || 'http://localhost:4200';
+
+const FIX_USER = { email: 'fixture-user@example.com' };
+
+function fixtureToken() {
+  return 'fixture-token';
+}
+
+test.describe('Support fixture', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(FIX_BASE);
+  });
+
+  test('CASE-SUP: support demo', async ({ page }) => {
+    await page.goto('/');
+  });
+});
+`;
+const SUITE_SUP = `import { test, expect } from '@playwright/test';
+
+// @suite-adaptation-support:fixture-imports
+import * as nodePath from 'node:path';
+// @suite-adaptation-support:end
+
+// @suite-adaptation-support:fixture-env
+const FIX_BASE = process.env.FIX_BASE_URL || 'http://localhost:4200';
+// @suite-adaptation-support:end
+
+// @suite-adaptation-support:fixture-identity
+const FIX_USER = { email: 'fixture-user@example.com' };
+// @suite-adaptation-support:end
+
+// @suite-adaptation-support:fixture-helper
+function fixtureToken() {
+  return 'fixture-token';
+}
+// @suite-adaptation-support:end
+
+test.describe('Support fixture', () => {
+  // @suite-adaptation-support:fixture-hook
+  test.beforeEach(async ({ page }) => {
+    await page.goto(FIX_BASE);
+  });
+  // @suite-adaptation-support:end
+
+  test('CASE-SUP: support demo', async ({ page }) => {
+    await page.goto('/');
+  });
+});
+`;
+const SUP_FILE = 'packages/frontend/tests/suite-sup.spec.ts';
+const TITLE_SUP = 'Support fixture CASE-SUP: support demo';
+const SUP_KINDS = [
+  ['fixture-imports', 'imports'],
+  ['fixture-env', 'env-resolution'],
+  ['fixture-identity', 'identity'],
+  ['fixture-helper', 'helper'],
+  ['fixture-hook', 'hook'],
+];
+// One interior line edit per region (the exact same edit is reused unmarked
+// for the AC-2 negative).
+const SUP_EDITS = {
+  'fixture-imports': (t) => t.replace("import * as nodePath from 'node:path';", "import * as nodeFs from 'node:fs';"),
+  'fixture-env': (t) => t.replace("'http://localhost:4200'", "'http://localhost:4210'"),
+  'fixture-identity': (t) => t.replace('fixture-user@example.com', 'other-user@example.com'),
+  'fixture-helper': (t) => t.replace("return 'fixture-token';", "return 'other-token';"),
+  'fixture-hook': (t) => t.replace('await page.goto(FIX_BASE);', 'await page.waitForLoadState("networkidle");'),
+};
 const EMPTY_MANIFEST = '[]\n';
 const APPROVAL = 'https://github.com/csim-sg/yacc/issues/481#issuecomment-6852529734';
 const TITLE_A = 'Outer group Inner group CASE-A: does something';
@@ -135,6 +223,7 @@ function makeRepo() {
   git(dir, ['config', 'user.name', 'gate fixture']);
   for (const rel of [
     'packages/frontend/tests/suite-a.spec.ts',
+    'packages/frontend/tests/suite-sup.spec.ts',
     'packages/frontend/e2e/suite-e2e.e2e.ts',
     'packages/frontend-angular/parity/suite-adaptations.json',
     'docs/README.md',
@@ -142,6 +231,7 @@ function makeRepo() {
     mkdirSync(dirname(join(dir, rel)), { recursive: true });
   }
   writeFileSync(join(dir, 'packages/frontend/tests/suite-a.spec.ts'), SUITE_A);
+  writeFileSync(join(dir, 'packages/frontend/tests/suite-sup.spec.ts'), SUITE_SUP_PLAIN);
   writeFileSync(join(dir, 'packages/frontend/e2e/suite-e2e.e2e.ts'), E2E_A);
   writeFileSync(join(dir, 'packages/frontend-angular/parity/suite-adaptations.json'), EMPTY_MANIFEST);
   writeFileSync(join(dir, 'docs/README.md'), '# fixture\n');
@@ -159,6 +249,24 @@ function commitHead(repo, mutate) {
   mutate(repo.dir);
   git(repo.dir, ['add', '-A']);
   git(repo.dir, ['commit', '-qm', 'head']);
+}
+
+function writeSupFile(d, text) {
+  writeFileSync(join(d, SUP_FILE), text);
+}
+
+function writeManifestFile(d, entries) {
+  writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify(entries, null, 2)}\n`);
+}
+
+/** A suite-sup entry with declared support regions (#498 schema). */
+function supportEntry(support, over = {}) {
+  return entry({
+    file: SUP_FILE,
+    cases: [TITLE_SUP],
+    support: support ?? SUP_KINDS.map(([label, kind]) => ({ label, kind, reason: `Fixture support region (${kind}).` })),
+    ...over,
+  });
 }
 
 // --- shared workflow fixtures for the guard -----------------------------------
@@ -444,6 +552,234 @@ ok('a legitimate in-case edit keeps passing (both sides inside the declared case
   assert.equal(r.status, 0, `expected pass, got ${r.status}:\n${r.stdout}\n${r.stderr}`);
 });
 
+// --- 2d. declared support regions (#498) ---------------------------------------
+// Marker-wrapped file-level lines are authorised only through a declared
+// `support` entry; everything below pins the positive routes and every
+// fail-closed negative from the issue.
+
+for (const [label, kind] of SUP_KINDS) {
+  ok(`support region positive (${kind}): declared label '${label}' authorises an interior line edit`, () => {
+    const repo = makeRepo();
+    commitHead(repo, (d) => {
+      // wrap the file-level lines AND edit one line inside the region
+      writeSupFile(d, SUP_EDITS[label](SUITE_SUP));
+      writeManifestFile(d, [supportEntry()]);
+    });
+    const r = runGate(repo.dir, ['--base', repo.base]);
+    assert.equal(r.status, 0, `expected pass, got ${r.status}:\n${r.stdout}\n${r.stderr}`);
+  });
+}
+
+ok('support region positive: a support edit and a declared case edit pass in the same file', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    // one change: an interior support-region line AND the declared case's
+    // body line — both authorised by the same entry
+    writeSupFile(d, SUP_EDITS['fixture-helper'](SUITE_SUP).replace("await page.goto('/');", "await page.goto('/login');"));
+    writeManifestFile(d, [supportEntry(undefined, { cases: [TITLE_SUP] })]);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 0, `expected pass, got ${r.status}:\n${r.stdout}\n${r.stderr}`);
+});
+
+ok('support region positive: --manifest-only validates declared support (schema + regions + integrity)', () => {
+  const repo = makeRepo();
+  writeSupFile(repo.dir, SUITE_SUP); // marked working tree, no commit needed
+  writeManifestFile(repo.dir, [supportEntry()]);
+  const r = runGate(repo.dir, ['--manifest-only']);
+  assert.equal(r.status, 0, `expected pass, got ${r.status}:\n${r.stdout}\n${r.stderr}`);
+  assert.match(`${r.stdout}\n${r.stderr}`, /support regions exist at HEAD/);
+});
+
+ok('support region positive: atomic region removal (markers + label retracted together) passes', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeSupFile(d, SUITE_SUP);
+    writeManifestFile(d, [supportEntry()]);
+  });
+  const markedBase = git(repo.dir, ['rev-parse', 'HEAD']).trim();
+  commitHead(repo, (d) => {
+    // remove the identity region entirely AND retract its label in the same
+    // change (exactly the three region lines — surrounding blank lines stay)
+    writeSupFile(d, SUITE_SUP.replace("// @suite-adaptation-support:fixture-identity\nconst FIX_USER = { email: 'fixture-user@example.com' };\n// @suite-adaptation-support:end\n", ''));
+    writeManifestFile(d, [supportEntry(SUP_KINDS.filter(([l]) => l !== 'fixture-identity').map(([label, kind]) => ({ label, kind, reason: 'Kept region.' })))]);
+  });
+  const r = runGate(repo.dir, ['--base', markedBase]);
+  assert.equal(r.status, 0, `expected pass, got ${r.status}:\n${r.stdout}\n${r.stderr}`);
+});
+
+ok('support negative (AC-2): the IDENTICAL file-level edit WITHOUT markers fails naming file + line', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeSupFile(d, SUP_EDITS['fixture-env'](SUITE_SUP_PLAIN)); // same edit, unmarked
+    // the case is declared, but no support region exists and none is declared
+    writeManifestFile(d, [entry({ file: SUP_FILE, cases: [TITLE_SUP] })]);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1, `expected fail, got 0:\n${r.stdout}\n${r.stderr}`);
+  const out = `${r.stdout}\n${r.stderr}`;
+  assert.match(out, /cannot be attributed to any case body/);
+  assert.match(out, /suite-sup\.spec\.ts/);
+  assert.match(out, /(new|base) lines \d+-\d+/);
+});
+
+ok('support negative: a marker region with an UNDECLARED label fails closed', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeSupFile(d, `${SUITE_SUP}\n// @suite-adaptation-support:rogue\nconst ROGUE = 1;\n// @suite-adaptation-support:end\n`);
+    writeManifestFile(d, [supportEntry()]);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  assert.match(`${r.stdout}\n${r.stderr}`, /support region 'rogue' is not declared for this file/);
+});
+
+ok('support negative: a declared label with NO marker region fails as stale (--manifest-only)', () => {
+  const repo = makeRepo(); // suite-sup stays PLAIN (no markers anywhere)
+  writeManifestFile(repo.dir, [supportEntry()]);
+  const r = runGate(repo.dir, ['--manifest-only']);
+  assert.equal(r.status, 1);
+  assert.match(`${r.stdout}\n${r.stderr}`, /the file has no support marker region at HEAD/);
+});
+
+ok('support negative: nested markers fail closed', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeSupFile(d, SUITE_SUP.replace('// @suite-adaptation-support:fixture-env\n', '// @suite-adaptation-support:fixture-env\n// @suite-adaptation-support:nested-marker\n'));
+    writeManifestFile(d, [supportEntry(SUP_KINDS.map(([label, kind]) => ({ label, kind, reason: 'r.' })).concat([{ label: 'nested-marker', kind: 'helper', reason: 'r.' }]))]);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  assert.match(`${r.stdout}\n${r.stderr}`, /nested support marker/);
+});
+
+ok('support negative: an unterminated marker region fails closed', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    // a top-level region AFTER the describe block that never closes — brace
+    // balance and case extraction stay intact, the region is unterminated
+    writeSupFile(d, `${SUITE_SUP}\n// @suite-adaptation-support:tail-region\nconst TAIL = 1;\n`);
+    writeManifestFile(d, [supportEntry(SUP_KINDS.map(([label, kind]) => ({ label, kind, reason: 'r.' })).concat([{ label: 'tail-region', kind: 'helper', reason: 'r.' }]))]);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  assert.match(`${r.stdout}\n${r.stderr}`, /unterminated support region 'tail-region'/);
+});
+
+ok('support negative: an EMPTY marker region fails closed', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeSupFile(d, `${SUITE_SUP}\n// @suite-adaptation-support:empty-region\n// @suite-adaptation-support:end\n`);
+    writeManifestFile(d, [supportEntry(SUP_KINDS.map(([label, kind]) => ({ label, kind, reason: 'r.' })).concat([{ label: 'empty-region', kind: 'helper', reason: 'r.' }]))]);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  assert.match(`${r.stdout}\n${r.stderr}`, /empty support region 'empty-region'/);
+});
+
+ok('support negative: DUPLICATED marker regions for one label fail closed', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeSupFile(d, `${SUITE_SUP}\n// @suite-adaptation-support:fixture-imports\nconst AGAIN = 1;\n// @suite-adaptation-support:end\n`);
+    writeManifestFile(d, [supportEntry()]);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  assert.match(`${r.stdout}\n${r.stderr}`, /'fixture-imports' has 2 marker regions/);
+});
+
+ok('support negative: a malformed marker-looking line fails closed', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeSupFile(d, `${SUITE_SUP}\n// @suite-adaptation-support:Bad Label\n// @suite-adaptation-support:end\n`);
+    writeManifestFile(d, [supportEntry()]);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  assert.match(`${r.stdout}\n${r.stderr}`, /malformed support marker/);
+});
+
+ok('support negative: a stray :end marker fails closed', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeSupFile(d, `${SUITE_SUP}\n// @suite-adaptation-support:end\n`);
+    writeManifestFile(d, [supportEntry()]);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  assert.match(`${r.stdout}\n${r.stderr}`, /stray '@suite-adaptation-support:end'/);
+});
+
+ok('support negative: a region overlapping a case body fails closed, naming the case', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeSupFile(
+      d,
+      SUITE_SUP.replace(
+        "  test('CASE-SUP: support demo', async ({ page }) => {",
+        "  // @suite-adaptation-support:case-wrapper\n  test('CASE-SUP: support demo', async ({ page }) => {",
+      ).replace(
+        "  test('CASE-SUP: support demo', async ({ page }) => {\n    await page.goto('/');\n  });",
+        "  test('CASE-SUP: support demo', async ({ page }) => {\n    await page.goto('/');\n  });\n  // @suite-adaptation-support:end",
+      ),
+    );
+    writeManifestFile(d, [supportEntry(SUP_KINDS.map(([label, kind]) => ({ label, kind, reason: 'r.' })).concat([{ label: 'case-wrapper', kind: 'hook', reason: 'r.' }]))]);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  const out = `${r.stdout}\n${r.stderr}`;
+  assert.match(out, /overlaps the case body of 'Support fixture CASE-SUP: support demo'/);
+});
+
+ok('support negative: markers in a file with NO declaring manifest entry fail closed', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => writeSupFile(d, SUITE_SUP)); // marked, but manifest stays []
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  assert.match(`${r.stdout}\n${r.stderr}`, /no manifest entry declares support for this file/);
+});
+
+ok('support negative: an undeclared case emptied toward a support region still fails via base-side case attribution', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    // suite-a gains a NEW declared support region, but CASE-B (undeclared)
+    // loses its assertion line in the SAME change — the old side of that
+    // hunk sits inside CASE-B's BASE case body, so the case rule wins.
+    const suiteAWithRegion = `import { test, expect } from '@playwright/test';\n\n// @suite-adaptation-support:ev-region\nconst EV_HELPER = 'reviewed';\n// @suite-adaptation-support:end\n\n${SUITE_A.replace(`import { test, expect } from '@playwright/test';\n\n`, '')}`;
+    writeFileSync(join(d, 'packages/frontend/tests/suite-a.spec.ts'), suiteAWithRegion.replace("    await expect(page.locator('body')).toBeVisible();\n", ''));
+    writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), `${JSON.stringify([{ ...entry(), support: [{ label: 'ev-region', kind: 'helper', reason: 'Reviewed helper region.' }] }], null, 2)}\n`);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1, `expected fail, got 0:\n${r.stdout}\n${r.stderr}`);
+  const out = `${r.stdout}\n${r.stderr}`;
+  assert.match(out, /CASE-B: standalone inside outer/);
+  assert.match(out, /NOT covered by a declaration/);
+});
+
+ok('support negative: relabelling a declared marker to an undeclared label fails closed', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeSupFile(d, SUITE_SUP.replaceAll('fixture-env', 'relabel-b'));
+    writeManifestFile(d, [supportEntry()]);
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  const out = `${r.stdout}\n${r.stderr}`;
+  assert.match(out, /'relabel-b' is not declared for this file/);
+  assert.match(out, /no marker region with that label exists/); // fixture-env went stale
+});
+
+ok('support negative: deleting a declared region while keeping its label fails as stale', () => {
+  const repo = makeRepo();
+  commitHead(repo, (d) => {
+    writeSupFile(d, SUITE_SUP.replace("// @suite-adaptation-support:fixture-identity\nconst FIX_USER = { email: 'fixture-user@example.com' };\n// @suite-adaptation-support:end\n\n", ''));
+    writeManifestFile(d, [supportEntry()]); // fixture-identity STILL declared
+  });
+  const r = runGate(repo.dir, ['--base', repo.base]);
+  assert.equal(r.status, 1);
+  assert.match(`${r.stdout}\n${r.stderr}`, /declares support label 'fixture-identity'.*no marker region with that label exists/s);
+});
+
 // --- 3. manifest schema/shape -------------------------------------------------
 
 const schemaCases = [
@@ -459,6 +795,15 @@ const schemaCases = [
   ['duplicate cases in one entry', (d) => writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), JSON.stringify([entry({ cases: [TITLE_A, TITLE_A] })])), /duplicate case titles/],
   ['file outside protected prefixes', (d) => writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), JSON.stringify([entry({ file: 'docs/README.md' })])), /not under a protected suite prefix/],
   ['path traversal', (d) => writeFileSync(join(d, 'packages/frontend-angular/parity/suite-adaptations.json'), JSON.stringify([entry({ file: 'packages/frontend/../tests/suite-a.spec.ts' })])), /without '\.\.'/],
+  // support-region schema (#498)
+  ['support not an array', (d) => writeManifestFile(d, [{ ...entry({ file: SUP_FILE, cases: [TITLE_SUP] }), support: 'imports' }]), /'support' must be a non-empty array/],
+  ['support empty array', (d) => writeManifestFile(d, [{ ...entry({ file: SUP_FILE, cases: [TITLE_SUP] }), support: [] }]), /'support' must be a non-empty array/],
+  ['support item missing label', (d) => writeManifestFile(d, [{ ...entry({ file: SUP_FILE, cases: [TITLE_SUP] }), support: [{ kind: 'imports', reason: 'r.' }] }]), /missing required field 'label'/],
+  ['support item unknown key', (d) => writeManifestFile(d, [{ ...entry({ file: SUP_FILE, cases: [TITLE_SUP] }), support: [{ label: 'a', kind: 'imports', reason: 'r.', extra: 1 }] }]), /unknown key 'extra'/],
+  ['support item bad kind', (d) => writeManifestFile(d, [{ ...entry({ file: SUP_FILE, cases: [TITLE_SUP] }), support: [{ label: 'a', kind: 'docs', reason: 'r.' }] }]), /'kind' must be one of imports \| env-resolution/],
+  ['support item empty reason', (d) => writeManifestFile(d, [{ ...entry({ file: SUP_FILE, cases: [TITLE_SUP] }), support: [{ label: 'a', kind: 'imports', reason: '   ' }] }]), /'reason' must be a non-empty/],
+  ['support item bad label slug', (d) => writeManifestFile(d, [{ ...entry({ file: SUP_FILE, cases: [TITLE_SUP] }), support: [{ label: 'Bad Label', kind: 'imports', reason: 'r.' }] }]), /'label' must be a lowercase slug/],
+  ['support item reserved label end', (d) => writeManifestFile(d, [{ ...entry({ file: SUP_FILE, cases: [TITLE_SUP] }), support: [{ label: 'end', kind: 'imports', reason: 'r.' }] }]), /'label' must be a lowercase slug/],
 ];
 
 for (const [name, mutate, re] of schemaCases) {
@@ -480,6 +825,17 @@ ok('duplicate cross-entry declaration fails closed', () => {
   const r = runGate(repo.dir, ['--manifest-only']);
   assert.equal(r.status, 1);
   assert.match(`${r.stdout}\n${r.stderr}`, /already declared by another entry/);
+});
+
+ok('support label duplicated across entries for the same file fails closed', () => {
+  const repo = makeRepo();
+  writeManifestFile(repo.dir, [
+    { ...entry({ file: SUP_FILE, cases: [TITLE_SUP] }), support: [{ label: 'same-label', kind: 'helper', reason: 'r.' }] },
+    { ...entry({ file: SUP_FILE, cases: ['CASE-C: top level'], issue: '#998' }), support: [{ label: 'same-label', kind: 'helper', reason: 'r.' }] },
+  ]);
+  const r = runGate(repo.dir, ['--manifest-only']);
+  assert.equal(r.status, 1);
+  assert.match(`${r.stdout}\n${r.stderr}`, /support label "same-label" of .* is already declared by another entry/);
 });
 
 // --- 4. modes ------------------------------------------------------------------

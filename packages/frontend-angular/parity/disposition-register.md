@@ -352,6 +352,37 @@ with a unique new title, in-case-edit positive on the extended fixture).
 No gate semantic relaxed; no suite file, anchor, `gate-scope.json`,
 comparator, threshold or register row changed.
 
+**Declared support regions — bounded file-level precondition route (#498,
+2026-11-13).** #495's measured gate conflict (evidence
+[#6854380832](https://github.com/csim-sg/yacc/issues/495#issuecomment-6854380832):
+the 13 declared case-body hunks passed but the adjudicated precondition hunks —
+header doc-block, imports + env resolution, identity const, token helper,
+`beforeEach` — failed as unattributable by design) is repaired by design, not
+waiver. The manifest entry gains an optional `support` array
+(`{ label, kind ∈ imports|env-resolution|identity|helper|hook, reason }`,
+closed enum, slug labels unique per file) and the spec file wraps exactly the
+authorised file-level lines in `// @suite-adaptation-support:<label>` …
+`:end` marker comments. The gate authorises an unattributable hunk only
+inside a marker region whose label is declared for that exact file; plain
+BASE-side file-level lines are tolerated only when the same hunk's new side
+lies entirely inside declared HEAD support regions (old-side lines inside a
+case body still require that case's declaration — an undeclared case cannot
+be emptied into a region). Fail-closed in every mode: unmarked/unattributable
+hunks, undeclared labels, declared labels with no region (removal must
+retract markers + label atomically), nested/unterminated/empty/duplicated/
+malformed/stray-end markers, region↔case-body overlap (case attribution
+wins; the overlap fails naming the case), and markers in a file with no
+declaring entry. Rejected alternatives recorded on #498: re-pointing
+preconditions into case bodies (impossible for imports/env/`beforeEach`;
+would multiply duplication across 13 cases), a file/glob allowlist, and an
+`allowSupportHunks` flag (both destroy per-case containment). Validator
+extended 46 → 77 checks (per-kind positives, interior edits, combined
+support+case edits, `--manifest-only` support validation, atomic region
+removal; every negative above; support schema violations). The interim PB-2
+PR suspension, its self-reverting guard, case-body attribution, both-side
+hunk attribution and duplicate-title rejection are unchanged; no suite file,
+anchor, `gate-scope.json`, comparator, threshold or register row changed.
+
 ## 9. Registration discipline
 
 1. New expected difference discovered **before** a run → add the register row + `gate-scope.json`
