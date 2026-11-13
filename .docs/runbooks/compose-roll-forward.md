@@ -8,6 +8,8 @@
 > **Why this file exists**: the staging deploy path is Docker Compose (ADR-032); the Helm-era incident runbook is retired with that target (MIG-080 #364 owns its removal). The **procedure** below is roll-forward: a rollback is not a recovery path on this stack, and every rollback mention in this document is a prohibition.
 >
 > **Rehearsal status**: the rehearsal-evidenced incident/stop-authority procedure is **AC-MIG-070-2 (#361)**, exercised through [compose-rehearsal-stop-authority.md](compose-rehearsal-stop-authority.md) Step 7. Until that rehearsal evidences it, the content below is documented intent — **this is a procedure, not evidence.**
+>
+> **Amended 2026-11-13:** the rehearsal-evidenced requirement named above was retired by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`). As amended, **AC-MIG-070-2 is “roll-forward incident runbook exists”** — this document is that runbook and no rehearsal evidences it; the drill referenced above may still be run voluntarily through [compose-rehearsal-stop-authority.md](compose-rehearsal-stop-authority.md) but is not a gate.
 
 ---
 
@@ -162,6 +164,8 @@ The full evidence sequence — authenticated sign-in, forced-change branch handl
 ## Stop Authority
 
 **Stop authority** = the explicit decision to halt deploys/changes rather than continue forward-fixing. Under the OPC operating model (SPEC-002 AC-10 as amended, `17ea19d6`) there is no on-call ladder: **the founder/sole operator holds stop authority directly**. [The rehearsal-evidenced stop-authority drill is AC-MIG-070-1 (#361), exercised via compose-rehearsal-stop-authority.md Step 6; the rules below are documented intent until then.]
+
+**Amended 2026-11-13:** the rehearsal-evidenced stop-authority drill named above was retired by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`). As amended, **AC-MIG-070-1 is the staging health gates (`/health/live` + `/health/ready` through the deployed host) plus one authenticated read (`GET /api/conversations` 200)** — not a drill record; the drill may still be run voluntarily via [compose-rehearsal-stop-authority.md](compose-rehearsal-stop-authority.md) and records nothing toward acceptance. Real stop authority is unchanged: the founder/sole operator holds it directly, and it is exercised at the real irreversible gate (MIG-072, #363); the rules below stand unchanged.
 
 Rules:
 

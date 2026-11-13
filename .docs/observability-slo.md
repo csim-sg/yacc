@@ -204,3 +204,5 @@ cat logs.json | jq "select(.correlationId == \"abc-123\")"
 
 **Last Updated**: 2026-10-18  
 **Next Review**: with MIG-070 (#361) cutover rehearsal
+
+**Amended 2026-11-13**: the rehearsal-based review trigger above was retired by the founder scope decision of 2026-11-13 (“no need for such DR processes” — SPEC-002 “Scope amendment — 2026-11-13”, Antpolis/documentation PR #24, merge `e4c0ead`) — no cutover rehearsal will occur or finalize this document; its review trigger no longer depends on any rehearsal.
