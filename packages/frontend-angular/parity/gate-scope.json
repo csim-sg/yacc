@@ -1,0 +1,122 @@
+{
+  "$comment": "ANG-015 (#385) U10 gate-scope decision — the single machine-readable source of truth for the Angular parity gate's run scope and baseline comparison. Consumed by packages/frontend-angular/playwright.config.ts (run scope) and parity/compare-baseline.mjs (baseline comparison). Editing this file changes what the parity gate runs and accepts — every change is a disposition-register event (parity/disposition-register.md) and must be deliberate, never a way to make a red gate green. File paths are relative to packages/frontend/ (the test root).",
+  "decision": "U10",
+  "decidedBy": "ANG-015 (#385)",
+  "decisionDate": "2026-10-19",
+  "testRoot": "packages/frontend",
+  "runMatch": [
+    "tests/**/*.spec.ts",
+    "e2e/**/*.spec.ts",
+    "e2e/**/*.e2e.ts"
+  ],
+  "excludedDebugSpecs": [
+    "tests/inbox-console.spec.ts",
+    "tests/inbox-content.spec.ts",
+    "tests/inbox-debug.spec.ts",
+    "tests/inbox-network.spec.ts",
+    "tests/inbox-screenshot.spec.ts",
+    "tests/inspect-inbox.spec.ts",
+    "tests/simple-sidebar-test.spec.ts",
+    "tests/test-navbar.spec.ts",
+    "tests/test-responsive-sidebar.spec.ts"
+  ],
+  "supersededWrappers": [
+    "tests/tags.e2e.spec.ts"
+  ],
+  "anchor": {
+    "id": "react-e2e-baseline-ae42c67-on-java",
+    "kind": "React-on-Java (SPEC-003 AD-1; S2 #373)",
+    "appSha": "ae42c674ef7a6a98ddbd9902def6fd0e48718697",
+    "javaSha": "ae42c674ef7a6a98ddbd9902def6fd0e48718697",
+    "capturedAt": "2026-10-18",
+    "perCaseListing": "packages/frontend-angular/parity/baseline/react-e2e-baseline-ae42c67-on-java/per-case-listing.tsv",
+    "declaredRows": 1395,
+    "declaredCounts": {
+      "passed": 503,
+      "failed": 664,
+      "timedOut": 174,
+      "skipped": 54,
+      "flaky": 0
+    },
+    "projects": ["chromium", "firefox", "webkit"],
+    "tier1AllGreen": [
+      "backend-auth.spec.ts",
+      "backend-conversations.spec.ts",
+      "backend-audit-logs.spec.ts",
+      "backend-regression.spec.ts"
+    ],
+    "sha256": {
+      "per-case-listing.tsv": "acf4a1eb56ac1f442d2d16b6da3c252ff5c16f4d2e25fcf0dc5c37d41803bc0b",
+      "baseline-report.json": "11b3d087378bae5449ccb3aafe6f3fdd6c4d43fb5f71504f52d29b9226290142",
+      "summary.txt": "7907d88c14411b7aa6e756566887efbcafa767fb656f2b2382fa505f5fbf9390"
+    }
+  },
+  "anchorRedClasses": {
+    "$comment": "Every file carrying anchor-red (failed/timedOut) rows must appear in exactly one class; counts are the anchor-recorded red-row totals across all 3 browser projects (see disposition-register.md §6).",
+    "A": {
+      "meaning": "Residual Node-URL inline API (hardcoded http://localhost:3000 setup calls -> ECONNREFUSED -> downstream 401s)",
+      "files": [
+        "acceptance/phase1/auth.spec.ts",
+        "acceptance/phase1/inbox-list-filters.spec.ts",
+        "acceptance/phase1/p0-frontend-option2.spec.ts",
+        "acceptance/phase2/assignments.spec.ts",
+        "acceptance/phase2/audit-logs-export.spec.ts",
+        "acceptance/phase2/bulk-actions.spec.ts",
+        "acceptance/phase2/notes-mentions.spec.ts",
+        "acceptance/phase2/notifications.spec.ts",
+        "acceptance/phase2/phase2-master.spec.ts",
+        "acceptance/phase2/routing-rules.spec.ts",
+        "acceptance/phase2/tags.spec.ts"
+      ]
+    },
+    "B": {
+      "meaning": "Non-fixture identities (spec signs in as admin2/manager/user-independent identities the Java fixture world does not create -> real sign-in 401 -> loginAs timeout)",
+      "files": [
+        "fe-003-rbac-nav.spec.ts"
+      ]
+    },
+    "C": {
+      "meaning": "Node-era contract expectations (specs wait for Node-era response shapes/flows; the frozen Java contract answers differently)",
+      "files": [
+        "fe-004-api-integration.spec.ts",
+        "fe-004-cache-invalidation.spec.ts",
+        "fe-004-error-scenarios.spec.ts"
+      ]
+    },
+    "D": {
+      "meaning": "Real-time / socket.io rows (React socket.io-client vs Java raw WS /ws, ADR-026 — transport-incompatible until R1 evidence, AD-2)",
+      "files": [
+        "e2e/tags.e2e.ts"
+      ]
+    },
+    "E": {
+      "meaning": "Debug/utility + mixed-era assertions (assertion-light debug specs, mixed mock/real UI-detail expectations, in-spec conditional skips)",
+      "files": [
+        "conversation-detail.spec.ts",
+        "fe-002-login-ui.spec.ts",
+        "inbox-filters.spec.ts",
+        "INT-010-irc-profiles.spec.ts",
+        "regression-suite.spec.ts"
+      ]
+    }
+  },
+  "unanchoredKnownFiles": {
+    "$comment": "Files that run inside the gate scope but have NO anchor coverage in the ae42c67 React-on-Java baseline. e2e-promotion files are surfaced in every parity run and are non-gating until a baseline capture anchors them (a red row here is a register/anchor event — disposition-register.md §7 — never a silent pass and never widened into expected-red without evidence). angular-native-tier0 specs are the merged port issues' own Angular evidence (ANG-006..013); their expected status is GREEN — a red row is a live Angular regression and gates (route to the owning issue).",
+    "e2e-promotion": [
+      "e2e/FE-008-009-010-api-integration.spec.ts",
+      "e2e/FE-013-014-015-websocket-listeners.spec.ts",
+      "e2e/QA-002-inbox-workflows.spec.ts",
+      "e2e/admin/irc-test-button.spec.ts",
+      "e2e/admin/users-table.spec.ts"
+    ],
+    "angular-native-tier0": [
+      "tests/realtime-rawws-r1.spec.ts",
+      "tests/inbox-shell-ang007.spec.ts",
+      "tests/conversation-detail-ang008.spec.ts",
+      "tests/routing-rules-ang010.spec.ts",
+      "tests/users-admin-ang011.spec.ts",
+      "tests/irc-profiles-ang012.spec.ts",
+      "tests/audit-logs-ang013.spec.ts"
+    ]
+  }
+}
