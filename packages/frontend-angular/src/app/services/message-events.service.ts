@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Subscription } from 'rxjs';
 
 import { WebSocketClientService } from './websocket-client.service';
+import { ConversationSubscriptionService } from './conversation-subscription.service';
 import { ConversationsStore } from './conversations.store';
 import { MessagesStore } from './messages.store';
 import type { Message } from '../contracts/http/messages.schema';
@@ -11,11 +12,20 @@ import type { Message } from '../contracts/http/messages.schema';
  * `event-handlers/message.handler` port on the frozen raw-WS channels):
  *
  * - `message.received` → append the inbound row to the loaded list cache
- *   with id dedup (backlog replay re-delivers rows), then invalidate the
- *   conversations list ("last message" parity).
+ *   behind the message-id re-delivery dedup, then patch the loaded
+ *   conversations-list rows locally (`latestMessagePreview` = body;
+ *   `unreadCount` +1 only for a NON-active conversation — #499 AC-5).
+ *   The blanket `invalidateLists()` deliberately does NOT run on this
+ *   path: the connector relay is publish-only (it never persists), so a
+ *   refetch returns pre-persist data and would clobber the local patch
+ *   with stale rows. The invalidate stays only where it is still
+ *   correct — the status handlers below (persisted delivery
+ *   transitions) and the `connect$` re-open invalidation; list truth
+ *   converges through those persisted-change paths.
  * - `message.sent` → patch the row's status to `sent` in the loaded
- *   list, then invalidate the conversations list.
- * - `message.failed` → patch the row's status to `failed`, then
+ *   list (id-agnostic: server id or optimistic tempId), then invalidate
+ *   the conversations list.
+ * - `message.failed` → same id-agnostic path to `failed`, then
  *   invalidate the conversations list.
  *
  * The wire payloads are the FROZEN shapes (`message-sent`/
@@ -29,6 +39,7 @@ export class MessageEventsService {
   private readonly client = inject(WebSocketClientService);
   private readonly messages = inject(MessagesStore);
   private readonly conversations = inject(ConversationsStore);
+  private readonly subscriptions = inject(ConversationSubscriptionService);
 
   /** Subscribe the handler set; returns the teardown subscription. */
   bind(): Subscription {
@@ -74,8 +85,14 @@ export class MessageEventsService {
       createdAt: payload.timestamp,
       updatedAt: payload.timestamp,
     };
-    this.messages.receiveInbound(message);
-    this.conversations.invalidateLists();
+    // Re-delivery dedup (message id): a duplicate frame is a no-op —
+    // never a second timeline row, never a second unread increment.
+    if (!this.messages.receiveInbound(message)) {
+      return;
+    }
+    this.conversations.patchReceived(payload.conversationId, payload.body, {
+      incrementUnread: !this.subscriptions.isActive(payload.conversationId),
+    });
   }
 
   private handleStatus(conversationId: string, messageId: string, status: 'sent' | 'failed'): void {

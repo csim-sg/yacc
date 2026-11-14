@@ -232,6 +232,35 @@ export class ResourceState<T> {
     entry.accessedAt = entry.fetchedAt;
   }
 
+  /**
+   * Synchronous patch over every LOADED entry of this instance (React
+   * `setQueriesData` family parity — the bounded adaptation that
+   * `markAsRead` documents: per-entry writes only are otherwise
+   * available). Entries whose data is absent (never loaded / failed
+   * load) are left untouched. Each patched entry becomes fresh per
+   * `update()` semantics: an in-flight response cannot overwrite it.
+   * Returning the previous reference from `patch` leaves that entry's
+   * data unchanged (still marked fresh).
+   */
+  updateLoaded(patch: (previous: T) => T): void {
+    for (const entry of this.entries.values()) {
+      const previous = entry.state().data;
+      if (previous === undefined) {
+        continue;
+      }
+      const next = patch(previous);
+      entry.generation += 1;
+      entry.state.set({
+        data: next,
+        loading: false,
+        refetching: false,
+        error: null,
+      });
+      entry.fetchedAt = Date.now();
+      entry.accessedAt = entry.fetchedAt;
+    }
+  }
+
   private ensureEntry(key: CacheKey): Entry<T> {
     const serialized = ResourceState.serialize(key);
     let entry = this.entries.get(serialized);

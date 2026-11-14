@@ -27,9 +27,13 @@ import { z } from 'zod';
  *   (`message.retry.scheduled`, `queue.message.dlq`) stay unconsumed
  *   (verified React baseline consumed neither).
  * - No `eventId` field exists on the wire (T3-G10) and none is depended
- *   on. There are NO client→server contracts here: the real-time surface
- *   is inbound-only (T2 B14 / T3-G10; ARCH-005 boundary 2) — the client
- *   sends nothing.
+ *   on. Client→server frames are CONTRACT-SCOPED SUBSCRIPTION CONTROL
+ *   ONLY (B14 narrowed, founder-authorized #499, 2026-11-13): the two
+ *   frozen `subscribe.conversation` / `unsubscribe.conversation`
+ *   channels (bare conversationId string, `asyncapi.yaml`) plus their
+ *   `conversation.subscribed` / `conversation.unsubscribed` acks encoded
+ *   below — there is NO general emit API (ARCH-005 boundary 2); all
+ *   other traffic stays inbound.
  * - `presence.updated` data is the MIG-003 canonical shape
  *   `{userId, status: online|offline, lastSeen}` — the retired
  *   `{userId, isOnline, timestamp}` disconnect variant and the richer
@@ -114,6 +118,19 @@ export const MessageFailedPayloadSchema = z.object({
 export type MessageFailedPayload = z.infer<typeof MessageFailedPayloadSchema>;
 
 /**
+ * `conversation.subscribed` / `conversation.unsubscribed` ack data —
+ * the frozen bare payloads (`asyncapi.yaml`: `{conversationId}`) for the
+ * client→server `subscribe.conversation` / `unsubscribe.conversation`
+ * control channels (B14 narrowed, #499). One shape, two channels.
+ */
+export const ConversationSubscriptionAckPayloadSchema = z.object({
+  conversationId: z.string(),
+});
+export type ConversationSubscriptionAckPayload = z.infer<
+  typeof ConversationSubscriptionAckPayloadSchema
+>;
+
+/**
  * `presence.updated` data (schemas/presence-updated.schema.json — the
  * MIG-003 canonical shape, incl. the disconnect path).
  */
@@ -181,6 +198,8 @@ export type SystemPayload = z.infer<typeof SystemPayloadSchema>;
 export const WS_SERVER_EVENTS = {
   conversationUpdated: 'conversation.updated',
   conversationReopened: 'conversation.reopened',
+  conversationSubscribed: 'conversation.subscribed',
+  conversationUnsubscribed: 'conversation.unsubscribed',
   messageReceived: 'message.received',
   messageSent: 'message.sent',
   messageFailed: 'message.failed',
@@ -203,6 +222,8 @@ export type WsServerEventName = (typeof WS_SERVER_EVENTS)[keyof typeof WS_SERVER
 export interface WsEventPayloadMap {
   'conversation.updated': ConversationUpdatedPayload;
   'conversation.reopened': ConversationReopenedPayload;
+  'conversation.subscribed': ConversationSubscriptionAckPayload;
+  'conversation.unsubscribed': ConversationSubscriptionAckPayload;
   'message.received': MessageReceivedPayload;
   'message.sent': MessageSentPayload;
   'message.failed': MessageFailedPayload;

@@ -4,6 +4,7 @@ import { Subscription } from 'rxjs';
 import { AuthService } from './auth.service';
 import { TokenStorageService } from './token-storage.service';
 import { WebSocketClientService } from './websocket-client.service';
+import { ConversationSubscriptionService } from './conversation-subscription.service';
 import { ConversationEventsService } from './conversation-events.service';
 import { MessageEventsService } from './message-events.service';
 import { NotificationEventsService } from './notification-events.service';
@@ -44,6 +45,7 @@ export class RealtimeBindingService {
   private readonly client = inject(WebSocketClientService);
   private readonly tokenStorage = inject(TokenStorageService);
   private readonly auth = inject(AuthService);
+  private readonly subscriptions = inject(ConversationSubscriptionService);
   private readonly conversations = inject(ConversationsStore);
   private readonly messages = inject(MessagesStore);
   private readonly conversationEvents = inject(ConversationEventsService);
@@ -102,6 +104,12 @@ export class RealtimeBindingService {
     if (authenticated) {
       this.ensureConnected();
     } else {
+      // #499: the subscription interest is session-scoped — dropped
+      // BEFORE the transport disconnect so a later session never
+      // inherits the previous identity's conversation interest (the
+      // next connect$ pass re-subscribes whatever the rendered pages
+      // report under the new identity).
+      this.subscriptions.reset();
       this.client.disconnect();
     }
   }
