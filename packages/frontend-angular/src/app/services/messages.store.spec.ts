@@ -14,7 +14,10 @@ import { MessagesStore } from './messages.store';
  * send path by founder-authorized #499 (AC-4): pending row before the
  * POST, race-safe reconcile to the returned server row (tempId as a
  * secondary key), id-agnostic idempotent status patches, and the
- * bounded inbound re-delivery window (AC-5).
+ * bounded inbound re-delivery window (AC-5). The #507 send split
+ * (`beginSend` → one render boundary → `dispatchSend`) keeps every
+ * assertion here byte-identical in meaning — the component-level
+ * boundary invariant is pinned in the Conversation page spec.
  */
 describe('MessagesStore', () => {
   let store: MessagesStore;
@@ -74,13 +77,15 @@ describe('MessagesStore', () => {
   it('send appends the confirmed message and invalidates the conversations family', async () => {
     await loadList();
 
-    const pending = store.send('c1', { body: 'new reply' });
+    const tempId = store.beginSend('c1', { body: 'new reply' });
+    expect(tempId).toMatch(/^temp-/);
+    const dispatched = store.dispatchSend('c1', tempId, { body: 'new reply' });
     const request = http.expectOne('/api/conversations/c1/messages');
     expect(request.request.body).toEqual({ body: 'new reply' });
     // Frozen `{ data: Message }` send envelope (ANG-008 U3 disposition —
     // the service unwraps it; the store appends the confirmed row).
     request.flush({ data: message('m2', 'new reply') });
-    await pending;
+    await dispatched;
 
     const messages = store.listSnapshot('c1')?.data?.messages ?? [];
     expect(messages.map((row) => row.body)).toEqual(['hello', 'new reply']);
@@ -150,23 +155,41 @@ describe('MessagesStore', () => {
   // U5 ACTIVATED on the live send path (AC-4, #499)
   // ---------------------------------------------------------------------------
 
+  it('beginSend answers null on an unloaded list; dispatchSend settles without a temp row', async () => {
+    // No list loaded for 'unloaded': no row to append, so no boundary to
+    // wait for — the row-less legacy dispatch path applies.
+    const tempId = store.beginSend('unloaded', { body: 'no list yet' });
+    expect(tempId).toBeNull();
+
+    const dispatched = store.dispatchSend('unloaded', tempId, { body: 'no list yet' });
+    const request = http.expectOne('/api/conversations/unloaded/messages');
+    request.flush({ data: message('srv-x', 'no list yet') });
+    await dispatched;
+
+    // Reconcile was skipped (null tempId) — still no snapshot entry.
+    expect(store.listSnapshot('unloaded')?.data).toBeUndefined();
+  });
+
   it('send appends the pending row BEFORE the POST and reconciles it to the server row', async () => {
     await loadList();
 
-    const pending = store.send('c1', { body: 'new reply' });
-    const request = http.expectOne('/api/conversations/c1/messages');
+    const tempId = store.beginSend('c1', { body: 'new reply' });
+    expect(tempId).toMatch(/^temp-/);
 
-    // Pre-POST: exactly one pending row keyed by its temp id.
+    // Pre-POST (after beginSend, before dispatchSend): exactly one
+    // pending row keyed by its temp id.
     const before = store.listSnapshot('c1')?.data?.messages ?? [];
     expect(before.filter((row) => row.status === 'pending')).toHaveLength(1);
-    const tempRow = before.find((row) => row.status === 'pending');
-    expect(tempRow?.id).toMatch(/^temp-/);
+    expect(tempId).toMatch(/^temp-/);
+    const tempRow = before.find((row) => row.id === tempId);
     expect(tempRow?.body).toBe('new reply');
 
+    const dispatched = store.dispatchSend('c1', tempId, { body: 'new reply' });
+    const request = http.expectOne('/api/conversations/c1/messages');
     // The 201 returns the PENDING server message — the row is reconciled
     // to the server id: temp row count 0, exactly one row for the body.
     request.flush({ data: message('srv-1', 'new reply', 'pending') });
-    await pending;
+    await dispatched;
 
     // B4 mapping rides the send: flush the conversations-family refetch.
     http.expectOne('/api/conversations').flush(conversationList);
@@ -181,14 +204,12 @@ describe('MessagesStore', () => {
   it('status patches match the server id AND the reconciled tempId (secondary key)', async () => {
     await loadList();
 
-    const pending = store.send('c1', { body: 'new reply' });
+    const tempId = store.beginSend('c1', { body: 'new reply' });
+    expect(tempId).toMatch(/^temp-/);
+    const dispatched = store.dispatchSend('c1', tempId, { body: 'new reply' });
     const request = http.expectOne('/api/conversations/c1/messages');
-    // Capture the optimistic row's tempId from the pre-POST state.
-    const tempId = (store.listSnapshot('c1')?.data?.messages ?? []).find(
-      (row) => row.status === 'pending',
-    )?.id as string;
     request.flush({ data: message('srv-1', 'new reply', 'pending') });
-    await pending;
+    await dispatched;
     http.expectOne('/api/conversations').flush(conversationList); // B4 refetch
 
     // By server id.
@@ -197,17 +218,18 @@ describe('MessagesStore', () => {
 
     // By the tempId of the same (already reconciled) row — the secondary
     // key recorded at reconcile.
-    store.updateMessageStatus('c1', tempId, 'failed');
+    store.updateMessageStatus('c1', tempId as string, 'failed');
     expect(store.listSnapshot('c1')?.data?.messages.find((row) => row.id === 'srv-1')?.status).toBe('failed');
   });
 
   it('duplicate status frames apply once (idempotent, never duplicate rows)', async () => {
     await loadList();
 
-    const pending = store.send('c1', { body: 'new reply' });
+    const tempId = store.beginSend('c1', { body: 'new reply' });
+    const dispatched = store.dispatchSend('c1', tempId, { body: 'new reply' });
     const request = http.expectOne('/api/conversations/c1/messages');
     request.flush({ data: message('srv-1', 'new reply', 'pending') });
-    await pending;
+    await dispatched;
     http.expectOne('/api/conversations').flush(conversationList); // B4 refetch
 
     store.updateMessageStatus('c1', 'srv-1', 'sent');
@@ -241,7 +263,9 @@ describe('MessagesStore', () => {
   it('send failure rolls the pending row to failed and rethrows (no server id invented)', async () => {
     await loadList();
 
-    const failing = store.send('c1', { body: 'will fail' });
+    const tempId = store.beginSend('c1', { body: 'will fail' });
+    expect(tempId).toMatch(/^temp-/);
+    const failing = store.dispatchSend('c1', tempId, { body: 'will fail' });
     const request = http.expectOne('/api/conversations/c1/messages');
     request.flush({ error: 'boom' }, { status: 500, statusText: 'err' });
     await expect(failing).rejects.toBeDefined();

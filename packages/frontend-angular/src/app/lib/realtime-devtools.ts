@@ -119,8 +119,16 @@ export function installRealtimeDevtools(): void {
     conversationsListSnapshot: () => conversations.listSnapshot({}) ?? null,
     messagesLoad: (conversationId: string) =>
       messages.loadMessages(conversationId).then(() => messages.listSnapshot(conversationId) ?? null),
-    messagesSend: (conversationId: string, body: string) =>
-      messages.send(conversationId, { body }),
+    messagesSend: async (conversationId: string, body: string) => {
+      // #507 split: this seam has no rendered view to present the
+      // optimistic row, so it dispatches without a render boundary — the
+      // same send mechanics as before the split (row created pre-POST,
+      // reconcile/fail unchanged); the rendered-boundary contract is the
+      // conversation page's.
+      const tempId = messages.beginSend(conversationId, { body });
+      const message = await messages.dispatchSend(conversationId, tempId, { body });
+      return { id: message.id };
+    },
     messagesSnapshot: (conversationId: string) => messages.listSnapshot(conversationId) ?? null,
     notifications: () => ({
       items: notifications.notifications(),

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, EnvironmentInjector, InjectionToken, NgZone, afterNextRender, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -47,18 +47,46 @@ const STATUS_BADGE: Record<ConversationStatus, string> = {
 };
 
 /**
+ * One Angular render boundary (#507): the send handler awaits this
+ * between `beginSend` (optimistic pending row) and `dispatchSend`
+ * (POST), so the pending state is rendered — observable — before the
+ * request is issued. The production implementation registers a one-shot
+ * `afterNextRender` callback (rAF-aligned scheduling; never a fixed
+ * timeout, no polling, no retry tuning) on the root `EnvironmentInjector`
+ * and resolves inside the Angular zone so the dispatch continuation
+ * stays zone-affine (after-render hooks run outside it). Injectable so
+ * the unit invariant test can drive a controlled boundary.
+ */
+export const RENDER_BOUNDARY = new InjectionToken<() => Promise<void>>(
+  'Conversation send render boundary (#507)',
+  {
+    providedIn: 'root',
+    factory: (): (() => Promise<void>) => {
+      const injector = inject(EnvironmentInjector);
+      const zone = inject(NgZone);
+      return () =>
+        new Promise<void>((resolve) => {
+          afterNextRender(() => zone.run(() => resolve()), { injector });
+        });
+    },
+  },
+);
+
+/**
  * Conversation Detail Page (React `pages/ConversationPage.tsx` port —
  * W7; the parity crux).
  *
  * Timeline + reply composer + exactly-once retry against the canonical
  * stores: the detail rides `ConversationsStore.loadDetail`, the messages
  * list rides `MessagesStore.loadMessages` (verified wire shape), and a
- * confirmed send appends through `MessagesStore.send` (server-confirmed
- * append — the live behavior; the U5 optimistic mechanism stays
- * tested-but-inactive). Retry posts `.../messages/:messageId/retry` with
- * exactly-once click tracking (`retriedMessageIds`, React parity). The
- * status UX rides the HTTP append path (U3 — no envelope "fix", no new
- * behavior); W11/W12 stay parity-of-absence (no status/priority UI).
+ * send runs through the store's split `beginSend` → one render boundary
+ * → `dispatchSend` flow (#507): the optimistic pending row is rendered
+ * BEFORE the POST is issued (U5 observable pending phase; the mechanism
+ * was activated on the live send path by founder-authorized #499).
+ * Retry posts `.../messages/:messageId/retry` with exactly-once click
+ * tracking (`retriedMessageIds`, React parity). The status UX rides the
+ * HTTP append path (U3 — no envelope "fix", no new behavior); W11/W12
+ * stay parity-of-absence (no status/priority UI).
  *
  * RBAC (T2 §3.6): `canReplyAndRetry` — SUPER_ADMIN/ADMIN/MANAGER can
  * always reply+retry; USER only when assigned to this conversation
@@ -219,9 +247,13 @@ export class Conversation {
   }
 
   /**
-   * Send a reply through the store's server-confirmed append (React
-   * `sendMessageMutation.mutateAsync` parity): the composer clears the
-   * draft on success and keeps it on failure; the typed error lands in
+   * Send a reply through the store's split send (React
+   * `sendMessageMutation.mutateAsync` parity): `beginSend` creates the
+   * optimistic pending row, then exactly ONE Angular render boundary is
+   * awaited (`afterNextRender` — one-shot, rAF-aligned scheduling; never
+   * a fixed timeout, #507) so the pending state is rendered before
+   * `dispatchSend` issues the POST. The composer clears the draft on
+   * success and keeps it on failure; the typed error lands in
    * `sendError` and is surfaced by the composer's alert. Bound as a
    * field arrow so the function-value `onSend` binding keeps `this`.
    */
@@ -233,7 +265,14 @@ export class Conversation {
     this.isSending.set(true);
     this.sendError.set(null);
     try {
-      await this.messagesStore.send(conversationId, { body });
+      const tempId = this.messagesStore.beginSend(conversationId, { body });
+      if (tempId !== null) {
+        // #507: render the pending row before the request goes out. On a
+        // not-yet-loaded list there is no row to render (beginSend
+        // returned null) — dispatch directly (pre-#499 behavior).
+        await this.renderBoundary();
+      }
+      await this.messagesStore.dispatchSend(conversationId, tempId, { body });
     } catch (err: unknown) {
       this.sendError.set(apiErrorMessage(err, 'Failed to send message'));
       // React `mutateAsync` rejection parity: the composer keeps the
@@ -243,6 +282,9 @@ export class Conversation {
       this.isSending.set(false);
     }
   };
+
+  /** The awaited one-render-boundary primitive (#507; see `RENDER_BOUNDARY`). */
+  private readonly renderBoundary = inject(RENDER_BOUNDARY);
 
   /** Dismiss the send error (React `sendMessageMutation.reset()` parity). */
   protected dismissSendError(): void {
