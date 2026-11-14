@@ -85,7 +85,8 @@ Baseline row source superseded: this section is re-pointed from the Node Socket.
 |---|---|---|---|---|
 | `conversation.updated` | wired, enveloped | yes (`ConversationEventsService`) | invalidate conversation detail + conversations lists | B4 mapping; updates are idempotent refetches |
 | `conversation.reopened` | declared channel, payload shape not pinned | yes (`ConversationEventsService`) | same invalidations | **U2 open**: backend emitter is an open founder product decision — no live coverage claimed (parity-of-absence); `conversationId` consumed only when present |
-| `message.received` | wired, enveloped | yes (`MessageEventsService`) | append to loaded message list (id dedup) + invalidate conversations lists | inbound rows map onto the store `Message` shape (`status: 'sent'`, `direction: 'inbound'`) |
+| `message.received` | wired, enveloped | yes (`MessageEventsService`) | append to loaded message list (message-id re-delivery dedup) + LOCAL patch of loaded list rows (`latestMessagePreview` = body; `unreadCount` +1 only for a non-active conversation, #499 AC-5) — the blanket list invalidation does NOT run on this path (the relay is publish-only; a refetch would clobber the patch) | inbound rows map onto the store `Message` shape (`status: 'sent'`, `direction: 'inbound'`); the dedup spans a bounded recent-id window so re-delivery never double-counts |
+| `conversation.subscribed` / `conversation.unsubscribed` | wired, enveloped — bare acks `{conversationId}` for the frozen client→server control channels | yes (`ConversationSubscriptionService` — the ONE interest owner) | pending → joined / joined → released room rows | consumed from the typed streams like any inbound frame (B14 narrowed, #499); the service re-subscribes the interest set once per successful open |
 | `message.sent` | wired, enveloped (`sentAt`) | yes (`MessageEventsService`) | patch row status → `sent` + invalidate conversations lists | frozen data schema supersedes the Node-era `platformMessageId`/`timestamp` members |
 | `message.failed` | wired, enveloped (`retryAt`, `attempt` ≤ 3) | yes (`MessageEventsService`) | patch row status → `failed` + invalidate conversations lists | same supersession (no `maxAttempts`/`isFinal`) |
 | `typing.started` / `typing.stopped` | wired, enveloped (`name`) | yes (`PresenceEventsService`) | `WebSocketStateService` typing rows + 5s auto-clear timers | W20 state half; UI is ANG-007/008 |
@@ -99,7 +100,7 @@ Baseline row source superseded: this section is re-pointed from the Node Socket.
 | `system.backlog.replay.started` / `system.backlog.replay.completed` | wired-in-target (ADR-026/ADR-028 PostgreSQL backlog) | routed (`SystemEventsService`) | none | backlog-replay consumption = message/conversation handlers applying replayed frames idempotently (id dedup) |
 | `message.retry.scheduled` / `queue.message.dlq` | wired (gateway envelopes) | **no listener** | — | LIVE, unconsumed at the React baseline — parity of absence |
 | `connection.established` / `error` (raw literals) | **retired** → canonical `system.*` (WS-EVT-014/018) | no listener | — | baseline provenance only; target does not emit them |
-| client→server (`subscribe.*`, `message.retry`, acks, presence/typing/reaction/connector publishes) | publish operations exist in the frozen contract | **none implemented** | — | the verified frontend surface emits nothing (T2 B14 / T3-G10; ARCH-005 boundary 2) — inbound-only by design; no `eventId` exists on the wire |
+| client→server (`subscribe.*`, `message.retry`, acks, presence/typing/reaction/connector publishes) | publish operations exist in the frozen contract | **the two frozen subscription control channels only** (`subscribe.conversation` / `unsubscribe.conversation`, bare conversationId string, ack-handled and re-subscribed on reconnect — `ConversationSubscriptionService` over the `WebSocketClientService` seams) | — | CONTRACT-SCOPED SUBSCRIPTION CONTROL ONLY (B14 narrowed, founder-authorized #499, 2026-11-13; ARCH-005 boundary 2): **no general emit API** — every other frozen publish op (message.retry, presence/typing/reaction/connector) stays unimplemented, and no `eventId` exists on the wire |
 
 ## Structural invariants (grep gates — issue AC-ANG-002-4/5 + AC-ANG-006-1)
 
@@ -113,7 +114,7 @@ Gate commands live in the ANG-002 issue "Verification" section and in PR evidenc
 | Lowercase role enum | `RoleSchema`/`UserStatusSchema` values are the lowercase wire labels (see `common/role.schema.ts`) |
 | Single raw-WS socket entry | exactly one file constructs a WebSocket: `services/websocket-client.service.ts` (via the `WS_SOCKET_FACTORY` seam) |
 | No socket.io (ANG-006 re-point) | `rg -n "socket\.io-client" packages/frontend-angular` = 0 — zero references, zero dependency |
-| Inbound-only socket | `rg -n "\.emit\(" packages/frontend-angular/src --glob '!**/*.spec.ts'` = 0 — zero production client→server sends |
+| Contract-scoped subscription control (B14 narrowed — #499) | zero production client→server sends EXCEPT the two frozen control frames in `services/websocket-client.service.ts` (`subscribe.conversation` / `unsubscribe.conversation`, bare conversationId string) — no general emit API, no `.emit(` anywhere in `src/` (socket.io emitter API absent) |
 | No ad-hoc cache keys | cache-key literals live only in `contracts/cache-keys.ts` |
 
 ## Change procedure (T3 §3)

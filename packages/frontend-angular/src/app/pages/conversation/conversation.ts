@@ -13,7 +13,9 @@ import type {
 import type { Message } from '../../contracts/http/messages.schema';
 import type { ResourceSnapshot } from '../../services/resource-state';
 import { apiErrorMessage } from '../../lib/api-error-message';
+import { isTempId } from '../../lib/tempId';
 import { AuthService } from '../../services/auth.service';
+import { ConversationSubscriptionService } from '../../services/conversation-subscription.service';
 import { ConversationsStore } from '../../services/conversations.store';
 import { MessagesStore } from '../../services/messages.store';
 
@@ -80,6 +82,7 @@ export class Conversation {
   private readonly conversationsStore = inject(ConversationsStore);
   private readonly messagesStore = inject(MessagesStore);
   private readonly auth = inject(AuthService);
+  private readonly subscriptions = inject(ConversationSubscriptionService);
 
   protected readonly user = this.auth.user;
   protected readonly authLoading = this.auth.isLoading;
@@ -153,7 +156,13 @@ export class Conversation {
       .subscribe((params) => {
         const id = params.get('id');
         this.conversationIdSignal.set(id && id.length > 0 ? id : null);
+        // #499 AC-1: the open conversation is the subscription owner's
+        // active interest — subscribe on open, and on a switch (component
+        // reuse) the service unsubscribes the previous id BEFORE
+        // subscribing this one. Component destroy releases it (leave).
+        this.subscriptions.setActive(id && id.length > 0 ? id : null);
       });
+    this.destroyRef.onDestroy(() => this.subscriptions.setActive(null));
 
     // React resize parity: the in-page sidebar opens on large screens.
     const checkScreenSize = (): void => {
@@ -250,6 +259,13 @@ export class Conversation {
   protected async handleMessageRetry(messageId: string): Promise<void> {
     const conversationId = this.conversationId();
     if (conversationId === null) {
+      return;
+    }
+    // #499 AC-6: the retry endpoint is addressed by SERVER message ids
+    // only — an optimistic row still carrying its generated tempId has
+    // no server row to retry, so the click path is guarded to server-id
+    // rows (isTempId) and never sends a temp id to the endpoint.
+    if (isTempId(messageId)) {
       return;
     }
     // P0: Track that user has clicked retry for this message (exactly once)

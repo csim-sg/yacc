@@ -19,6 +19,16 @@
  *   `handshake.auth.token`; browsers cannot set headers on an upgrade —
  *   same wire decision as the Java `WebSocketHandshakeAuthInterceptor`).
  *   Token capture semantics are U6 → ANG-004 (`TokenStorageService`).
+ * - Client→server frames (B14 narrowed, founder-authorized #499,
+ *   2026-11-13): the TWO frozen subscription control channels only —
+ *   `subscribe.conversation` / `unsubscribe.conversation` with the bare
+ *   conversationId string as `data` (ack `conversation.subscribed` /
+ *   `conversation.unsubscribed` `{conversationId}`; missing/empty id →
+ *   `system.error` `bad_frame`). Room membership (`conversation:{id}`)
+ *   is the server-side fan-out gate for the conversation-scoped relays;
+ *   `user:{userId}` is joined by the server at connect. There is no
+ *   general emit API on this seam (ARCH-005 boundary 2; `events.schema.ts`
+ *   encodes the ack channels).
  * - Correlation: the captured per-connection `X-Request-ID` header has NO
  *   raw-WebSocket equivalent — the browser WS API cannot set custom
  *   headers on an upgrade. HTTP correlation is unchanged (the ANG-005
@@ -33,11 +43,12 @@
  *   manual retry (W19).
  * - Heartbeat: the server broadcasts `system.heartbeat` every 60s
  *   (application level — `WS_PING_INTERVAL_MS` documents the frozen
- *   interval; the client never sends pings, inbound-only).
+ *   interval; the client never sends pings).
  * - Rooms (`user:{userId}`, `conversation:{conversationId}`) are
- *   server-side fan-out conventions; the client joins no rooms (the
- *   frozen client→server `subscribe.*` channels are not implemented —
- *   the verified frontend surface is inbound-only, T2 B14 / T3-G10).
+ *   server-side fan-out conventions; the client joins `conversation:{id}`
+ *   rooms only through the two frozen control channels via the
+ *   `ConversationSubscriptionService` interest set (re-subscribed
+ *   idempotently on every successful open).
  */
 
 /** Java raw-WS upgrade path (backend `RealtimeProperties` default). */

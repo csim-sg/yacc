@@ -1,5 +1,16 @@
 [
   {
+    "issue": "#504",
+    "date": "2026-11-13",
+    "file": "packages/frontend/tests/realtime-rawws-r1.spec.ts",
+    "cases": [
+      "R1-WS-TYPE-1: typing relay is server-truth on the wire; the inbound-only client (no room join) correctly receives none (W20 disposition evidence)"
+    ],
+    "kind": "fixture-fragility",
+    "rationale": "The founder-authorized #499 inbox subscription interest set now includes the row's former seeded fixture room \u20261002, so the receive-side negative control is re-pointed to seeded bulk-test row \u20263050 (provably outside the rendered inbox page in both suite postures) and gains one additive unsubscribe precondition \u2014 title and assertion semantics unchanged, room-membership gating evidence per the founder-authorized B14 narrowing.",
+    "approval": "https://github.com/csim-sg/yacc/issues/504#issuecomment-6857656003"
+  },
+  {
     "issue": "#495",
     "date": "2026-11-13",
     "file": "packages/frontend/e2e/FE-013-014-015-websocket-listeners.spec.ts",

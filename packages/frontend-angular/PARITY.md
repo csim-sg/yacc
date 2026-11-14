@@ -76,6 +76,31 @@ AD-2) and stay blocking until it exists.
   equivalent-or-stronger, and expected-red/anchor semantics are unchanged. There is no
   approval-bypass flag, no allowlist keyed on paths/globs, and no silent fallback when
   the manifest is absent.
+- **Declared support regions — bounded file-level preconditions (issue #498,
+  2026-11-13).** Case attribution cannot cover the file-level lines a
+  contract-conformance re-point legitimately needs (#495: header doc-block, imports +
+  env resolution, identity const, helper, `beforeEach`). A declared entry may
+  additionally carry an optional `support` array — `[{ "label": "<lowercase slug>",
+  "kind": "imports" | "env-resolution" | "identity" | "helper" | "hook", "reason":
+  "<one sentence>" }]` (closed enum; `label` unique per file; unknown keys, missing
+  fields, bad slugs and duplicate labels fail closed) — and the spec file must wrap
+  exactly the authorised lines in marker comments:
+  `// @suite-adaptation-support:<label>` … `// @suite-adaptation-support:end`. The
+  gate authorises an unattributable hunk **only** inside a marker region whose label
+  is declared **for that exact file**; a BASE-side line that was plain file-level is
+  tolerated only when the same hunk's new side lies entirely inside declared HEAD
+  support regions (a reviewed wrap or interior rewrite), so an undeclared case can
+  never be emptied into a region. Fail-closed, in every gate mode (including
+  `--manifest-only`): an unmarked unattributable hunk, an undeclared label, a declared
+  label with no marker region (and a deleted region whose label survives — removal
+  must retract markers + label atomically), nested/unterminated/empty/duplicated/
+  malformed/stray-end markers, a region overlapping any case body (markers must never
+  enclose `test(`/`test.describe(` declarations — case attribution wins and the
+  overlap fails naming the case), and support markers in a file with no declaring
+  manifest entry. A support region is a **reviewed permission, never an implicit
+  allowlist**: it carries the same rationale + approval-link discipline, there is no
+  file/glob allowlist and no bypass flag, and the reviewer still judges the wrapped
+  content equivalent-or-stronger.
 - **Interim PB-2 PR suspension (2026-11-13, issue #481 — founder-accepted AM-1: CI
   engines are exactly `{obscura}`).** The three-engine `parity` matrix and
   `parity-compare` run `workflow_dispatch`-only until **#490** installs the Obscura-only

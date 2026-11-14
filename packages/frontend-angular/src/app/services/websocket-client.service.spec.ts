@@ -25,7 +25,9 @@ import {
  * validation, invalid/unknown frame handling, the application-owned
  * reconnect ladder (1s/2s/4s/8s/30s × 10) with manual retry, the
  * `system.heartbeat` liveness timestamp, teardown without leaked
- * sockets/timers, and INBOUND-ONLY transport (nothing is ever sent).
+ * sockets/timers, and the CONTRACT-SCOPED SUBSCRIPTION CONTROL sends
+ * (B14 narrowed, #499): the only outbound frames are the two frozen
+ * control channels — nothing else is ever sent.
  */
 
 const socketFactory = vi.fn((url: string) => new FakeRealtimeSocket(url));
@@ -144,7 +146,7 @@ describe('WebSocketClientService', () => {
     expect(beats).toHaveLength(1);
   });
 
-  it('is inbound-only — nothing is ever sent over the socket', () => {
+  it('sends nothing unless a subscription control frame is requested (narrowed B14 — #499)', () => {
     service.connect('token-1');
     const socket = latestFakeSocket();
     socket.open();
@@ -158,6 +160,73 @@ describe('WebSocketClientService', () => {
     socket.error();
 
     expect(socket.sent).toHaveLength(0);
+  });
+
+  describe('frozen subscription control sends (AC-1, #499 — contract-exact)', () => {
+    it('sends subscribe.conversation with the bare conversationId string', () => {
+      service.connect('token-1');
+      const socket = latestFakeSocket();
+      socket.open();
+
+      service.subscribeConversation('00000000-0000-0000-0000-00000000000c');
+
+      expect(socket.sent).toEqual([
+        JSON.stringify({ event: 'subscribe.conversation', data: '00000000-0000-0000-0000-00000000000c' }),
+      ]);
+    });
+
+    it('sends unsubscribe.conversation with the bare conversationId string', () => {
+      service.connect('token-1');
+      const socket = latestFakeSocket();
+      socket.open();
+
+      service.unsubscribeConversation('00000000-0000-0000-0000-00000000000c');
+
+      expect(socket.sent).toEqual([
+        JSON.stringify({ event: 'unsubscribe.conversation', data: '00000000-0000-0000-0000-00000000000c' }),
+      ]);
+    });
+
+    it('refuses an empty conversationId (the frozen server answer would be bad_frame)', () => {
+      service.connect('token-1');
+      const socket = latestFakeSocket();
+      socket.open();
+
+      service.subscribeConversation('');
+      service.unsubscribeConversation('   '.trim());
+
+      expect(socket.sent).toHaveLength(0);
+    });
+
+    it('no-ops control frames without an OPEN socket', () => {
+      service.connect('token-1');
+      const socket = latestFakeSocket();
+      service.subscribeConversation('c1'); // still connecting
+
+      socket.open();
+      socket.close(); // dropped — socket nulled, ladder running
+      service.unsubscribeConversation('c1');
+
+      expect(socket.sent).toHaveLength(0);
+    });
+  });
+
+  it('routes the frozen subscription acks to the typed channel streams', () => {
+    service.connect('token-1');
+    const socket = latestFakeSocket();
+    socket.open();
+
+    const subscribed: unknown[] = [];
+    const unsubscribed: unknown[] = [];
+    service.on$('conversation.subscribed').subscribe((payload) => subscribed.push(payload));
+    service.on$('conversation.unsubscribed').subscribe((payload) => unsubscribed.push(payload));
+
+    socket.message(wsFrame('conversation.subscribed', { conversationId: 'c1' }));
+    socket.message(wsFrame('conversation.unsubscribed', { conversationId: 'c1' }));
+    socket.message(wsFrame('conversation.subscribed', { wrong: 'shape' })); // contract violation — dropped
+
+    expect(subscribed).toEqual([{ conversationId: 'c1' }]);
+    expect(unsubscribed).toEqual([{ conversationId: 'c1' }]);
   });
 
   it('maps an initial handshake error to the error state', () => {

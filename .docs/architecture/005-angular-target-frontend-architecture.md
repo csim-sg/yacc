@@ -27,7 +27,7 @@ The React package (`packages/frontend`) remains the **production frontend** unti
 | Server-state | Resource signal stores on one internal typed helper (`ResourceState<T>`) | T2 §3.1; no state library (NgRx rejected, T2 §8.1) |
 | Routing | Angular Router + **functional guards** (`authGuard`, `publicGuard`, `roleGuard`) | T2 §3.3; route table mirrors `App.tsx` |
 | HTTP | HttpClient + **functional interceptors** (auth-header/correlation, 401-refresh, retry) | T2 §3.4 |
-| Real-time | **RxJS Subjects/Observables over retained `socket.io-client`**, one `WebSocketClientService` | T2 §3.5; inbound-only (B14) |
+| Real-time | **RxJS Subjects/Observables over retained `socket.io-client`**, one `WebSocketClientService` | T2 §3.5; contract-scoped subscription control only (B14 narrowed, founder-authorized #499, 2026-11-13): `subscribe.conversation`/`unsubscribe.conversation` + ack handling, re-subscribed on reconnect; no general emit API; all other traffic inbound |
 | Styling | **Tailwind v4 + daisyUI 5**, `@tailwindcss/postcss` (auto-applied by the `@angular/build` application builder when the package is installed) | T2 §4.1; identical class names/themes as React → E2E selectors unaffected. Note: the v17+ application builder has no `postcssConfiguration` option (that belonged to the retired webpack builder) — Tailwind v4 wiring is package-detection based |
 | Forms | Template-driven (ngModel) for simple forms; reactive only where validation warrants | T2 §1.1 (applies from ANG-004+) |
 | Change detection | **zone.js (retained explicitly)** | T2 §1.1: "zoneless is an optimization with no current need; default = max compatibility with socket callbacks". Angular 21 scaffolds default to zoneless — `provideZoneChangeDetection` + `zone.js` polyfill are deliberately kept |
@@ -66,7 +66,7 @@ packages/frontend-angular/
 ## Boundaries (binding)
 
 1. **Single HTTP entry** — all HTTP goes through the contract-backed API services behind one HttpClient provisioning seam (ANG-002). No fetch calls, no ad-hoc base URLs.
-2. **Single socket entry** — one injectable `WebSocketClientService` wraps `socket.io-client`. **Inbound-only**: the client emits nothing over the socket (verified current behavior, T2 B14); no `eventId` dependency.
+2. **Single socket entry** — one injectable `WebSocketClientService` wraps `socket.io-client`. **Contract-scoped subscription control only** (B14 narrowed, founder-authorized #499, 2026-11-13): client→server frames are limited to the two frozen `subscribe.conversation`/`unsubscribe.conversation` channels (bare conversationId string) + their ack handling, re-subscribed idempotently on reconnect (one interest owner, `ConversationSubscriptionService`); **no general emit API**; all other traffic inbound; no `eventId` dependency.
 3. **No `@yacc/common`** — local Angular contracts (Zod `z.infer`) in `contracts/` are the frontend source of truth (SPEC binding decision; ADR-020 governs the backend, not this package).
 4. **No cross-import from `packages/frontend`** — zero shared code with React; the React package is untouched until ANG-016.
 5. **No TanStack** (Query/Router), **no NgRx/NgModules**, no state library (SPEC binding decisions; T2 §8).
