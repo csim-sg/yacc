@@ -59,5 +59,23 @@
         "reason": "Precondition hook (#495 AC-1/B1): the describe-level beforeEach \u2014 login-submit selector, /inbox post-login URL, and the per-test injection-token acquisition."
       }
     ]
+  },
+  {
+    "issue": "#480",
+    "date": "2026-11-15",
+    "file": "packages/frontend/tests/routing-rules-ang010.spec.ts",
+    "cases": [
+      "ANG-010 routing rules (real backend) ANG010-RBAC-1: USER is bounced to /inbox by the ADMIN route guard and the nav hides Routing Rules"
+    ],
+    "kind": "contract-conformance",
+    "rationale": "MIG-091e-fix #467 (founder decision B `72e7fd1`) makes routing-rule administration SUPER_ADMIN-only and both frontends now gate the route+nav to SUPER_ADMIN (#480), so the declared case upgrades to assert the ADMIN denial (nav hidden + direct goto bounced to /inbox) alongside the kept USER denial; title byte-identical, no assertion removed or relaxed.",
+    "approval": "https://github.com/csim-sg/yacc/issues/480#issuecomment-6878608224",
+    "support": [
+      {
+        "label": "rbac1-upgrade-note",
+        "kind": "helper",
+        "reason": "File-head doc note (no executable lines) recording the #480 RBAC-1 upgrade and its declaration, per the recorded-not-silent convention of the earlier #478/#485 re-point bullets."
+      }
+    ]
   }
 ]

@@ -272,7 +272,10 @@ function AppRoutes(): ReactElement {
        <Route
          path="/routing-rules"
          element={
-           <ProtectedRoute requiredRole="ADMIN">
+           /* MIG-091e-fix #467 (founder decision B `72e7fd1`): routing-rule
+              administration is SUPER_ADMIN-only — the former ADMIN gate
+              let ADMIN reach a page whose every call 403'd (#480). */
+           <ProtectedRoute requiredRole="SUPER_ADMIN">
              <MainLayout>
                <RoutingRulesPage />
              </MainLayout>
