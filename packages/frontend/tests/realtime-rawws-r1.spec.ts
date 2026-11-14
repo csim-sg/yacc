@@ -653,16 +653,17 @@ test('R1-WS-TYPE-1: typing relay is server-truth on the wire; the inbound-only c
   // Dedicated negative-control fixture (#504, declared `fixture-fragility`
   // adaptation): the seeded bulk-test row …3050 ("Bulk Test Conversation
   // 51"). It is provably OUTSIDE the app's subscription interest set in
-  // both suite postures — never on the rendered inbox page (at fresh boot
-  // the fixture conversation …1002 and the newest seeded bulk rows
-  // …3086..…3104 rank above it; in the full sequential gate run the
-  // phase-2 bulk-assign bumps rank only …1001/…1002, the bulk-assign probe
-  // rows …3000..…3009 and the later half of the EDGE-BULK-006 batch above
-  // it — both postures leave it far below the list page size) and never
-  // the active conversation. FIXTURES.conversationId (…1002) is NOT usable
-  // here: the founder-authorized #499 inbox interest set subscribes that
-  // room, so its typing relay legitimately reaches the app wire (#499
-  // measured the two delivered frames).
+  // both suite postures — never on the rendered inbox page and never the
+  // active conversation. Structurally: it is a MID-BLOCK bulk-test row, so
+  // at fresh boot only …3086..…3104 and the bulk rows created after it
+  // rank above it (measured 55/107), and in the full sequential gate run
+  // the phase-2 bulk-assign bumps rank only …3000..…3009 plus the later
+  // EDGE-BULK-006 batch entries above it — both postures hold it far below
+  // the inbox list page size, and the additive precondition below fails
+  // loudly if that ever drifts. FIXTURES.conversationId (…1002) is NOT
+  // usable here: it sits in the founder-authorized #499 inbox interest set
+  // whenever it is rendered, so its typing relay legitimately reaches the
+  // app wire (#499 measured the two delivered frames).
   const unsubscribedConversationId = '00000000-0000-0000-0000-000000003050';
 
   // Additive precondition (#504): no `conversation.subscribed` ack for the
