@@ -1,3 +1,4 @@
+// @suite-adaptation-support:repoint-imports-env
 /**
  * E2E Tests for FE-013/014/015: WebSocket Real-Time Message Listeners
  *
@@ -61,6 +62,8 @@ const WS_URL = process.env.PLAYWRIGHT_TEST_WS_URL || 'ws://localhost:8080/ws';
 // tests/helpers/auth.ts`).
 const TEST_USER = TEST_USERS.admin;
 
+// @suite-adaptation-support:end
+// @suite-adaptation-support:repoint-token-helper
 // #495 B1 (2026-11-13): the event-injection socket authenticates exactly like
 // the frozen R1 spec's sockets — the upgrade URL carries `?token=` with a real
 // access token minted by the seeded-identity sign-in (`POST /api/auth/sign-in/
@@ -75,8 +78,10 @@ async function signInToken(request: APIRequestContext): Promise<string> {
   const body = (await response.json()) as { accessToken?: string };
   return body.accessToken ?? '';
 }
+// @suite-adaptation-support:end
 
 test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
+  // @suite-adaptation-support:repoint-beforeeach
   test.beforeEach(async ({ page }) => {
     // Login before each test
     await page.goto(`${BASE_URL}/login`);
@@ -94,6 +99,7 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
     // #495 B1: token for the authenticated injection socket (below).
     injectionToken = await signInToken(page.request);
   });
+  // @suite-adaptation-support:end
 
   test.describe('FE-013: message.received Listener', () => {
     test('should receive and display new inbound message in real-time', async ({ page, context }) => {
@@ -403,19 +409,42 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       
       const testMessage = `Test message ${Date.now()}`;
       await textarea.fill(testMessage);
+      
+      // #495 B4 (declared contract-conformance, tech-lead-approved 2026-11-14):
+      // observe the ACTUAL #499 optimistic reconcile exactly — capture the
+      // optimistic row id the moment the pending row renders (the store
+      // appends it before the POST), capture the reconciled server id after
+      // the 201 resolves, then inject the frozen `message.sent` frame with
+      // that server id (`serverId` exists in no schema; the wire is the
+      // `message.sent#messageId` uuid). Assertions: server-ID row visible,
+      // optimistic-id row count 0, exactly one row for the body.
+      const firstNewRowId = page.evaluate(() => new Promise<string>((resolve) => {
+        const before = document.querySelectorAll('[data-testid="message-item"]').length;
+        const observer = new MutationObserver(() => {
+          const rows = document.querySelectorAll('[data-testid="message-item"]');
+          if (rows.length > before) {
+            observer.disconnect();
+            resolve(rows[rows.length - 1].getAttribute('data-message-id') ?? '');
+          }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+      }));
+      const sendResponse = page.waitForResponse(
+        (r) => r.url().includes('/messages') && r.request().method() === 'POST',
+      );
       await page.locator('[data-testid="reply-composer-send-button"]').click();
       
       // Get temporary message ID
       await page.waitForSelector('[data-testid="message-item"][data-status="pending"]');
-      const tempMessage = page.locator('[data-testid="message-item"]').last();
-      const tempId = await tempMessage.getAttribute('data-message-id');
+      const tempId = await firstNewRowId;
       
       // Simulate message.sent event with server ID
-      // (#495 B1/B3/B4 — DECLARED contract-conformance substitution: `serverId`
-      // exists in no frozen schema or code path; the frozen `message.sent`
-      // payload carries `messageId`, so the equivalent observable is the row
-      // whose `data-message-id` equals `message.sent#messageId` — the
-      // optimistic row is replaced by the contract-identified row.)
+      await sendResponse;
+      const serverId = await page
+        .locator('[data-testid="message-item"]')
+        .last()
+        .getAttribute('data-message-id');
+      
       await page.evaluate(({ wsUrl, token, conversationId, msgId }) => {
         const socket = new WebSocket(`${wsUrl}?token=${encodeURIComponent(token)}`);
         socket.onopen = () => {
@@ -429,15 +458,22 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
             },
           }));
         };
-      }, { wsUrl: WS_URL, token: injectionToken, conversationId, msgId: tempId });
+      }, { wsUrl: WS_URL, token: injectionToken, conversationId, msgId: serverId });
       
       // Wait for update
       await page.waitForTimeout(500);
       
       // Verify message ID was updated to server ID
-      // (#495 B4: declared substitution — see above.)
-      const updatedMessage = page.locator(`[data-message-id="${tempId}"]`);
+      // (#495 B4: the #499 reconcile replaced the optimistic row — the
+      // server-ID row is the single row for this body and no row bears the
+      // optimistic id.)
+      const updatedMessage = page.locator(`[data-message-id="${serverId}"]`);
       await expect(updatedMessage).toBeVisible();
+      await expect(page.locator(`[data-message-id="${tempId}"]`)).toHaveCount(0);
+      const bodyRow = page
+        .locator('[data-testid="message-item"]')
+        .filter({ hasText: testMessage });
+      await expect(bodyRow).toHaveCount(1);
     });
 
     test('should handle duplicate message.sent events', async ({ page }) => {

@@ -30,7 +30,24 @@
       "FE-013/014/015: WebSocket Real-Time Message Listeners WebSocket Resilience & Error Handling should deduplicate events across reconnections"
     ],
     "kind": "contract-conformance",
-    "rationale": "ANG-015-P6 (#495, tech-lead adjudication #6852513056): re-point the FE-013/014/015 event-injection stimulus to the frozen raw-WS contract \u2014 one-object page.evaluate arity, token-authenticated injection socket, connector.message.received (+senderId, uuid messageId), message.sent sentAt, message.failed retryAt+attempt \u2014 and the single declared B4 substitution asserting the row whose data-message-id equals message.sent#messageId; titles and assertions otherwise byte-identical.",
-    "approval": "https://github.com/csim-sg/yacc/issues/495#issuecomment-6852513056"
+    "rationale": "ANG-015-P6 (#495, tech-lead adjudication #6852513056): re-point the FE-013/014/015 event-injection stimulus to the frozen raw-WS contract \u2014 one-object page.evaluate arity, token-authenticated injection socket, connector.message.received (+senderId, uuid messageId), message.sent sentAt, message.failed retryAt+attempt \u2014 and the single declared B4 substitution asserting the #499 reconcile observable (server-ID row visible, optimistic-id row count 0, exactly one row for the body); titles and all other assertions byte-identical.",
+    "approval": "https://github.com/csim-sg/yacc/issues/495#issuecomment-6852513056",
+    "support": [
+      {
+        "label": "repoint-imports-env",
+        "kind": "imports",
+        "reason": "File-head precondition re-point (#495 AC-1): the two suite imports, the pinned harness env resolution (BASE_URL/API_URL/WS_URL \u2014 no dead React ports) and the seeded TEST_USERS.admin identity const, plus the dated header note documenting them."
+      },
+      {
+        "label": "repoint-token-helper",
+        "kind": "helper",
+        "reason": "B1 injection-socket authentication (#495): the file-local signInToken helper (seeded-identity sign-in for the ?token= upgrade) and the serial-execution token holder."
+      },
+      {
+        "label": "repoint-beforeeach",
+        "kind": "hook",
+        "reason": "Precondition hook (#495 AC-1/B1): the describe-level beforeEach \u2014 login-submit selector, /inbox post-login URL, and the per-test injection-token acquisition."
+      }
+    ]
   }
 ]
