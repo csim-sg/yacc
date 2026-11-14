@@ -1,5 +1,11 @@
 @if (count() !== 0) {
+  <!-- #495 DOM contract hook (#498-class attribute exposure; no behavior
+       change): machine-readable projection of the React UnreadBadge count
+       element (packages/frontend/src/components/UnreadBadge.tsx) — the
+       rendered count itself is the React-parity source; neither app carried
+       this attribute before. -->
   <span
+    data-testid="unread-badge"
     class="badge badge-sm badge-error transition-all duration-200 {{ className() }}"
     role="status"
     aria-live="polite"

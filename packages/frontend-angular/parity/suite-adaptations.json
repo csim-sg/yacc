@@ -7,7 +7,57 @@
       "R1-WS-TYPE-1: typing relay is server-truth on the wire; the inbound-only client (no room join) correctly receives none (W20 disposition evidence)"
     ],
     "kind": "fixture-fragility",
-    "rationale": "The founder-authorized #499 inbox subscription interest set now includes the row's former seeded fixture room …1002, so the receive-side negative control is re-pointed to seeded bulk-test row …3050 (provably outside the rendered inbox page in both suite postures) and gains one additive unsubscribe precondition — title and assertion semantics unchanged, room-membership gating evidence per the founder-authorized B14 narrowing.",
+    "rationale": "The founder-authorized #499 inbox subscription interest set now includes the row's former seeded fixture room \u20261002, so the receive-side negative control is re-pointed to seeded bulk-test row \u20263050 (provably outside the rendered inbox page in both suite postures) and gains one additive unsubscribe precondition \u2014 title and assertion semantics unchanged, room-membership gating evidence per the founder-authorized B14 narrowing.",
     "approval": "https://github.com/csim-sg/yacc/issues/504#issuecomment-6857656003"
+  },
+  {
+    "issue": "#495",
+    "date": "2026-11-14",
+    "file": "packages/frontend/e2e/FE-013-014-015-websocket-listeners.spec.ts",
+    "cases": [
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-013: message.received Listener should receive and display new inbound message in real-time",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-013: message.received Listener should handle duplicate message.received events",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-013: message.received Listener should preserve message order in timeline"
+    ],
+    "kind": "fixture-fragility",
+    "rationale": "AC-12 class 1 (tech-lead #6877967464, #507 A/B evidence): on a fresh S1 seed the top inbox cards are the zero-message bulk-test family, so the frozen first-card precondition never renders a message timeline; the precondition re-points to the first card whose preview is not \"No messages yet\" (a conversation seeded with messages). Assertions unchanged.",
+    "approval": "https://github.com/csim-sg/yacc/issues/495#issuecomment-6877967464"
+  },
+  {
+    "issue": "#495",
+    "date": "2026-11-14",
+    "file": "packages/frontend/e2e/FE-013-014-015-websocket-listeners.spec.ts",
+    "cases": [
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-013: message.received Listener should update unread count when new message arrives",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-013: message.received Listener should update conversation list with latest message preview",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-014: message.sent Listener should update message status from pending to sent",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-014: message.sent Listener should reconcile temporary ID with server ID",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-014: message.sent Listener should handle duplicate message.sent events",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-015: message.failed Listener should update message status from pending to failed",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-015: message.failed Listener should display error reason in message",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-015: message.failed Listener should show retry capability when canRetry is true",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners FE-015: message.failed Listener should handle duplicate message.failed events",
+      "FE-013/014/015: WebSocket Real-Time Message Listeners WebSocket Resilience & Error Handling should deduplicate events across reconnections"
+    ],
+    "kind": "contract-conformance",
+    "rationale": "ANG-015-P6 (#495, tech-lead adjudication #6852513056; AC-10 + AC-12 classes 2/3 per #6877967464): re-point the event-injection stimulus to the frozen raw-WS contract (one-object page.evaluate arity, token-authenticated socket, connector.message.received +senderId/uuid messageId, sentAt / retryAt+attempt), the declared B4 substitution asserting the #499 reconcile observable (server-ID row visible, optimistic-id row count 0, exactly one row for the body), the AC-10 case-6-family async re-point (exactly-+1 toHaveCount), posture-agnostic ordering for the sent cases (observe pending, wait for the row to leave pending, inject message.sent with the reconciled server id, assert sent), and row identity by unique message body for the status assertions (the optimistic id is replaced by the server id at reconcile); titles byte-identical, no assertion removed or relaxed.",
+    "approval": "https://github.com/csim-sg/yacc/issues/495#issuecomment-6877967464",
+    "support": [
+      {
+        "label": "repoint-imports-env",
+        "kind": "imports",
+        "reason": "File-head precondition re-point (#495 AC-1): the two suite imports, the pinned harness env resolution (BASE_URL/API_URL/WS_URL \u2014 no dead React ports) and the seeded TEST_USERS.admin identity const, plus the dated header note documenting them."
+      },
+      {
+        "label": "repoint-token-helper",
+        "kind": "helper",
+        "reason": "B1 injection-socket authentication (#495): the file-local signInToken helper (seeded-identity sign-in for the ?token= upgrade) and the serial-execution token holder."
+      },
+      {
+        "label": "repoint-beforeeach",
+        "kind": "hook",
+        "reason": "Precondition hook (#495 AC-1/B1): the describe-level beforeEach \u2014 login-submit selector, /inbox post-login URL, and the per-test injection-token acquisition."
+      }
+    ]
   }
 ]
