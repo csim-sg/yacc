@@ -650,6 +650,33 @@ test('R1-PRES-1: server-originated presence.updated drives the presence store fo
 
 test('R1-WS-TYPE-1: typing relay is server-truth on the wire; the inbound-only client (no room join) correctly receives none (W20 disposition evidence)', async () => {
   test.setTimeout(90_000);
+  // Dedicated negative-control fixture (#504, declared `fixture-fragility`
+  // adaptation): the seeded bulk-test row …3050 ("Bulk Test Conversation
+  // 51"). It is provably OUTSIDE the app's subscription interest set in
+  // both suite postures — never on the rendered inbox page and never the
+  // active conversation. Structurally: it is a MID-BLOCK bulk-test row, so
+  // at fresh boot only …3086..…3104 and the bulk rows created after it
+  // rank above it (measured 55/107), and in the full sequential gate run
+  // the phase-2 bulk-assign bumps rank only …3000..…3009 plus the later
+  // EDGE-BULK-006 batch entries above it — both postures hold it far below
+  // the inbox list page size, and the additive precondition below fails
+  // loudly if that ever drifts. FIXTURES.conversationId (…1002) is NOT
+  // usable here: it sits in the founder-authorized #499 inbox interest set
+  // whenever it is rendered, so its typing relay legitimately reaches the
+  // app wire (#499 measured the two delivered frames).
+  const unsubscribedConversationId = '00000000-0000-0000-0000-000000003050';
+
+  // Additive precondition (#504): no `conversation.subscribed` ack for the
+  // negative-control fixture may exist on the app wire. If inbox page-1
+  // drift ever pulls …3050 into the interest set, this fails loudly
+  // instead of silently invalidating the negative control below.
+  const subscribedAcks = appFrames.filter(
+    (frame) =>
+      frame.event === 'conversation.subscribed' &&
+      frame.data.conversationId === unsubscribedConversationId,
+  );
+  expect(subscribedAcks).toHaveLength(0);
+
   const manager = await signIn(
     page.context().request,
     FIXTURES.manager.email,
@@ -657,7 +684,7 @@ test('R1-WS-TYPE-1: typing relay is server-truth on the wire; the inbound-only c
   );
 
   // Two REAL raw-WS sessions inside the page realm: the subscriber joins
-  // the fixture conversation room (frozen `subscribe.conversation`), the
+  // the negative-control fixture room (frozen `subscribe.conversation`), the
   // manager session emits the frozen `typing.*` lifecycle. This evidences
   // the server relay half of W20 against the frozen AsyncAPI shapes. Both
   // instruments ride the MANAGER identity — a same-user session here would
@@ -716,7 +743,7 @@ test('R1-WS-TYPE-1: typing relay is server-truth on the wire; the inbound-only c
     {
       wsUrl: WS_BASE_URL,
       managerToken: manager.accessToken,
-      conversationId: FIXTURES.conversationId,
+      conversationId: unsubscribedConversationId,
       userId: manager.id,
       name: 'Manager User',
     },
@@ -726,15 +753,26 @@ test('R1-WS-TYPE-1: typing relay is server-truth on the wire; the inbound-only c
   // Frozen envelope + per-channel payload shapes, observed on the wire.
   expect(relay.started).toMatchObject({
     event: 'typing.started',
-    data: { conversationId: FIXTURES.conversationId, userId: manager.id, name: 'Manager User' },
+    data: {
+      conversationId: unsubscribedConversationId,
+      userId: manager.id,
+      name: 'Manager User',
+    },
   });
   expect(relay.stopped).toMatchObject({
     event: 'typing.stopped',
-    data: { conversationId: FIXTURES.conversationId, userId: manager.id },
+    data: { conversationId: unsubscribedConversationId, userId: manager.id },
   });
 
-  // The Angular client never joined the room (inbound-only surface — it
-  // sends nothing), so the server delivered it no typing frame at all.
+  // Receive-side negative control (`appFrames` records only frames
+  // DELIVERED TO the app's own raw-WS sockets): the app has not subscribed
+  // to `conversation:{…3050}` — the precondition above pins that on the
+  // wire — so room-membership gating delivers it no typing frame at all.
+  // The paired positive is #499's measurement: a client that HAS joined
+  // the room (the inbox fixture …1002) receives both frozen frames. The
+  // title's "inbound-only client" phrasing is the frozen case identity;
+  // the observable is room gating (B14 narrowed, founder-authorized
+  // #499), not a client that cannot emit.
   await page.waitForTimeout(1_500);
   const clientTypingFrames = appFrames.filter((frame) => frame.event.startsWith('typing.'));
   expect(clientTypingFrames).toHaveLength(0);
