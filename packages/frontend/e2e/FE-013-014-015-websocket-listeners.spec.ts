@@ -140,8 +140,10 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       }, { wsUrl: WS_URL, token: injectionToken, conversationId, senderId: TEST_USER.id });
       
       // Wait for new message to appear
-      const updatedMessageCount = await page.locator('[data-testid="message-item"]').count();
-      expect(updatedMessageCount).toBeGreaterThan(initialMessageCount);
+      // #495 (tech-lead, 2026-11-14): the injection is delivered asynchronously —
+      // the synchronous count read was a spec defect, not an app behavior.
+      // Equivalent-or-stronger (exactly +1, polled), declared in the manifest.
+      await expect(page.locator('[data-testid="message-item"]')).toHaveCount(initialMessageCount + 1);
       
       // Verify new message content
       const lastMessage = page.locator('[data-testid="message-item"]').last();

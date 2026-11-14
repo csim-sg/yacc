@@ -30,7 +30,7 @@
       "FE-013/014/015: WebSocket Real-Time Message Listeners WebSocket Resilience & Error Handling should deduplicate events across reconnections"
     ],
     "kind": "contract-conformance",
-    "rationale": "ANG-015-P6 (#495, tech-lead adjudication #6852513056): re-point the FE-013/014/015 event-injection stimulus to the frozen raw-WS contract \u2014 one-object page.evaluate arity, token-authenticated injection socket, connector.message.received (+senderId, uuid messageId), message.sent sentAt, message.failed retryAt+attempt \u2014 and the single declared B4 substitution asserting the #499 reconcile observable (server-ID row visible, optimistic-id row count 0, exactly one row for the body); titles and all other assertions byte-identical.",
+    "rationale": "ANG-015-P6 (#495, tech-lead adjudication #6852513056 + AC-10 extension 2026-11-14): re-point the FE-013/014/015 event-injection stimulus to the frozen raw-WS contract \u2014 one-object page.evaluate arity, token-authenticated injection socket, connector.message.received (+senderId, uuid messageId), message.sent sentAt, message.failed retryAt+attempt \u2014 the single declared B4 substitution asserting the #499 reconcile observable (server-ID row visible, optimistic-id row count 0, exactly one row for the body), and the AC-10 case-1 async re-point (the injection is delivered asynchronously; the synchronous count read was a spec defect \u2014 replaced by the auto-retrying exactly-+1 toHaveCount, stricter than the former toBeGreaterThan, real-event observation preserved); titles and all other assertions byte-identical.",
     "approval": "https://github.com/csim-sg/yacc/issues/495#issuecomment-6852513056",
     "support": [
       {
