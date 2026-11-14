@@ -68,8 +68,11 @@ describe('routes', () => {
     expect(children[0]?.component).toBe(Inbox);
     // ANG-008: the conversation detail row under the shell group.
     expect(children[1]?.component).toBe(Conversation);
-    // ANG-010: the routing-rules row — ADMIN-gated via roleGuard (React
-    // `ProtectedRoute requiredRole="ADMIN"` parity).
+    // ANG-010 + #480: the routing-rules row — SUPER_ADMIN-gated via
+    // roleGuard (MIG-091e-fix #467, founder decision B `72e7fd1`; React
+    // `ProtectedRoute requiredRole="SUPER_ADMIN"` parity — the role×
+    // requirement matrix in `guards.spec.ts` proves admin/manager/user
+    // are redirected to /inbox).
     expect(children[2]?.component).toBe(RoutingRules);
     expect(children[2]?.canActivate).toBeDefined();
     // ANG-011: the users row — SUPER_ADMIN-gated via roleGuard (React

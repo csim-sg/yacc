@@ -56,13 +56,16 @@ export const routes: Routes = [
       // the inbox cards and the shell NotificationCenter click-through
       // (React `path="/conversations/:id"` parity).
       { path: 'conversations/:id', component: Conversation },
-      // ANG-010 (#380): the routing-rules row — ADMIN-gated management page
-      // (React `ProtectedRoute requiredRole="ADMIN"` + `RoutingRulesPage`
-      // parity; the nav row in `lib/navigation.ts` filters identically).
+      // ANG-010 (#380) + #480: the routing-rules row — SUPER_ADMIN-gated
+      // management page (MIG-091e-fix #467, founder decision B `72e7fd1`,
+      // makes every routing-rule operation SUPER_ADMIN-only; the former
+      // ADMIN gate let ADMIN reach a page whose every call 403'd). React
+      // `ProtectedRoute requiredRole="SUPER_ADMIN"` + `RoutingRulesPage`
+      // parity; the nav row in `lib/navigation.ts` filters identically.
       {
         path: 'routing-rules',
         component: RoutingRules,
-        canActivate: [roleGuard('ADMIN')],
+        canActivate: [roleGuard('SUPER_ADMIN')],
       },
       // ANG-011 (#381): the users row — SUPER_ADMIN-gated management page
       // (React `ProtectedRoute requiredRole="SUPER_ADMIN"` + `UsersPage`

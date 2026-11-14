@@ -61,7 +61,10 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: 'Routing Rules',
     href: '/routing-rules',
     icon: '⚙️',
-    allowedRoles: ['SUPER_ADMIN', 'ADMIN'],
+    // MIG-091e-fix #467 (founder decision B `72e7fd1`): routing-rule
+    // administration is SUPER_ADMIN-only — ADMIN no longer sees the item
+    // (#480; mirrors the React `lib/navigation.ts` row).
+    allowedRoles: ['SUPER_ADMIN'],
   },
   {
     id: 'settings',
