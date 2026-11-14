@@ -104,10 +104,12 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
   test.describe('FE-013: message.received Listener', () => {
     test('should receive and display new inbound message in real-time', async ({ page, context }) => {
       // Navigate to conversation
-      await page.goto(`${BASE_URL}/`);
-      await page.waitForSelector('[data-testid="conversation-card"]');
-      
-      const conversationId = await page.locator('[data-testid="conversation-card"]').first().getAttribute('data-conversation-id');
+      // #495 AC-12 (fixture-fragility): on a fresh S1 seed the first rendered
+      // inbox page is entirely the zero-message bulk-test family — the seeded
+      // `…1001` "Fixture Support Thread" (2 messages) sits on inbox page 6 and
+      // is never rendered — so the precondition navigates directly to the
+      // seeded telegram fixture conversation (the frozen R1 FIXTURES pattern).
+      const conversationId = '00000000-0000-0000-0000-000000001001';
       await page.goto(`${BASE_URL}/conversations/${conversationId}`);
       
       // Wait for initial messages to load
@@ -241,10 +243,11 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
 
     test('should handle duplicate message.received events', async ({ page }) => {
       // Navigate to conversation
-      await page.goto(`${BASE_URL}/`);
-      await page.waitForSelector('[data-testid="conversation-card"]');
-      
-      const conversationId = await page.locator('[data-testid="conversation-card"]').first().getAttribute('data-conversation-id');
+      // #495 AC-12 (fixture-fragility): direct navigation to the seeded
+      // `…1001` "Fixture Support Thread" (2 messages) — the first rendered
+      // inbox page on a fresh seed is entirely zero-message bulk-test rows,
+      // so the timeline would never render (the frozen R1 FIXTURES pattern).
+      const conversationId = '00000000-0000-0000-0000-000000001001';
       await page.goto(`${BASE_URL}/conversations/${conversationId}`);
       
       // Wait for initial messages
@@ -288,10 +291,11 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
 
     test('should preserve message order in timeline', async ({ page }) => {
       // Navigate to conversation
-      await page.goto(`${BASE_URL}/`);
-      await page.waitForSelector('[data-testid="conversation-card"]');
-      
-      const conversationId = await page.locator('[data-testid="conversation-card"]').first().getAttribute('data-conversation-id');
+      // #495 AC-12 (fixture-fragility): direct navigation to the seeded
+      // `…1001` "Fixture Support Thread" (2 messages) — the first rendered
+      // inbox page on a fresh seed is entirely zero-message bulk-test rows,
+      // so the timeline would never render (the frozen R1 FIXTURES pattern).
+      const conversationId = '00000000-0000-0000-0000-000000001001';
       await page.goto(`${BASE_URL}/conversations/${conversationId}`);
       
       // Wait for initial messages
@@ -371,8 +375,14 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       await page.waitForSelector('[data-testid="message-item"][data-status="pending"]');
       
       // Simulate message.sent event
-      const lastMessage = page.locator('[data-testid="message-item"]').last();
-      const messageId = await lastMessage.getAttribute('data-message-id');
+      // (#495 AC-12: posture-agnostic ordering — wait for the row to leave
+      // `pending` (whatever terminal status this posture produces), then
+      // inject `message.sent` with the reconciled server id, then assert
+      // `sent`. Row identity by unique body: the optimistic id is replaced
+      // by the server id at reconcile (B4-class).)
+      const sentRow = page.locator('[data-testid="message-item"]').filter({ hasText: testMessage });
+      await expect(sentRow).not.toHaveAttribute('data-status', 'pending');
+      const messageId = await sentRow.getAttribute('data-message-id');
       
       // (#495 B1/B3: authenticated socket, frozen `message.sent` payload.)
       await page.evaluate(({ wsUrl, token, conversationId, msgId }) => {
@@ -394,7 +404,7 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       await page.waitForTimeout(500);
       
       // Verify status changed to sent
-      await expect(lastMessage.locator('[data-testid="message-status"]')).toContainText('sent');
+      await expect(sentRow.locator('[data-testid="message-status"]')).toContainText('sent');
     });
 
     test('should reconcile temporary ID with server ID', async ({ page }) => {
@@ -496,9 +506,15 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       
       // Get message ID
       await page.waitForSelector('[data-testid="message-item"][data-status="pending"]');
-      const messageId = await page.locator('[data-testid="message-item"]').last().getAttribute('data-message-id');
       
       // Send duplicate message.sent events
+      // (#495 AC-12: posture-agnostic ordering — observe `pending`, wait for
+      // the row to leave `pending`, then inject; row identity by unique body,
+      // B4-class — the optimistic id is replaced at reconcile.)
+      const sentRow = page.locator('[data-testid="message-item"]').filter({ hasText: testMessage });
+      await expect(sentRow).not.toHaveAttribute('data-status', 'pending');
+      const messageId = await sentRow.getAttribute('data-message-id');
+      
       // (#495 B1/B3: authenticated socket, frozen `message.sent` payload;
       // the duplicate is the same messageId sent twice — message-id
       // uniqueness is the dedup mechanism, T3-G10.)
@@ -524,7 +540,7 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       await page.waitForTimeout(500);
       
       // Verify message status is sent (only processed once)
-      const message = page.locator(`[data-message-id="${messageId}"]`);
+      const message = page.locator('[data-testid="message-item"]').filter({ hasText: testMessage });
       await expect(message.locator('[data-testid="message-status"]')).toContainText('sent');
     });
   });
@@ -573,7 +589,9 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       await page.waitForTimeout(500);
       
       // Verify status changed to failed
-      const message = page.locator(`[data-message-id="${messageId}"]`);
+      // (#495 AC-12 contract-conformance: row identity by unique body — the
+      // optimistic id is replaced by the server id at reconcile.)
+      const message = page.locator('[data-testid="message-item"]').filter({ hasText: testMessage });
       await expect(message.locator('[data-testid="message-status"]')).toContainText('failed');
     });
 
@@ -673,7 +691,9 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       await page.waitForTimeout(500);
       
       // Verify retry button is visible
-      const message = page.locator(`[data-message-id="${messageId}"]`);
+      // (#495 AC-12 contract-conformance: row identity by unique body — the
+      // optimistic id is replaced by the server id at reconcile.)
+      const message = page.locator('[data-testid="message-item"]').filter({ hasText: testMessage });
       const retryButton = message.locator('[data-testid="message-retry-button"]');
       
       const retryVisible = await retryButton.isVisible().catch(() => false);
@@ -728,7 +748,9 @@ test.describe('FE-013/014/015: WebSocket Real-Time Message Listeners', () => {
       await page.waitForTimeout(500);
       
       // Verify message status is failed (only processed once)
-      const message = page.locator(`[data-message-id="${messageId}"]`);
+      // (#495 AC-12 contract-conformance: row identity by unique body — the
+      // optimistic id is replaced by the server id at reconcile.)
+      const message = page.locator('[data-testid="message-item"]').filter({ hasText: testMessage });
       await expect(message.locator('[data-testid="message-status"]')).toContainText('failed');
     });
   });
