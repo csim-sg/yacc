@@ -25,6 +25,16 @@ import { ResourceState } from './resource-state';
  * HTTP/transport failure. `updateMessageStatus` matches
  * `id === messageId || tempId === messageId` and is idempotent —
  * duplicate frames patch the same row once, never duplicating rows.
+ *
+ * Send split (#507): the send is two store operations — `beginSend`
+ * (create the pending row, return its tempId) and `dispatchSend`
+ * (POST → reconcile / fail). The conversation page awaits exactly ONE
+ * Angular render boundary between them (`afterNextRender`, #507), so
+ * the pending state is rendered — observable — before the request is
+ * issued. The request payload, reconcile, failure rollback, alias map,
+ * idempotent status patches and the server-id-only retry guard are
+ * unchanged; only the dispatch TIMING relative to the first render of
+ * the pending row differs.
  */
 @Injectable({ providedIn: 'root' })
 export class MessagesStore {
@@ -75,28 +85,60 @@ export class MessagesStore {
   }
 
   /**
-   * Send a message through the ACTIVATED optimistic mechanism (U5,
-   * #499): `sendPending` BEFORE the POST (pending row `{id: tempId,
-   * status: 'pending'}`), `reconcile` with the 201's returned server row
-   * (the frozen send operation answers a PENDING server message) on
-   * success, `fail` on HTTP/transport failure. The conversations family
-   * is invalidated on success (B4 mapping). Rejects on failure — the
-   * composer surfaces the typed error and the failed temp row keeps the
-   * retry affordance (server-id rows only; the click guard is the
-   * conversation page's).
+   * First half of the split send (U5, #499; the #507 render-ordering
+   * contract): create the optimistic pending row NOW and return its
+   * tempId, so the caller can render it before issuing the POST.
+   *
+   * Returns `null` when the conversation's list is not loaded — there is
+   * no loaded snapshot to append the row to (the append would no-op), so
+   * there is no row to render and no boundary to wait for; the caller
+   * dispatches directly (the pre-#499 behavior: POST without an
+   * optimistic row). On a loaded list the returned tempId is already in
+   * the list snapshot when this call returns — the caller must await one
+   * render boundary before `dispatchSend`.
    */
-  async send(conversationId: string, body: SendMessageRequest): Promise<Message> {
-    const tempId = this.sendPending(conversationId, {
+  beginSend(conversationId: string, body: SendMessageRequest): string | null {
+    if (this.listSnapshot(conversationId)?.data === undefined) {
+      return null;
+    }
+    return this.sendPending(conversationId, {
       body: body.body,
       senderName: this.auth.user()?.name ?? 'Agent',
     });
+  }
+
+  /**
+   * Second half of the split send (U5, #499/#507): POST the message and
+   * settle the optimistic row — `reconcile` with the 201's returned
+   * server row (the frozen send operation answers a PENDING server
+   * message) on success, `fail` on HTTP/transport failure. The
+   * conversations family is invalidated on success (B4 mapping).
+   * Rejects on failure — the composer surfaces the typed error and the
+   * failed temp row keeps the retry affordance (server-id rows only;
+   * the click guard is the conversation page's).
+   *
+   * Callers MUST have rendered the pending row first (one render
+   * boundary between `beginSend` and this call — #507). A `null` tempId
+   * (unloaded list, see `beginSend`) dispatches without reconciliation:
+   * the row-less path matches the pre-#499 behavior where both
+   * `reconcile` and `fail` would no-op on a missing snapshot.
+   */
+  async dispatchSend(
+    conversationId: string,
+    tempId: string | null,
+    body: SendMessageRequest,
+  ): Promise<Message> {
     try {
       const message = await this.service.send(conversationId, body);
-      this.reconcile(conversationId, tempId, message);
+      if (tempId !== null) {
+        this.reconcile(conversationId, tempId, message);
+      }
       this.conversations.invalidate();
       return message;
     } catch (err: unknown) {
-      this.fail(conversationId, tempId);
+      if (tempId !== null) {
+        this.fail(conversationId, tempId);
+      }
       throw err;
     }
   }

@@ -6,7 +6,8 @@ import { provideRouter, Router, RouterOutlet } from '@angular/router';
 
 import { errorMappingInterceptor } from '../../interceptors/error-mapping.interceptor';
 import { flushTasks } from '../../../testing/flush-tasks';
-import { Conversation } from './conversation';
+import { MessagesStore } from '../../services/messages.store';
+import { RENDER_BOUNDARY, Conversation } from './conversation';
 
 @Component({ selector: 'app-stub', template: '' })
 class StubPage {}
@@ -17,6 +18,131 @@ class StubPage {}
   template: '<router-outlet />',
 })
 class TestHost {}
+
+let fixture: ComponentFixture<TestHost>;
+let router: Router;
+let http: HttpTestingController;
+
+const CONVERSATION_ID = '00000000-0000-4000-8000-00000000c001';
+const MANAGER = {
+  id: '00000000-0000-4000-8000-00000000d003',
+  email: 'manager@yacc.local',
+  name: 'Manager User',
+  role: 'manager',
+  status: 'active',
+};
+const PLAIN_USER = {
+  id: '00000000-0000-4000-8000-00000000d004',
+  email: 'user@yacc.local',
+  name: 'Support User',
+  role: 'user',
+  status: 'active',
+};
+
+const detail = (assignedUserId: string | null = MANAGER.id, tags: unknown[] = vipTag()) => ({
+  data: {
+    id: CONVERSATION_ID,
+    channel: 'telegram',
+    externalThreadId: 'thread-1',
+    title: 'Support thread',
+    status: 'open',
+    priority: 'normal',
+    assignedUserId,
+    createdAt: '2026-10-01T10:00:00Z',
+    updatedAt: '2026-10-19T10:00:00Z',
+    tags,
+  },
+});
+
+function vipTag(): unknown[] {
+  return [{ id: '1', name: 'VIP', color: '#2563EB' }];
+}
+
+const inbound = {
+  id: '00000000-0000-4000-8000-00000000e001',
+  conversationId: CONVERSATION_ID,
+  senderId: null,
+  senderName: 'Fixture Sender',
+  body: 'fixture inbound message',
+  status: 'sent',
+  direction: 'inbound',
+  createdAt: '2026-10-19T09:00:00Z',
+  updatedAt: '2026-10-19T09:00:00Z',
+};
+const outboundFailed = {
+  id: '00000000-0000-4000-8000-00000000e002',
+  conversationId: CONVERSATION_ID,
+  senderId: MANAGER.id,
+  senderName: 'Manager User',
+  body: 'failed outbound reply',
+  status: 'failed',
+  direction: 'outbound',
+  createdAt: '2026-10-19T09:05:00Z',
+  updatedAt: '2026-10-19T09:05:00Z',
+};
+
+const messageList = (rows: Record<string, unknown>[]) => ({
+  messages: rows,
+  total: rows.length,
+  page: 1,
+  limit: 50,
+});
+
+function pageElement(): HTMLElement {
+  return fixture.nativeElement as HTMLElement;
+}
+
+async function render(url = `/conversations/${CONVERSATION_ID}`): Promise<void> {
+  await router.navigateByUrl(url);
+  fixture.detectChanges();
+  await fixture.whenStable();
+  fixture.detectChanges();
+}
+
+/**
+ * Seed the token storage and render: the AuthService memoizes its
+ * session restore at construction, so the token MUST exist before the
+ * component instantiates — the construction-time get-session is then
+ * flushed here.
+ */
+async function renderSignedIn(user: Record<string, string>): Promise<void> {
+  localStorage.setItem('yacc_token', 'access-1');
+  localStorage.setItem('yacc_refresh_token', 'refresh-1');
+  localStorage.setItem('yacc_token_kind', 'local');
+  await render();
+  http.expectOne('/api/auth/get-session').flush({ user, mustChangePassword: false });
+  fixture.detectChanges();
+}
+
+/**
+ * Flush the detail + messages list, then — once the loaded detail has
+ * rendered the right panel — the panel's own tags/notes loads.
+ */
+async function flushDetail(inputs: {
+  messages: Record<string, unknown>[];
+  assignedUserId?: string | null;
+}): Promise<void> {
+  fixture.detectChanges();
+  http.expectOne(`/api/conversations/${CONVERSATION_ID}`).flush(detail(inputs.assignedUserId ?? MANAGER.id));
+  http
+    .expectOne(`/api/conversations/${CONVERSATION_ID}/messages`)
+    .flush(messageList(inputs.messages));
+  await fixture.whenStable();
+  fixture.detectChanges();
+  flushRightPanelLoads();
+}
+
+/** The right panel loads tags + notes whenever the conversation renders. */
+function flushRightPanelLoads(): void {
+  http.expectOne('/api/tags').flush({ data: [], page: 1, pageSize: 50, total: 0 });
+  http
+    .expectOne(`/api/conversations/${CONVERSATION_ID}/notes`)
+    .flush({ data: [], page: 1, pageSize: 50, total: 0 });
+}
+
+function composerTextarea(): HTMLTextAreaElement {
+  return pageElement().querySelector('[data-testid="reply-composer-textarea"]') as HTMLTextAreaElement;
+}
 
 /**
  * ConversationPage spec (W7 — detail, timeline, reply, exactly-once
@@ -29,131 +155,6 @@ class TestHost {}
  * Interactions go through the DOM (existing page-spec convention).
  */
 describe('Conversation page', () => {
-  let fixture: ComponentFixture<TestHost>;
-  let router: Router;
-  let http: HttpTestingController;
-
-  const CONVERSATION_ID = '00000000-0000-4000-8000-00000000c001';
-  const MANAGER = {
-    id: '00000000-0000-4000-8000-00000000d003',
-    email: 'manager@yacc.local',
-    name: 'Manager User',
-    role: 'manager',
-    status: 'active',
-  };
-  const PLAIN_USER = {
-    id: '00000000-0000-4000-8000-00000000d004',
-    email: 'user@yacc.local',
-    name: 'Support User',
-    role: 'user',
-    status: 'active',
-  };
-
-  const detail = (assignedUserId: string | null = MANAGER.id, tags: unknown[] = vipTag()) => ({
-    data: {
-      id: CONVERSATION_ID,
-      channel: 'telegram',
-      externalThreadId: 'thread-1',
-      title: 'Support thread',
-      status: 'open',
-      priority: 'normal',
-      assignedUserId,
-      createdAt: '2026-10-01T10:00:00Z',
-      updatedAt: '2026-10-19T10:00:00Z',
-      tags,
-    },
-  });
-
-  function vipTag(): unknown[] {
-    return [{ id: '1', name: 'VIP', color: '#2563EB' }];
-  }
-
-  const inbound = {
-    id: '00000000-0000-4000-8000-00000000e001',
-    conversationId: CONVERSATION_ID,
-    senderId: null,
-    senderName: 'Fixture Sender',
-    body: 'fixture inbound message',
-    status: 'sent',
-    direction: 'inbound',
-    createdAt: '2026-10-19T09:00:00Z',
-    updatedAt: '2026-10-19T09:00:00Z',
-  };
-  const outboundFailed = {
-    id: '00000000-0000-4000-8000-00000000e002',
-    conversationId: CONVERSATION_ID,
-    senderId: MANAGER.id,
-    senderName: 'Manager User',
-    body: 'failed outbound reply',
-    status: 'failed',
-    direction: 'outbound',
-    createdAt: '2026-10-19T09:05:00Z',
-    updatedAt: '2026-10-19T09:05:00Z',
-  };
-
-  const messageList = (rows: Record<string, unknown>[]) => ({
-    messages: rows,
-    total: rows.length,
-    page: 1,
-    limit: 50,
-  });
-
-  function pageElement(): HTMLElement {
-    return fixture.nativeElement as HTMLElement;
-  }
-
-  async function render(url = `/conversations/${CONVERSATION_ID}`): Promise<void> {
-    await router.navigateByUrl(url);
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-  }
-
-  /**
-   * Seed the token storage and render: the AuthService memoizes its
-   * session restore at construction, so the token MUST exist before the
-   * component instantiates — the construction-time get-session is then
-   * flushed here.
-   */
-  async function renderSignedIn(user: Record<string, string>): Promise<void> {
-    localStorage.setItem('yacc_token', 'access-1');
-    localStorage.setItem('yacc_refresh_token', 'refresh-1');
-    localStorage.setItem('yacc_token_kind', 'local');
-    await render();
-    http.expectOne('/api/auth/get-session').flush({ user, mustChangePassword: false });
-    fixture.detectChanges();
-  }
-
-  /**
-   * Flush the detail + messages list, then — once the loaded detail has
-   * rendered the right panel — the panel's own tags/notes loads.
-   */
-  async function flushDetail(inputs: {
-    messages: Record<string, unknown>[];
-    assignedUserId?: string | null;
-  }): Promise<void> {
-    fixture.detectChanges();
-    http.expectOne(`/api/conversations/${CONVERSATION_ID}`).flush(detail(inputs.assignedUserId ?? MANAGER.id));
-    http
-      .expectOne(`/api/conversations/${CONVERSATION_ID}/messages`)
-      .flush(messageList(inputs.messages));
-    await fixture.whenStable();
-    fixture.detectChanges();
-    flushRightPanelLoads();
-  }
-
-  /** The right panel loads tags + notes whenever the conversation renders. */
-  function flushRightPanelLoads(): void {
-    http.expectOne('/api/tags').flush({ data: [], page: 1, pageSize: 50, total: 0 });
-    http
-      .expectOne(`/api/conversations/${CONVERSATION_ID}/notes`)
-      .flush({ data: [], page: 1, pageSize: 50, total: 0 });
-  }
-
-  function composerTextarea(): HTMLTextAreaElement {
-    return pageElement().querySelector('[data-testid="reply-composer-textarea"]') as HTMLTextAreaElement;
-  }
-
   beforeEach(async () => {
     localStorage.clear();
     TestBed.configureTestingModule({
@@ -236,8 +237,9 @@ describe('Conversation page', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    // Server-confirmed append: the timeline shows the new row (status
-    // rides the HTTP append path — no optimistic temp row, U5 inactive).
+    // The optimistic pending row was rendered pre-dispatch (#507) and the
+    // 201's returned server row reconciled over it (U5, #499): the
+    // timeline shows the new row exactly once, keyed by the server id.
     const bodies = Array.from(pageElement().querySelectorAll('[data-testid="message-body"]')).map(
       (row) => row.textContent?.trim(),
     );
@@ -252,6 +254,7 @@ describe('Conversation page', () => {
     await fixture.whenStable();
     fixture.detectChanges();
   });
+
 
   it('surfaces a failed send through the composer alert and clears it on dismiss', async () => {
     await renderSignedIn(MANAGER);
@@ -488,5 +491,144 @@ describe('Conversation page', () => {
 
     expect(pageElement().querySelector('.skeleton')).toBeNull();
     expect(pageElement().querySelector('[data-testid="conversation-detail"]')).toBeDefined();
+  });
+});
+
+/**
+ * #507 render-ordering invariant: the optimistic pending row must be
+ * RENDERED — observable — before the POST is dispatched, via exactly one
+ * awaited render boundary (no fixed delay). The boundary is a controlled
+ * double here so the ordering is deterministic in the harness (the
+ * TestBed fixture renders through explicit `detectChanges`, not the
+ * application tick the real `afterNextRender` rides — the real default
+ * is exercised by the send-flow tests above). Removing the boundary in
+ * `sendMessage` dispatches inside the click task, before any render can
+ * run: the `expectNone` + rendered-state assertions below then fail.
+ */
+describe('Conversation page — observable pending dispatch (#507)', () => {
+  let boundaryCount = 0;
+  let releaseBoundary: (() => void) | null = null;
+  /** Controlled boundary: counts awaits; resolves when the test releases it. */
+  const controlledBoundary = (): Promise<void> =>
+    new Promise<void>((resolve) => {
+      boundaryCount += 1;
+      releaseBoundary = resolve;
+    });
+
+  beforeEach(async () => {
+    localStorage.clear();
+    boundaryCount = 0;
+    releaseBoundary = null;
+    TestBed.configureTestingModule({
+      imports: [TestHost, Conversation],
+      providers: [
+        provideHttpClient(withInterceptors([errorMappingInterceptor])),
+        provideHttpClientTesting(),
+        provideRouter([
+          { path: 'conversations/:id', component: Conversation },
+          { path: 'inbox', component: StubPage },
+          { path: 'login', component: StubPage },
+        ]),
+        { provide: RENDER_BOUNDARY, useValue: controlledBoundary },
+      ],
+    });
+    router = TestBed.inject(Router);
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(TestHost);
+  });
+
+  afterEach(() => {
+    fixture.destroy();
+    http.verify();
+    localStorage.clear();
+  });
+
+  it('renders the optimistic pending row before the POST is dispatched (one render boundary)', async () => {
+    await renderSignedIn(MANAGER);
+    await flushDetail({ messages: [inbound] });
+    await flushTasks();
+    fixture.detectChanges();
+
+    const textarea = composerTextarea();
+    textarea.value = 'observable pending reply';
+    textarea.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    (pageElement().querySelector('[data-testid="reply-composer-send-button"]') as HTMLButtonElement).click();
+
+    // beginSend has run; the dispatch must WAIT on the boundary — no POST
+    // may be in flight while it is pending.
+    await flushTasks();
+    expect(boundaryCount).toBe(1);
+    http.expectNone(`/api/conversations/${CONVERSATION_ID}/messages`);
+
+    // The boundary's render actuation: the pending row becomes observable
+    // in the rendered timeline (badge `pending`), keyed by its tempId.
+    fixture.detectChanges();
+    const renderedRow = Array.from(
+      pageElement().querySelectorAll('[data-testid="message-item"]'),
+    ).find(
+      (row) =>
+        row.querySelector('[data-testid="message-body"]')?.textContent?.trim() ===
+        'observable pending reply',
+    );
+    expect(renderedRow).toBeDefined();
+    expect(renderedRow?.querySelector('.badge')?.textContent?.trim()).toBe('pending');
+
+    const messagesStore = TestBed.inject(MessagesStore);
+    const pendingRows = (
+      messagesStore.listSnapshot(CONVERSATION_ID)?.data?.messages ?? []
+    ).filter((row) => row.status === 'pending');
+    expect(pendingRows).toHaveLength(1);
+    expect(pendingRows[0]?.body).toBe('observable pending reply');
+    expect(pendingRows[0]?.id).toMatch(/^temp-/);
+
+    // Releasing the boundary dispatches the POST (exactly one boundary
+    // awaited — the count must not grow).
+    releaseBoundary?.();
+    await flushTasks();
+    expect(boundaryCount).toBe(1);
+
+    const request = http.expectOne(`/api/conversations/${CONVERSATION_ID}/messages`);
+    expect(request.request.body).toEqual({ body: 'observable pending reply' });
+
+    // Dispatch-time snapshot invariant: BEFORE the 201 lands, the pending
+    // row is the only `pending` row in the snapshot.
+    const pendingAtDispatch = (
+      messagesStore.listSnapshot(CONVERSATION_ID)?.data?.messages ?? []
+    ).filter((row) => row.status === 'pending');
+    expect(pendingAtDispatch).toHaveLength(1);
+    expect(pendingAtDispatch[0]?.id).toMatch(/^temp-/);
+
+    // The frozen flow continues: the 201 returns the PENDING server row
+    // and reconcile replaces the temp row with it.
+    request.flush({
+      data: {
+        id: '00000000-0000-4000-8000-00000000e004',
+        conversationId: CONVERSATION_ID,
+        senderId: MANAGER.id,
+        senderName: 'Manager User',
+        body: 'observable pending reply',
+        status: 'pending',
+        direction: 'outbound',
+        createdAt: '2026-10-19T10:07:00Z',
+        updatedAt: '2026-10-19T10:07:00Z',
+      },
+    });
+    await flushTasks();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const bodies = Array.from(pageElement().querySelectorAll('[data-testid="message-body"]')).map(
+      (row) => row.textContent?.trim(),
+    );
+    expect(bodies).toEqual(['fixture inbound message', 'observable pending reply']);
+
+    // B4: the dispatched send invalidated the conversations family — the
+    // loaded detail entry refetches.
+    http.expectOne(`/api/conversations/${CONVERSATION_ID}`).flush(detail());
+    await flushTasks();
+    await fixture.whenStable();
+    fixture.detectChanges();
   });
 });
