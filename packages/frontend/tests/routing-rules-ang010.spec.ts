@@ -49,6 +49,18 @@ import { ensureSuperAdminCredential } from './helpers/auth';
  *   here — RBAC propagation to both frontends is #480's scope.
  */
 
+// @suite-adaptation-support:rbac1-upgrade-note
+// #480 upgrade (2026-11-15, MIG-091e-fix #467 — founder decision B
+// `72e7fd1`): RBAC propagation has landed — both frontends now gate
+// routing-rule administration to SUPER_ADMIN (route guard + nav data),
+// and ANG010-RBAC-1 asserts BOTH denials: ADMIN (the formerly permitted
+// role, now bounced exactly like USER) and USER (the original assertions,
+// kept). Declared in `parity/suite-adaptations.json` (kind:
+// contract-conformance; approval = the tech-lead #480 handoff
+// #6878608224); the case title is byte-identical and nothing is removed
+// or relaxed — an assertion upgrade, never a weakening.
+
+// @suite-adaptation-support:end
 test.describe.configure({ mode: 'serial' });
 
 test.describe('ANG-010 routing rules (real backend)', () => {
@@ -188,16 +200,40 @@ test.describe('ANG-010 routing rules (real backend)', () => {
   test('ANG010-RBAC-1: USER is bounced to /inbox by the ADMIN route guard and the nav hides Routing Rules', async ({
     page,
   }) => {
-    await realSignIn(page, USER);
+    // #480 upgrade (MIG-091e-fix #467, founder decision B `72e7fd1`): the
+    // route/nav gate is SUPER_ADMIN-only in both frontends, so the case
+    // asserts BOTH denials — ADMIN (the formerly permitted role, now
+    // bounced exactly like USER) and USER (the original assertions,
+    // kept). See the declared note in the file head.
+    await realSignIn(page, ADMIN);
 
-    // W23 nav gate: USER does NOT see the Routing Rules item.
+    // W23 nav gate: ADMIN no longer sees the Routing Rules item (the nav
+    // data is SUPER_ADMIN-only; the backend ops gate matches it).
     const nav = page.locator('nav[aria-label="Main navigation"]');
     await expect(nav).toBeVisible();
     await expect(nav.getByText('Routing Rules')).toHaveCount(0);
 
-    // Direct goto — roleGuard('ADMIN') redirects to /inbox (React
-    // `ProtectedRoute requiredRole="ADMIN"` parity: insufficient
-    // permissions never show an error page). The page never renders.
+    // Direct goto — roleGuard('SUPER_ADMIN') redirects ADMIN to /inbox
+    // (React `ProtectedRoute requiredRole="SUPER_ADMIN"` parity:
+    // insufficient permissions never show an error page). The page never
+    // renders.
+    await page.goto('/routing-rules');
+    await expect(page).toHaveURL(/\/inbox$/);
+    await expect(page.locator('app-routing-rules')).toHaveCount(0);
+
+    // USER leg (original assertions, kept): sign out through the real nav
+    // control first — the ADMIN session would otherwise survive the
+    // /login goto (publicGuard redirects authenticated users to /inbox).
+    await nav.getByRole('button', { name: 'Sign out from application' }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    await realSignIn(page, USER);
+
+    // W23 nav gate: USER does NOT see the Routing Rules item.
+    await expect(nav).toBeVisible();
+    await expect(nav.getByText('Routing Rules')).toHaveCount(0);
+
+    // Direct goto — roleGuard('SUPER_ADMIN') redirects USER to /inbox the
+    // same way. The page never renders.
     await page.goto('/routing-rules');
     await expect(page).toHaveURL(/\/inbox$/);
     await expect(page.locator('app-routing-rules')).toHaveCount(0);

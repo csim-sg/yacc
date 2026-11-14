@@ -33,9 +33,9 @@ describe('navigation config', () => {
     ]);
   });
 
-  it('shows Inbox/Audit Logs/IRC Profiles/Routing Rules/Settings to ADMIN (no users/integrations)', () => {
+  it('shows Inbox/Audit Logs/IRC Profiles/Settings to ADMIN (no users/integrations/routing rules — #480)', () => {
     const labels = getAccessibleNavItems('ADMIN').map((item) => item.label);
-    expect(labels).toEqual(['Inbox', 'Audit Logs', 'IRC Profiles', 'Routing Rules', 'Settings']);
+    expect(labels).toEqual(['Inbox', 'Audit Logs', 'IRC Profiles', 'Settings']);
   });
 
   it('shows Inbox/Audit Logs/IRC Profiles to MANAGER', () => {
@@ -51,6 +51,12 @@ describe('navigation config', () => {
   it('grants route access only to allowed roles', () => {
     expect(hasAccessToRoute('SUPER_ADMIN', '/users')).toBe(true);
     expect(hasAccessToRoute('ADMIN', '/users')).toBe(false);
+    // #480 (MIG-091e-fix #467, founder decision B `72e7fd1`): the
+    // routing-rules surface is SUPER_ADMIN-only.
+    expect(hasAccessToRoute('SUPER_ADMIN', '/routing-rules')).toBe(true);
+    expect(hasAccessToRoute('ADMIN', '/routing-rules')).toBe(false);
+    expect(hasAccessToRoute('MANAGER', '/routing-rules')).toBe(false);
+    expect(hasAccessToRoute('USER', '/routing-rules')).toBe(false);
     expect(hasAccessToRoute('USER', '/inbox')).toBe(true);
     expect(hasAccessToRoute('USER', '/audit-logs')).toBe(false);
     expect(hasAccessToRoute('USER', '/nonexistent')).toBe(false);
