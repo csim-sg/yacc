@@ -11,7 +11,7 @@
   <!-- Not authenticated: render nothing (React `<></>` parity) -->
 } @else {
   <nav
-    class="fixed inset-y-0 left-0 z-50 w-64 bg-base-100 border-r border-base-300 transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:z-0 {{ isOpen() ? 'translate-x-0' : '-translate-x-full' }}"
+    class="fixed inset-y-0 left-0 z-50 w-64 bg-base-100 border-r border-base-300 transition-transform duration-200 ease-in-out lg:static lg:h-full lg:translate-x-0 lg:z-0 {{ isOpen() ? 'translate-x-0' : '-translate-x-full' }}"
     aria-label="Main navigation"
   >
     <div class="flex flex-col h-full p-4">

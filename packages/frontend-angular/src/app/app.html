@@ -1,2 +1,10 @@
-<app-reconnecting-indicator />
-<router-outlet />
+<div class="flex flex-col h-screen">
+  <!-- #512: viewport-height flex column — the in-flow reconnect banner is a
+       shrink-0 flex item and the routed surface consumes the remaining height
+       (flex-1 + min-h-0), so a visible banner can never push a full-height
+       shell below the fold. -->
+  <app-reconnecting-indicator class="shrink-0" />
+  <div class="flex-1 min-h-0">
+    <router-outlet />
+  </div>
+</div>
