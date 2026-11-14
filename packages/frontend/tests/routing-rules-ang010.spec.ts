@@ -59,8 +59,8 @@ import { ensureSuperAdminCredential } from './helpers/auth';
 // contract-conformance; approval = the tech-lead #480 handoff
 // #6878608224); the case title is byte-identical and nothing is removed
 // or relaxed — an assertion upgrade, never a weakening.
-// @suite-adaptation-support:end
 
+// @suite-adaptation-support:end
 test.describe.configure({ mode: 'serial' });
 
 test.describe('ANG-010 routing rules (real backend)', () => {
