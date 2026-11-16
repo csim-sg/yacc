@@ -29,11 +29,15 @@ name: Frontend Angular Parity Gates
 #                          identity checks (--list 23-identity pre-check;
 #                          exactly-23-row + `projectName === 'webkit'` +
 #                          exact-keyset post-check) and ANCHOR-FAITHFUL
-#                          outcomes (AM-8.3): the 12 anchor-green rows must
-#                          pass first attempt; the 11 pre-registered
-#                          anchor-red class-E rows remain permitted red as
-#                          recorded (never skipped, never flaky-into-green,
-#                          never claimed fixed). Report + SHA-256 sidecar +
+#                          outcomes (AM-8.3 + reviewer loop-1 correction):
+#                          the 12 anchor-passed rows must pass first
+#                          attempt; the 11 pre-registered anchor-red
+#                          class-E rows remain permitted red WITH THEIR
+#                          EXACT RECORDED DISPOSITION (`failed` stays
+#                          `failed`, `timedOut` stays `timedOut` — a
+#                          failed<->timedOut swap fails closed; never
+#                          greener, never skipped, never flaky, never
+#                          claimed fixed). Report + SHA-256 sidecar +
 #                          per-row table evidence and the declared AM-8
 #                          exception block in the job summary. No matrix
 #                          change (the suspension below is untouched);
@@ -255,14 +259,18 @@ jobs:
   # applicable row stays on Obscura (AM-1/#490). No `-g` filter, no second
   # file, no fallback engine, no duplicate Obscura execution credited.
   #
-  # ANCHOR-FAITHFUL acceptance (AM-8.3 — not blanket all-green): the frozen
-  # `ae42c67` anchor records this file on `webkit` as 12 passed / 10 failed /
-  # 1 timedOut. The 12 anchor-green rows MUST pass (first attempt); the 11
-  # pre-registered anchor-red class-E rows (markup/behaviour deltas: missing
-  # #email-error/#password-error elements, ARIA, toggle/keyboard/contrast)
-  # remain PERMITTED RED as recorded — never skipped, never
-  # flaky-into-green, never claimed fixed. The "all 23 must pass" proposal
-  # recorded in AM-8.3 is a pending decision and is NOT adopted here.
+  # ANCHOR-FAITHFUL acceptance (AM-8.3 + reviewer loop-1 correction — not
+  # blanket all-green): the frozen `ae42c67` anchor records this file on
+  # `webkit` as 12 passed / 10 failed / 1 timedOut. The 12 anchor-passed
+  # rows MUST pass (first attempt); the 11 pre-registered anchor-red
+  # class-E rows (markup/behaviour deltas: missing #email-error/
+  # #password-error elements, ARIA, toggle/keyboard/contrast) remain
+  # PERMITTED RED WITH THEIR EXACT RECORDED DISPOSITION — `failed` stays
+  # `failed`, `timedOut` stays `timedOut` (a failed<->timedOut swap is a
+  # real degradation and fails closed, it is never absorbed into a generic
+  # red bucket); never greener, never skipped, never flaky, never claimed
+  # fixed. The "all 23 must pass" proposal recorded in AM-8.3 is a pending
+  # decision and is NOT adopted here.
   #
   # Fail-closed identity rules (AM-8.4 / #517 AC-2/AC-3):
   #   pre-check  — a `--list` of the whole file under `--project=webkit`
@@ -274,9 +282,12 @@ jobs:
   #                `projectName === 'webkit'`, every row in this file, and
   #                titles matching the declared keyset exactly (no
   #                missing/extra/duplicate/out-of-file rows), with
-  #                ANCHOR-FAITHFUL outcomes per row (anchor-green →
-  #                first-attempt green; anchor-red → red; a flaky or skipped
-  #                row of either class fails closed);
+  #                ANCHOR-FAITHFUL outcomes per row (anchor-`passed` →
+  #                first-attempt green; anchor-`failed`/`timedOut` → red
+  #                with EXACTLY the recorded disposition via the final
+  #                attempt's result; a flaky or skipped row of any class,
+  #                a green row gone red, or a failed<->timedOut swap all
+  #                fail closed);
   #   evidence   — the JSON report + SHA-256 sidecar + per-row table + logs
   #                are uploaded as one flat artifact and the declared AM-8
   #                exception block is printed in the job summary so #477's
@@ -290,10 +301,10 @@ jobs:
   webkit-fe002-file:
     name: webkit-fe002-file (AM-8 — FE-002 whole file → WebKit)
     runs-on: ubuntu-latest
-    # 23 cases (12 anchor-green + 11 anchor-red class E — the reds burn
-    # config retries=2, one is a 3x test-timeout) + the S1 boot + a
-    # single-engine WebKit install; a job that cannot finish in 30 min is
-    # failing loudly, not slowly.
+    # 23 cases (12 anchor-passed + 11 anchor-red class E: 10 failed + 1
+    # timedOut — the reds burn config retries=2, the timedOut row burns 3x
+    # the test timeout) + the S1 boot + a single-engine WebKit install; a
+    # job that cannot finish in 30 min is failing loudly, not slowly.
     timeout-minutes: 30
     services:
       # Identical posture to the parity jobs (S1 #423): PostgreSQL is the
@@ -557,41 +568,46 @@ jobs:
           // per-case-listing.tsv (frozen ae42c67 anchor; gate-scope.json
           // sha256 acf4a1eb56ac1f442d2d16b6da3c252ff5c16f4d2e25fcf0dc5c37d41803bc0b),
           // project `webkit`, file fe-002-login-ui.spec.ts = 12 passed /
-          // 10 failed / 1 timedOut (23 rows). 'green' = anchor `passed` (MUST
-          // pass, first attempt); 'red' = anchor `failed`/`timedOut`
-          // (pre-registered class E — MUST remain red; flaky into green or
-          // skipped fails closed). AM-8.3: this map never upgrades the
-          // anchor; the "all 23 must pass" proposal is NOT adopted.
+          // 10 failed / 1 timedOut (23 rows). The map carries each row's
+          // EXACT recorded webkit anchor disposition: 'passed' rows MUST
+          // pass on the first attempt; 'failed'/'timedOut' rows
+          // (pre-registered class E) MUST remain red with EXACTLY their
+          // recorded disposition (final attempt 'failed' vs 'timedOut') —
+          // greener, skipped, flaky, or the OTHER red kind all fail closed
+          // (reviewer loop-1 correction, #6913136081: a failed<->timedOut
+          // swap is a real degradation, not an equivalent red). AM-8.3:
+          // this map never upgrades the anchor; the "all 23 must pass"
+          // proposal is NOT adopted.
           const FE002_ANCHOR_OUTCOMES = {
-            'should display login form with all required fields': 'red', // anchor failed
-            'should have proper form labels for accessibility': 'green',
-            'should require email field': 'red', // anchor failed
-            'should require password field': 'red', // anchor failed
-            'should validate email format': 'red', // anchor failed
-            'should validate password minimum length': 'red', // anchor failed
-            'should enable submit button when form is valid': 'green',
-            'should show real-time validation on input': 'red', // anchor failed
-            'should toggle password visibility': 'red', // anchor timedOut
-            'should have accessible toggle button': 'red', // anchor failed
-            'should show loading state during form submission': 'green',
-            'should disable inputs during submission': 'green',
-            'should display server error messages': 'green',
-            'should allow closing error message': 'green',
-            'should navigate to forgot password page': 'green',
-            'should navigate to sign up page': 'green',
-            'should have proper ARIA attributes': 'red', // anchor failed
-            'should support keyboard navigation': 'red', // anchor failed
-            'should have sufficient color contrast': 'red', // anchor failed
-            'should be responsive on mobile (375px)': 'green',
-            'should be responsive on tablet (768px)': 'green',
-            'should be responsive on desktop (1920px)': 'green',
-            'should have logout button in header (when logged in)': 'green',
+            'should display login form with all required fields': 'failed',
+            'should have proper form labels for accessibility': 'passed',
+            'should require email field': 'failed',
+            'should require password field': 'failed',
+            'should validate email format': 'failed',
+            'should validate password minimum length': 'failed',
+            'should enable submit button when form is valid': 'passed',
+            'should show real-time validation on input': 'failed',
+            'should toggle password visibility': 'timedOut',
+            'should have accessible toggle button': 'failed',
+            'should show loading state during form submission': 'passed',
+            'should disable inputs during submission': 'passed',
+            'should display server error messages': 'passed',
+            'should allow closing error message': 'passed',
+            'should navigate to forgot password page': 'passed',
+            'should navigate to sign up page': 'passed',
+            'should have proper ARIA attributes': 'failed',
+            'should support keyboard navigation': 'failed',
+            'should have sufficient color contrast': 'failed',
+            'should be responsive on mobile (375px)': 'passed',
+            'should be responsive on tablet (768px)': 'passed',
+            'should be responsive on desktop (1920px)': 'passed',
+            'should have logout button in header (when logged in)': 'passed',
           };
           const declaredTitles = Object.keys(FE002_ANCHOR_OUTCOMES);
           if (declaredTitles.length !== FE002_EXPECTED_ROWS) {
             fail(`the declared keyset itself has ${declaredTitles.length} entries, expected ${FE002_EXPECTED_ROWS}`);
           }
-          const GREEN = declaredTitles.filter((t) => FE002_ANCHOR_OUTCOMES[t] === 'green').length;
+          const GREEN = declaredTitles.filter((t) => FE002_ANCHOR_OUTCOMES[t] === 'passed').length;
           const RED = FE002_EXPECTED_ROWS - GREEN;
           if (!fs.existsSync(REPORT)) fail('the JSON report is absent — the run produced no machine-readable evidence');
           let report;
@@ -634,21 +650,25 @@ jobs:
           if (missing.length) fail(`missing FE-002 row(s): ${JSON.stringify(missing)} — the complete ${FE002_EXPECTED_ROWS}-row keyset is required (AM-8 fail-closed identity)`);
           if (extra.length) fail(`extra/out-of-keyset row(s): ${JSON.stringify(extra)} — rows outside the frozen file's identity set fail closed`);
           if (dupes.length) fail(`duplicated row(s): ${JSON.stringify(dupes)} — a case reported more than once fails closed`);
-          // Anchor-faithful outcome rule (AM-8.3): anchor-green green (first
-          // attempt); anchor-red red (final status 'unexpected' — failed or
-          // timedOut are both the recorded red class). Any flaky or skipped
-          // row, any anchor-green row red, and any anchor-red row green or
-          // flaky-into-green fail closed.
+          // Anchor-faithful outcome rule (AM-8.3 + reviewer loop-1
+          // correction): anchor-`passed` green (first attempt); anchor-
+          // `failed`/`timedOut` red with EXACTLY its recorded disposition —
+          // the row's final attempt must have ended the way the anchor
+          // recorded it (`failed` vs `timedOut`), so a failed<->timedOut
+          // swap fails closed instead of hiding inside a generic red
+          // bucket. Any flaky or skipped row, any anchor-passed row not
+          // green, and any anchor-red row greener, redder-differently,
+          // flaky or skipped fails closed.
           const problems = [];
           const table = [];
           for (const r of rows) {
             const anchor = FE002_ANCHOR_OUTCOMES[r.title];
-            if (anchor === 'green') {
+            if (anchor === 'passed') {
               if (!(r.status === 'expected' && r.expectedStatus === 'passed' && r.attempts === 1)) {
-                problems.push(`ANCHOR-GREEN ROW NOT GREEN: '${r.title}' status=${r.status} expectedStatus=${r.expectedStatus} attempts=${r.attempts} (anchor-green rows MUST pass on the first attempt)`);
+                problems.push(`ANCHOR-PASSED ROW NOT PASSED: '${r.title}' status=${r.status} expectedStatus=${r.expectedStatus} attempts=${r.attempts} (anchor-passed rows MUST pass on the first attempt)`);
               }
-            } else if (r.status !== 'unexpected') {
-              problems.push(`ANCHOR-RED ROW NOT RED: '${r.title}' status=${r.status} expectedStatus=${r.expectedStatus} attempts=${r.attempts} (anchor-red class-E rows must remain red as recorded — green, flaky and skipped all fail closed; this is NOT an acceptance upgrade)`);
+            } else if (!(r.status === 'unexpected' && r.lastResultStatus === anchor)) {
+              problems.push(`ANCHOR-${anchor.toUpperCase()} ROW DEGRADED/MISMATCHED: '${r.title}' status=${r.status} last_result=${r.lastResultStatus} attempts=${r.attempts} (the frozen anchor records this row '${anchor}' on webkit — the final attempt must match that exact disposition; greener, skipped, flaky, or the other red kind all fail closed)`);
             }
             table.push([r.title, anchor, r.status, r.expectedStatus, r.attempts, r.lastResultStatus].join('\t'));
           }
@@ -660,7 +680,7 @@ jobs:
             fail(`stats must be exactly ${JSON.stringify(expectedStats)}, found ${JSON.stringify(stats)}`);
           }
           if (problems.length) fail(`anchor-faithful outcome rule violated —\n  ${problems.join('\n  ')}`);
-          console.log('AM-8 post-check PASSED: exactly 23 rows, project webkit on every row, exact frozen keyset, anchor-faithful outcomes (12 anchor-green first-attempt green; 11 anchor-red class-E rows red as recorded — not claimed fixed).');
+          console.log('AM-8 post-check PASSED: exactly 23 rows, project webkit on every row, exact frozen keyset, anchor-faithful outcomes (12 anchor-passed rows first-attempt green; 10 anchor-failed rows failed and the 1 anchor-timedOut row timedOut — exact per-row dispositions, not claimed fixed).');
           EOF
 
       - name: Evidence — SHA-256 sidecar + AM-8 exception summary (always)
@@ -689,7 +709,7 @@ jobs:
             echo ""
             echo "Binding amendment: SPEC-003 AM-8 (vault \`14898f9\`, founder-directed 2026-11-16) — the whole file runs in REQUIRED CI on WebKit while every other applicable row stays on Obscura (AM-1/#490). This evidence is required, never \`CI-waived\` and never \`not-run\`."
             echo ""
-            echo "Anchor semantics (AM-8.3): the 12 anchor-green rows MUST pass (first attempt); the 11 pre-registered anchor-red class-E rows (10 \`failed\` + 1 \`timedOut\` in the frozen \`ae42c67\` webkit anchor) remain permitted red AS RECORDED — they are **not** claimed fixed, and the \"all 23 must pass\" proposal recorded in AM-8.3 is a pending decision that is **not** adopted."
+            echo "Anchor semantics (AM-8.3 + reviewer loop-1 correction): the 12 anchor-passed rows MUST pass (first attempt); the 11 pre-registered anchor-red class-E rows (10 \`failed\` + 1 \`timedOut\` in the frozen \`ae42c67\` webkit anchor) remain permitted red WITH THEIR EXACT RECORDED DISPOSITION — \`failed\` stays \`failed\`, \`timedOut\` stays \`timedOut\` (a failed<->timedOut swap fails closed) — they are **not** claimed fixed, and the \"all 23 must pass\" proposal recorded in AM-8.3 is a pending decision that is **not** adopted."
             echo ""
             echo "Fail-closed identity evidence:"
             echo "- engine: \`webkit\` only (Playwright project \`webkit\`; engine tool version: $(cat engine-version.txt 2>/dev/null || echo '(not captured)'))"
