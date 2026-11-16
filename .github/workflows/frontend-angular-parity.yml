@@ -18,28 +18,30 @@ name: Frontend Angular Parity Gates
 #                          `PB-2 PR verdict deferred to AM-1/#490 — no verdict
 #                          claimed`. Removed by #490 in the same change that
 #                          restores the matrix (guarded — see preflight).
-#   webkit-fe002-file      AM-8 exception (#517; SPEC-003 amendment AM-8,
-#                          vault 14898f9): the WHOLE frozen file
+#   webkit-fe002-file      AM-8/AM-9 required WebKit job (#517/#519; SPEC-003
+#                          amendments AM-8 vault 14898f9 + AM-9 vault
+#                          125af1f): the WHOLE frozen file
 #                          packages/frontend/tests/fe-002-login-ui.spec.ts
 #                          (23 cases) runs in REQUIRED CI on the `webkit`
 #                          project (file-level anchor mapping webkit→webkit;
-#                          supersedes AM-7's single-case scope, #515 — every
-#                          other row still stays on Obscura per AM-1/#490).
+#                          AM-8 routing retained — every other row still
+#                          stays on Obscura per AM-1/#490).
 #                          Exactly one file, exactly one engine, fail-closed
 #                          identity checks (--list 23-identity pre-check;
 #                          exactly-23-row + `projectName === 'webkit'` +
-#                          exact-keyset post-check) and ANCHOR-FAITHFUL
-#                          outcomes (AM-8.3 + reviewer loop-1 correction):
-#                          the 12 anchor-passed rows must pass first
-#                          attempt; the 11 pre-registered anchor-red
-#                          class-E rows remain permitted red WITH THEIR
-#                          EXACT RECORDED DISPOSITION (`failed` stays
-#                          `failed`, `timedOut` stays `timedOut` — a
-#                          failed<->timedOut swap fails closed; never
-#                          greener, never skipped, never flaky, never
-#                          claimed fixed). Report + SHA-256 sidecar +
-#                          per-row table evidence and the declared AM-8
-#                          exception block in the job summary. No matrix
+#                          exact-keyset post-check). AM-9 (founder "fix
+#                          them", superseding AM-8.3's permitted-red
+#                          allowance for this file ONLY): ALL 23 rows must
+#                          pass — status=expected, expectedStatus=passed,
+#                          attempts=1, stats {expected:23, unexpected:0,
+#                          flaky:0, skipped:0}; any repaired row regressing
+#                          to red/flaky/skipped/retried fails closed. The
+#                          frozen ae42c67 anchor stays the immutable
+#                          historical record (class E is historical anchor
+#                          disposition, not permission for a red row now).
+#                          Report + SHA-256 sidecar + per-row table
+#                          evidence and the declared AM-8/AM-9 block in
+#                          the job summary. No matrix
 #                          change (the suspension below is untouched);
 #                          gate-scope/comparator engine-coverage integration
 #                          stays with #490.
@@ -250,29 +252,30 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ------------------------------------------------------------------
-  # AM-8 exception (#517) — the whole-file WebKit alternate-engine job.
-  # SPEC-003 amendment AM-8 (vault 14898f9, founder-directed 2026-11-16)
-  # supersedes AM-7's single-case scope (#515): the ENTIRE frozen file
+  # AM-8/AM-9 required WebKit job (#517/#519) — the whole-file
+  # alternate-engine job. SPEC-003 amendment AM-8 (vault 14898f9,
+  # founder-directed 2026-11-16) supersedes AM-7's single-case scope
+  # (#515): the ENTIRE frozen file
   # `packages/frontend/tests/fe-002-login-ui.spec.ts` (23 cases) runs in
   # required CI on WebKit — the engine whose anchor rows map 1:1 (file-level
   # mapping run `webkit` ↔ anchor project `webkit`) — while EVERY other
   # applicable row stays on Obscura (AM-1/#490). No `-g` filter, no second
   # file, no fallback engine, no duplicate Obscura execution credited.
   #
-  # ANCHOR-FAITHFUL acceptance (AM-8.3 + reviewer loop-1 correction — not
-  # blanket all-green): the frozen `ae42c67` anchor records this file on
-  # `webkit` as 12 passed / 10 failed / 1 timedOut. The 12 anchor-passed
-  # rows MUST pass (first attempt); the 11 pre-registered anchor-red
-  # class-E rows (markup/behaviour deltas: missing #email-error/
-  # #password-error elements, ARIA, toggle/keyboard/contrast) remain
-  # PERMITTED RED WITH THEIR EXACT RECORDED DISPOSITION — `failed` stays
-  # `failed`, `timedOut` stays `timedOut` (a failed<->timedOut swap is a
-  # real degradation and fails closed, it is never absorbed into a generic
-  # red bucket); never greener, never skipped, never flaky, never claimed
-  # fixed. The "all 23 must pass" proposal recorded in AM-8.3 is a pending
-  # decision and is NOT adopted here.
+  # ALL 23 ROWS REQUIRED GREEN (AM-9, vault 125af1f — founder "fix them",
+  # 2026-11-16; supersedes AM-8.3's permitted-red allowance for this file
+  # ONLY): every row must pass with status=expected, expectedStatus=passed
+  # and EXACTLY ONE attempt — no retries, no flaky, no skipped — and
+  # `stats` must be exactly {expected: 23, unexpected: 0, flaky: 0,
+  # skipped: 0}. Any repaired row regressing to red/flaky/skipped/retried
+  # fails closed, exactly like the anchor-passed rows do. The frozen
+  # `ae42c67` anchor stays the immutable historical record (it still
+  # reads 12 passed / 10 failed / 1 timedOut for this file on `webkit`);
+  # its class-E registration is historical anchor disposition ONLY and is
+  # NOT permission for a red row now. The app-side repair is #519 (the
+  # Angular login page port of the React LoginForm reference behaviour).
   #
-  # Fail-closed identity rules (AM-8.4 / #517 AC-2/AC-3):
+  # Fail-closed identity rules (AM-8.4 / #519 AC-5):
   #   pre-check  — a `--list` of the whole file under `--project=webkit`
   #                yields EXACTLY the declared 23-identity keyset
   #                (FE002_EXPECTED_ROWS = 23; every declared title exactly
@@ -281,30 +284,28 @@ jobs:
   #   post-check — the JSON report contains EXACTLY 23 rows, every
   #                `projectName === 'webkit'`, every row in this file, and
   #                titles matching the declared keyset exactly (no
-  #                missing/extra/duplicate/out-of-file rows), with
-  #                ANCHOR-FAITHFUL outcomes per row (anchor-`passed` →
-  #                first-attempt green; anchor-`failed`/`timedOut` → red
-  #                with EXACTLY the recorded disposition via the final
-  #                attempt's result; a flaky or skipped row of any class,
-  #                a green row gone red, or a failed<->timedOut swap all
-  #                fail closed);
+  #                missing/extra/duplicate/out-of-file rows), with the
+  #                AM-9 all-green outcome per row (first-attempt pass; a
+  #                red, flaky, skipped or retried row of any kind fails
+  #                closed);
   #   evidence   — the JSON report + SHA-256 sidecar + per-row table + logs
-  #                are uploaded as one flat artifact and the declared AM-8
-  #                exception block is printed in the job summary so #477's
+  #                are uploaded as one flat artifact and the declared
+  #                AM-8/AM-9 block is printed in the job summary so #477's
   #                terminal verdict can consume it as required evidence
   #                (never `CI-waived`, never `not-run`).
   # The posture is the SAME S1 posture the parity jobs provision (Java
   # :8080 bootJar, PostgreSQL service, Mailhog SMTP sink,
   # BASE_URL=http://localhost:4200). The fail-closed boundaries are
-  # demonstrated on synthetic reports before merge (recorded on #517).
+  # demonstrated on synthetic reports before merge (recorded on #517 and
+  # extended with the AM-9 regression negatives on #519).
   # ------------------------------------------------------------------
   webkit-fe002-file:
-    name: webkit-fe002-file (AM-8 — FE-002 whole file → WebKit)
+    name: webkit-fe002-file (AM-9 — FE-002 whole file → WebKit, all 23 green)
     runs-on: ubuntu-latest
-    # 23 cases (12 anchor-passed + 11 anchor-red class E: 10 failed + 1
-    # timedOut — the reds burn config retries=2, the timedOut row burns 3x
-    # the test timeout) + the S1 boot + a single-engine WebKit install; a
-    # job that cannot finish in 30 min is failing loudly, not slowly.
+    # 23 cases, ALL required green under AM-9 (no anchor-red rows anymore —
+    # no retry budget is burned; the previous worst case, the timedOut row,
+    # is gone) + the S1 boot + a single-engine WebKit install; a job that
+    # cannot finish in 30 min is failing loudly, not slowly.
     timeout-minutes: 30
     services:
       # Identical posture to the parity jobs (S1 #423): PostgreSQL is the
@@ -463,7 +464,7 @@ jobs:
         # package directory resolves this workspace's @playwright/test.
         run: (cd packages/frontend-angular && npx playwright install --with-deps webkit)
 
-      - name: AM-8 pre-check — the frozen file's identity set is exactly the declared 23 (fail-closed)
+      - name: AM-9 pre-check — the frozen file's identity set is exactly the declared 23 (fail-closed)
         run: |
           set -euo pipefail
           FE002_FILE='packages/frontend/tests/fe-002-login-ui.spec.ts'
@@ -501,7 +502,7 @@ jobs:
             echo "::error::AM-8 pre-check FAILED CLOSED — the declared keyset itself has ${#DECLARED_TITLES[@]} entries, expected $FE002_EXPECTED_ROWS"
             exit 1
           fi
-          echo "AM-8 exception: $FE002_FILE (whole file, $FE002_EXPECTED_ROWS cases) -> webkit (anchor project: webkit)"
+          echo "AM-8/AM-9: $FE002_FILE (whole file, $FE002_EXPECTED_ROWS cases) -> webkit (anchor project: webkit); AM-9 requires ALL $FE002_EXPECTED_ROWS rows green (first attempt)."
           mkdir -p /tmp/opencode/webkit-fe002-file
           ENGINE_VERSION="$( (cd packages/frontend-angular && npx playwright --version) )"
           echo "Playwright engine tool: $ENGINE_VERSION (project webkit — Playwright's bundled WebKit build)"
@@ -527,7 +528,7 @@ jobs:
           if [ "$FAIL" -ne 0 ]; then
             exit 1
           fi
-          echo "AM-8 pre-check PASSED: exactly $FE002_EXPECTED_ROWS identities on [webkit]; every declared title occurs exactly once."
+          echo "AM-9 pre-check PASSED: exactly $FE002_EXPECTED_ROWS identities on [webkit]; every declared title occurs exactly once."
 
       - name: Run the WHOLE frozen FE-002 file (webkit, --project=webkit, no title filter)
         run: |
@@ -535,13 +536,13 @@ jobs:
           mkdir -p /tmp/opencode/webkit-fe002-file
           export PLAYWRIGHT_JSON_OUTPUT_DIR=/tmp/opencode/webkit-fe002-file
           export PLAYWRIGHT_JSON_OUTPUT_NAME=parity-run.json
-          # `defaults.run.shell: bash` expands to `bash -eo pipefail`; the
-          # whole file contains 11 pre-registered anchor-red (class E) rows,
-          # so a FAITHFUL run exits 1 (expected red). The exact Playwright
-          # exit code is captured for the record and this step exits 0 —
-          # the AM-8 verdict belongs to the post-check (identity +
-          # anchor-faithful outcomes), which fails closed on any absent,
-          # truncated or unfaithful report.
+          # `defaults.run.shell: bash` expands to `bash -eo pipefail`. Under
+          # AM-9 ALL 23 rows must pass, so a FAITHFUL run exits 0; a
+          # non-zero exit means at least one row regressed. The exact
+          # Playwright exit code is captured for the record and this step
+          # exits 0 either way — the AM-9 verdict belongs to the post-check
+          # (identity + all-green outcomes), which fails closed on any
+          # absent, truncated, red, flaky, skipped or retried row.
           set +e
           (cd packages/frontend-angular && npx playwright test \
             ../frontend/tests/fe-002-login-ui.spec.ts \
@@ -551,10 +552,10 @@ jobs:
           code=${PIPESTATUS[0]}
           set -e
           echo "$code" > /tmp/opencode/webkit-fe002-file/playwright-exit-code.txt
-          echo "playwright_exit=$code (informational only — 11 anchor-red rows are expected red; the post-check owns the AM-8 verdict)"
+          echo "playwright_exit=$code (informational only — under AM-9 a faithful run exits 0; the post-check owns the verdict)"
           exit 0
 
-      - name: AM-8 post-check — exactly 23 rows, projectName webkit, exact keyset, anchor-faithful outcomes (fail-closed)
+      - name: AM-9 post-check — exactly 23 rows, projectName webkit, exact keyset, ALL GREEN first attempt (fail-closed)
         run: |
           set -euo pipefail
           node <<'EOF'
@@ -563,41 +564,40 @@ jobs:
           const TABLE = '/tmp/opencode/webkit-fe002-file/am8-rows.tsv';
           const FE002_FILE = 'fe-002-login-ui.spec.ts';
           const FE002_EXPECTED_ROWS = 23;
-          const fail = (msg) => { console.error(`::error::AM-8 post-check FAILED CLOSED — ${msg}`); process.exit(1); };
+          const fail = (msg) => { console.error(`::error::AM-9 post-check FAILED CLOSED — ${msg}`); process.exit(1); };
           // Anchor provenance: parity/baseline/react-e2e-baseline-ae42c67-on-java/
           // per-case-listing.tsv (frozen ae42c67 anchor; gate-scope.json
-          // sha256 acf4a1eb56ac1f442d2d16b6da3c252ff5c16f4d2e25fcf0dc5c37d41803bc0b),
-          // project `webkit`, file fe-002-login-ui.spec.ts = 12 passed /
-          // 10 failed / 1 timedOut (23 rows). The map carries each row's
-          // EXACT recorded webkit anchor disposition: 'passed' rows MUST
-          // pass on the first attempt; 'failed'/'timedOut' rows
-          // (pre-registered class E) MUST remain red with EXACTLY their
-          // recorded disposition (final attempt 'failed' vs 'timedOut') —
-          // greener, skipped, flaky, or the OTHER red kind all fail closed
-          // (reviewer loop-1 correction, #6913136081: a failed<->timedOut
-          // swap is a real degradation, not an equivalent red). AM-8.3:
-          // this map never upgrades the anchor; the "all 23 must pass"
-          // proposal is NOT adopted.
+          // sha256 acf4a1eb56ac1f442d2d16b6da3c252ff5c16f4d2e25fcf0dc5c37d41803bc0b).
+          // The anchor still reads 12 passed / 10 failed / 1 timedOut for
+          // this file on project `webkit` — it is the immutable HISTORICAL
+          // record. AM-9 (vault 125af1f, founder "fix them", superseding
+          // AM-8.3's permitted-red allowance for this file ONLY) requires
+          // ALL 23 rows GREEN: every map value below is 'passed'
+          // (status=expected, expectedStatus=passed, attempts=1 — no
+          // retries, no flaky, no skipped). A repaired row regressing to
+          // red/flaky/skipped/retried fails closed exactly like the
+          // anchor-passed rows do today; class E is historical anchor
+          // disposition, never permission for a red row now.
           const FE002_ANCHOR_OUTCOMES = {
-            'should display login form with all required fields': 'failed',
+            'should display login form with all required fields': 'passed',
             'should have proper form labels for accessibility': 'passed',
-            'should require email field': 'failed',
-            'should require password field': 'failed',
-            'should validate email format': 'failed',
-            'should validate password minimum length': 'failed',
+            'should require email field': 'passed',
+            'should require password field': 'passed',
+            'should validate email format': 'passed',
+            'should validate password minimum length': 'passed',
             'should enable submit button when form is valid': 'passed',
-            'should show real-time validation on input': 'failed',
-            'should toggle password visibility': 'timedOut',
-            'should have accessible toggle button': 'failed',
+            'should show real-time validation on input': 'passed',
+            'should toggle password visibility': 'passed',
+            'should have accessible toggle button': 'passed',
             'should show loading state during form submission': 'passed',
             'should disable inputs during submission': 'passed',
             'should display server error messages': 'passed',
             'should allow closing error message': 'passed',
             'should navigate to forgot password page': 'passed',
             'should navigate to sign up page': 'passed',
-            'should have proper ARIA attributes': 'failed',
-            'should support keyboard navigation': 'failed',
-            'should have sufficient color contrast': 'failed',
+            'should have proper ARIA attributes': 'passed',
+            'should support keyboard navigation': 'passed',
+            'should have sufficient color contrast': 'passed',
             'should be responsive on mobile (375px)': 'passed',
             'should be responsive on tablet (768px)': 'passed',
             'should be responsive on desktop (1920px)': 'passed',
@@ -650,25 +650,26 @@ jobs:
           if (missing.length) fail(`missing FE-002 row(s): ${JSON.stringify(missing)} — the complete ${FE002_EXPECTED_ROWS}-row keyset is required (AM-8 fail-closed identity)`);
           if (extra.length) fail(`extra/out-of-keyset row(s): ${JSON.stringify(extra)} — rows outside the frozen file's identity set fail closed`);
           if (dupes.length) fail(`duplicated row(s): ${JSON.stringify(dupes)} — a case reported more than once fails closed`);
-          // Anchor-faithful outcome rule (AM-8.3 + reviewer loop-1
-          // correction): anchor-`passed` green (first attempt); anchor-
-          // `failed`/`timedOut` red with EXACTLY its recorded disposition —
-          // the row's final attempt must have ended the way the anchor
-          // recorded it (`failed` vs `timedOut`), so a failed<->timedOut
-          // swap fails closed instead of hiding inside a generic red
-          // bucket. Any flaky or skipped row, any anchor-passed row not
-          // green, and any anchor-red row greener, redder-differently,
-          // flaky or skipped fails closed.
+          // AM-9 outcome rule (supersedes the AM-8.3 anchor-faithful red
+          // allowance for this file): EVERY map value is 'passed' and every
+          // row MUST be status=expected, expectedStatus=passed, with
+          // EXACTLY ONE attempt — a repaired row regressing to red
+          // (unexpected), flaky, skipped or retried fails closed. The
+          // reviewer loop-1 exact-disposition guard (#6913136081) is kept
+          // as a defensive else-branch: should a future declared value
+          // ever be a red kind again, that row must still end red with
+          // EXACTLY its recorded disposition (a failed<->timedOut swap, a
+          // greener/skipped/flaky row all fail closed).
           const problems = [];
           const table = [];
           for (const r of rows) {
             const anchor = FE002_ANCHOR_OUTCOMES[r.title];
             if (anchor === 'passed') {
               if (!(r.status === 'expected' && r.expectedStatus === 'passed' && r.attempts === 1)) {
-                problems.push(`ANCHOR-PASSED ROW NOT PASSED: '${r.title}' status=${r.status} expectedStatus=${r.expectedStatus} attempts=${r.attempts} (anchor-passed rows MUST pass on the first attempt)`);
+                problems.push(`ROW NOT FIRST-ATTEMPT GREEN (AM-9): '${r.title}' status=${r.status} expectedStatus=${r.expectedStatus} attempts=${r.attempts} (AM-9 requires status=expected, expectedStatus=passed, attempts=1 — red, flaky, skipped and retried rows all fail closed)`);
               }
             } else if (!(r.status === 'unexpected' && r.lastResultStatus === anchor)) {
-              problems.push(`ANCHOR-${anchor.toUpperCase()} ROW DEGRADED/MISMATCHED: '${r.title}' status=${r.status} last_result=${r.lastResultStatus} attempts=${r.attempts} (the frozen anchor records this row '${anchor}' on webkit — the final attempt must match that exact disposition; greener, skipped, flaky, or the other red kind all fail closed)`);
+              problems.push(`ANCHOR-${anchor.toUpperCase()} ROW DEGRADED/MISMATCHED: '${r.title}' status=${r.status} last_result=${r.lastResultStatus} attempts=${r.attempts} (the declared disposition for this row is '${anchor}' — the final attempt must match that exact disposition; greener, skipped, flaky, or the other red kind all fail closed)`);
             }
             table.push([r.title, anchor, r.status, r.expectedStatus, r.attempts, r.lastResultStatus].join('\t'));
           }
@@ -679,8 +680,8 @@ jobs:
           if (stats.expected !== expectedStats.expected || stats.unexpected !== expectedStats.unexpected || stats.flaky !== expectedStats.flaky || stats.skipped !== expectedStats.skipped) {
             fail(`stats must be exactly ${JSON.stringify(expectedStats)}, found ${JSON.stringify(stats)}`);
           }
-          if (problems.length) fail(`anchor-faithful outcome rule violated —\n  ${problems.join('\n  ')}`);
-          console.log('AM-8 post-check PASSED: exactly 23 rows, project webkit on every row, exact frozen keyset, anchor-faithful outcomes (12 anchor-passed rows first-attempt green; 10 anchor-failed rows failed and the 1 anchor-timedOut row timedOut — exact per-row dispositions, not claimed fixed).');
+          if (problems.length) fail(`AM-9 all-green outcome rule violated —\n  ${problems.join('\n  ')}`);
+          console.log('AM-9 post-check PASSED: exactly 23 rows, project webkit on every row, exact frozen keyset, ALL rows first-attempt green (23 expected / 0 unexpected / 0 flaky / 0 skipped) — every repaired row green on its first attempt.');
           EOF
 
       - name: Evidence — SHA-256 sidecar + AM-8 exception summary (always)
@@ -703,13 +704,13 @@ jobs:
             cp /tmp/opencode/java-service.log java-service.log
           fi
           {
-            echo "## AM-8 exception — whole-file WebKit job (#517)"
+            echo "## AM-8/AM-9 — whole-file WebKit job (#517/#519)"
             echo ""
-            echo "**AM-8 exception: \`packages/frontend/tests/fe-002-login-ui.spec.ts\` (whole frozen file, 23 cases) → webkit (anchor project: webkit)**"
+            echo "**AM-8/AM-9: \`packages/frontend/tests/fe-002-login-ui.spec.ts\` (whole frozen file, 23 cases) → webkit (anchor project: webkit); AM-9 requires ALL 23 rows green (first attempt)**"
             echo ""
-            echo "Binding amendment: SPEC-003 AM-8 (vault \`14898f9\`, founder-directed 2026-11-16) — the whole file runs in REQUIRED CI on WebKit while every other applicable row stays on Obscura (AM-1/#490). This evidence is required, never \`CI-waived\` and never \`not-run\`."
+            echo "Binding amendments: SPEC-003 AM-8 (vault \`14898f9\`, founder-directed 2026-11-16) — the whole file runs in REQUIRED CI on WebKit while every other applicable row stays on Obscura (AM-1/#490); SPEC-003 AM-9 (vault \`125af1f\`, founder \"fix them\", 2026-11-16) — every row must pass with \`status=expected\`, \`expectedStatus=passed\`, \`attempts=1\` and \`stats\` exactly \`{expected: 23, unexpected: 0, flaky: 0, skipped: 0}\`. This evidence is required, never \`CI-waived\` and never \`not-run\`."
             echo ""
-            echo "Anchor semantics (AM-8.3 + reviewer loop-1 correction): the 12 anchor-passed rows MUST pass (first attempt); the 11 pre-registered anchor-red class-E rows (10 \`failed\` + 1 \`timedOut\` in the frozen \`ae42c67\` webkit anchor) remain permitted red WITH THEIR EXACT RECORDED DISPOSITION — \`failed\` stays \`failed\`, \`timedOut\` stays \`timedOut\` (a failed<->timedOut swap fails closed) — they are **not** claimed fixed, and the \"all 23 must pass\" proposal recorded in AM-8.3 is a pending decision that is **not** adopted."
+            echo "Anchor semantics (AM-9, superseding AM-8.3's permitted-red allowance for this file ONLY): the frozen \`ae42c67\` anchor still reads 12 passed / 10 failed / 1 timedOut for this file on \`webkit\` and remains the immutable HISTORICAL record; its class-E registration is historical anchor disposition and is NOT permission for a red row now. Every repaired row regressing to red/flaky/skipped/retried fails closed."
             echo ""
             echo "Fail-closed identity evidence:"
             echo "- engine: \`webkit\` only (Playwright project \`webkit\`; engine tool version: $(cat engine-version.txt 2>/dev/null || echo '(not captured)'))"
@@ -718,11 +719,11 @@ jobs:
             echo "- head SHA (content): ${CONTENT_HEAD}"
             echo "- github.sha (the ephemeral merge commit on pull_request events): ${EVENT_SHA}"
             echo "- event: ${{ github.event_name }}"
-            echo "- anchor provenance: \`parity/baseline/react-e2e-baseline-ae42c67-on-java/per-case-listing.tsv\` — webkit × fe-002: 12 passed / 10 failed / 1 timedOut (gate-scope.json per-case-listing sha256 acf4a1eb56ac1f442d2d16b6da3c252ff5c16f4d2e25fcf0dc5c37d41803bc0b)"
-            echo "- playwright_exit: $(cat playwright-exit-code.txt 2>/dev/null || echo '(not captured)') (informational — the 11 anchor-red rows are expected red; the post-check owns the verdict)"
+            echo "- anchor provenance: \`parity/baseline/react-e2e-baseline-ae42c67-on-java/per-case-listing.tsv\` — webkit × fe-002: 12 passed / 10 failed / 1 timedOut (gate-scope.json per-case-listing sha256 acf4a1eb56ac1f442d2d16b6da3c252ff5c16f4d2e25fcf0dc5c37d41803bc0b; historical record)"
+            echo "- playwright_exit: $(cat playwright-exit-code.txt 2>/dev/null || echo '(not captured)') (informational — under AM-9 a faithful run exits 0; the post-check owns the verdict)"
             echo ""
             if [ -f am8-rows.tsv ]; then
-              echo "Per-row outcomes (all 23 identities — anchor class vs run outcome):"
+              echo "Per-row outcomes (all 23 identities — required disposition (AM-9: all \`passed\`) vs run outcome):"
               echo ""
               echo '```'
               cat am8-rows.tsv
