@@ -18,6 +18,22 @@ name: Frontend Angular Parity Gates
 #                          `PB-2 PR verdict deferred to AM-1/#490 — no verdict
 #                          claimed`. Removed by #490 in the same change that
 #                          restores the matrix (guarded — see preflight).
+#   webkit-am7-case        AM-7 exception (#515; SPEC-003 amendment AM-7,
+#                          vault 0733b9a): the ONE founder-directed
+#                          alternate-engine case —
+#                          packages/frontend/tests/fe-002-login-ui.spec.ts →
+#                          `should have proper form labels for accessibility` —
+#                          runs in REQUIRED CI on the `webkit` project
+#                          (anchor mapping webkit→webkit; upstream obscura #722
+#                          still blocks it on Obscura). Exactly one case,
+#                          exactly one engine, fail-closed identity checks
+#                          (exact-title existence pre-check, exactly-one-row +
+#                          `projectName === 'webkit'` + green post-check),
+#                          report + SHA-256 sidecar evidence, and the declared
+#                          AM-7 exception line in the job summary. No matrix
+#                          change (the suspension below is untouched);
+#                          gate-scope/comparator engine-coverage integration
+#                          stays with #490.
 #   parity (matrix)        PB-2 E2E parity EVIDENCE: boots the Java backend of
 #                          record in the S1 (#423) fail-closed E2E fixture
 #                          posture (PostgreSQL ONLY among data stores — the Java
@@ -223,6 +239,329 @@ jobs:
             echo "No PB-2 verdict is claimed for this PR. Suite-file integrity is still enforced fail-closed by the \`preflight\` job (declared-adaptation manifest)."
             echo "Restoration: #490 re-enables the matrix for \`pull_request\` and removes this job in the same change (guarded — the two must never diverge)."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # ------------------------------------------------------------------
+  # AM-7 exception (#515) — the single-case WebKit alternate-engine job.
+  # SPEC-003 amendment AM-7 (vault 0733b9a, founder-directed): the exact
+  # frozen case `packages/frontend/tests/fe-002-login-ui.spec.ts` →
+  # `should have proper form labels for accessibility` must run in required
+  # CI on WebKit — the tech-lead-selected alternate engine because the
+  # committed anchor records the case `passed` on the `webkit` project
+  # (mapping webkit→webkit) and WebKit is the smaller/faster install
+  # (285 MB vs ~676 MB for Chromium + headless shell). Upstream obscura #722
+  # (inline elements yielding 0×0 geometry) still blocks the case on
+  # Obscura; EVERY OTHER row stays on Obscura (AM-1/#490) — no whole-file
+  # move, no second case, no matrix change, no fallback engine.
+  #
+  # Fail-closed identity rules (AM-7 / #515 AC-2):
+  #   pre-check  — the exact title exists exactly once in a `--list` of the
+  #                file AND the exact-title filter selects exactly one test
+  #                (a missing/renamed/duplicated/ambiguous title fails the
+  #                job — the frozen case identity can never drift silently);
+  #   post-check — the JSON report contains EXACTLY ONE test row, its
+  #                projectName is exactly `webkit`, its title matches the
+  #                frozen title byte-for-byte, and the row is GREEN on the
+  #                first attempt (the case is anchor-green on webkit —
+  #                unlike the parity matrix there is NO expected-red
+  #                tolerance here);
+  #   evidence   — the JSON report + SHA-256 sidecar + logs are uploaded as
+  #                one flat artifact and the declared AM-7 exception line is
+  #                printed in the job summary, so #477's terminal verdict can
+  #                consume it as the declared exception.
+  # The posture is the SAME S1 posture the parity jobs provision (Java :8080
+  # bootJar, PostgreSQL service, Mailhog SMTP sink, BASE_URL=http://localhost:4200).
+  # ------------------------------------------------------------------
+  webkit-am7-case:
+    name: webkit-am7-case (AM-7 exception — FE-002 form labels → WebKit)
+    runs-on: ubuntu-latest
+    # One case + the S1 boot + a single-engine WebKit install; a job that
+    # cannot finish in 30 min is failing loudly, not slowly.
+    timeout-minutes: 30
+    services:
+      # Identical posture to the parity jobs (S1 #423): PostgreSQL is the
+      # ONLY data store (ADR-028 — no Redis) and Mailhog is the SMTP sink.
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: yacc_user
+          POSTGRES_PASSWORD: yacc_password
+          POSTGRES_DB: yacc_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U yacc_user -d yacc_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      mailhog:
+        image: mailhog/mailhog:v1.0.1
+        ports:
+          - 1025:1025
+    env:
+      # E2E posture (identical to the parity job env, runbook §7)
+      YACC_API_PROXY_TARGET: http://localhost:8080
+      API_URL: http://localhost:8080/api
+      PLAYWRIGHT_TEST_API_BASE_URL: http://localhost:8080
+      BASE_URL: http://localhost:4200
+      YACC_REALTIME_WS_ALLOWED_ORIGINS: http://localhost:4200
+      YACC_SMTP_HOST: 127.0.0.1
+      YACC_SMTP_PORT: '1025'
+      # W19 restart handles (identical env to the parity jobs; not exercised
+      # by this case, kept so the posture is byte-identical to PB-2 legs).
+      YACC_JAVA_PID_FILE: /tmp/opencode/java-service.pid
+      YACC_JAVA_RESTART_CMD: bash /tmp/opencode/boot-java.sh
+      CI: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Set up Temurin 21 (satisfies the Gradle toolchain, ADR-024)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for SMTP sink readiness (Mailhog :1025, fail-closed)
+        run: |
+          for i in $(seq 1 30); do
+            if (exec 3<>/dev/tcp/127.0.0.1/1025) 2>/dev/null; then
+              echo "SMTP sink ready on 127.0.0.1:1025 (attempt $i)."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::SMTP sink not reachable on 127.0.0.1:1025 within 60s (fail-closed — identical posture to the parity jobs)"
+          exit 1
+
+      - name: Build Java bootJar (backend of record)
+        working-directory: services/backend-java
+        run: ./gradlew --no-daemon bootJar
+
+      - name: Start Java service (S1 E2E fixture posture, fail-closed)
+        run: |
+          set -euo pipefail
+          JAR="$(ls services/backend-java/build/libs/yacc-backend-*.jar | head -1)"
+          # Absolute path, resolved + verified AT GENERATION TIME (run
+          # 43160616114 lesson — a repo-relative jar path kills every
+          # restart executed from the Playwright cwd).
+          JAR="$(realpath "$JAR")"
+          test -f "$JAR"
+          LOADER_ARGS=()
+          if ! unzip -l "$JAR" | grep -q 'org/postgresql/Driver.class'; then
+            PG_JAR="$(find ~/.gradle/caches/modules-2/files-2.1/org.postgresql -name 'postgresql-*.jar' 2>/dev/null | head -1)"
+            if [ -z "$PG_JAR" ]; then
+              echo "::error::postgresql driver neither packaged in the bootJar nor present in the Gradle cache (fail-closed)"
+              exit 1
+            fi
+            mkdir -p /tmp/opencode/pgdriver
+            cp "$PG_JAR" /tmp/opencode/pgdriver/
+            LOADER_ARGS=(-Dloader.path=/tmp/opencode/pgdriver)
+          fi
+          # One launcher definition (parity-job heredoc, verbatim posture:
+          # persisted key pair, absolute jar, loopback PG, Mailhog sink).
+          cat > /tmp/opencode/boot-java.sh <<SCRIPT
+          #!/usr/bin/env bash
+          set -euo pipefail
+          # Persist the generated key pair ONCE per job under a directory no
+          # artifact upload path covers, and reuse it for every W19 in-spec
+          # restart (tests/realtime-rawws-r1.spec.ts): minting a fresh RSA
+          # key per boot invalidates the client's stored WS handshake token
+          # after a restart (the reconnect ladder reuses the pre-restart
+          # token -> R1-W19-* red) and the seeded integration ciphertext
+          # (DeterministicSeed is skip-if-present). Key material is never
+          # echoed/xtraced (this script's output lands in the uploaded
+          # java-service.log), generation is atomic (tmp -> mv under
+          # set -euo pipefail, so a failed openssl can never leave a
+          # truncated key for a later restart to reuse), and there is NO
+          # regeneration-on-failure fallback: a corrupt key fails the
+          # restart health poll loudly instead of silently re-identifying
+          # the service mid-run. Modes: dir 0700, files 0600 (umask 077).
+          KEY_DIR=/tmp/opencode/.e2e-keys
+          if [ ! -s "\$KEY_DIR/signing.key" ] || [ ! -s "\$KEY_DIR/master.key" ]; then
+            mkdir -p "\$KEY_DIR" && chmod 700 "\$KEY_DIR"
+            (
+              umask 077
+              openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null \\
+                | openssl pkcs8 -topk8 -nocrypt -outform DER 2>/dev/null \\
+                | base64 -w0 > "\$KEY_DIR/.signing.key.tmp"
+              openssl rand -base64 32 > "\$KEY_DIR/.master.key.tmp"
+              chmod 600 "\$KEY_DIR/.signing.key.tmp" "\$KEY_DIR/.master.key.tmp"
+              mv "\$KEY_DIR/.signing.key.tmp" "\$KEY_DIR/signing.key"
+              mv "\$KEY_DIR/.master.key.tmp" "\$KEY_DIR/master.key"
+            )
+          fi
+          SIGNING_KEY="\$(cat "\$KEY_DIR/signing.key")"
+          MASTER_KEY="\$(cat "\$KEY_DIR/master.key")"
+          env SPRING_PROFILES_ACTIVE=e2e \\
+            SPRING_APPLICATION_JSON='{"yacc":{"e2e":{"seed-enabled":true}}}' \\
+            DATABASE_URL=jdbc:postgresql://localhost:5432/yacc_e2e \\
+            POSTGRES_USER=yacc_user POSTGRES_PASSWORD=yacc_password \\
+            YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL=admin@yacc.local \\
+            YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL=admin123 \\
+            YACC_AUTH_TOKEN_SIGNING_KEY="\$SIGNING_KEY" \\
+            YACC_INTEGRATION_ENCRYPTION_MASTER_KEY="\$MASTER_KEY" \\
+            YACC_SMTP_HOST=127.0.0.1 YACC_SMTP_PORT=1025 \\
+            YACC_REALTIME_WS_ALLOWED_ORIGINS=http://localhost:4200 \\
+            nohup java ${LOADER_ARGS[*]+"${LOADER_ARGS[*]}"} -cp "$JAR" org.springframework.boot.loader.launch.PropertiesLauncher >> /tmp/opencode/java-service.log 2>&1 &
+          echo \$! > /tmp/opencode/java-service.pid
+          SCRIPT
+          chmod +x /tmp/opencode/boot-java.sh
+          bash /tmp/opencode/boot-java.sh
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/health/live > /dev/null; then
+              echo "Java service healthy (attempt $i) — S1 E2E fixture posture up."
+              grep -E 'E2E fixture seed applied|First-run Super Admin bootstrap' /tmp/opencode/java-service.log || true
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Java service did not become healthy within 120s (fail-closed)"
+          tail -50 /tmp/opencode/java-service.log
+          exit 1
+
+      - name: Install Playwright WebKit ONLY (AM-7 budget — no other engine)
+        # npm workspaces hoist binaries to the root .bin; running from the
+        # package directory resolves this workspace's @playwright/test.
+        run: (cd packages/frontend-angular && npx playwright install --with-deps webkit)
+
+      - name: AM-7 pre-check — exact title exists exactly once; filter selects exactly one test (fail-closed)
+        run: |
+          set -euo pipefail
+          TITLE='should have proper form labels for accessibility'
+          FILTER='should have proper form labels for accessibility$'
+          echo "AM-7 exception: $TITLE -> webkit (anchor project: webkit)"
+          LIST_ALL="$( (cd packages/frontend-angular && npx playwright test ../frontend/tests/fe-002-login-ui.spec.ts --list --project=webkit) 2>&1 )"
+          LIST_FILTERED="$( (cd packages/frontend-angular && npx playwright test ../frontend/tests/fe-002-login-ui.spec.ts --list --project=webkit -g "$FILTER") 2>&1 )"
+          printf '%s\n' "$LIST_ALL"
+          echo "--- exact-title filter selection ---"
+          printf '%s\n' "$LIST_FILTERED"
+          COUNT_FILE="$(printf '%s\n' "$LIST_ALL" | grep -Fc -- "$TITLE" || true)"
+          COUNT_FILTER="$(printf '%s\n' "$LIST_FILTERED" | grep -Fc -- "$TITLE" || true)"
+          echo "exact-title occurrences in the file --list: $COUNT_FILE (required: exactly 1)"
+          echo "tests selected by the exact-title filter:  $COUNT_FILTER (required: exactly 1)"
+          if [ "$COUNT_FILE" -ne 1 ] || [ "$COUNT_FILTER" -ne 1 ]; then
+            echo "::error::AM-7 pre-check FAILED CLOSED — the frozen case title must exist exactly once in the file and the exact-title filter must select exactly one test (file: $COUNT_FILE, filter: $COUNT_FILTER). A missing, renamed, duplicated or ambiguous title must never run under this exception."
+            exit 1
+          fi
+
+      - name: Run the single AM-7 case (webkit, --project=webkit, exact-title filter)
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/opencode/webkit-am7
+          export PLAYWRIGHT_JSON_OUTPUT_DIR=/tmp/opencode/webkit-am7
+          export PLAYWRIGHT_JSON_OUTPUT_NAME=parity-run.json
+          # `defaults.run.shell: bash` expands to `bash -eo pipefail`; the
+          # run is REQUIRED to be green (anchor-green row on webkit), so the
+          # exact Playwright exit code is captured via PIPESTATUS[0] and
+          # re-raised — no expected-red tolerance, no swallowed failure.
+          set +e
+          (cd packages/frontend-angular && npx playwright test \
+            ../frontend/tests/fe-002-login-ui.spec.ts \
+            --project=webkit \
+            --workers=1 \
+            -g 'should have proper form labels for accessibility$' \
+            --reporter=json) 2>&1 | tee /tmp/opencode/webkit-am7/run-output.log
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "playwright_exit=$code (required: 0 — the AM-7 case is anchor-green on webkit)"
+          exit "$code"
+
+      - name: AM-7 post-check — exactly one row, projectName webkit, exact title, first-attempt green (fail-closed)
+        run: |
+          set -euo pipefail
+          node <<'EOF'
+          const fs = require('node:fs');
+          const REPORT = '/tmp/opencode/webkit-am7/parity-run.json';
+          const TITLE = 'should have proper form labels for accessibility';
+          const fail = (msg) => { console.error(`::error::AM-7 post-check FAILED CLOSED — ${msg}`); process.exit(1); };
+          if (!fs.existsSync(REPORT)) fail('the JSON report is absent — the run produced no machine-readable evidence');
+          const report = JSON.parse(fs.readFileSync(REPORT, 'utf8'));
+          const rows = [];
+          const walk = (suite) => {
+            for (const child of suite.suites || []) walk(child);
+            for (const spec of suite.specs || []) {
+              for (const t of spec.tests || []) {
+                rows.push({
+                  title: spec.title,
+                  projectName: t.projectName,
+                  status: t.status,
+                  expectedStatus: t.expectedStatus,
+                  attempts: (t.results || []).length,
+                });
+              }
+            }
+          };
+          for (const s of report.suites || []) walk(s);
+          console.log(`AM-7 report rows: ${rows.length}`);
+          for (const r of rows) console.log(JSON.stringify(r));
+          if (rows.length !== 1) fail(`expected EXACTLY ONE test row, found ${rows.length} — any extra, missing or duplicated row fails the job (AM-7 identity rule)`);
+          const row = rows[0];
+          if (row.projectName !== 'webkit') fail(`projectName must be exactly 'webkit', found '${row.projectName}' — never relabel or substitute another engine`);
+          if (row.title !== TITLE) fail(`the row title must match the frozen case title exactly, found '${row.title}'`);
+          // JSON-report enums: the test-level status of a green row is
+          // 'expected' (vs the anchor), while expectedStatus mirrors the
+          // public API enum ('passed' — measured in run 43800943987).
+          if (row.expectedStatus !== 'passed') fail(`expectedStatus must be 'passed', found '${row.expectedStatus}'`);
+          if (row.status !== 'expected') fail(`the row must be GREEN ('expected'), found '${row.status}' — the case is anchor-green on webkit; red or flaky evidence fails the job`);
+          if (row.attempts !== 1) fail(`expected a first-attempt pass (1 attempt, retries not consumed), found ${row.attempts}`);
+          const stats = report.stats || {};
+          console.log(`stats: ${JSON.stringify(stats)}`);
+          if (stats.expected !== 1 || stats.unexpected !== 0 || stats.flaky !== 0 || stats.skipped !== 0) {
+            fail(`stats must be exactly {expected: 1, unexpected: 0, flaky: 0, skipped: 0}, found ${JSON.stringify(stats)}`);
+          }
+          console.log('AM-7 post-check PASSED: exactly one row, project webkit, exact frozen title, first-attempt green.');
+          EOF
+
+      - name: Evidence — SHA-256 sidecar + AM-7 exception summary (always)
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ ! -d /tmp/opencode/webkit-am7 ]; then
+            echo "::warning::no AM-7 evidence directory (the run step never created it)"
+            exit 0
+          fi
+          cd /tmp/opencode/webkit-am7
+          if [ -s parity-run.json ]; then
+            sha256sum parity-run.json > parity-run.json.sha256
+            cat parity-run.json.sha256
+          fi
+          if [ -f /tmp/opencode/java-service.log ]; then
+            cp /tmp/opencode/java-service.log java-service.log
+          fi
+          {
+            echo "## AM-7 exception — single-case WebKit alternate-engine job (#515)"
+            echo ""
+            echo "**AM-7 exception: should have proper form labels for accessibility → webkit (anchor project: webkit)**"
+            echo ""
+            echo "Binding amendment: SPEC-003 AM-7 (vault \`0733b9a\`, founder-directed) — this exact case runs on WebKit while upstream obscura #722 blocks it on Obscura; every other row stays on Obscura (AM-1/#490)."
+            echo ""
+            echo "Fail-closed identity evidence:"
+            echo "- engine: \`webkit\` only (Playwright project \`webkit\` — no fallback, no relabel, no second engine)"
+            echo "- case: \`packages/frontend/tests/fe-002-login-ui.spec.ts\` → \`should have proper form labels for accessibility\` (frozen and unmodified)"
+            echo "- run: \`--project=webkit --workers=1\` + end-anchored exact-title filter, S1 posture (Java :8080 bootJar, PostgreSQL, Mailhog, \`BASE_URL=http://localhost:4200\`)"
+            echo "- head SHA: ${{ github.sha }}"
+            echo "- event: ${{ github.event_name }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload AM-7 WebKit case evidence (report + SHA-256 + logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webkit-am7-case-evidence
+          # Single-directory upload (the #385 lesson): downloads land flat.
+          path: /tmp/opencode/webkit-am7/
+          retention-days: 14
+          if-no-files-found: warn
 
   # ------------------------------------------------------------------
   # PB-2 — E2E parity evidence: one FULL U10-suite run per browser.
