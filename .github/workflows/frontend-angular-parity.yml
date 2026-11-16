@@ -508,7 +508,10 @@ jobs:
           const row = rows[0];
           if (row.projectName !== 'webkit') fail(`projectName must be exactly 'webkit', found '${row.projectName}' — never relabel or substitute another engine`);
           if (row.title !== TITLE) fail(`the row title must match the frozen case title exactly, found '${row.title}'`);
-          if (row.expectedStatus !== 'expected') fail(`expectedStatus must be 'expected', found '${row.expectedStatus}'`);
+          // JSON-report enums: the test-level status of a green row is
+          // 'expected' (vs the anchor), while expectedStatus mirrors the
+          // public API enum ('passed' — measured in run 43800943987).
+          if (row.expectedStatus !== 'passed') fail(`expectedStatus must be 'passed', found '${row.expectedStatus}'`);
           if (row.status !== 'expected') fail(`the row must be GREEN ('expected'), found '${row.status}' — the case is anchor-green on webkit; red or flaky evidence fails the job`);
           if (row.attempts !== 1) fail(`expected a first-attempt pass (1 attempt, retries not consumed), found ${row.attempts}`);
           const stats = report.stats || {};
