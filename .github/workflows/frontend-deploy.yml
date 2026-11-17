@@ -1,20 +1,23 @@
 name: Deploy Frontend
 
-# Fail-closed deploy-safety model (ANG-001 #371; deploy re-point ANG-014 #384,
-# SPEC-003 AM-6):
-# - The `deploy` job builds @yacc/frontend-angular and publishes the Angular
-#   browser output (packages/frontend-angular/dist/frontend-angular/browser)
-#   to S3 + CloudFront. It runs only on push to `main`; the merge that brings
-#   this workflow to `main` is the CP-1-gated cutover (ANG-016) — landing this
-#   change on `dev` triggers no publication.
+# Fail-closed deploy-safety model (SPEC-003 AM-11 — migration halted, React
+# retained as the frontend of record; ANG-018 #524):
+# - React (@yacc/frontend, packages/frontend) is the frontend of record. The
+#   `deploy` job publishes the React build to S3 + CloudFront on push to
+#   `main` only. It never publishes the Angular output.
 # - The `build-angular` job validates the Angular shell (ng build, Node 20.x)
 #   only — it has no AWS credentials and no deploy steps, so it can never
-#   touch production. It also runs on PRs touching the Angular package.
-# - Asset/cache correctness: the Angular production configuration hashes all
-#   emitted assets (outputHashing: "all"), so the sync applies immutable
-#   cache headers to hashed files while excluding `index.html`, which is
-#   copied with no-cache/no-store so clients always fetch the current shell;
-#   `--delete` prunes stale hashed assets from prior deploys.
+#   touch production. Push events cover both frontend packages; pull_request
+#   events keep the Angular-validation path (build validation only — a PR can
+#   never deploy).
+# - Latent-risk note: no `main` branch exists today and no `push` deploy run
+#   has ever executed (all recorded runs are pull_request build validation),
+#   so no publication has occurred from this workflow; the current production
+#   frontend state is unknown and is not claimed by this workflow.
+# - Asset/cache correctness: the sync applies immutable cache headers to
+#   hashed static assets while excluding `index.html`, which is copied with
+#   no-cache/no-store so clients always fetch the current shell; `--delete`
+#   prunes stale hashed assets from prior deploys.
 
 permissions:
   contents: read
@@ -23,6 +26,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'packages/frontend/**'
       - 'packages/frontend-angular/**'
       - '.github/workflows/frontend-deploy.yml'
   pull_request:
@@ -32,8 +36,9 @@ on:
 
 jobs:
   deploy:
-    # Publishes the Angular browser output (production publication only on
-    # push to main — the CP-1-gated cutover).
+    # Publishes the React build (frontend of record, AM-11). Production
+    # publication only on push to `main`; landing this change on `dev`
+    # triggers no publication, and no `main` branch exists today.
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     strategy:
@@ -53,8 +58,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build frontend (Angular)
-        run: npm run build -w @yacc/frontend-angular
+      - name: Build frontend (React)
+        run: npm run build -w @yacc/frontend
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -65,11 +72,11 @@ jobs:
 
       - name: Deploy to S3
         run: |
-          aws s3 sync packages/frontend-angular/dist/frontend-angular/browser s3://${{ secrets.AWS_S3_BUCKET }}/ \
+          aws s3 sync packages/frontend/dist s3://${{ secrets.AWS_S3_BUCKET }}/ \
             --delete \
             --cache-control "max-age=31536000,immutable" \
             --exclude "index.html"
-          aws s3 cp packages/frontend-angular/dist/frontend-angular/browser/index.html s3://${{ secrets.AWS_S3_BUCKET }}/index.html \
+          aws s3 cp packages/frontend/dist/index.html s3://${{ secrets.AWS_S3_BUCKET }}/index.html \
             --cache-control "max-age=0,no-cache,no-store,must-revalidate" \
             --content-type "text/html"
 
@@ -80,8 +87,9 @@ jobs:
             --paths "/*"
 
   build-angular:
-    # Build-only validation of the Angular shell (ANG-001). No AWS credentials,
-    # no deploy steps — unchanged by the ANG-014 deploy re-point.
+    # Build-only validation of the Angular shell (ANG-001). The Angular output
+    # is never published: no AWS credentials and no deploy steps (AM-11 —
+    # React is the frontend of record).
     runs-on: ubuntu-latest
     strategy:
       matrix:
