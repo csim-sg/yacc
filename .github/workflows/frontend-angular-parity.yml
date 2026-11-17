@@ -89,16 +89,12 @@ name: Frontend Angular Parity Gates
 #                          red, unanchored red/green, improvements and flaky
 #                          rows are surfaced in the job summary — never
 #                          hidden.
-#   react-baseline-capture CP-3: automated React-on-Java baseline capture
-#                          (workflow_dispatch only — a full-suite 3-browser
-#                          run). Boots the same Java posture (+ the same
-#                          Mailhog SMTP sink, and BASE_URL pinned to the React
-#                          origin :5173 so capture conditions match the
-#                          anchor), runs the REACT harness, derives the
-#                          per-case TSV + env versions, and uploads everything
-#                          as workflow artifacts. Non-gating evidence;
-#                          archiving a new anchor into the repo is a separate
-#                          deliberate register/gate-scope update.
+#   (The CP-3 baseline capture job was removed by #522, 2026-11-17:
+#                          AM-3 waives CP-3 capture entirely — CP-3 capture is
+#                          not delivered and the committed ae42c67 archive is
+#                          the baseline of record (no re-anchor, no
+#                          recapture). parity-compare still validates and
+#                          compares against that archive.)
 #
 # Why per-engine jobs: the full U10-scope suite (1767 cases, retries=2, 1 CI
 # worker) no longer fits a single GitHub-hosted job — parity run 39440888894
@@ -848,8 +844,9 @@ jobs:
       YACC_REALTIME_WS_ALLOWED_ORIGINS: http://localhost:4200
       # H4: SMTP sink coordinates for the synchronous sign-up email path
       # (spring.mail binds YACC_SMTP_HOST/YACC_SMTP_PORT; defaults already
-      # target localhost:1025 — explicit here for parity with the capture job
-      # and so the boot script below is self-contained).
+      # target localhost:1025 — explicit here for parity with the anchor
+      # capture posture (S2, runbook §7) and so the boot script below is
+      # self-contained).
       YACC_SMTP_HOST: 127.0.0.1
       YACC_SMTP_PORT: '1025'
       # W19 restart handles required by tests/realtime-rawws-r1.spec.ts
@@ -1183,244 +1180,5 @@ jobs:
             /tmp/opencode/parity/comparison-report.json
             /tmp/opencode/parity/comparison-summary.md
             _parity/webkit/parity-run.json
-          retention-days: 14
-          if-no-files-found: warn
-
-  # ------------------------------------------------------------------
-  # CP-3 — automated React-on-Java baseline capture (AC-ANG-015-3).
-  # workflow_dispatch only: a full-suite 3-browser run (~2.5 h). Evidence
-  # job — outcomes are archived as artifacts, never a silent gate input.
-  # ------------------------------------------------------------------
-  react-baseline-capture:
-    name: react-baseline-capture (CP-3 evidence)
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 350
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: yacc_user
-          POSTGRES_PASSWORD: yacc_password
-          POSTGRES_DB: yacc_e2e
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U yacc_user -d yacc_e2e"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-      # SMTP sink so capture conditions match the anchor environment (the S2
-      # anchor captured locally with docker-compose Mailhog on :1025).
-      mailhog:
-        image: mailhog/mailhog:v1.0.1
-        ports:
-          - 1025:1025
-    env:
-      # React anchor env (runbook §7.4): same-origin Vite proxy -> Java :8080.
-      # BASE_URL pinned explicitly to the React origin so the gate-scoped
-      # suite (`process.env.BASE_URL || 'http://localhost:5173'`) always
-      # targets the Vite dev server, matching the anchor's capture
-      # conditions (the :4200 override is the ANGULAR parity job's alone).
-      BASE_URL: http://localhost:5173
-      VITE_API_BASE_URL: ''
-      VITE_API_URL: http://localhost:8080
-      API_URL: http://localhost:8080/api
-      PLAYWRIGHT_TEST_API_BASE_URL: http://localhost:8080
-      # SMTP sink coordinates (H4) — the capture must exercise the same
-      # synchronous sign-up email path the anchor captured. The realtime
-      # allowed-origin is left at the Java default (the React origin
-      # :5173), which already matches this harness.
-      YACC_SMTP_HOST: 127.0.0.1
-      YACC_SMTP_PORT: '1025'
-      # W19 restart handles required by tests/realtime-rawws-r1.spec.ts
-      YACC_JAVA_PID_FILE: /tmp/opencode/java-service.pid
-      YACC_JAVA_RESTART_CMD: bash /tmp/opencode/boot-java.sh
-      CI: 'true'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-          cache: 'npm'
-
-      - name: Set up Temurin 21 (satisfies the Gradle toolchain, ADR-024)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: gradle
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Baseline pre-flight (validate the committed anchor this capture would succeed)
-        run: node packages/frontend-angular/parity/compare-baseline.mjs check
-
-      - name: Wait for SMTP sink readiness (Mailhog :1025, fail-closed)
-        run: |
-          for i in $(seq 1 30); do
-            if (exec 3<>/dev/tcp/127.0.0.1/1025) 2>/dev/null; then
-              echo "SMTP sink ready on 127.0.0.1:1025 (attempt $i)."
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::SMTP sink not reachable on 127.0.0.1:1025 within 60s (fail-closed — the synchronous sign-up email path requires it)"
-          exit 1
-
-      - name: Build Java bootJar (backend of record)
-        working-directory: services/backend-java
-        run: ./gradlew --no-daemon bootJar
-
-      - name: Start Java service (S1 E2E fixture posture, fail-closed)
-        run: |
-          set -euo pipefail
-          JAR="$(ls services/backend-java/build/libs/yacc-backend-*.jar | head -1)"
-          # Absolute path, resolved + verified AT GENERATION TIME: the W19
-          # in-spec restart re-executes the generated script from the Playwright
-          # cwd (packages/frontend-angular), and a repo-relative jar path makes
-          # every restart die with "Could not find or load main class" (run
-          # 43160616114). Fail closed here rather than at first restart.
-          JAR="$(realpath "$JAR")"
-          test -f "$JAR"
-          LOADER_ARGS=()
-          if ! unzip -l "$JAR" | grep -q 'org/postgresql/Driver.class'; then
-            PG_JAR="$(find ~/.gradle/caches/modules-2/files-2.1/org.postgresql -name 'postgresql-*.jar' 2>/dev/null | head -1)"
-            if [ -z "$PG_JAR" ]; then
-              echo "::error::postgresql driver neither packaged in the bootJar nor present in the Gradle cache (fail-closed)"
-              exit 1
-            fi
-            mkdir -p /tmp/opencode/pgdriver
-            cp "$PG_JAR" /tmp/opencode/pgdriver/
-            LOADER_ARGS=(-Dloader.path=/tmp/opencode/pgdriver)
-          fi
-          # One launcher definition, used for the initial boot AND the W19
-          # in-spec restart (YACC_JAVA_RESTART_CMD points at this script).
-          cat > /tmp/opencode/boot-java.sh <<SCRIPT
-          #!/usr/bin/env bash
-          set -euo pipefail
-          # Persist the generated key pair ONCE per job under a directory no
-          # artifact upload path covers, and reuse it for every W19 in-spec
-          # restart (tests/realtime-rawws-r1.spec.ts): minting a fresh RSA
-          # key per boot invalidates the client's stored WS handshake token
-          # after a restart (the reconnect ladder reuses the pre-restart
-          # token -> R1-W19-* red) and the seeded integration ciphertext
-          # (DeterministicSeed is skip-if-present). Key material is never
-          # echoed/xtraced (this script's output lands in the uploaded
-          # java-service.log), generation is atomic (tmp -> mv under
-          # set -euo pipefail, so a failed openssl can never leave a
-          # truncated key for a later restart to reuse), and there is NO
-          # regeneration-on-failure fallback: a corrupt key fails the
-          # restart health poll loudly instead of silently re-identifying
-          # the service mid-run. Modes: dir 0700, files 0600 (umask 077).
-          KEY_DIR=/tmp/opencode/.e2e-keys
-          if [ ! -s "\$KEY_DIR/signing.key" ] || [ ! -s "\$KEY_DIR/master.key" ]; then
-            mkdir -p "\$KEY_DIR" && chmod 700 "\$KEY_DIR"
-            (
-              umask 077
-              openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null \\
-                | openssl pkcs8 -topk8 -nocrypt -outform DER 2>/dev/null \\
-                | base64 -w0 > "\$KEY_DIR/.signing.key.tmp"
-              openssl rand -base64 32 > "\$KEY_DIR/.master.key.tmp"
-              chmod 600 "\$KEY_DIR/.signing.key.tmp" "\$KEY_DIR/.master.key.tmp"
-              mv "\$KEY_DIR/.signing.key.tmp" "\$KEY_DIR/signing.key"
-              mv "\$KEY_DIR/.master.key.tmp" "\$KEY_DIR/master.key"
-            )
-          fi
-          SIGNING_KEY="\$(cat "\$KEY_DIR/signing.key")"
-          MASTER_KEY="\$(cat "\$KEY_DIR/master.key")"
-          env SPRING_PROFILES_ACTIVE=e2e \\
-            SPRING_APPLICATION_JSON='{"yacc":{"e2e":{"seed-enabled":true}}}' \\
-            DATABASE_URL=jdbc:postgresql://localhost:5432/yacc_e2e \\
-            POSTGRES_USER=yacc_user POSTGRES_PASSWORD=yacc_password \\
-            YACC_BOOTSTRAP_SUPER_ADMIN_EMAIL=admin@yacc.local \\
-            YACC_BOOTSTRAP_SUPER_ADMIN_INITIAL_CREDENTIAL=admin123 \\
-            YACC_AUTH_TOKEN_SIGNING_KEY="\$SIGNING_KEY" \\
-            YACC_INTEGRATION_ENCRYPTION_MASTER_KEY="\$MASTER_KEY" \\
-            YACC_SMTP_HOST=127.0.0.1 YACC_SMTP_PORT=1025 \\
-            nohup java ${LOADER_ARGS[*]+"${LOADER_ARGS[*]}"} -cp "$JAR" org.springframework.boot.loader.launch.PropertiesLauncher >> /tmp/opencode/java-service.log 2>&1 &
-          echo \$! > /tmp/opencode/java-service.pid
-          SCRIPT
-          chmod +x /tmp/opencode/boot-java.sh
-          bash /tmp/opencode/boot-java.sh
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:8080/health/live > /dev/null; then
-              echo "Java service healthy (attempt $i)."
-              grep -E 'E2E fixture seed applied|First-run Super Admin bootstrap' /tmp/opencode/java-service.log || true
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::Java service did not become healthy within 120s (fail-closed)"
-          tail -50 /tmp/opencode/java-service.log
-          exit 1
-
-      - name: Install Playwright browsers (React package)
-        # Package-directory cwd resolves this workspace's @playwright/test
-        # (npm workspaces hoist binaries to the root .bin).
-        run: (cd packages/frontend && npx playwright install --with-deps chromium firefox webkit)
-
-      - name: Capture React-on-Java baseline (full suite, anchor run shape)
-        run: |
-          set -o pipefail
-          mkdir -p /tmp/opencode/capture
-          export PLAYWRIGHT_JSON_OUTPUT_DIR=/tmp/opencode/capture
-          export PLAYWRIGHT_JSON_OUTPUT_NAME=baseline-report.json
-          # Same command shape as the S2 capture (runbook §7.5): HTML + JSON
-          # reporters, CI retries. Red rows are recorded as-is — the capture
-          # anchors the recorded state, it does not require green (the React
-          # anchor itself records 664 failed / 174 timedOut, so the raw
-          # Playwright exit is guaranteed non-zero). `defaults.run.shell:
-          # bash` expands to `bash -eo pipefail`, so `set +e` is required for
-          # this step to reach `exit 0` at all; `-e` is restored immediately
-          # after so non-Playwright failures still fail the step.
-          set +e
-          (cd packages/frontend && npx playwright test \
-            --reporter=html,json) 2>&1 | tee /tmp/opencode/capture/run-output.log
-          code=${PIPESTATUS[0]}
-          set -e
-          echo "playwright_exit=$code (red rows are recorded as-is; the capture does not require green)"
-          exit 0
-
-      - name: Derive per-case TSV + environment provenance
-        if: always()
-        run: |
-          set -euo pipefail
-          node packages/frontend-angular/parity/compare-baseline.mjs tsv \
-            --json-report /tmp/opencode/capture/baseline-report.json \
-            --out /tmp/opencode/capture/per-case-listing.tsv
-          {
-            echo "capture_sha: ${{ github.sha }}"
-            echo "event: ${{ github.event_name }}"
-            echo "node: $(node --version)"
-            echo "npm: $(npm --version)"
-            echo "playwright: $(cd packages/frontend && npx playwright --version)"
-            echo "java: $(java -version 2>&1 | head -1)"
-            echo "gradle: $(cd services/backend-java && ./gradlew --no-daemon --version 2>/dev/null | grep '^Gradle' | head -1)"
-            echo "postgres: postgres:15-alpine (service container, yacc_e2e)"
-            echo "posture: SPRING_PROFILES_ACTIVE=e2e + yacc.e2e.seed-enabled=true + loopback DATABASE_URL (S1 #423)"
-            echo "status totals:"
-            tail -n +2 /tmp/opencode/capture/per-case-listing.tsv | cut -f3 | sort | uniq -c | sort -rn | sed 's/^/  /'
-          } > /tmp/opencode/capture/env-versions.txt
-          cat /tmp/opencode/capture/env-versions.txt >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload baseline capture artifacts (evidence archive)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: react-on-java-baseline-${{ github.sha }}
-          path: |
-            /tmp/opencode/capture/baseline-report.json
-            /tmp/opencode/capture/per-case-listing.tsv
-            /tmp/opencode/capture/env-versions.txt
-            /tmp/opencode/capture/run-output.log
-            /tmp/opencode/java-service.log
-            packages/frontend/playwright-report/
           retention-days: 14
           if-no-files-found: warn
