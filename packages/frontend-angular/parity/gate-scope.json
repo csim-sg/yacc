@@ -1,9 +1,13 @@
 {
-  "$comment": "ANG-015 (#385) U10 gate-scope decision — the single machine-readable source of truth for the Angular parity gate's run scope and baseline comparison. Consumed by packages/frontend-angular/playwright.config.ts (run scope) and parity/compare-baseline.mjs (baseline comparison). Editing this file changes what the parity gate runs and accepts — every change is a disposition-register event (parity/disposition-register.md) and must be deliberate, never a way to make a red gate green. File paths are relative to packages/frontend/ (the test root).",
+  "$comment": "ANG-015 (#385) U10 gate-scope decision — the single machine-readable source of truth for the Angular parity gate's run scope and baseline comparison. Consumed by packages/frontend-angular/playwright.config.ts (run scope) and parity/compare-baseline.mjs (baseline comparison). Editing this file changes what the parity gate runs and accepts — every change is a disposition-register event (parity/disposition-register.md) and must be deliberate, never a way to make a red gate green. File paths are relative to packages/frontend/ (the test root). ENGINE COVERAGE (SPEC-003 AM-10, vault ea1bc3e, founder correction 2026-11-17, #490): ciEngines is the declared CI parity engine set — exactly {webkit} — and anchorProjectByEngine maps each declared run engine to the anchor project its rows are compared against, row-for-row (run webkit ↔ anchor webkit; no cross-engine substitution). The declaration is a RUN declaration only: anchor.projects and the whole anchor block below stay the untouched three-project provenance record (shrinking them to pretend the anchor is single-engine is forbidden). Absent/empty ciEngines, an unmapped engine, a foreign projectName, or an undeclared extra engine all fail closed in parity/merge-browser-reports.mjs and parity/compare-baseline.mjs compare.",
   "decision": "U10",
   "decidedBy": "ANG-015 (#385)",
   "decisionDate": "2026-10-19",
   "testRoot": "packages/frontend",
+  "ciEngines": ["webkit"],
+  "anchorProjectByEngine": {
+    "webkit": "webkit"
+  },
   "runMatch": [
     "tests/**/*.spec.ts",
     "e2e/**/*.spec.ts",

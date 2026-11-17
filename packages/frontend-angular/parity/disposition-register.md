@@ -402,6 +402,82 @@ PR suspension, its self-reverting guard, case-body attribution, both-side
 hunk attribution and duplicate-title rejection are unchanged; no suite file,
 anchor, `gate-scope.json`, comparator, threshold or register row changed.
 
+**Execution-wiring record (17 Nov 2026, #490 — AM-10 WebKit-only CI engine,
+SPEC-003 amendment AM-10 vault [`ea1bc3e`](https://github.com/Antpolis/documentation/blob/ea1bc3e/02-Architecture-Landscape/projects/yacc/spec/SPEC-003-react-to-angular-frontend-implementation.md),
+founder correction "the entire CI parity suite should now use WebKit,
+replacing Obscura"; strategist proposal
+[#6939641973](https://github.com/csim-sg/yacc/issues/490#issuecomment-6939641973)).**
+Gate WIRING, not a disposition: no expected-red class, per-row disposition,
+anchor artifact, threshold or gate semantic changed; the engine set becomes a
+machine-readable RUN declaration.
+
+- **`gate-scope.json`** gains `ciEngines: ["webkit"]` and
+  `anchorProjectByEngine: { webkit: "webkit" }` (row-for-row run webkit ↔
+  anchor webkit; no cross-engine substitution). The `anchor` block is
+  **byte-identical**: `projects` stays the three-project provenance record
+  (`chromium`/`firefox`/`webkit`, 465 rows each / 1,395 total) — shrinking it
+  to pretend the anchor is single-engine is forbidden (AM-10.1). This entry is
+  the disposition-register event required by the file's `$comment`.
+- **`merge-browser-reports.mjs`** derives its expected `--project` set from
+  `ciEngines` (each mapped to its declared anchor project), not
+  `anchor.projects`; fail-closed on an absent/empty/duplicated declaration, an
+  unmapped or foreign-mapped engine, a missing declared-engine report, an
+  undeclared extra engine, a foreign `projectName` row, duplicate rows and
+  zero-row reports; the identical-case-set rule across declared engines is
+  kept (vacuous for n=1, proven still enforced under a synthetic multi-engine
+  declaration); the merged report records the declared engine coverage in its
+  provenance block.
+- **`compare-baseline.mjs`** `compare` requires the declaration (absent/empty
+  → exit 2) and restricts the COMPARISON ROW SET to the declared engine's
+  mapped anchor-project rows: run rows are looked up against their engine's
+  declared anchor project; any in-scope anchor row of a mapped project without
+  a run result is a `missing result for anchored case` violation; a run row
+  whose `projectName` is not a declared engine is a violation; anchor rows of
+  projects outside the mapping are surfaced as new
+  `outOfEngineScopeAnchorRowCount` accounting (alongside the unchanged
+  U10-excluded count), never as violations. Per-row acceptance semantics are
+  UNCHANGED: anchor-green must be green, anchor-red keeps its recorded
+  disposition, expected red is reported honestly, improvements stay
+  informational, Tier-1/PB-3/thresholds untouched. `check` still validates
+  the WHOLE 1,395-row anchor + SHA-256s independently of the engine scope
+  (AM-10.3).
+- **Workflow** `.github/workflows/frontend-angular-parity.yml`: `parity`
+  matrix is `[webkit]` and installs WebKit only; `parity-compare` downloads
+  the single declared-engine artifact, enumerates its pre-flight/SHA loops
+  from `ciEngines` (not hardcoded), and passes one `--project webkit=…` merge
+  argument; artifact paths single-engine. `parity`/`parity-compare` remain
+  `workflow_dispatch`-only with the `# PB2-PR-MATRIX: SUSPENDED` sentinel and
+  the `pb2-pr-deferral` job retained — the deferral prose now states the final
+  AM-10 WebKit-only posture (full PB-2 verdict by dispatch and at #477's
+  terminal SHA) instead of the retired "installing Obscura (#490 pending)";
+  restoring PR-time full-suite gating is a separate runtime-policy decision
+  (AM-10.4) and is deliberately NOT flipped here; `--guard` verified
+  consistent. The `webkit-fe002-file` AM-9 job is untouched (stricter
+  same-engine sub-gate retained per AM-10.2; its historical AM-8/AM-1 prose is
+  superseded by AM-10 by record, not by edit). The CP-3 `react-baseline-capture`
+  job is untouched (waived by AM-3, dispatch-only evidence).
+- **`validate-merge-browser-reports.mjs`** extended to the declared-engine
+  contract (17 checks): single-declared-engine merge + engine→anchor mapping
+  provenance; n=1 round-trip; absent declared engine; undeclared extra engine;
+  foreign `projectName`; duplicate row; empty/corrupt report; the
+  identical-case-set rule proven alive under a multi-engine declaration;
+  comparator positives/negatives on a synthetic anchor (faithful single-engine
+  run accepted with engine-scoped required-row accounting and no
+  missing-result for other-project anchor rows; foreign engine rejected;
+  missing declared-engine row rejected; a wrong engine→anchor mapping fails
+  closed; absent/empty `ciEngines` rejected on BOTH scripts; zero-row report
+  rejected; extra anchor row beyond the declared shape rejected); and a
+  REAL-data check that the declared-engine projection of the committed
+  three-project anchor report merges losslessly and yields the identical
+  comparator verdict (runs by default; `MERGE_VALIDATE_REAL_REPORT` overrides,
+  `=skip` disables).
+
+Policy, not evidence: no full WebKit suite run was dispatched by #490; the
+first complete single-engine verdict remains #477's separately assigned
+terminal evidence event, with 221 `failed` + 49 `timedOut` in-scope WebKit
+anchor rows expected red until separately repaired under their own amendments
+(AM-10.2/AM-10.6).
+
 ## 9. Registration discipline
 
 1. New expected difference discovered **before** a run → add the register row + `gate-scope.json`

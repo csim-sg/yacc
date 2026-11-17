@@ -21,6 +21,21 @@
  *     surfaced in the report and summary — never silently passed — and are
  *     non-gating until a baseline capture anchors them (register §7).
  *
+ * ENGINE SCOPE (SPEC-003 AM-10, vault ea1bc3e, #490): the COMPARISON ROW SET
+ * is engine-scoped. `compare` requires the machine-readable declaration
+ * (`gate-scope.json ciEngines` + `anchorProjectByEngine` — exactly {webkit},
+ * row-for-row run webkit ↔ anchor webkit) and fails closed on an
+ * absent/empty declaration, a run row whose `projectName` is not a declared
+ * engine, and any in-scope anchor row of a declared engine's mapped anchor
+ * project without a run result. Anchor rows of projects outside the declared
+ * engine mapping are surfaced as out-of-engine-scope accounting (the anchor
+ * is provenance — its chromium/firefox rows impose no result on a webkit
+ * run), and U10-excluded rows keep their own accounting. `check` mode keeps
+ * validating the WHOLE multi-project anchor and its SHA-256s independently
+ * of the engine scope. Per-row acceptance semantics are unchanged:
+ * anchor-green must be green, anchor-red keeps its recorded disposition,
+ * expected red is reported honestly, never as passed.
+ *
  * Subcommands:
  *   check   — validate the anchor artifact only (pre-flight, fail closed)
  *   compare — full comparison; exit 1 on any violation; writes a JSON report
@@ -238,6 +253,50 @@ function isExcluded(scope, normalizedFile) {
   return false;
 }
 
+/**
+ * The declared CI engine coverage (AM-10), resolved from gate-scope.json.
+ * `compare` requires it; `check` deliberately does not (the anchor is
+ * validated whole, independently of the engine scope). Absent/empty
+ * declarations, duplicate engines, unmapped engines, mappings pointing
+ * outside the anchor's declared projects and mappings for undeclared engines
+ * all fail closed. Returns [{ engine, anchorProject }] in declared order.
+ */
+function declaredEngineCoverage(scope) {
+  const engines = scope.ciEngines;
+  if (!Array.isArray(engines) || engines.length === 0) {
+    fail(`gate-scope "ciEngines" is absent or empty — the CI engine set must be declared machine-readably for the comparison (AM-10; fail-closed; engine coverage undeclared)`);
+  }
+  const mapping = scope.anchorProjectByEngine;
+  if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) {
+    fail(`gate-scope "anchorProjectByEngine" is absent or not an object — every declared engine must map to its anchor project (AM-10; fail-closed)`);
+  }
+  const declared = new Set();
+  const out = [];
+  for (const engine of engines) {
+    if (typeof engine !== 'string' || engine.length === 0) {
+      fail(`gate-scope "ciEngines" contains a non-string/empty engine entry (fail-closed)`);
+    }
+    if (declared.has(engine)) {
+      fail(`gate-scope "ciEngines" declares "${engine}" more than once (ambiguous engine coverage — fail-closed)`);
+    }
+    declared.add(engine);
+    const anchorProject = mapping[engine];
+    if (typeof anchorProject !== 'string' || anchorProject.length === 0) {
+      fail(`declared engine "${engine}" has no anchorProjectByEngine mapping — engine coverage is undeclared for it (AM-10; fail-closed)`);
+    }
+    if (!scope.anchor.projects.includes(anchorProject)) {
+      fail(`declared engine "${engine}" maps to anchor project "${anchorProject}", which is not one of the anchor's declared projects (${scope.anchor.projects.join(', ')}) (fail-closed)`);
+    }
+    out.push({ engine, anchorProject });
+  }
+  for (const key of Object.keys(mapping)) {
+    if (!declared.has(key)) {
+      fail(`gate-scope "anchorProjectByEngine" maps "${key}", which is not a declared ciEngines entry (${engines.join(', ')}) — undeclared engine coverage (fail-closed)`);
+    }
+  }
+  return out;
+}
+
 function collectSpecs(suite, path, out) {
   if (!suite) return;
   const current = path.concat(suite.title ?? []);
@@ -294,7 +353,7 @@ function topTitle(spec) {
   return spec.file;
 }
 
-function compare(anchorRows, runRows, scope) {
+function compare(anchorRows, runRows, scope, engineCoverage) {
   const violations = [];
   const regressions = [];
   const weakenings = [];
@@ -305,6 +364,11 @@ function compare(anchorRows, runRows, scope) {
   const skippedSurface = [];
   const stabilityWarnings = [];
   const outOfScopeAnchorRows = [];
+  const outOfEngineScopeAnchorRows = [];
+
+  const declaredEngines = new Set(engineCoverage.map((e) => e.engine));
+  const anchorProjectByEngine = new Map(engineCoverage.map((e) => [e.engine, e.anchorProject]));
+  const mappedAnchorProjects = new Set([...anchorProjectByEngine.values()]);
 
   const anchorByKey = new Map();
   for (const row of anchorRows) {
@@ -326,12 +390,31 @@ function compare(anchorRows, runRows, scope) {
     }
   }
 
-  // Row-level comparison.
+  // Run-side engine purity (AM-10): every run row must carry a declared CI
+  // engine. The aggregation fails closed on this too; the comparator enforces
+  // it independently because it owns the gate decision.
+  const foreignEngineRows = new Map();
+  for (const row of runRows) {
+    if (!declaredEngines.has(row.project)) {
+      foreignEngineRows.set(row.project, (foreignEngineRows.get(row.project) ?? 0) + 1);
+    }
+  }
+  for (const [project, count] of foreignEngineRows) {
+    violations.push(`${count} run row(s) carry projectName "${project}", which is not a declared CI engine (${[...declaredEngines].join(', ')}) — no foreign or undeclared engine may contribute to the verdict (AM-10; fail-closed)`);
+  }
+
+  // Row-level comparison. Each run row is looked up against the anchor project
+  // declared for its engine (row-for-row engine mapping — run webkit ↔ anchor
+  // webkit); a row of an undeclared engine has no lawful mapping and is
+  // already covered by the foreign-engine violation above.
   const runKeys = new Set();
   for (const row of runRows) {
     const key = rowKey(row.project, row.file, row.suitePath, row.test);
     runKeys.add(key);
-    const anchor = anchorByKey.get(key);
+    const mappedProject = anchorProjectByEngine.get(row.project);
+    const anchor = mappedProject
+      ? anchorByKey.get(rowKey(mappedProject, row.file, row.suitePath, row.test))
+      : undefined;
     const label = `${row.project} › ${row.file} › ${row.suitePath} › ${row.test}`;
     const runFamily = STATUS_FAMILY[row.status];
     if (isExcluded(scope, row.file)) continue;
@@ -375,15 +458,24 @@ function compare(anchorRows, runRows, scope) {
     }
   }
 
-  // Fail-closed: every in-scope anchor row must have a result in the run.
+  // Fail-closed: every in-scope anchor row of a declared engine's mapped
+  // anchor project must have a result in the run. Anchor rows outside the
+  // declared engine mapping are provenance the engine cannot answer — they
+  // are surfaced as out-of-engine-scope accounting, never as violations
+  // (shrinking the required set below the declared engine's in-scope anchor
+  // rows is forbidden; this loop IS that required set).
   for (const row of anchorRows) {
     if (isExcluded(scope, row.file)) {
       outOfScopeAnchorRows.push(row);
       continue;
     }
+    if (!mappedAnchorProjects.has(row.project)) {
+      outOfEngineScopeAnchorRows.push(row);
+      continue;
+    }
     const key = rowKey(row.project, row.file, row.suitePath, row.test);
     if (!runKeys.has(key)) {
-      violations.push(`missing result for anchored case (silent shrinkage or crashed run): ${row.project} › ${row.file} › ${row.suitePath} › ${row.test}`);
+      violations.push(`missing result for anchored case (silent shrinkage, crashed run, or the declared engine did not report it): ${row.project} › ${row.file} › ${row.suitePath} › ${row.test}`);
     }
   }
 
@@ -402,10 +494,13 @@ function compare(anchorRows, runRows, scope) {
     skippedSurface,
     stabilityWarnings,
     outOfScopeAnchorRowCount: outOfScopeAnchorRows.length,
+    outOfEngineScopeAnchorRowCount: outOfEngineScopeAnchorRows.length,
+    engineCoverage,
     totals: {
       anchorRows: anchorRows.length,
       runRows: runRows.length,
       inScopeAnchorFiles: inScopeAnchorFiles.length,
+      requiredAnchorRows: anchorRows.length - outOfScopeAnchorRows.length - outOfEngineScopeAnchorRows.length,
     },
   };
 }
@@ -414,7 +509,8 @@ function renderMarkdown(result) {
   const lines = [];
   lines.push('## Angular parity gate — baseline comparison (PB-2)');
   lines.push('');
-  lines.push(`Anchor rows: ${result.totals.anchorRows} · Run rows: ${result.totals.runRows} · Out-of-scope anchor rows (U10-excluded): ${result.outOfScopeAnchorRowCount}`);
+  const coverage = (result.engineCoverage ?? []).map(({ engine, anchorProject }) => `${engine} → anchor ${anchorProject}`).join(', ');
+  lines.push(`Declared CI engines (AM-10): ${coverage || '(undeclared)'} · Anchor rows: ${result.totals.anchorRows} · Run rows: ${result.totals.runRows} · Engine-scoped required anchor rows: ${result.totals.requiredAnchorRows} · Out-of-scope anchor rows (U10-excluded): ${result.outOfScopeAnchorRowCount} · Other-project in-scope anchor rows (outside the declared engine mapping): ${result.outOfEngineScopeAnchorRowCount}`);
   lines.push('');
   const section = (title, items, cap) => {
     lines.push(`### ${title} (${items.length})`);
@@ -473,8 +569,9 @@ function cmdCheck(scope) {
 function cmdCompare(args, scope) {
   const anchorRows = parseAnchorTsv(scope.anchor.perCaseListing);
   const anchorViolations = validateAnchor(anchorRows, scope);
+  const engineCoverage = declaredEngineCoverage(scope);
   const runRows = parseRunJson(args['--json-report']);
-  const result = compare(anchorRows, runRows, scope);
+  const result = compare(anchorRows, runRows, scope, engineCoverage);
   result.violations.unshift(...anchorViolations);
   const report = { gateScope: scope.decision, anchor: scope.anchor.id, generatedAt: new Date().toISOString(), ...result };
   if (args['--report']) {
@@ -486,7 +583,7 @@ function cmdCompare(args, scope) {
     process.stderr.write(`\n[compare-baseline] PARITY GATE RED: ${result.violations.length} violation(s), ${result.regressions.length} regression(s), ${result.weakenings.length} weakening(s)\n`);
     process.exit(1);
   }
-  process.stdout.write('\n[compare-baseline] PARITY GATE GREEN — zero regressions vs the anchored baseline (unanchored rows surfaced, non-gating)\n');
+  process.stdout.write(`\n[compare-baseline] PARITY GATE GREEN — zero regressions vs the anchored baseline for the declared engine coverage (${engineCoverage.map(({ engine, anchorProject }) => `${engine} → anchor ${anchorProject}`).join(', ')}) (unanchored rows surfaced, non-gating)\n`);
 }
 
 function cmdTsv(args) {

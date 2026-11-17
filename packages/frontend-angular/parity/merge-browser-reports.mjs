@@ -2,39 +2,52 @@
 /**
  * ANG-015 (#385) — per-browser parity report aggregation (PB-2, fail-closed).
  *
- * Merges the per-browser Playwright JSON reports produced by the `parity`
- * matrix jobs (chromium / firefox / webkit — one FULL U10-suite run each) into
- * the single 3-browser report the unchanged comparator
- * (`compare-baseline.mjs compare`) consumes as the PB-2 gate decision.
+ * Merges the per-engine Playwright JSON reports produced by the `parity`
+ * matrix into the single report the comparator (`compare-baseline.mjs
+ * compare`) consumes as the PB-2 gate decision.
+ *
+ * ENGINE SCOPE (SPEC-003 AM-10, vault ea1bc3e, #490): the expected
+ * `--project` set is the DECLARED CI engine set — `gate-scope.json
+ * ciEngines` (exactly {webkit}), each engine mapped row-for-row to its
+ * declared anchor project via `anchorProjectByEngine` (run webkit ↔ anchor
+ * webkit) — NOT the anchor's three-project provenance list
+ * (`anchor.projects` stays the untouched ae42c67 record). A missing declared
+ * engine report, an undeclared extra engine, a foreign projectName, a
+ * duplicate or a zero-row report all fail closed before anything is written.
  *
  * The merge is a lossless structural concatenation: a Playwright JSON report's
- * top-level `suites` array is per-file, and in a `--project=<browser>` run each
+ * top-level `suites` array is per-file, and in a `--project=<engine>` run each
  * spec entry carries exactly one test (that project's). Concatenating the
- * per-browser `suites` arrays therefore reproduces the exact row set of a
- * native 3-browser run — every row (project | file | describe chain | test,
- * with its full results array) passes through byte-identically. The comparator
- * walks `report.suites` row-by-row and makes no suite-uniqueness assumption,
- * so the merged report is consumed exactly like a native one.
+ * per-engine `suites` arrays therefore reproduces the exact row set of a
+ * native multi-project run — every row (project | file | describe chain |
+ * test, with its full results array) passes through byte-identically. The
+ * comparator walks `report.suites` row-by-row and makes no suite-uniqueness
+ * assumption, so the merged report is consumed exactly like a native one.
  *
  * Fails closed (exit 2) before writing anything when:
- *   - the gate scope's declared anchor browser projects (`anchor.projects`)
- *     are not covered by exactly one `--project <name>=<path>` each (no
- *     missing browser, no undeclared extra, no duplicates);
+ *   - `ciEngines` is absent/empty or `anchorProjectByEngine` is absent, maps a
+ *     declared engine to nothing, maps to a project outside the anchor's
+ *     declared projects, or carries keys for undeclared engines;
+ *   - the declared engines are not covered by exactly one
+ *     `--project <name>=<path>` each (no missing engine, no undeclared extra,
+ *     no duplicates);
  *   - a report is absent, unparsable, has no `suites` array, or contains zero
  *     rows (a killed/crashed browser run must never yield a partial verdict);
  *   - any row in a report belongs to a project other than the report's own
- *     designated browser (mis-scoped run);
+ *     declared engine (mis-scoped run — never credit a foreign engine);
  *   - a report contains a duplicate row key (ambiguous evidence);
- *   - the per-browser CASE sets (file | describe chain | test — project-free)
- *     are not identical across all browsers (every browser must have run the
- *     full suite; a shortened/timeout-truncated run fails here, and the
- *     comparator's own fail-closed "missing result for anchored case" check
- *     still applies on top).
+ *   - the per-engine CASE sets (file | describe chain | test — project-free)
+ *     are not identical across all declared engines (every engine must have
+ *     run the full suite; vacuous for the single declared engine, kept for
+ *     future multi-engine declarations — a shortened/timeout-truncated run
+ *     fails here, and the comparator's own fail-closed "missing result for
+ *     anchored case" check still applies on top).
  *
  * The output adds a `merge` provenance block (per-source path, SHA-256, row
- * count) and sums the input `stats`; `suites`, `errors` and every result row
- * are carried through unchanged. Gate semantics remain entirely in
- * `compare-baseline.mjs` — this script only assembles complete evidence.
+ * count, declared engine coverage) and sums the input `stats`; `suites`,
+ * `errors` and every result row are carried through unchanged. Gate semantics
+ * remain entirely in `compare-baseline.mjs` — this script only assembles
+ * complete evidence.
  *
  * Validation: `parity/validate-merge-browser-reports.mjs` (synthetic fixtures,
  * failure paths, round-trip identity) — run it after any change here.
@@ -78,6 +91,48 @@ function loadGateScope(path) {
     fail(`gate-scope is missing a non-empty "anchor.projects" array: ${path} (fail-closed)`);
   }
   return scope;
+}
+
+/**
+ * The declared CI engine coverage (AM-10): `ciEngines` + `anchorProjectByEngine`.
+ * Absent/empty declarations, duplicate engines, unmapped engines, mappings that
+ * point outside the anchor's declared projects and mappings for undeclared
+ * engines all fail closed. Returns [{ engine, anchorProject }] in declared order.
+ */
+function declaredCiEngines(scope) {
+  const engines = scope.ciEngines;
+  if (!Array.isArray(engines) || engines.length === 0) {
+    fail(`gate-scope "ciEngines" is absent or empty — the CI engine set must be declared machine-readably (AM-10; fail-closed; engine coverage undeclared)`);
+  }
+  const mapping = scope.anchorProjectByEngine;
+  if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) {
+    fail(`gate-scope "anchorProjectByEngine" is absent or not an object — every declared engine must map to its anchor project (AM-10; fail-closed)`);
+  }
+  const declared = new Set();
+  const out = [];
+  for (const engine of engines) {
+    if (typeof engine !== 'string' || engine.length === 0) {
+      fail(`gate-scope "ciEngines" contains a non-string/empty engine entry (fail-closed)`);
+    }
+    if (declared.has(engine)) {
+      fail(`gate-scope "ciEngines" declares "${engine}" more than once (ambiguous engine coverage — fail-closed)`);
+    }
+    declared.add(engine);
+    const anchorProject = mapping[engine];
+    if (typeof anchorProject !== 'string' || anchorProject.length === 0) {
+      fail(`declared engine "${engine}" has no anchorProjectByEngine mapping — engine coverage is undeclared for it (AM-10; fail-closed)`);
+    }
+    if (!scope.anchor.projects.includes(anchorProject)) {
+      fail(`declared engine "${engine}" maps to anchor project "${anchorProject}", which is not one of the anchor's declared projects (${scope.anchor.projects.join(', ')}) (fail-closed)`);
+    }
+    out.push({ engine, anchorProject });
+  }
+  for (const key of Object.keys(mapping)) {
+    if (!declared.has(key)) {
+      fail(`gate-scope "anchorProjectByEngine" maps "${key}", which is not a declared ciEngines entry (${engines.join(', ')}) — undeclared engine coverage (fail-closed)`);
+    }
+  }
+  return out;
 }
 
 // --- Row collection: mirrors compare-baseline.mjs exactly -------------------
@@ -178,7 +233,8 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args['--out']) fail('--out <merged.json> is required');
   const scope = loadGateScope(args['--gate-scope'] ?? fileURLToPath(new URL('./gate-scope.json', import.meta.url)));
-  const expected = scope.anchor.projects;
+  const engineCoverage = declaredCiEngines(scope);
+  const expected = engineCoverage.map(({ engine }) => engine);
 
   // 1. The --project set must equal the declared anchor projects exactly.
   const given = new Map();
@@ -189,13 +245,13 @@ function main() {
   const missing = expected.filter((p) => !given.has(p));
   const extra = [...given.keys()].filter((p) => !expected.includes(p));
   if (missing.length > 0) {
-    fail(`missing per-browser report(s) for declared project(s): ${missing.join(', ')} — the aggregated parity gate fails closed on any absent browser (declared: ${expected.join(', ')})`);
+    fail(`missing per-engine report(s) for declared CI engine(s): ${missing.join(', ')} — the aggregated parity gate fails closed on any absent declared engine (declared: ${expected.join(', ')}; anchor provenance projects remain ${scope.anchor.projects.join(', ')})`);
   }
   if (extra.length > 0) {
-    fail(`undeclared --project entries (not in gate-scope.anchor.projects): ${extra.join(', ')} — declared: ${expected.join(', ')}`);
+    fail(`undeclared --project entries (not in gate-scope.ciEngines): ${extra.join(', ')} — declared CI engines: ${expected.join(', ')}`);
   }
 
-  // 2. Load + structurally validate each per-browser report.
+  // 2. Load + structurally validate each per-engine report.
   const loaded = [];
   for (const project of expected) {
     const path = given.get(project);
@@ -203,11 +259,11 @@ function main() {
     try {
       report = JSON.parse(readFileSync(repoPath(path), 'utf8'));
     } catch (e) {
-      fail(`per-browser report for "${project}" is absent or not valid JSON: ${path}: ${e.message} (fail-closed)`);
+      fail(`per-engine report for "${project}" is absent or not valid JSON: ${path}: ${e.message} (fail-closed)`);
     }
     const rows = collectRows(report, `report "${project}"`);
     if (rows.length === 0) {
-      fail(`per-browser report for "${project}" contains zero test rows: ${path} (a killed/crashed run must never yield a partial verdict — fail-closed)`);
+      fail(`per-engine report for "${project}" contains zero test rows: ${path} (a killed/crashed run must never yield a partial verdict — fail-closed)`);
     }
     for (const row of rows) {
       if (row.project !== project) {
@@ -236,7 +292,7 @@ function main() {
     const onlyInOther = [...other.set].filter((k) => !reference.set.has(k));
     if (onlyInRef.length > 0 || onlyInOther.length > 0) {
       const show = (list) => list.slice(0, 10).map((k) => `      ${k.replaceAll('|', ' › ')}`).join('\n');
-      fail(`per-browser case sets differ between "${reference.project}" and "${other.project}" — every browser must run the identical full suite (fail-closed):\n` +
+      fail(`per-engine case sets differ between "${reference.project}" and "${other.project}" — every declared engine must run the identical full suite (fail-closed; the rule is vacuous for a single declared engine and kept for future multi-engine declarations):\n` +
         (onlyInRef.length ? `    only in ${reference.project} (${onlyInRef.length}):\n${show(onlyInRef)}\n` : '') +
         (onlyInOther.length ? `    only in ${other.project} (${onlyInOther.length}):\n${show(onlyInOther)}` : ''));
     }
@@ -284,7 +340,8 @@ function main() {
       mergedAt: new Date().toISOString(),
       gateScope: scope.decision,
       anchor: scope.anchor.id,
-      shape: 'concatenated per-browser Playwright JSON suites (lossless; consumed by compare-baseline.mjs like a native multi-project report)',
+      engineCoverage,
+      shape: 'concatenated per-engine Playwright JSON suites (lossless; consumed by compare-baseline.mjs like a native multi-project report)',
       sources,
       totalRows,
     },
@@ -296,9 +353,10 @@ function main() {
 
   process.stdout.write(
     `[merge-browser-reports] merged ${totalRows} rows ` +
-    `(cases: ${sources[0].cases} × ${sources.length} browsers: ${expected.join(', ')}) -> ${args['--out']}\n` +
+    `(cases: ${sources[0].cases} × ${sources.length} declared engine(s): ${expected.join(', ')}) -> ${args['--out']}\n` +
     sources.map((s) => `  ${s.project}: ${s.rows} rows, sha256 ${s.sha256.slice(0, 12)}… (${s.path})`).join('\n') +
-    `\n[merge-browser-reports] coverage validated: identical case set across all browsers (fail-closed aggregation OK).\n`,
+    `\n[merge-browser-reports] engine coverage (AM-10): ${engineCoverage.map(({ engine, anchorProject }) => `${engine} -> anchor ${anchorProject}`).join(', ')}\n` +
+    `\n[merge-browser-reports] coverage validated: identical case set across all declared engines (fail-closed aggregation OK).\n`,
   );
 }
 
